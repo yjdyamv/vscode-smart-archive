@@ -183,10 +183,14 @@ function passwordHtml(archiveName: string): string {
 <html><head><meta charset='UTF-8'>
 <style>${CSS}
 .pw-box{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px}
-.pw-box input{background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);padding:6px 12px;border-radius:3px;font-size:var(--vscode-font-size);width:240px;transition:border-color .2s}
-.pw-box input.err{border-color:var(--vscode-inputValidation-errorBorder,#e51400)}
-.pw-box input:focus{outline:1px solid var(--vscode-focusBorder)}
-.pw-err{color:var(--vscode-inputValidation-errorForeground,#e51400);font-size:calc(var(--vscode-font-size) * 0.92);min-height:1.4em;opacity:0;transition:opacity .2s}
+.pw-inp{position:relative;display:flex;align-items:center}
+.pw-inp input{background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);padding:6px 36px 6px 12px;border-radius:3px;font-size:var(--vscode-font-size);width:248px;transition:border-color .2s}
+.pw-inp input.err{border-color:var(--vscode-inputValidation-errorBorder,#e51400);box-shadow:0 0 0 1px var(--vscode-inputValidation-errorBorder,#e5140033)}
+.pw-inp input:focus{outline:1px solid var(--vscode-focusBorder)}
+.pw-eye,.pw-clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--vscode-descriptionForeground);font-size:14px;padding:2px 4px;line-height:1}
+.pw-clr{right:28px}
+.pw-eye:hover,.pw-clr:hover{color:var(--vscode-foreground)}
+.pw-err{color:var(--vscode-inputValidation-errorForeground,#f14c4c);font-size:calc(var(--vscode-font-size) * 0.92);min-height:1.4em;opacity:0;transition:opacity .2s}
 .pw-err.on{opacity:1}
 </style></head>
 <body>
@@ -194,7 +198,11 @@ function passwordHtml(archiveName: string): string {
   <div style='font-size:3em'>\u{1F512}</div>
   <div style='color:var(--vscode-foreground);font-size:calc(var(--vscode-font-size) * 1.1)'>${esc(archiveName)}</div>
   <div style='color:var(--vscode-descriptionForeground);font-size:calc(var(--vscode-font-size) * 0.92);margin-bottom:4px'>Encrypted \u2014 enter password</div>
-  <input id='pw' type='password' placeholder='Password' autofocus onkeydown='if(event.key==="Enter"||event.keyCode===13)submitPw()'>
+  <div class='pw-inp'>
+    <input id='pw' type='password' placeholder='Password' autofocus onkeydown='if(event.key==="Enter"||event.keyCode===13)submitPw()'>
+    <button class='pw-clr' title='Clear' onclick='var i=document.getElementById("pw");i.value="";i.focus();i.classList.remove("err");document.getElementById("pwe").classList.remove("on")'>\u2715</button>
+    <button class='pw-eye' title='Show password' onmousedown='document.getElementById("pw").type="text"' onmouseup='document.getElementById("pw").type="password"' onmouseleave='document.getElementById("pw").type="password"'>\u{1F441}</button>
+  </div>
   <button class='btn' onclick='submitPw()' style='margin-top:4px'>Unlock</button>
   <div id='pwe' class='pw-err'>Wrong password</div>
 </div>
