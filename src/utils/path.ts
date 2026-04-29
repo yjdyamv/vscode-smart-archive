@@ -65,7 +65,7 @@ export function fixArchiveEncoding(raw: string): string {
   const encodings: any[] = ["cp437", "latin1"];
   for (const enc of encodings) {
     try {
-      const bytes = Buffer.from(raw, enc);
+      const bytes = enc === "cp437" ? iconv.encode(raw, "cp437") : Buffer.from(raw, "latin1");
       const decoded = iconv.decode(bytes, "gbk");
       if (/[\u4E00-\u9FFF]/.test(decoded)) return decoded;
     } catch {

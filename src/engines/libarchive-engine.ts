@@ -86,11 +86,19 @@ export async function extractArchive(
       const dir = path.dirname(outPath);
       fs.mkdirSync(dir, { recursive: true });
 
-      // Read and write file data with size limits
+      // Security: prevent zip bomb — check reported size before allocating
+      const reportedSize = entry.getSize();
+      checkFileSize(reportedSize);
+      totalSize = checkTotalSize(totalSize, reportedSize);
+
+      // Read and write file data
       const data = entry.readData();
       if (data) {
-        checkFileSize(data.byteLength);
-        totalSize = checkTotalSize(totalSize, data.byteLength);
+        if (data.byteLength > reportedSize * 4 && reportedSize > 1024) {
+          throw new Error(
+            `Decompression bomb: reported ${reportedSize}B but decompressed to ${data.byteLength}B`,
+          );
+        }
         fs.writeFileSync(outPath, Buffer.from(data));
         fileCount++;
       }
@@ -100,23 +108,6 @@ export async function extractArchive(
   }
 
   return fileCount;
-}
-
-/**
- * Check whether an archive contains encrypted data.
- *
- * @param filePath - Path to the archive file
- * @returns true=encrypted, false=not, null=cannot determine
- */
-export async function hasEncryptedData(filePath: string): Promise<boolean | null> {
-  const mod = await getWasmModule();
-  const buffer = fs.readFileSync(filePath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer));
-  try {
-    return reader.hasEncryptedData();
-  } finally {
-    reader.free();
-  }
 }
 
 /**
