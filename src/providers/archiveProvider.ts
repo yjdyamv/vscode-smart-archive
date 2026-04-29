@@ -387,7 +387,11 @@ function readDirEntries(
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const JS7z: JS7zFactory = require("js7z-tools");
 
-async function extractSelected(archivePath: string, selectedPaths: string[]): Promise<void> {
+async function extractSelected(
+  archivePath: string,
+  selectedPaths: string[],
+  password?: string,
+): Promise<void> {
   const ext = getFullExt(archivePath);
   const isRar = isRarExt(ext);
   const isWrapped = isWrappedFormat(ext);
@@ -400,7 +404,7 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
       archivePath,
       outputDir,
       selectedPaths,
-      archivePassword || undefined,
+      password || undefined,
     );
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
     await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
@@ -466,7 +470,7 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
       };
       const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
       const xArgs = ["x", `/${archiveName}`, "-o/out", "-y"];
-      if (archivePassword) xArgs.splice(1, 0, `-p${archivePassword}`);
+      if (password) xArgs.splice(1, 0, `-p${password}`);
       xArgs.push(...normalizedPaths);
       js7z.callMain(xArgs);
     });
@@ -551,10 +555,10 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
                 return;
               }
               logger.info({ event: "setupWebview.password.ok", count: pwEntries.length });
-              archivePassword = msg.pw;
+              const capturedPw = msg.pw;
               const tree = buildTree(pwEntries, archiveName);
               webview.html = contentHtml(tree, pwEntries.length);
-              setupExtractHandlers(webview, archiveUri, archiveName, filePath);
+              setupExtractHandlers(webview, archiveUri, archiveName, filePath, capturedPw);
             } catch (err) {
               logger.error({ event: "setupWebview.password.error", err });
               webview.postMessage({ c: "pwerr", t: "Wrong password" });
@@ -571,17 +575,15 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   const tree = buildTree(entries, archiveName);
   webview.html = contentHtml(tree, entries.length);
 
-  setupExtractHandlers(webview, archiveUri, archiveName, filePath);
+  setupExtractHandlers(webview, archiveUri, archiveName, filePath, undefined);
 }
-
-// Store password for encrypted archives so extract can use it
-let archivePassword = "";
 
 function setupExtractHandlers(
   webview: vscode.Webview,
   archiveUri: vscode.Uri,
   archiveName: string,
   filePath: string,
+  password: string | undefined,
 ): void {
   webview.onDidReceiveMessage(async (msg: { c: string; paths?: string[]; msg?: string }) => {
     if (msg.c === "log") {
@@ -602,7 +604,7 @@ function setupExtractHandlers(
     if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
       logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
       try {
-        await extractSelected(filePath, msg.paths);
+        await extractSelected(filePath, msg.paths, password);
         webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
       } catch (err) {
         logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);

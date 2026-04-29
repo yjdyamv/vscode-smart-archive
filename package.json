@@ -123,7 +123,77 @@
           "group": "7_modification"
         }
       ]
-    }
+    },
+    "configuration": {
+      "title": "Smart Archive",
+      "properties": {
+        "smart-archive.defaultFormat": {
+          "type": "string",
+          "default": "7z",
+          "enum": ["7z", "zip", "tar", "tar.gz", "tar.bz2", "tar.xz", "tar.zst", "gz", "bz2", "xz", "wim"],
+          "enumDescriptions": [
+            "7-Zip — best compression ratio, AES-256 encryption",
+            "ZIP — universal compatibility, AES-256 encryption",
+            "TAR — archive only, no compression",
+            "TAR + GZip — compressed archive with directory structure",
+            "TAR + BZip2 — high compression with directory structure",
+            "TAR + XZ — best compression with directory structure",
+            "TAR + Zstandard — fast compression with directory structure",
+            "GZip — single-file compression (auto-wraps in TAR for folders)",
+            "BZip2 — high compression for single files",
+            "XZ — high compression for single files",
+            "WIM — Windows Imaging Format"
+          ],
+          "description": "Default archive format used when compressing files."
+        },
+        "smart-archive.defaultCompressionLevel": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 9,
+          "enum": [0, 1, 3, 5, 7, 9],
+          "enumDescriptions": [
+            "0 – Store (no compression, fastest)",
+            "1 – Fastest",
+            "3 – Fast",
+            "5 – Normal",
+            "7 – Maximum",
+            "9 – Ultra (slowest, best ratio)"
+          ],
+          "description": "Default compression level (0=store, 5=normal, 9=ultra)."
+        },
+        "smart-archive.defaultOutputDir": {
+          "type": "string",
+          "default": "source",
+          "enum": ["source", "prompt"],
+          "enumDescriptions": [
+            "Extract/compress next to the source file",
+            "Always prompt for output directory"
+          ],
+          "description": "Where to place extracted/compressed files by default."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "yjdyamv.smart-archive.compress",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c",
+        "when": "filesExplorerFocus || editorFocus"
+      },
+      {
+        "command": "yjdyamv.smart-archive.decompress",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "filesExplorerFocus || editorFocus"
+      },
+      {
+        "command": "yjdyamv.smart-archive.browse",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "filesExplorerFocus || editorFocus"
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p .",

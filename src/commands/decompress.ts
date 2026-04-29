@@ -78,19 +78,11 @@ export async function decompressCommand(
         fs.mkdirSync(outputDir, { recursive: true });
 
         if (isRar) {
-          await tryExtract(
-            async () => {
-              progress.report({ message: t("archive.extracting") });
-              const count = await extractWithLibarchive({ inputPath, outputDir, password }, token);
-              const elapsed = formatDuration(Date.now() - startTime);
-              vscode.window.showInformationMessage(
-                t("decompress.rarDone", String(count)) + outputDir + t("time.elapsed", elapsed),
-              );
-            },
-            async () => {
-              progress.report({ message: t("decompress.fallbackTo7z") });
-              await decompressWith7z({ inputPath, outputDir, password }, progress, token);
-            },
+          progress.report({ message: t("archive.extracting") });
+          const count = await extractWithLibarchive({ inputPath, outputDir, password }, token);
+          const elapsed = formatDuration(Date.now() - startTime);
+          vscode.window.showInformationMessage(
+            t("decompress.rarDone", String(count)) + outputDir + t("time.elapsed", elapsed),
           );
         } else {
           await tryExtract(
