@@ -281,13 +281,18 @@ const messages: Record<string, Record<Locale, string>> = {
 /**
  * Detect current VSCode locale.
  * Maps VSCode locale string to our internal Locale type.
+ * Cached after first call — locale doesn't change at runtime.
  */
+let _cachedLocale: Locale | null = null;
+
 function detectLocale(): Locale {
+  if (_cachedLocale) return _cachedLocale;
   const lang = vscode.env.language.toLowerCase();
-  if (lang.startsWith("zh-cn") || lang === "zh-hans") return "zh-cn";
-  if (lang.startsWith("zh-tw") || lang === "zh-hant") return "zh-tw";
-  if (lang.startsWith("zh")) return "zh-cn"; // Generic Chinese → Simplified
-  return "en";
+  if (lang.startsWith("zh-cn") || lang === "zh-hans") _cachedLocale = "zh-cn";
+  else if (lang.startsWith("zh-tw") || lang === "zh-hant") _cachedLocale = "zh-tw";
+  else if (lang.startsWith("zh")) _cachedLocale = "zh-cn";
+  else _cachedLocale = "en";
+  return _cachedLocale;
 }
 
 /**

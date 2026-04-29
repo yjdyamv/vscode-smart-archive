@@ -434,6 +434,73 @@ void (async () => {
     assert.ok(true);
   });
 
+  // ── 10. Encryption detection for preview ──
+  // Inline isEncrypted logic (can't require main project — depends on vscode)
+  async function isEncryptedInline(filePath: string): Promise<boolean> {
+    const data = fs.readFileSync(filePath);
+    let stdout = '',
+      stderr = '';
+    const j = await JS7z({
+      print: (t: string) => (stdout += t + '\n'),
+      printErr: (t: string) => (stderr += t + '\n'),
+    });
+    j.FS.writeFile('/_ie', new Uint8Array(data));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        j.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
+        j.callMain(['l', '-slt', '-p', '/_ie']);
+      });
+      return stdout.includes('Encrypted = +');
+    } catch {
+      const msg = (stdout + stderr).toLowerCase();
+      return msg.includes('encrypted') || msg.includes('wrong password');
+    }
+  }
+
+  await test('enc 7z: listing fails without password', async () => {
+    const b = await j7zCompressDir({ '/f.txt': 'secret' }, '/enc.7z', ['-pp4ss', '-mhe=on']);
+    const tmp = path.join(td, 'enc-test.7z');
+    fs.writeFileSync(tmp, b);
+    const encrypted = await isEncryptedInline(tmp);
+    assert.strictEqual(encrypted, true, 'isEncrypted should detect encrypted 7z');
+    const j = await JS7z();
+    j.FS.writeFile('/_t.7z', new Uint8Array(b));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        j.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
+        j.callMain(['l', '-slt', '-sccUTF-8', '/_t.7z']);
+      });
+      assert.fail('listing encrypted 7z without pw should fail');
+    } catch (er) {
+      assert.ok((er as Error).message.includes('exit 2'));
+    }
+    fs.unlinkSync(tmp);
+  });
+
+  await test('enc 7z: listing succeeds with correct password', async () => {
+    const b = await j7zCompressDir({ '/f.txt': 'secret' }, '/enc2.7z', ['-pp4ss', '-mhe=on']);
+    let out = '';
+    const j = await JS7z({
+      print: (t: string) => (out += t + '\n'),
+      printErr: () => {},
+    });
+    j.FS.writeFile('/_t2.7z', new Uint8Array(b));
+    await new Promise<void>((resolve, reject) => {
+      j.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
+      j.callMain(['l', '-slt', '-sccUTF-8', '-pp4ss', '/_t2.7z']);
+    });
+    assert.ok(out.includes('f.txt'), `listing with pw: ${out.slice(0, 200)}`);
+  });
+
+  await test('enc ZIP: isEncrypted detects encryption', async () => {
+    const b = await j7zCompressDir({ '/f.txt': 'zip-secret' }, '/enc.zip', ['-pzip']);
+    const tmp = path.join(td, 'enc-test.zip');
+    fs.writeFileSync(tmp, b);
+    const encrypted = await isEncryptedInline(tmp);
+    assert.strictEqual(encrypted, true, 'isEncrypted should detect encrypted ZIP');
+    fs.unlinkSync(tmp);
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);

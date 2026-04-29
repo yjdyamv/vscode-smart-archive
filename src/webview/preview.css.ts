@@ -1,0 +1,85 @@
+/**
+ * Archive preview CSS — Smart Archive VSCode Extension
+ *
+ * All colors driven by VSCode CSS custom properties for theme compatibility.
+ *
+ * @module webview/archive.css
+ */
+
+export const PREVIEW_CSS = `
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--vscode-font-family);
+  font-size:var(--vscode-font-size);
+  color:var(--vscode-foreground);
+  background:var(--vscode-sideBar-background)
+}
+.tb{
+  position:sticky;top:0;z-index:1;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:4px 12px;
+  border-bottom:1px solid var(--vscode-sideBarSectionHeader-border);
+  background:var(--vscode-sideBarSectionHeader-background)
+}
+.tb-l{display:flex;align-items:center;gap:8px}
+.btn{
+  background:var(--vscode-button-background);
+  color:var(--vscode-button-foreground);
+  border:none;padding:2px 10px;border-radius:2px;
+  cursor:pointer;font-size:calc(var(--vscode-font-size) * 0.92)
+}
+.btn:hover{background:var(--vscode-button-hoverBackground)}
+.btn:disabled{opacity:.5;cursor:default}
+.sel-cnt{font-size:calc(var(--vscode-font-size) * 0.92);color:var(--vscode-descriptionForeground)}
+.sel-cnt span{font-weight:600;color:var(--vscode-foreground)}
+.tree{padding:4px 0}
+.rw{
+  position:relative;
+  height:calc(var(--vscode-font-size) * 1.8);
+  line-height:calc(var(--vscode-font-size) * 1.8);
+  display:flex;align-items:center;
+  cursor:default;user-select:none;padding-right:8px
+}
+.rw:hover{background:var(--vscode-list-hoverBackground)}
+.rw.sel{background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground)}
+.gd{
+  position:absolute;top:0;bottom:0;width:1px;
+  background:var(--vscode-tree-indentGuidesStroke);
+  pointer-events:none
+}
+.cb{width:20px;flex-shrink:0;text-align:center;cursor:pointer;padding:2px 0}
+.cb:hover .ck{border-color:var(--vscode-focusBorder,#007acc);box-shadow:0 0 0 1px var(--vscode-focusBorder,#007acc44)}
+.ck{
+  display:inline-block;width:calc(var(--vscode-font-size) * 1.3);
+  height:calc(var(--vscode-font-size) * 1.3);
+  border:1.5px solid var(--vscode-checkbox-border,#6e7681);
+  border-radius:3px;background:var(--vscode-checkbox-background,transparent);
+  vertical-align:middle;position:relative;transition:all .12s
+}
+.ck.on{
+  background:var(--vscode-checkbox-selectBackground,#0e639c);
+  border-color:var(--vscode-checkbox-selectBorder,#007acc)
+}
+.ck.on::after{
+  content:'';position:absolute;left:26%;top:12%;width:30%;height:55%;
+  border:solid var(--vscode-checkbox-selectForeground,#2ea043);
+  border-width:0 2px 2px 0;transform:rotate(45deg)
+}
+.ar{width:calc(var(--vscode-font-size) * 1.2);flex-shrink:0;text-align:center;font-size:10px;color:var(--vscode-descriptionForeground)}
+.ic{width:calc(var(--vscode-font-size) * 1.2);text-align:center;flex-shrink:0;font-size:calc(var(--vscode-font-size) * 1.1);line-height:calc(var(--vscode-font-size) * 1.8)}
+.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sz{
+  font-size:calc(var(--vscode-font-size) * 0.85);
+  color:var(--vscode-descriptionForeground);
+  margin-left:1em;flex-shrink:0
+}
+.grp{}
+.st{margin:8px 12px;padding:4px 10px;border-radius:4px;font-size:calc(var(--vscode-font-size) * 0.92);display:none}
+.st.ok{display:block;background:var(--vscode-terminal-ansiGreen);color:var(--vscode-editor-background)}
+.st.er{display:block;background:var(--vscode-inputValidation-errorBackground);color:var(--vscode-inputValidation-errorForeground);border:1px solid var(--vscode-inputValidation-errorBorder)}
+.empty{text-align:center;color:var(--vscode-descriptionForeground);padding:4em 1.5em;font-size:var(--vscode-font-size)}
+.pw-box{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px}
+.pw-box input{background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);padding:6px 12px;border-radius:3px;font-size:var(--vscode-font-size);width:240px}
+.pw-box input:focus{outline:1px solid var(--vscode-focusBorder)}
+.pw-err{color:var(--vscode-inputValidation-errorForeground);font-size:calc(var(--vscode-font-size) * 0.9);display:none}
+`;

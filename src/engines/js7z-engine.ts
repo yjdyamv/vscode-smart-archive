@@ -37,6 +37,7 @@ import { joinFSPath, getBaseName, fixArchiveEncoding } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
 import { zstdCompress } from "./zstd-codec";
+import { logger } from "../utils/logger";
 
 // js7z-tools is a CommonJS module — use require
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -144,6 +145,7 @@ export async function compressWith7z(
   // Copy input files into the virtual FS
   progress.report({ message: t("compress.readingFiles") });
   const localPaths = options.targets.map((target) => target.fsPath);
+  logger.info({ event: "compress.start", format: options.format.label, files: localPaths.length, level: options.level });
   const fsInputPaths = copyInputsToFS(js7z, localPaths, token);
   if (token?.isCancellationRequested) throw new vscode.CancellationError();
   progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
@@ -260,6 +262,7 @@ export async function decompressWith7z(
   token?: vscode.CancellationToken,
 ): Promise<void> {
   const startTime = Date.now();
+  logger.info({ event: "decompress.start", inputPath: options.inputPath, outputDir: options.outputDir });
   progress.report({ message: t("decompress.initEngine") });
 
   const js7z = await JS7z();
@@ -335,7 +338,9 @@ async function unwrapInnerTar(
  */
 export async function listFiles(
   filePath: string,
+  password = "",
 ): Promise<{ path: string; size: number; type: string }[]> {
+  logger.debug({ event: "listFiles.start", filePath, hasPassword: !!password });
   const data = fs.readFileSync(filePath);
   let stdout = "";
   let stderr = "";
@@ -361,7 +366,10 @@ export async function listFiles(
       if (code === 0) resolve();
       else reject(new Error(`7z l: ${code}\n${stderr}`));
     };
-    js7z.callMain(["l", "-slt", "-sccUTF-8", `/${archiveName}`]);
+    const args = ["l", "-slt", "-sccUTF-8"];
+    if (password) args.splice(1, 0, `-p${password}`);
+    args.push(`/${archiveName}`);
+    js7z.callMain(args);
   });
 
   // Parse `7z l -slt` output line by line: each entry starts
@@ -401,6 +409,7 @@ export async function listFiles(
   flush();
 
   tryCleanup(js7z);
+  logger.debug({ event: "listFiles.done", count: results.length });
   return results;
 }
 
@@ -421,30 +430,28 @@ export async function listFiles(
  */
 export async function isEncrypted(filePath: string): Promise<boolean> {
   const data = fs.readFileSync(filePath);
-  const js7z = await JS7z();
-  let stdout = "";
-  let stderr = "";
-  js7z.print = (text: string) => {
-    stdout += text + "\n";
-  };
-  js7z.printErr = (text: string) => {
-    stderr += text + "\n";
-  };
+  let stdout = "",
+    stderr = "";
+  const js7z = await JS7z({
+    print: (text: string) => {
+      stdout += text + "\n";
+    },
+    printErr: (text: string) => {
+      stderr += text + "\n";
+    },
+  });
 
   const archiveName = getBaseName(filePath);
   js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
 
   try {
     await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
-    // Listing succeeded — check for encryption markers in output
     return stdout.includes("Encrypted = +");
   } catch {
-    // Listing failed — check if it was due to encryption
-    const lower = stderr.toLowerCase();
-    if (lower.includes("encrypted") || lower.includes("wrong password")) {
+    const msg = (stdout + stderr).toLowerCase();
+    if (msg.includes("encrypted") || msg.includes("wrong password")) {
       return true;
     }
-    // Some other error — assume not encrypted, proceed without password
     return false;
   }
 }

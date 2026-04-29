@@ -17,11 +17,10 @@ import { decompressWith7z } from "../engines/js7z-engine";
 import { extractArchive as extractWithLibarchive } from "../engines/libarchive-engine";
 import { promptPassword } from "../ui/prompts";
 import { getOutputPath } from "../utils/fs";
-import { DECOMPRESS_EXTENSIONS, ENCRYPTABLE_EXTS, isRarExt, getFullExt } from "../constants";
+import { DECOMPRESS_EXTENSIONS, isRarExt, getFullExt, isEncryptableExt } from "../constants";
 import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
-
-
+import { logger } from "../utils/logger";
 
 export async function decompressCommand(
   uri: vscode.Uri | undefined,
@@ -35,6 +34,7 @@ export async function decompressCommand(
   const inputPath = uri.fsPath;
   const ext = getFullExt(inputPath);
   const isRar = isRarExt(ext);
+  logger.info({ event: "decompress.command.start", inputPath, ext, isRar });
 
   if (isRar) {
     try {
@@ -57,7 +57,7 @@ export async function decompressCommand(
   // Password: always prompt for encryptable formats, skip for others
   let password = "";
 
-  if (ENCRYPTABLE_EXTS.some((e) => e === ext)) {
+  if (isEncryptableExt(ext)) {
     const pwd = await promptPassword(t("password.decryptHint"));
     if (pwd === null) return;
     password = pwd;
@@ -129,6 +129,7 @@ async function tryExtract(
   try {
     await primary();
   } catch (primaryErr) {
+    console.warn("Primary extraction failed:", (primaryErr as Error).message);
     try {
       await fallback();
     } catch (fallbackErr) {

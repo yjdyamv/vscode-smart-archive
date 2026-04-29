@@ -47,7 +47,7 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
   // Case-insensitive comparison on Windows (NTFS is case-insensitive)
   const normalizedOutput = path.resolve(outputDir) + path.sep;
   const within =
-    process.platform === "win32"
+    process.platform === "win32" || process.platform === "darwin"
       ? resolved.toLowerCase().startsWith(normalizedOutput.toLowerCase())
       : resolved.startsWith(normalizedOutput);
 

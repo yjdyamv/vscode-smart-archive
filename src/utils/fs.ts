@@ -40,6 +40,9 @@ export function getOutputPath(inputPath: string, extension: string): string {
   let output = path.join(dir, name);
   let counter = 1;
   while (fs.existsSync(output)) {
+    if (counter > 999) {
+      throw new Error(`Failed to find unique output path after ${counter} attempts`);
+    }
     output = path.join(dir, `${base}_${counter}.${extension}`);
     counter++;
   }

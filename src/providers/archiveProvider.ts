@@ -9,11 +9,15 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { listFiles } from "../engines/js7z-engine";
+import type { JS7zFactory } from "../types";
+import { listFiles, isEncrypted } from "../engines/js7z-engine";
 import { getFileList, extractSelectedFiles } from "../engines/libarchive-engine";
 import { t, formatCompactSize } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
-import { isRarExt, getFullExt, isWrappedFormat } from "../constants";
+import { isRarExt, getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { logger } from "../utils/logger";
+import { PREVIEW_CSS } from "../webview/preview.css";
+import { PREVIEW_JS } from "../webview/preview.js";
 
 // ── Tree ───────────────────────────────────────────────────────────
 
@@ -97,13 +101,17 @@ const FILE_ICONS: { exts: string[]; color: string; emoji: string }[] = [
   { exts: ["wasm"], color: "#654ff0", emoji: "\u{1F9F1}" },
 ];
 
+const EXT_ICON_MAP: Record<string, { color: string; emoji: string }> = {};
+for (const row of FILE_ICONS) {
+  for (const e of row.exts) {
+    EXT_ICON_MAP[e] = { color: row.color, emoji: row.emoji };
+  }
+}
+
 function fileIcon(name: string, isDir: boolean): { color: string; emoji: string } {
   if (isDir) return { color: "#dcb67a", emoji: "\u{1F4C1}" };
   const ext = (name.split(".").pop() || "").toLowerCase();
-  for (const row of FILE_ICONS) {
-    if (row.exts.includes(ext)) return { color: row.color, emoji: row.emoji };
-  }
-  return { color: "#9e9e9e", emoji: "\u{1F4C4}" };
+  return EXT_ICON_MAP[ext] ?? { color: "#9e9e9e", emoji: "\u{1F4C4}" };
 }
 
 // ── Escaping ───────────────────────────────────────────────────────
@@ -113,7 +121,8 @@ function esc(s: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ── Render ─────────────────────────────────────────────────────────
@@ -134,7 +143,7 @@ function renderRow(node: TreeNode, depth: number): string {
 
   return (
     `<div class='rw${isDir ? " dir" : ""}' style='padding-left:${depth * INDENT_PX}px' data-path='${esc(node.path)}'` +
-    (hasKids ? " onclick='togDir(event,this)'" : "") +
+    (hasKids ? " onclick='togDir(event,this)'" : " onclick='selRow(event,this)'") +
     ">" +
     guides +
     "<span class='cb' onclick='selOne(event)'><span class='ck'></span></span>" +
@@ -157,137 +166,56 @@ function renderTree(nodes: TreeNode[], depth: number): string {
   return html;
 }
 
-// ── CSS (VSCode-variable driven) ───────────────────────────────────
+// ── CSS & JS (imported from webview/) ─────────────────────────────
 
-const CSS = `
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family:var(--vscode-font-family);
-  font-size:var(--vscode-font-size);
-  color:var(--vscode-foreground);
-  background:var(--vscode-sideBar-background)
-}
-.tb{
-  position:sticky;top:0;z-index:1;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:4px 12px;
-  border-bottom:1px solid var(--vscode-sideBarSectionHeader-border);
-  background:var(--vscode-sideBarSectionHeader-background)
-}
-.tb-l{display:flex;align-items:center;gap:8px}
-.btn{
-  background:var(--vscode-button-background);
-  color:var(--vscode-button-foreground);
-  border:none;padding:2px 10px;border-radius:2px;
-  cursor:pointer;font-size:calc(var(--vscode-font-size) * 0.92)
-}
-.btn:hover{background:var(--vscode-button-hoverBackground)}
-.btn:disabled{opacity:.5;cursor:default}
-.sel-cnt{font-size:calc(var(--vscode-font-size) * 0.92);color:var(--vscode-descriptionForeground)}
-.sel-cnt span{font-weight:600;color:var(--vscode-foreground)}
-.tree{padding:4px 0}
-.rw{
-  position:relative;
-  height:calc(var(--vscode-font-size) * 1.8);
-  line-height:calc(var(--vscode-font-size) * 1.8);
-  display:flex;align-items:center;
-  cursor:default;user-select:none;padding-right:8px
-}
-.rw:hover{background:var(--vscode-list-hoverBackground)}
-.gd{
-  position:absolute;top:0;bottom:0;width:1px;
-  background:var(--vscode-tree-indentGuidesStroke);
-  pointer-events:none
-}
-.cb{width:20px;flex-shrink:0;text-align:center;cursor:pointer;padding:2px 0}
-.cb:hover .ck{border-color:var(--vscode-focusBorder,#007acc);box-shadow:0 0 0 1px var(--vscode-focusBorder,#007acc44)}
-.ck{
-  display:inline-block;width:calc(var(--vscode-font-size) * 1.3);
-  height:calc(var(--vscode-font-size) * 1.3);
-  border:1.5px solid var(--vscode-checkbox-border,#6e7681);
-  border-radius:3px;background:var(--vscode-checkbox-background,transparent);
-  vertical-align:middle;position:relative;transition:all .12s
-}
-.ck.on{
-  background:var(--vscode-checkbox-selectBackground,#0e639c);
-  border-color:var(--vscode-checkbox-selectBorder,#007acc)
-}
-.ck.on::after{
-  content:'';position:absolute;left:26%;top:12%;width:30%;height:55%;
-  border:solid var(--vscode-checkbox-selectForeground,#2ea043);
-  border-width:0 2px 2px 0;transform:rotate(45deg)
-}
-.ar{width:calc(var(--vscode-font-size) * 1.2);flex-shrink:0;text-align:center;font-size:10px;color:var(--vscode-descriptionForeground)}
-.ic{width:calc(var(--vscode-font-size) * 1.2);text-align:center;flex-shrink:0;font-size:calc(var(--vscode-font-size) * 1.1);line-height:calc(var(--vscode-font-size) * 1.8)}
-.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.sz{
-  font-size:calc(var(--vscode-font-size) * 0.85);
-  color:var(--vscode-descriptionForeground);
-  margin-left:1em;flex-shrink:0
-}
-.grp{}
-.st{margin:8px 12px;padding:4px 10px;border-radius:4px;font-size:calc(var(--vscode-font-size) * 0.92);display:none}
-.st.ok{display:block;background:var(--vscode-terminal-ansiGreen);color:var(--vscode-editor-background)}
-.st.er{display:block;background:var(--vscode-inputValidation-errorBackground);color:var(--vscode-inputValidation-errorForeground);border:1px solid var(--vscode-inputValidation-errorBorder)}
-.empty{text-align:center;color:var(--vscode-descriptionForeground);padding:4em 1.5em;font-size:var(--vscode-font-size)}
-`;
+const CSS = PREVIEW_CSS;
+const JS = PREVIEW_JS;
 
-// ── HTML ───────────────────────────────────────────────────────────
+function emptyHtml(msg: string): string {
+  return `<!DOCTYPE html><html><head><meta charset='UTF-8'>
+<style>${CSS}</style></head>
+<body><div class='empty'>${esc(msg)}</div>
+<script>${JS}</script></body></html>`;
+}
 
-const JS = `
+function passwordHtml(archiveName: string): string {
+  return `<!DOCTYPE html>
+<html><head><meta charset='UTF-8'>
+<style>${CSS}
+.pw-box{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px}
+.pw-box input{background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);padding:6px 12px;border-radius:3px;font-size:var(--vscode-font-size);width:240px;transition:border-color .2s}
+.pw-box input.err{border-color:var(--vscode-inputValidation-errorBorder,#e51400)}
+.pw-box input:focus{outline:1px solid var(--vscode-focusBorder)}
+.pw-err{color:var(--vscode-inputValidation-errorForeground,#e51400);font-size:calc(var(--vscode-font-size) * 0.92);min-height:1.4em;opacity:0;transition:opacity .2s}
+.pw-err.on{opacity:1}
+</style></head>
+<body>
+<div class='pw-box'>
+  <div style='font-size:3em'>\u{1F512}</div>
+  <div style='color:var(--vscode-foreground);font-size:calc(var(--vscode-font-size) * 1.1)'>${esc(archiveName)}</div>
+  <div style='color:var(--vscode-descriptionForeground);font-size:calc(var(--vscode-font-size) * 0.92);margin-bottom:4px'>Encrypted \u2014 enter password</div>
+  <input id='pw' type='password' placeholder='Password' autofocus onkeydown='if(event.key==="Enter")submitPw()'>
+  <button class='btn' onclick='submitPw()' style='margin-top:4px'>Unlock</button>
+  <div id='pwe' class='pw-err'>Wrong password</div>
+</div>
+<script>
 var v=acquireVsCodeApi();
-var sel=new Set();
-function updateUI(){var n=sel.size;document.getElementById('cnt').textContent=n;document.getElementById('bSel').disabled=n===0}
-function getPath(el){return el.closest('.rw').dataset.path}
-function selOne(e){
-  e.stopPropagation();
-  var r=e.currentTarget.closest('.rw'),p=getPath(r),k=r.querySelector('.ck');
-  if(sel.has(p)){
-    sel.delete(p);k.classList.remove('on');
-    unselKids(r);
-  } else {
-    sel.add(p);k.classList.add('on');
-    selKids(r);
-  }
-  updateUI()
-}
-function selKids(el){
-  var g=el.nextElementSibling;
-  if(!g||!g.classList.contains('grp'))return;
-  var rs=g.querySelectorAll('.rw');
-  for(var i=0;i<rs.length;i++){
-    var p=getPath(rs[i]);
-    if(!sel.has(p)){sel.add(p);rs[i].querySelector('.ck').classList.add('on')}
-  }
-}
-function unselKids(el){
-  var g=el.nextElementSibling;
-  if(!g||!g.classList.contains('grp'))return;
-  var rs=g.querySelectorAll('.rw');
-  for(var i=0;i<rs.length;i++){
-    var p=getPath(rs[i]);
-    sel.delete(p);rs[i].querySelector('.ck').classList.remove('on')
-  }
-}
-function extAll(){document.getElementById('s').className='st';v.postMessage({c:'extAll'})}
-function extSel(){
-  var ps=[...sel];if(!ps.length)return;
-  document.getElementById('s').className='st';v.postMessage({c:'extSel',paths:ps})
-}
-function togDir(e,el){
-  e.stopPropagation();
-  var nx=el.nextElementSibling;
-  if(!nx||!nx.classList.contains('grp'))return;
-  var ar=el.querySelector('.ar'),hd=nx.style.display!=='none';
-  nx.style.display=hd?'none':'';
-  if(ar)ar.textContent=hd?'\u25B6':'\u25BC'
+function submitPw(){
+  var el=document.getElementById('pw'),pw=el.value;
+  if(!pw)return;
+  el.classList.remove('err');document.getElementById('pwe').classList.remove('on');
+  v.postMessage({c:'pw',pw:pw})
 }
 window.addEventListener('message',function(e){
-  var s=document.getElementById('s');
-  if(e.data.c==='ok'){s.className='st ok';s.textContent=e.data.t}
-  else if(e.data.c==='err'){s.className='st er';s.textContent=e.data.t}
+  if(e.data.c==='pwerr'){
+    document.getElementById('pw').classList.add('err');
+    document.getElementById('pwe').classList.add('on');
+    document.getElementById('pwe').textContent=e.data.t || 'Wrong password'
+  }
 });
-`;
+</script>
+</body></html>`;
+}
 
 function loadingHtml(): string {
   return `<!DOCTYPE html>
@@ -330,32 +258,40 @@ ${
 
 async function fetchFileList(
   filePath: string,
+  password = "",
 ): Promise<{ path: string; size: number; type: string }[]> {
   const ext = getFullExt(filePath);
-  // Wrapped formats (tar.gz/.tgz etc.): 7z l -slt only sees outer layer.
-  // Extract to virtual FS temporarily to discover inner tar file list.
-  if (isWrappedFormat(ext)) return listViaExtract(filePath);
+  if (isWrappedFormat(ext)) return listViaExtract(filePath, password);
   try {
-    const f = await listFiles(filePath);
+    const f = await listFiles(filePath, password);
     if (f && f.length > 0) return f;
   } catch {
-    /* fallthrough */
+    /* encrypted or unsupported — caller handles */
   }
+  // For encryptable formats without a password, don't fall back to libarchive —
+  // it may leak file structure metadata without requiring the password.
+  // Instead return empty to trigger the encryption check / password prompt.
+  if (!password && isEncryptableExt(ext)) return [];
   return getFileList(filePath);
 }
 
-async function listViaExtract(filePath: string): Promise<{ path: string; size: number; type: string }[]> {
+async function listViaExtract(
+  filePath: string,
+  password = "",
+): Promise<{ path: string; size: number; type: string }[]> {
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
   const archiveName = path.basename(filePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
   js7z.FS.mkdir("/_ls");
+  const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
+  if (password) args.splice(1, 0, `-p${password}`);
   await new Promise<void>((resolve, reject) => {
     js7z.onExit = (code: number) => {
       if (code === 0) resolve();
       else reject(new Error(`7z x: ${code}`));
     };
-    js7z.callMain(["x", `/${archiveName}`, "-o/_ls", "-y"]);
+    js7z.callMain(args);
   });
   // Check if output contains a single .tar (inner tar not auto-extracted)
   const topEntries = js7z.FS.readdir("/_ls").filter((e: string) => e !== "." && e !== "..");
@@ -406,8 +342,8 @@ function readDirEntries(
 
 // ── Extract helpers ────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-require-imports
-const JS7z: any = require("js7z-tools");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const JS7z: JS7zFactory = require("js7z-tools");
 
 async function extractSelected(archivePath: string, selectedPaths: string[]): Promise<void> {
   const ext = getFullExt(archivePath);
@@ -433,7 +369,10 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
     js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
     js7z.FS.mkdir("/_x1");
     await new Promise<void>((resolve, reject) => {
-      js7z.onExit = (c: number) => { if (c === 0) resolve(); else reject(new Error(`7z x outer: ${c}`)); };
+      js7z.onExit = (c: number) => {
+        if (c === 0) resolve();
+        else reject(new Error(`7z x outer: ${c}`));
+      };
       js7z.callMain(["x", `/${archiveName}`, "-o/_x1", "-y"]);
     });
     const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
@@ -445,7 +384,10 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
     js7z2.FS.mkdir("/_x2");
     const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
     await new Promise<void>((resolve, reject) => {
-      js7z2.onExit = (c: number) => { if (c === 0) resolve(); else reject(new Error(`7z x inner: ${c}`)); };
+      js7z2.onExit = (c: number) => {
+        if (c === 0) resolve();
+        else reject(new Error(`7z x inner: ${c}`));
+      };
       js7z2.callMain(["x", `/${innerTar}`, "-o/_x2", "-y", ...normalizedPaths]);
     });
     copyDirFromFS(js7z2, "/_x2", outputDir);
@@ -485,9 +427,7 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
     // 7z failed — fall back to libarchive
     try {
       const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
-      vscode.window.showInformationMessage(
-        t("decompress.rarDone", String(count)) + outputDir,
-      );
+      vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
       await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
     } catch (fallbackErr) {
       // eslint-disable-next-line preserve-caught-error
@@ -504,6 +444,7 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
 async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Promise<void> {
   const filePath = archiveUri.fsPath;
   const archiveName = path.basename(filePath);
+  logger.info({ event: "setupWebview.start", filePath, wrapped: isWrappedFormat(getFullExt(filePath)) });
 
   webview.html = loadingHtml();
 
@@ -511,28 +452,95 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   try {
     entries = await fetchFileList(filePath);
   } catch (err) {
-    vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
+    logger.error({ event: "setupWebview.fetchFileList.failed", err }, (err as Error).message);
+    webview.html = emptyHtml(t("decompress.failed") + (err as Error).message);
     return;
   }
+
+  // Encrypted archive — show password dialog inline
+  if (entries.length === 0 && isEncryptableExt(getFullExt(filePath))) {
+    let encrypted = false;
+    try { encrypted = await isEncrypted(filePath); } catch { /* can't detect */ }
+    if (encrypted) {
+      webview.html = passwordHtml(archiveName);
+      webview.onDidReceiveMessage(async (msg: { c: string; pw?: string; paths?: string[]; msg?: string }) => {
+        if (msg.c === "log") {
+          logger.debug({ event: "webview.ui", msg: msg.msg });
+          return;
+        }
+        if (msg.c === "pw" && msg.pw) {
+          logger.info({ event: "setupWebview.password.attempt" });
+          try {
+            const pwEntries = await fetchFileList(filePath, msg.pw);
+            if (pwEntries.length === 0) {
+              logger.warn({ event: "setupWebview.password.failed", reason: "empty" });
+              webview.postMessage({ c: "pwerr", t: "Wrong password" });
+              return;
+            }
+            const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
+            const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+            js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
+            try {
+              await new Promise<void>((resolve, reject) => {
+                js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
+                js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
+              });
+            } catch {
+              logger.warn({ event: "setupWebview.password.failed", reason: "7z t" });
+              webview.postMessage({ c: "pwerr", t: "Wrong password" });
+              return;
+            }
+            logger.info({ event: "setupWebview.password.ok", count: pwEntries.length });
+            const tree = buildTree(pwEntries, archiveName);
+            webview.html = contentHtml(tree, pwEntries.length);
+            setupExtractHandlers(webview, archiveUri, archiveName, filePath);
+          } catch (err) {
+            logger.error({ event: "setupWebview.password.error", err });
+            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+          }
+        }
+      });
+      return;
+    }
+  }
+
+  logger.info({ event: "setupWebview.entries", count: entries.length });
 
   const tree = buildTree(entries, archiveName);
   webview.html = contentHtml(tree, entries.length);
 
-  webview.onDidReceiveMessage(async (msg: { c: string; paths?: string[] }) => {
+  setupExtractHandlers(webview, archiveUri, archiveName, filePath);
+}
+
+function setupExtractHandlers(
+  webview: vscode.Webview,
+  archiveUri: vscode.Uri,
+  archiveName: string,
+  filePath: string,
+): void {
+  webview.onDidReceiveMessage(async (msg: { c: string; paths?: string[]; msg?: string }) => {
+    if (msg.c === "log") {
+      logger.debug({ event: "webview.ui", msg: msg.msg });
+      return;
+    }
     if (msg.c === "extAll") {
+      logger.info({ event: "webview.extAll", archiveName });
       try {
         await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", archiveUri);
         webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
       } catch (err) {
+        logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
         webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
       }
     }
 
     if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+      logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
       try {
         await extractSelected(filePath, msg.paths);
         webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
       } catch (err) {
+        logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
         webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
       }
     }

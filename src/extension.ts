@@ -27,7 +27,7 @@ import * as vscode from "vscode";
 import { compressCommand } from "./commands/compress";
 import { decompressCommand, browseCommand } from "./commands/decompress";
 import { registerArchiveEditor } from "./providers/archiveProvider";
-import { t } from "./i18n";
+import { logger } from "./utils/logger";
 
 /**
  * Called when the extension is activated.
@@ -36,10 +36,11 @@ import { t } from "./i18n";
  * @param context - Extension context for managing subscriptions
  */
 export function activate(context: vscode.ExtensionContext): void {
-  console.log(t("extension.activated"));
+  logger.info({ event: "extension.activate", vscode: vscode.version });
 
   // Register custom editor as default viewer for archive files (.7z, .zip, …)
   registerArchiveEditor(context);
+  logger.info({ event: "extension.archiveProvider.registered" });
 
   // Register compress command
   const compressDisposable = vscode.commands.registerCommand(
@@ -68,5 +69,6 @@ export function activate(context: vscode.ExtensionContext): void {
  * VSCode automatically disposes of all subscriptions.
  */
 export function deactivate(): void {
-  console.log(t("extension.deactivated"));
+  logger.info({ event: "extension.deactivate" });
+  logger.dispose();
 }
