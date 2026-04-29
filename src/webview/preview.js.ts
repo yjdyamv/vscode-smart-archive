@@ -40,7 +40,7 @@ function selKids(el){
   var rs=g.querySelectorAll('.rw');
   for(var i=0;i<rs.length;i++){
     var p=getPath(rs[i]);
-    if(!sel.has(p)){sel.add(p);rs[i].querySelector('.ck').classList.add('on')}
+    if(!sel.has(p)){sel.add(p);rs[i].querySelector('.ck').classList.add('on');rs[i].classList.add('sel')}
   }
 }
 function unselKids(el){
@@ -49,7 +49,7 @@ function unselKids(el){
   var rs=g.querySelectorAll('.rw');
   for(var i=0;i<rs.length;i++){
     var p=getPath(rs[i]);
-    sel.delete(p);rs[i].querySelector('.ck').classList.remove('on')
+    sel.delete(p);rs[i].querySelector('.ck').classList.remove('on');rs[i].classList.remove('sel')
   }
 }
 function extAll(){

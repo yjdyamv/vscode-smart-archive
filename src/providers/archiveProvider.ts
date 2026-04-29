@@ -194,7 +194,7 @@ function passwordHtml(archiveName: string): string {
   <div style='font-size:3em'>\u{1F512}</div>
   <div style='color:var(--vscode-foreground);font-size:calc(var(--vscode-font-size) * 1.1)'>${esc(archiveName)}</div>
   <div style='color:var(--vscode-descriptionForeground);font-size:calc(var(--vscode-font-size) * 0.92);margin-bottom:4px'>Encrypted \u2014 enter password</div>
-  <input id='pw' type='password' placeholder='Password' autofocus onkeydown='if(event.key==="Enter")submitPw()'>
+  <input id='pw' type='password' placeholder='Password' autofocus onkeydown='if(event.key==="Enter"||event.keyCode===13)submitPw()'>
   <button class='btn' onclick='submitPw()' style='margin-top:4px'>Unlock</button>
   <div id='pwe' class='pw-err'>Wrong password</div>
 </div>
