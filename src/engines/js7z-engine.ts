@@ -145,7 +145,12 @@ export async function compressWith7z(
   // Copy input files into the virtual FS
   progress.report({ message: t("compress.readingFiles") });
   const localPaths = options.targets.map((target) => target.fsPath);
-  logger.info({ event: "compress.start", format: options.format.label, files: localPaths.length, level: options.level });
+  logger.info({
+    event: "compress.start",
+    format: options.format.label,
+    files: localPaths.length,
+    level: options.level,
+  });
   const fsInputPaths = copyInputsToFS(js7z, localPaths, token);
   if (token?.isCancellationRequested) throw new vscode.CancellationError();
   progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
@@ -228,9 +233,10 @@ function run7z(
     const m = text.match(/(\d{1,3})%/);
     if (m && progress) {
       const pct = parseInt(m[1], 10);
-      if (pct !== lastPct) {
+      if (pct !== lastPct && pct > 0) {
+        const delta = pct - (lastPct < 0 ? 0 : lastPct);
         lastPct = pct;
-        progress.report({ message: `${pct}%`, increment: pct });
+        progress.report({ message: `${pct}%`, increment: delta });
       }
     }
   };
@@ -262,7 +268,11 @@ export async function decompressWith7z(
   token?: vscode.CancellationToken,
 ): Promise<void> {
   const startTime = Date.now();
-  logger.info({ event: "decompress.start", inputPath: options.inputPath, outputDir: options.outputDir });
+  logger.info({
+    event: "decompress.start",
+    inputPath: options.inputPath,
+    outputDir: options.outputDir,
+  });
   progress.report({ message: t("decompress.initEngine") });
 
   const js7z = await JS7z();

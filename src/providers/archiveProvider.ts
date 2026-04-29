@@ -85,13 +85,47 @@ function buildTree(
 // ── File-type icon ─────────────────────────────────────────────────
 
 const FILE_ICONS: { exts: string[]; color: string; emoji: string }[] = [
-  { exts: ["png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "tiff"], color: "#4caf50", emoji: "\u{1F5BC}" },
-  { exts: ["ts", "tsx", "js", "jsx", "py", "rb", "rs", "go", "java", "c", "cpp", "h", "swift", "kt", "cs", "php", "r"], color: "#3178c6", emoji: "\u{1F4DD}" },
+  {
+    exts: ["png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "tiff"],
+    color: "#4caf50",
+    emoji: "\u{1F5BC}",
+  },
+  {
+    exts: [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "py",
+      "rb",
+      "rs",
+      "go",
+      "java",
+      "c",
+      "cpp",
+      "h",
+      "swift",
+      "kt",
+      "cs",
+      "php",
+      "r",
+    ],
+    color: "#3178c6",
+    emoji: "\u{1F4DD}",
+  },
   { exts: ["css", "scss", "less", "sass"], color: "#42a5f5", emoji: "\u{1F3A8}" },
   { exts: ["html", "htm", "xml", "vue", "svelte"], color: "#e44d26", emoji: "\u{1F310}" },
   { exts: ["json", "yaml", "yml", "toml", "ini", "cfg"], color: "#ffb300", emoji: "\u{1F4CA}" },
-  { exts: ["zip", "gz", "bz2", "xz", "7z", "rar", "tar", "zst"], color: "#ff9800", emoji: "\u{1F4E6}" },
-  { exts: ["md", "txt", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"], color: "#42a5f5", emoji: "\u{1F4C4}" },
+  {
+    exts: ["zip", "gz", "bz2", "xz", "7z", "rar", "tar", "zst"],
+    color: "#ff9800",
+    emoji: "\u{1F4E6}",
+  },
+  {
+    exts: ["md", "txt", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"],
+    color: "#42a5f5",
+    emoji: "\u{1F4C4}",
+  },
   { exts: ["sh", "bash", "bat", "ps1", "zsh", "fish"], color: "#4eaa25", emoji: "\u{1F4DC}" },
   { exts: ["sql", "db", "sqlite", "sqlite3"], color: "#e65100", emoji: "\u{1F5C4}" },
   { exts: ["exe", "dll", "so", "dylib"], color: "#9e9e9e", emoji: "\u{2699}" },
@@ -452,7 +486,11 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
 async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Promise<void> {
   const filePath = archiveUri.fsPath;
   const archiveName = path.basename(filePath);
-  logger.info({ event: "setupWebview.start", filePath, wrapped: isWrappedFormat(getFullExt(filePath)) });
+  logger.info({
+    event: "setupWebview.start",
+    filePath,
+    wrapped: isWrappedFormat(getFullExt(filePath)),
+  });
 
   webview.html = loadingHtml();
 
@@ -468,46 +506,53 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   // Encrypted archive — show password dialog inline
   if (entries.length === 0 && isEncryptableExt(getFullExt(filePath))) {
     let encrypted = false;
-    try { encrypted = await isEncrypted(filePath); } catch { /* can't detect */ }
+    try {
+      encrypted = await isEncrypted(filePath);
+    } catch {
+      /* can't detect */
+    }
     if (encrypted) {
       webview.html = passwordHtml(archiveName);
-      webview.onDidReceiveMessage(async (msg: { c: string; pw?: string; paths?: string[]; msg?: string }) => {
-        if (msg.c === "log") {
-          logger.debug({ event: "webview.ui", msg: msg.msg });
-          return;
-        }
-        if (msg.c === "pw" && msg.pw) {
-          logger.info({ event: "setupWebview.password.attempt" });
-          try {
-            const pwEntries = await fetchFileList(filePath, msg.pw);
-            if (pwEntries.length === 0) {
-              logger.warn({ event: "setupWebview.password.failed", reason: "empty" });
-              webview.postMessage({ c: "pwerr", t: "Wrong password" });
-              return;
-            }
-            const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
-            const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-            js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
-            try {
-              await new Promise<void>((resolve, reject) => {
-                js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
-                js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
-              });
-            } catch {
-              logger.warn({ event: "setupWebview.password.failed", reason: "7z t" });
-              webview.postMessage({ c: "pwerr", t: "Wrong password" });
-              return;
-            }
-            logger.info({ event: "setupWebview.password.ok", count: pwEntries.length });
-            const tree = buildTree(pwEntries, archiveName);
-            webview.html = contentHtml(tree, pwEntries.length);
-            setupExtractHandlers(webview, archiveUri, archiveName, filePath);
-          } catch (err) {
-            logger.error({ event: "setupWebview.password.error", err });
-            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+      webview.onDidReceiveMessage(
+        async (msg: { c: string; pw?: string; paths?: string[]; msg?: string }) => {
+          if (msg.c === "log") {
+            logger.debug({ event: "webview.ui", msg: msg.msg });
+            return;
           }
-        }
-      });
+          if (msg.c === "pw" && msg.pw) {
+            logger.info({ event: "setupWebview.password.attempt" });
+            try {
+              const pwEntries = await fetchFileList(filePath, msg.pw);
+              if (pwEntries.length === 0) {
+                logger.warn({ event: "setupWebview.password.failed", reason: "empty" });
+                webview.postMessage({ c: "pwerr", t: "Wrong password" });
+                return;
+              }
+              const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
+              const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+              js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
+              try {
+                await new Promise<void>((resolve, reject) => {
+                  js7z.onExit = (c: number) =>
+                    c === 0 ? resolve() : reject(new Error(`7z t: ${c}`));
+                  js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
+                });
+              } catch {
+                logger.warn({ event: "setupWebview.password.failed", reason: "7z t" });
+                webview.postMessage({ c: "pwerr", t: "Wrong password" });
+                return;
+              }
+              logger.info({ event: "setupWebview.password.ok", count: pwEntries.length });
+              const tree = buildTree(pwEntries, archiveName);
+              webview.html = contentHtml(tree, pwEntries.length);
+              setupExtractHandlers(webview, archiveUri, archiveName, filePath);
+            } catch (err) {
+              logger.error({ event: "setupWebview.password.error", err });
+              webview.postMessage({ c: "pwerr", t: "Wrong password" });
+            }
+          }
+        },
+      );
       return;
     }
   }

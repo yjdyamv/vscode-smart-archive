@@ -34,16 +34,29 @@ const channelStream = new Writable({
       const str = Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
       const obj = JSON.parse(str);
       const ts = obj.time ? new Date(obj.time).toISOString().slice(11, 23) : "";
-      const lvl = (obj.level === 50 ? "ERROR" : obj.level === 40 ? "WARN" : obj.level === 30 ? "INFO" : "DEBUG").padEnd(5);
+      const lvl = (
+        obj.level === 50 ? "ERROR" : obj.level === 40 ? "WARN" : obj.level === 30 ? "INFO" : "DEBUG"
+      ).padEnd(5);
       let msg = `[${ts}] [${lvl}] ${obj.event || obj.msg || ""}`;
       if (obj.err) msg += ` ${obj.err}`;
       for (const k of Object.keys(obj)) {
-        if (k === "time" || k === "level" || k === "hostname" || k === "pid" || k === "event" || k === "msg" || k === "err") continue;
+        if (
+          k === "time" ||
+          k === "level" ||
+          k === "hostname" ||
+          k === "pid" ||
+          k === "event" ||
+          k === "msg" ||
+          k === "err"
+        )
+          continue;
         msg += ` ${k}=${JSON.stringify(obj[k])}`;
       }
       getChannel().appendLine(msg);
     } catch {
-      getChannel().appendLine(Buffer.isBuffer(chunk) ? chunk.toString().trim() : String(chunk).trim());
+      getChannel().appendLine(
+        Buffer.isBuffer(chunk) ? chunk.toString().trim() : String(chunk).trim(),
+      );
     }
     callback();
   },
