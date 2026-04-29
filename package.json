@@ -1,0 +1,164 @@
+{
+  "name": "smart-archive",
+  "displayName": "Smart Archive",
+  "description": "Compress and decompress files using JS7z + libarchive.js. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ with AES-256 encryption.",
+  "version": "1.1.0",
+  "publisher": "yjdyamv",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yjdyamv/vscode-smart-archive"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:yjdyamv.smart-archive.compress",
+    "onCommand:yjdyamv.smart-archive.decompress",
+    "onCommand:yjdyamv.smart-archive.browse",
+    "onCustomEditor:archiveViewer"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "archiveViewer",
+        "displayName": "Archive Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.7z"
+          },
+          {
+            "filenamePattern": "*.zip"
+          },
+          {
+            "filenamePattern": "*.rar"
+          },
+          {
+            "filenamePattern": "*.tar"
+          },
+          {
+            "filenamePattern": "*.gz"
+          },
+          {
+            "filenamePattern": "*.bz2"
+          },
+          {
+            "filenamePattern": "*.xz"
+          },
+          {
+            "filenamePattern": "*.tar.gz"
+          },
+          {
+            "filenamePattern": "*.tar.bz2"
+          },
+          {
+            "filenamePattern": "*.tar.xz"
+          },
+          {
+            "filenamePattern": "*.tar.zst"
+          },
+          {
+            "filenamePattern": "*.tar.lz"
+          },
+          {
+            "filenamePattern": "*.tar.lzma"
+          },
+          {
+            "filenamePattern": "*.tgz"
+          },
+          {
+            "filenamePattern": "*.tbz2"
+          },
+          {
+            "filenamePattern": "*.tbz"
+          },
+          {
+            "filenamePattern": "*.txz"
+          },
+          {
+            "filenamePattern": "*.tzst"
+          },
+          {
+            "filenamePattern": "*.tlz"
+          },
+          {
+            "filenamePattern": "*.wim"
+          },
+          {
+            "filenamePattern": "*.zst"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "yjdyamv.smart-archive.compress",
+        "title": "Smart Archive: Compress"
+      },
+      {
+        "command": "yjdyamv.smart-archive.decompress",
+        "title": "Smart Archive: Decompress"
+      },
+      {
+        "command": "yjdyamv.smart-archive.browse",
+        "title": "Smart Archive: Browse Contents"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "yjdyamv.smart-archive.compress",
+          "group": "7_modification"
+        },
+        {
+          "command": "yjdyamv.smart-archive.decompress",
+          "group": "7_modification"
+        },
+        {
+          "command": "yjdyamv.smart-archive.browse",
+          "group": "7_modification"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test": "npm run compile && tsc -p test && node test/out/core.test.js && node test/out/preview.test.js",
+    "test:extension": "node test/runTest.js",
+    "format": "oxfmt --write src/",
+    "format:check": "oxfmt --check src/",
+    "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort src/",
+    "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort --fix src/",
+    "typecheck": "tsc -p . --noEmit",
+    "check": "npm run format:check && npm run lint && npm run typecheck",
+    "package": "npm run compile && vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "overrides": {
+    "encoding-sniffer": "1.0.2"
+  },
+  "dependencies": {
+    "@bokuweb/zstd-wasm": "^0.0.27",
+    "iconv-lite": "^0.7.2",
+    "js7z-tools": "^2.5.0",
+    "libarchive-wasm": "^1.2.0"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^3.9.1",
+    "glob": "^10.0.0",
+    "mocha": "^11.7.5",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "typescript": "^6.0.3"
+  }
+}

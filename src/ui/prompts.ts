@@ -1,0 +1,122 @@
+/**
+ * VSCode UI prompts — 7z VSCode Extension
+ *
+ * Encapsulates all user-facing VSCode dialogs:
+ * - Format picker (QuickPick)
+ * - Encryption confirmation
+ * - Password input (masked)
+ * - File save dialog
+ *
+ * All displayed strings are localized via the i18n module.
+ *
+ * @module ui/prompts
+ */
+
+import * as vscode from "vscode";
+import * as path from "path";
+import type { FormatInfo, PasswordResult, EncryptChoice } from "../types";
+import { COMPRESS_FORMATS } from "../constants";
+import { t, compressLevels } from "../i18n";
+
+/**
+ * Show a format selection dropdown.
+ * Only formats with `canCreate === true` are shown.
+ *
+ * @returns The chosen format, or undefined if the user cancelled
+ */
+export async function promptCompressFormat(): Promise<FormatInfo | undefined> {
+  const items = COMPRESS_FORMATS.filter((f) => f.canCreate).map((f) => ({
+    label: f.label,
+    description: f.description,
+  }));
+
+  const chosen = await vscode.window.showQuickPick(items, {
+    placeHolder: t("compress.selectFormat"),
+    ignoreFocusOut: true,
+  });
+
+  if (!chosen) return undefined;
+  return COMPRESS_FORMATS.find((f) => f.label === chosen.label);
+}
+
+/**
+ * Ask the user whether to enable AES-256 encryption.
+ *
+ * @returns true=encrypt, false=no encryption, null=cancelled
+ */
+export async function promptEncryptChoice(): Promise<EncryptChoice> {
+  const choice = await vscode.window.showQuickPick(
+    [
+      { label: t("encrypt.no"), description: "" },
+      { label: t("encrypt.yes"), description: "" },
+    ],
+    { placeHolder: t("encrypt.title"), ignoreFocusOut: true },
+  );
+  if (!choice) return null;
+  return choice.label === t("encrypt.yes");
+}
+
+/**
+ * Show a masked password input box.
+ * Empty input = skip password.
+ *
+ * @param hint - Placeholder hint (from i18n)
+ * @returns Password string ('' = skip) or null if cancelled
+ */
+export async function promptPassword(hint: string): Promise<PasswordResult> {
+  const password = await vscode.window.showInputBox({
+    prompt: t("password.prompt"),
+    placeHolder: hint,
+    password: true,
+    ignoreFocusOut: true,
+  });
+  // ESC → undefined → null
+  if (password === undefined) return null;
+  return password;
+}
+
+/**
+ * Show a "Save As" dialog for the output archive.
+ *
+ * @param targetPath - Path of the first selected item (used to derive default location)
+ * @param targetCount - How many items are selected (1 = use item name, >1 = 'archive')
+ * @param format - Archive format extension (e.g. '7z')
+ * @returns The chosen save URI, or undefined if cancelled
+ */
+export async function promptSavePath(
+  targetPath: string,
+  targetCount: number,
+  format: string,
+): Promise<vscode.Uri | undefined> {
+  let defaultUri: vscode.Uri;
+
+  if (targetCount === 1) {
+    const base = path.basename(targetPath, path.extname(targetPath));
+    defaultUri = vscode.Uri.file(path.join(path.dirname(targetPath), `${base}.${format}`));
+  } else {
+    defaultUri = vscode.Uri.file(path.join(path.dirname(targetPath), `archive.${format}`));
+  }
+
+  return vscode.window.showSaveDialog({
+    defaultUri,
+    filters: { [t("save.filterName")]: [format] },
+  });
+}
+
+const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
+
+export async function promptCompressLevel(): Promise<number> {
+  const labels = compressLevels();
+  // Put "Normal" (level 5) first so it's selected by default
+  const order = [3, 2, 1, 0, 4, 5]; // 5, 3, 1, 0, 7, 9
+  const items = order.map((i) => ({ label: labels[i] }));
+
+  const chosen = await vscode.window.showQuickPick(items, {
+    placeHolder: t("compress.selectLevel"),
+    ignoreFocusOut: true,
+  });
+
+  if (!chosen) return -1;
+  const idx = labels.indexOf(chosen.label);
+  return idx >= 0 ? LEVEL_VALUES[idx] : 5;
+}

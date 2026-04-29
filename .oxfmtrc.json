@@ -1,0 +1,5 @@
+{
+  "indent": "space",
+  "indentSize": 2,
+  "ignorePatterns": ["out/**", "node_modules/**", "test/**"]
+}
