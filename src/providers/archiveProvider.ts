@@ -396,7 +396,12 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
   // RAR: 7z can't extract RAR at all; use libarchive
   if (isRar) {
     fs.mkdirSync(outputDir, { recursive: true });
-    const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
+    const count = await extractSelectedFiles(
+      archivePath,
+      outputDir,
+      selectedPaths,
+      archivePassword || undefined,
+    );
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
     await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
     return;
@@ -460,7 +465,10 @@ async function extractSelected(archivePath: string, selectedPaths: string[]): Pr
         else reject(new Error(`7z x: ${code}\n${stderr}`));
       };
       const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
-      js7z.callMain(["x", `/${archiveName}`, "-o/out", "-y", ...normalizedPaths]);
+      const xArgs = ["x", `/${archiveName}`, "-o/out", "-y"];
+      if (archivePassword) xArgs.splice(1, 0, `-p${archivePassword}`);
+      xArgs.push(...normalizedPaths);
+      js7z.callMain(xArgs);
     });
     copyDirFromFS(js7z, "/out", outputDir);
     await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
@@ -543,6 +551,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
                 return;
               }
               logger.info({ event: "setupWebview.password.ok", count: pwEntries.length });
+              archivePassword = msg.pw;
               const tree = buildTree(pwEntries, archiveName);
               webview.html = contentHtml(tree, pwEntries.length);
               setupExtractHandlers(webview, archiveUri, archiveName, filePath);
@@ -564,6 +573,9 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
 
   setupExtractHandlers(webview, archiveUri, archiveName, filePath);
 }
+
+// Store password for encrypted archives so extract can use it
+let archivePassword = "";
 
 function setupExtractHandlers(
   webview: vscode.Webview,

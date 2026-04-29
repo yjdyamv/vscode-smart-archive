@@ -156,11 +156,12 @@ export async function extractSelectedFiles(
   filePath: string,
   outputDir: string,
   selectedPaths: string[],
+  password?: string,
   token?: vscode.CancellationToken,
 ): Promise<number> {
   const mod = await getWasmModule();
   const buffer = fs.readFileSync(filePath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer));
+  const reader = new ArchiveReader(mod, new Int8Array(buffer), password || undefined);
   const selected = new Set(selectedPaths);
   let fileCount = 0;
   let totalSize = 0;
