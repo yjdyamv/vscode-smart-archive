@@ -136,7 +136,7 @@
     "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort --fix src/",
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
-    "package": "npm run compile && vsce package --no-dependencies",
+    "package": "npm run compile && vsce package",
     "vscode:prepublish": "npm run compile"
   },
   "overrides": {
