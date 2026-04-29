@@ -62,6 +62,19 @@ const channelStream = new Writable({
   },
 });
 
+/** Sanitize sensitive fields before hitting any output */
+function sanitize(obj: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === "password" || k === "pw" || k === "pass") {
+      out[k] = "***";
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 const p = pino(
   {
     level: _level,
@@ -88,15 +101,15 @@ export const logger = {
   },
 
   debug(obj: Record<string, unknown>, msg?: string): void {
-    p.debug(obj, msg);
+    p.debug(sanitize(obj), msg);
   },
 
   info(obj: Record<string, unknown>, msg?: string): void {
-    p.info(obj, msg);
+    p.info(sanitize(obj), msg);
   },
 
   warn(obj: Record<string, unknown>, msg?: string): void {
-    p.warn(obj, msg);
+    p.warn(sanitize(obj), msg);
   },
 
   error(obj: Record<string, unknown>, msg?: string): void {
@@ -105,7 +118,7 @@ export const logger = {
       obj.err = e.message;
       obj.stack = e.stack?.split("\n").slice(0, 3).join(" | ");
     }
-    p.error(obj, msg);
+    p.error(sanitize(obj), msg);
   },
 
   throw(event: string, err: unknown, data?: Record<string, unknown>): never {
