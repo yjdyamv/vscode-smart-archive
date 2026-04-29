@@ -76,4 +76,18 @@ window.addEventListener('message',function(e){
   else if(e.data.c==='err'){s.className='st er';s.textContent=e.data.t}
   else if(e.data.c==='log'){v.postMessage({c:'log',msg:e.data.msg})}
 });
+// Ctrl+A / Cmd+A to select all visible files
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==='a'){
+    e.preventDefault();
+    var all=document.querySelectorAll('.rw:not(.dir)');
+    for(var i=0;i<all.length;i++){
+      var p=getPath(all[i]);
+      if(!sel.has(p)){
+        sel.add(p);all[i].querySelector('.ck').classList.add('on');all[i].classList.add('sel')
+      }
+    }
+    updateUI()
+  }
+});
 `;

@@ -183,7 +183,7 @@ function renderRow(node: TreeNode, depth: number): string {
     "<span class='cb' onclick='selOne(event)'><span class='ck'></span></span>" +
     `<span class='ar'>${hasKids ? "\u25BC" : isDir ? "\u25B6" : ""}</span>` +
     `<span class='ic' style='color:${color}'>${emoji}</span>` +
-    `<span class='nm'>${esc(node.name)}</span>` +
+    `<span class='nm' title='${esc(node.path)}'>${esc(node.name)}</span>` +
     size +
     "</div>"
   );
@@ -284,7 +284,7 @@ ${
     ? `<div class='tb'>
     <div class='tb-l'>
       <button class='btn' onclick='extSel()' id='bSel' disabled>${"\u{1F4E6}"} Extract Selected</button>
-      <span class='sel-cnt'><span id='cnt'>0</span> selected</span>
+      <span class='sel-cnt'><span id='cnt'>0</span> selected / <span id='tot'>${fileCount}</span> files</span>
     </div>
     <button class='btn' onclick='extAll()'>${"\u{1F4E6}"} Extract All</button>
   </div>
