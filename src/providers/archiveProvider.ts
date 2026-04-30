@@ -21,6 +21,56 @@ import { logger } from "../utils/logger";
 import { PREVIEW_CSS } from "../webview/preview.css";
 import { PREVIEW_JS } from "../webview/preview.js";
 
+// ── Temp file lifecycle ──────────────────────────────────────────
+
+const PREVIEW_TMP_DIR = path.join(
+  fs.existsSync(process.env.TEMP || "/tmp") ? process.env.TEMP || "/tmp" : "/tmp",
+  "vscode-7z-preview",
+);
+
+const trackedTempFiles = new Set<string>();
+let tempCleanupRegistered = false;
+
+function initTempCleanup(context: vscode.ExtensionContext): void {
+  if (tempCleanupRegistered) return;
+  tempCleanupRegistered = true;
+
+  // Clean up temp files from previous sessions
+  try {
+    if (fs.existsSync(PREVIEW_TMP_DIR)) {
+      for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
+        try { fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f)); } catch { /* stale */ }
+      }
+    }
+  } catch { /* best-effort */ }
+
+  // Clean up tracked files when their editor tab closes
+  context.subscriptions.push(
+    vscode.window.tabGroups.onDidChangeTabs((e) => {
+      for (const tab of e.closed) {
+        const uri =
+          (tab.input as vscode.TabInputText)?.uri ??
+          (tab.input as vscode.TabInputCustom)?.uri ??
+          (tab.input as any)?.uri;
+        if (uri instanceof vscode.Uri && trackedTempFiles.has(uri.fsPath)) {
+          try { fs.unlinkSync(uri.fsPath); } catch { /* ignore */ }
+          trackedTempFiles.delete(uri.fsPath);
+        }
+      }
+    }),
+  );
+
+  // Final cleanup on deactivation
+  context.subscriptions.push({
+    dispose: () => {
+      for (const p of trackedTempFiles) {
+        try { fs.unlinkSync(p); } catch { /* ignore */ }
+      }
+      trackedTempFiles.clear();
+    },
+  });
+}
+
 // ── Tree ───────────────────────────────────────────────────────────
 
 interface TreeNode {
@@ -39,7 +89,7 @@ function buildTree(
   // filter it out to avoid a redundant top-level node.
   const filtered = entries.filter((e) => {
     const segs = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
-    return segs[segs.length - 1] !== archiveName;
+    return !(segs.length === 1 && segs[0] === archiveName);
   });
   const root: TreeNode[] = [];
   const dirMap = new Map<string, TreeNode>();
@@ -63,18 +113,31 @@ function buildTree(
       const full = prefix ? prefix + "/" + seg : seg;
 
       if (last) {
-        const node: TreeNode = {
-          name: seg,
-          path: entry.path,
-          size: entry.size,
-          kind: entry.type === "DIRECTORY" ? "DIRECTORY" : "REGULAR_FILE",
-          children: entry.type === "DIRECTORY" ? [] : undefined,
-        };
-        siblings.push(node);
-        if (entry.type === "DIRECTORY") dirMap.set(full, node);
+        const isDir = entry.type !== "REGULAR_FILE";
+        // If a directory was already created for this path (e.g. from
+        // a child entry's traversal), merge instead of duplicating.
+        const existing = dirMap.get(full);
+        if (existing && existing.kind === "DIRECTORY") {
+          existing.size = entry.size || existing.size;
+        } else {
+          const node: TreeNode = {
+            name: seg,
+            path: entry.path,
+            size: entry.size,
+            kind: isDir ? "DIRECTORY" : "REGULAR_FILE",
+            children: isDir ? [] : undefined,
+          };
+          siblings.push(node);
+          if (isDir) dirMap.set(full, node);
+        }
       } else {
         let dir = dirMap.get(full);
         if (!dir) {
+          // If a non-directory sibling with this name already exists
+          // (e.g. tar dirs parsed as files due to missing Attributes),
+          // replace it with a proper directory node.
+          const dup = siblings.findIndex((s) => s.name === seg && s.kind !== "DIRECTORY");
+          if (dup >= 0) siblings.splice(dup, 1);
           dir = { name: seg, path: full, size: 0, kind: "DIRECTORY", children: [] };
           siblings.push(dir);
           dirMap.set(full, dir);
@@ -83,6 +146,12 @@ function buildTree(
         prefix = full;
       }
     }
+  }
+  // Collapse solitary top-level directory: many archives (especially
+  // tars) contain a single wrapper folder. Promote its children so
+  // the tree starts at the actual content level.
+  if (root.length === 1 && root[0].kind === "DIRECTORY" && root[0].children) {
+    return root[0].children;
   }
   return root;
 }
@@ -181,7 +250,7 @@ function renderRow(node: TreeNode, depth: number): string {
   }
 
   return (
-    `<div class='rw${isDir ? " dir" : ""}' style='padding-left:${depth * INDENT_PX}px' data-path='${esc(node.path)}'` +
+    `<div class='rw${isDir ? " dir" : ""}' style='padding-left:${depth * INDENT_PX}px' data-path='${esc(node.path)}' data-name='${esc(node.name)}' data-size='${node.size}'` +
     (hasKids ? " onclick='togDir(event,this)'" : " onclick='selRow(event,this)'") +
     ">" +
     guides +
@@ -276,9 +345,11 @@ function loadingHtml(): string {
 <body><div class='msg'><div class='sp'></div>${esc(t("archive.reading"))}</div></body></html>`;
 }
 
-function contentHtml(tree: TreeNode[], fileCount: number): string {
+function contentHtml(tree: TreeNode[], fileCount: number, dirCount: number): string {
   const treeHtml = renderTree(tree, 0);
   const emptyMsg = esc(t("decompress.previewTitle") + ": (empty)");
+
+  // Embed total counts as JS vars so the counter works before props arrives
 
   return `<!DOCTYPE html>
 <html><head><meta charset='UTF-8'>
@@ -288,16 +359,29 @@ ${
   fileCount > 0
     ? `<div class='tb'>
     <div class='tb-l'>
-      <button class='btn' onclick='extSel()' id='bSel' disabled>${"\u{1F4E6}"} Extract Selected</button>
-      <span class='sel-cnt'><span id='cnt'>0</span> selected / <span id='tot'>${fileCount}</span> files</span>
+      <button class='btn' onclick='extSel()' id='bSel' disabled>${"\u{1F4E6}"} Extract</button>
+      <button class='btn' onclick='delSel()' id='bDel' disabled>${"\u{1F5D1}"} Delete</button>
+      <span class='sel-cnt'><span id='cnt'>0</span></span>
+      <button class='btn-ico' title='Expand All' onclick='expandAll()'>${"\u{1F4C2}"}</button>
+      <button class='btn-ico' title='Collapse All' onclick='collapseAll()'>${"\u{1F4C1}"}</button>
     </div>
-    <button class='btn' onclick='extAll()'>${"\u{1F4E6}"} Extract All</button>
+    <div class='tb-m'>
+      <span class='sort-lbl' onclick='doSort("name")' id='sortName'>Name</span>
+      <span class='sort-lbl' onclick='doSort("size")' id='sortSize'>Size</span>
+      <span id='sortLbl' style='font-size:calc(var(--vscode-font-size)*0.78);color:var(--vscode-descriptionForeground)'></span>
+      <input class='srch' type='text' placeholder='Filter\u2026' oninput='doSearch(this.value)'>
+      <button class='btn-ico' title='Test Archive' onclick='testArchive()'>${"\u{2705}"}</button>
+      <button class='btn-ico' title='Properties' onclick='var p=document.getElementById("props");p.style.display=p.style.display=="none"?"":"none"'>${"\u{2139}"}</button>
+      <button class='btn' onclick='extAll()'>${"\u{1F4E6}"} Extract All</button>
+    </div>
   </div>
+  <div id='props' class='props' style='display:none'></div>
 <div class='tree'>${treeHtml}</div>`
     : `<div class='empty'>${emptyMsg}</div>`
 }
   <div id='s' class='st'></div>
   <script>${JS}</script>
+  <script>var _totFiles=${fileCount},_totDirs=${dirCount};</script>
 </body></html>`;
 }
 
@@ -598,7 +682,9 @@ async function extractSelected(
           if (c === 0) resolve();
           else reject(new Error(`7z x outer: ${c}`));
         };
-        js7z.callMain(["x", `/${archiveName}`, "-o/_x1", "-y"]);
+        const outerArgs = ["x", `/${archiveName}`, "-o/_x1", "-y"];
+        if (password) outerArgs.splice(1, 0, `-p${password}`);
+        js7z.callMain(outerArgs);
       });
       const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
       const innerTar = top.find((e: string) => e.endsWith(".tar"));
@@ -694,6 +780,17 @@ async function extractSelected(
 
 // ── Core setup (reused by both custom editor and browse command) ───
 
+// State tracked per-webview so multiple archive tabs don't interfere.
+interface HandlerState {
+  archiveUri: vscode.Uri;
+  archiveName: string;
+  filePath: string;
+  password: string | undefined;
+}
+
+const handlerStates = new WeakMap<vscode.Webview, HandlerState>();
+const handlerRegistered = new WeakSet<vscode.Webview>();
+
 async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Promise<void> {
   const filePath = archiveUri.fsPath;
   const archiveName = path.basename(filePath);
@@ -729,107 +826,290 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
       }
     }
     if (encrypted) {
+      const prev = handlerStates.get(webview);
+      handlerStates.set(webview, {
+        archiveUri, archiveName, filePath, password: prev?.password,
+      });
       webview.html = passwordHtml(archiveName);
-      webview.onDidReceiveMessage(
-        async (msg: { c: string; pw?: string; paths?: string[]; msg?: string }) => {
-          if (msg.c === "log") {
-            logger.debug({ event: "webview.ui", msg: msg.msg });
-            return;
-          }
-          if (msg.c === "pw" && msg.pw) {
-            logger.info({ event: "setupWebview.password.attempt" });
-            try {
-              const pwEntries = await fetchFileList(filePath, msg.pw);
-              if (pwEntries.length === 0) {
-                logger.warn({ event: "setupWebview.password.failed", reason: "empty" });
-                webview.postMessage({ c: "pwerr", t: "Wrong password" });
-                return;
-              }
-              const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
-              const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-              let pwVerified = false;
-              try {
-                js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
-                await new Promise<void>((resolve, reject) => {
-                  js7z.onExit = (c: number) =>
-                    c === 0 ? resolve() : reject(new Error(`7z t: ${c}`));
-                  js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
-                });
-                pwVerified = true;
-              } catch {
-                logger.warn({ event: "setupWebview.password.failed", reason: "7z t" });
-                webview.postMessage({ c: "pwerr", t: "Wrong password" });
-                return;
-              } finally {
-                tryCleanupJS7z(js7z);
-              }
-              if (!pwVerified) return;
-              logger.info({ event: "setupWebview.password.ok", count: pwEntries.length });
-              const capturedPw = msg.pw;
-              const tree = buildTree(pwEntries, archiveName);
-              webview.html = contentHtml(tree, pwEntries.length);
-              setupExtractHandlers(webview, archiveUri, archiveName, filePath, capturedPw);
-            } catch (err) {
-              logger.error({ event: "setupWebview.password.error", err });
-              webview.postMessage({ c: "pwerr", t: "Wrong password" });
-            }
-          }
-        },
-      );
+      if (!handlerRegistered.has(webview)) {
+        handlerRegistered.add(webview);
+        registerHandler(webview);
+      }
       return;
     }
   }
 
   logger.info({ event: "setupWebview.entries", count: entries.length });
 
+  const prev = handlerStates.get(webview);
+  handlerStates.set(webview, {
+    archiveUri, archiveName, filePath, password: prev?.password,
+  });
   const tree = buildTree(entries, archiveName);
-  webview.html = contentHtml(tree, entries.length);
+  const fileCount = entries.filter((e) => e.type !== "DIRECTORY").length;
+  const dirCount = entries.filter((e) => e.type === "DIRECTORY").length;
+  webview.html = contentHtml(tree, fileCount, dirCount);
 
-  setupExtractHandlers(webview, archiveUri, archiveName, filePath, undefined);
+  // Send archive properties
+  const totalSize = entries.reduce((s, e) => s + (e.size || 0), 0);
+  const ext = getFullExt(filePath);
+  setTimeout(() => {
+    webview.postMessage({
+      c: "props",
+      name: archiveName,
+      format: ext,
+      count: entries.length,
+      files: fileCount,
+      dirs: dirCount,
+      size: formatCompactSize(totalSize),
+    });
+  }, 100);
+
+  if (!handlerRegistered.has(webview)) {
+    handlerRegistered.add(webview);
+    registerHandler(webview);
+  }
 }
 
-function setupExtractHandlers(
-  webview: vscode.Webview,
-  archiveUri: vscode.Uri,
-  archiveName: string,
+async function deleteFromArchive(
+  archivePath: string,
+  selectedPaths: string[],
+  password?: string,
+): Promise<void> {
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    const dArgs = ["d", `/${archiveName}`, "-y"];
+    if (password) dArgs.splice(1, 0, `-p${password}`);
+    dArgs.push(...selectedPaths.map((p) => p.replace(/\\/g, "/")));
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z d: ${c}`)));
+      js7z.callMain(dArgs);
+    });
+    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+    fs.writeFileSync(archivePath, Buffer.from(updated));
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}
+
+async function previewFileFromArchive(
+  archivePath: string,
   filePath: string,
-  password: string | undefined,
-): void {
+  password?: string,
+): Promise<void> {
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
+  const normalizedFile = filePath.replace(/\\/g, "/");
+
+  let fileData: ArrayBuffer;
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.mkdir("/_pv");
+
+    // Extract everything. For wrapped formats (tar.gz etc.) 7z can't
+    // resolve paths into the inner tar, so the outer layer decompresses
+    // into a single .tar which we then unwrap in a fresh instance.
+    // For normal archives (7z, zip, tar, wim) files land directly in /_pv.
+    const xArgs = ["x", `/${archiveName}`, "-o/_pv", "-y"];
+    if (password) xArgs.splice(1, 0, `-p${password}`);
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) =>
+        c === 0 ? resolve() : reject(new Error(`7z x: ${c}`));
+      js7z.callMain(xArgs);
+    });
+
+    const top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+    if (top.length === 1 && top[0].endsWith(".tar")) {
+      fileData = await unwrapAndExtract(js7z, `/_pv/${top[0]}`, normalizedFile, password);
+    } else {
+      // Normal archive — resolve the requested file at its VFS path
+      const vfsPath = `/_pv/${normalizedFile}`;
+      try {
+        fileData = js7z.FS.readFile(vfsPath, { encoding: "binary" });
+      } catch {
+        throw new Error(`Preview file not found: ${normalizedFile}`);
+      }
+    }
+
+    const buf = Buffer.from(fileData);
+    fs.mkdirSync(PREVIEW_TMP_DIR, { recursive: true });
+    const ext = path.extname(normalizedFile);
+    const base = path.basename(normalizedFile, ext);
+    const tmpPath = path.join(PREVIEW_TMP_DIR, `${base}_${Date.now()}${ext}`);
+    fs.writeFileSync(tmpPath, buf);
+    trackedTempFiles.add(tmpPath);
+    const uri = vscode.Uri.file(tmpPath);
+    await vscode.commands.executeCommand("vscode.open", uri, {
+      preview: true,
+      preserveFocus: false,
+      viewColumn: vscode.ViewColumn.Beside,
+    });
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}
+
+/** Extract a target file from an inner .tar in a fresh 7z instance. */
+async function unwrapAndExtract(
+  js7z: JS7zInstance,
+  tarPath: string,
+  target: string,
+  password?: string,
+): Promise<ArrayBuffer> {
+  const tarData = js7z.FS.readFile(tarPath, { encoding: "binary" });
+  const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    js7z2.FS.writeFile("/_inner.tar", new Uint8Array(tarData));
+    js7z2.FS.mkdir("/_pv2");
+    const args = ["x", "/_inner.tar", "-o/_pv2", "-y", target];
+    if (password) args.splice(1, 0, `-p${password}`);
+    await new Promise<void>((resolve, reject) => {
+      js7z2.onExit = (c: number) =>
+        c === 0 ? resolve() : reject(new Error(`7z x inner: ${c}`));
+      js7z2.callMain(args);
+    });
+    const vfsPath = `/_pv2/${target}`;
+    return js7z2.FS.readFile(vfsPath, { encoding: "binary" });
+  } finally {
+    tryCleanupJS7z(js7z2);
+  }
+}
+
+async function testArchive(archivePath: string, password?: string): Promise<string> {
+  const data = fs.readFileSync(archivePath);
+  const archiveName = path.basename(archivePath);
+  let stdout = "";
+  const js7z = await JS7z({
+    print: (text: string) => {
+      stdout += text + "\n";
+    },
+    printErr: () => {},
+  });
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    const tArgs = ["t", `/${archiveName}`];
+    if (password) tArgs.splice(1, 0, `-p${password}`);
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) =>
+        c === 0 ? resolve() : reject(new Error(`7z t: ${c}\n${stdout}`));
+      js7z.callMain(tArgs);
+    });
+    const ok = stdout.includes("Everything is Ok");
+    return ok
+      ? "Archive integrity test passed"
+      : "Test completed with warnings:\n" + stdout.slice(-200);
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}
+
+function registerHandler(webview: vscode.Webview): void {
   webview.onDidReceiveMessage(
-    async (msg: { c: string; paths?: string[]; msg?: string; flat?: boolean }) => {
+    async (msg: {
+      c: string;
+      paths?: string[];
+      msg?: string;
+      flat?: boolean;
+      path?: string;
+      dir?: string;
+      pw?: string;
+    }) => {
+      const s = handlerStates.get(webview);
+      if (!s) return;
+
       if (msg.c === "log") {
         logger.debug({ event: "webview.ui", msg: msg.msg });
         return;
       }
-      if (msg.c === "extAll") {
-        logger.info({ event: "webview.extAll", archiveName });
+
+      // ── Password submit (encrypted archives) ──
+      if (msg.c === "pw" && msg.pw) {
+        logger.info({ event: "webview.password.attempt" });
         try {
-          await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", archiveUri);
-          webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
+          const pwEntries = await fetchFileList(s.filePath, msg.pw);
+          if (pwEntries.length === 0) {
+            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+            return;
+          }
+          const data = await vscode.workspace.fs.readFile(vscode.Uri.file(s.filePath));
+          const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+          let pwVerified = false;
+          try {
+            js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
+            await new Promise<void>((resolve, reject) => {
+              js7z.onExit = (c: number) =>
+                c === 0 ? resolve() : reject(new Error(`7z t: ${c}`));
+              js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
+            });
+            pwVerified = true;
+          } catch {
+            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+            return;
+          } finally {
+            tryCleanupJS7z(js7z);
+          }
+          if (!pwVerified) return;
+          logger.info({ event: "webview.password.ok", count: pwEntries.length });
+          s.password = msg.pw;
+          const tree = buildTree(pwEntries, s.archiveName);
+          const fileCount2 = pwEntries.filter((e) => e.type !== "DIRECTORY").length;
+          const dirCount2 = pwEntries.filter((e) => e.type === "DIRECTORY").length;
+          webview.html = contentHtml(tree, fileCount2, dirCount2);
+          const totalSize2 = pwEntries.reduce((sum, e) => sum + (e.size || 0), 0);
+          const ext2 = getFullExt(s.filePath);
+          setTimeout(() => {
+            webview.postMessage({
+              c: "props",
+              name: s.archiveName,
+              format: ext2,
+              count: pwEntries.length,
+              files: fileCount2,
+              dirs: dirCount2,
+              size: formatCompactSize(totalSize2),
+            });
+          }, 100);
+        } catch (err) {
+          logger.error({ event: "webview.password.error", err });
+          webview.postMessage({ c: "pwerr", t: "Wrong password" });
+        }
+        return;
+      }
+
+      // ── Extract All ──
+      if (msg.c === "extAll") {
+        logger.info({ event: "webview.extAll", archiveName: s.archiveName });
+        try {
+          await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", s.archiveUri);
+          webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
         } catch (err) {
           logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
         }
       }
 
+      // ── Extract Selected ──
       if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
         logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
         try {
-          await extractSelected(filePath, msg.paths, password, msg.flat);
-          webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
+          await extractSelected(s.filePath, msg.paths, s.password, msg.flat);
+          webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
         } catch (err) {
           logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
         }
       }
 
+      // ── Copy ──
       if (msg.c === "copy" && Array.isArray(msg.paths) && msg.paths.length > 0) {
         copiedPaths = msg.paths;
-        copiedArchivePath = filePath;
-        copiedPassword = password;
+        copiedArchivePath = s.filePath;
+        copiedPassword = s.password;
         copiedFlat = msg.flat;
         logger.info({ event: "webview.copy", count: msg.paths.length, flat: msg.flat });
-
         const pasteAction = t("archive.pasteAction");
         vscode.window
           .showInformationMessage(t("archive.copied", String(msg.paths.length)), pasteAction)
@@ -838,6 +1118,44 @@ function setupExtractHandlers(
               vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
             }
           });
+      }
+
+      // ── Delete ──
+      if (msg.c === "delSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+        logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
+        try {
+          await deleteFromArchive(s.filePath, msg.paths, s.password);
+          webview.postMessage({
+            c: "del-ok",
+            t: "Deleted " + msg.paths.length + " item(s). Reloading...",
+          });
+          await setupWebview(webview, s.archiveUri);
+        } catch (err) {
+          logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
+      }
+
+      // ── Preview ──
+      if (msg.c === "preview" && typeof msg.path === "string") {
+        logger.info({ event: "webview.preview", path: msg.path });
+        try {
+          await previewFileFromArchive(s.filePath, msg.path, s.password);
+        } catch (err) {
+          logger.error({ event: "webview.preview.failed", err }, (err as Error).message);
+          vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
+        }
+      }
+
+      // ── Test ──
+      if (msg.c === "test") {
+        try {
+          const result = await testArchive(s.filePath, s.password);
+          webview.postMessage({ c: "ok", t: result });
+        } catch (err) {
+          logger.error({ event: "webview.test.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
       }
     },
   );
@@ -860,6 +1178,8 @@ class ArchiveEditorProvider implements vscode.CustomReadonlyEditorProvider {
 }
 
 export function registerArchiveEditor(context: vscode.ExtensionContext): void {
+  initTempCleanup(context);
+
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider("archiveViewer", new ArchiveEditorProvider(), {
       webviewOptions: { retainContextWhenHidden: true },
