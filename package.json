@@ -200,27 +200,7 @@
           "description": "Where to place extracted/compressed files by default."
         }
       }
-    },
-    "keybindings": [
-      {
-        "command": "yjdyamv.smart-archive.compress",
-        "key": "ctrl+alt+c",
-        "mac": "cmd+alt+c",
-        "when": "filesExplorerFocus || editorFocus"
-      },
-      {
-        "command": "yjdyamv.smart-archive.decompress",
-        "key": "ctrl+alt+d",
-        "mac": "cmd+alt+d",
-        "when": "filesExplorerFocus || editorFocus"
-      },
-      {
-        "command": "yjdyamv.smart-archive.browse",
-        "key": "ctrl+alt+b",
-        "mac": "cmd+alt+b",
-        "when": "filesExplorerFocus || editorFocus"
-      }
-    ]
+    }
   },
   "scripts": {
     "compile": "tsc -p .",
