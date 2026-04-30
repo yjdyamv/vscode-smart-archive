@@ -38,6 +38,7 @@ import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
 import { zstdCompress } from "./zstd-codec";
 import { logger } from "../utils/logger";
+import { checkFileSize } from "../utils/security";
 
 // js7z-tools is a CommonJS module — use require
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -80,7 +81,7 @@ function copyInputsToFS(
       copyDirToFS(js7z, localPath, fsTarget, token);
     } else {
       const data = fs.readFileSync(localPath);
-      js7z.FS.writeFile(fsTarget, new Uint8Array(data));
+      js7z.FS.writeFile(fsTarget, data);
     }
     fsPaths.push(fsTarget);
   }
@@ -282,9 +283,10 @@ export async function decompressWith7z(
 
   try {
     // Read archive into virtual FS
+    checkFileSize(fs.statSync(options.inputPath).size);
     const data = fs.readFileSync(options.inputPath);
     const archiveName = getBaseName(options.inputPath);
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
     js7z.FS.mkdir(OUTPUT_DIR);
 
     // Build extraction args (password inserted before archive path)
@@ -329,11 +331,12 @@ async function unwrapInnerTar(
   const tarPath = path.join(outputDir, tarFiles[0]);
   progress.report({ message: t("decompress.unwrapTar") });
 
+  checkFileSize(fs.statSync(tarPath).size);
   const tarData = fs.readFileSync(tarPath);
   const js7z = await JS7z();
 
   try {
-    js7z.FS.writeFile("/_inner.tar", new Uint8Array(tarData));
+    js7z.FS.writeFile("/_inner.tar", tarData);
     js7z.FS.mkdir("/_inner_out");
 
     await run7z(js7z, ["x", "/_inner.tar", "-o/_inner_out"], progress);
@@ -361,6 +364,7 @@ export async function listFiles(
   password = "",
 ): Promise<{ path: string; size: number; type: string }[]> {
   logger.debug({ event: "listFiles.start", filePath, hasPassword: !!password });
+  checkFileSize(fs.statSync(filePath).size);
   const data = fs.readFileSync(filePath);
   let stdout = "";
   let stderr = "";
@@ -379,7 +383,7 @@ export async function listFiles(
 
   try {
     const archiveName = getBaseName(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
 
     // Dedicated runner — avoids run7z which overwrites js7z.printErr
     await new Promise<void>((resolve, reject) => {
@@ -452,6 +456,7 @@ export async function listFiles(
  * @returns true=encrypted, false=not encrypted
  */
 export async function isEncrypted(filePath: string): Promise<boolean> {
+  checkFileSize(fs.statSync(filePath).size);
   const data = fs.readFileSync(filePath);
   let stdout = "",
     stderr = "";
@@ -466,7 +471,7 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
 
   try {
     const archiveName = getBaseName(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
 
     try {
       await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);

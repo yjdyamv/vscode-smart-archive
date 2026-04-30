@@ -85,25 +85,31 @@ function buildTree(
   entries: { path: string; size: number; type: string }[],
   archiveName: string,
 ): TreeNode[] {
-  // Some archivers include the archive name itself as a root entry —
-  // filter it out to avoid a redundant top-level node.
-  const filtered = entries.filter((e) => {
-    const segs = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
-    return !(segs.length === 1 && segs[0] === archiveName);
-  });
+  // Pre-normalize paths to avoid repeated replace+split per entry
+  interface EntryWithParts {
+    entry: (typeof entries)[0];
+    parts: string[];
+  }
+  const normed: EntryWithParts[] = [];
+  for (const e of entries) {
+    const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
+    // Filter out archive-name-as-root entries
+    if (parts.length === 1 && parts[0] === archiveName) continue;
+    normed.push({ entry: e, parts });
+  }
+
   const root: TreeNode[] = [];
   const dirMap = new Map<string, TreeNode>();
 
   // Sort directories before files, then alphabetically
-  const sorted = [...filtered].sort((a, b) => {
-    const aD = a.type !== "REGULAR_FILE" ? 0 : 1;
-    const bD = b.type !== "REGULAR_FILE" ? 0 : 1;
+  normed.sort((a, b) => {
+    const aD = a.entry.type !== "REGULAR_FILE" ? 0 : 1;
+    const bD = b.entry.type !== "REGULAR_FILE" ? 0 : 1;
     if (aD !== bD) return aD - bD;
-    return a.path.localeCompare(b.path);
+    return a.entry.path.localeCompare(b.entry.path);
   });
 
-  for (const entry of sorted) {
-    const parts = entry.path.replace(/\\/g, "/").split("/").filter(Boolean);
+  for (const { entry, parts } of normed) {
     let siblings = root;
     let prefix = "";
 
@@ -423,7 +429,7 @@ async function listViaExtract(
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
     js7z.FS.mkdir("/_ls");
     const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
     if (password) args.splice(1, 0, `-p${password}`);
@@ -675,7 +681,7 @@ async function extractSelected(
     const archiveName = path.basename(archivePath);
     const js7z = await JS7z({ print: () => {}, printErr: () => {} });
     try {
-      js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+      js7z.FS.writeFile(`/${archiveName}`, data);
       js7z.FS.mkdir("/_x1");
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (c: number) => {
@@ -737,7 +743,7 @@ async function extractSelected(
   });
 
   try {
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
     js7z.FS.mkdir("/out");
 
     try {
@@ -880,7 +886,7 @@ async function deleteFromArchive(
   const archiveName = path.basename(archivePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
     const dArgs = ["d", `/${archiveName}`, "-y"];
     if (password) dArgs.splice(1, 0, `-p${password}`);
     dArgs.push(...selectedPaths.map((p) => p.replace(/\\/g, "/")));
@@ -907,7 +913,7 @@ async function previewFileFromArchive(
   let fileData: ArrayBuffer;
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
     js7z.FS.mkdir("/_pv");
 
     // Extract everything. For wrapped formats (tar.gz etc.) 7z can't
@@ -990,7 +996,7 @@ async function testArchive(archivePath: string, password?: string): Promise<stri
     printErr: () => {},
   });
   try {
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.writeFile(`/${archiveName}`, data);
     const tArgs = ["t", `/${archiveName}`];
     if (password) tArgs.splice(1, 0, `-p${password}`);
     await new Promise<void>((resolve, reject) => {
