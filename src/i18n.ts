@@ -276,6 +276,28 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "（耗时 {0}）",
     "zh-tw": "（耗時 {0}）",
   },
+
+  // ---- Copy / Paste ----
+  "archive.copyNone": {
+    en: "No files copied from archive. Select files in the archive preview and press Ctrl+C first.",
+    "zh-cn": "尚未从压缩包复制文件。请先在预览中选中文件并按 Ctrl+C。",
+    "zh-tw": "尚未從壓縮檔複製檔案。請先在預覽中選取檔案並按 Ctrl+C。",
+  },
+  "archive.pasteHere": {
+    en: "Paste extracted files here",
+    "zh-cn": "将复制的文件解压到此处",
+    "zh-tw": "將複製的檔案解壓到此處",
+  },
+  "archive.copied": {
+    en: "Copied {0} item(s) from archive",
+    "zh-cn": "已从压缩包复制 {0} 个项目",
+    "zh-tw": "已從壓縮檔複製 {0} 個項目",
+  },
+  "archive.pasteAction": {
+    en: "Paste Files...",
+    "zh-cn": "粘贴文件...",
+    "zh-tw": "貼上檔案...",
+  },
 };
 
 /**

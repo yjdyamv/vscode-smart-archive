@@ -404,6 +404,40 @@ function readDirEntries(
   return results;
 }
 
+// ── Copy/paste state ──────────────────────────────────────────────
+
+let copiedPaths: string[] | null = null;
+let copiedArchivePath = "";
+let copiedPassword: string | undefined;
+let copiedFlat: boolean | undefined;
+
+export function pasteCopiedFromArchive(): void {
+  if (!copiedPaths || copiedPaths.length === 0 || !copiedArchivePath) {
+    vscode.window.showInformationMessage(t("archive.copyNone"));
+    return;
+  }
+  const paths = copiedPaths;
+  const source = copiedArchivePath;
+  const pw = copiedPassword;
+  const fl = copiedFlat;
+  vscode.window
+    .showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      canSelectMany: false,
+      openLabel: t("archive.pasteHere"),
+    })
+    .then(async (uris) => {
+      if (!uris || uris.length === 0) return;
+      try {
+        await extractSelected(source, paths, pw, fl, uris[0].fsPath);
+      } catch (err) {
+        logger.error({ event: "paste.failed", err }, (err as Error).message);
+        vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
+      }
+    });
+}
+
 // ── Extract helpers ────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -501,11 +535,12 @@ async function extractSelected(
   selectedPaths: string[],
   password?: string,
   flat?: boolean,
+  outputOverride?: string,
 ): Promise<void> {
   const ext = getFullExt(archivePath);
   const isRar = isRarExt(ext);
   const isWrapped = isWrappedFormat(ext);
-  const outputDir = getOutputPath(archivePath, "extracted");
+  const outputDir = outputOverride || getOutputPath(archivePath, "extracted");
 
   if (isRar) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -751,6 +786,26 @@ function setupExtractHandlers(
         logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
         webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
       }
+    }
+
+    if (msg.c === "copy" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+      copiedPaths = msg.paths;
+      copiedArchivePath = filePath;
+      copiedPassword = password;
+      copiedFlat = msg.flat;
+      logger.info({ event: "webview.copy", count: msg.paths.length, flat: msg.flat });
+
+      const pasteAction = t("archive.pasteAction");
+      vscode.window
+        .showInformationMessage(
+          t("archive.copied", String(msg.paths.length)),
+          pasteAction,
+        )
+        .then((action) => {
+          if (action === pasteAction) {
+            vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
+          }
+        });
     }
   });
 }

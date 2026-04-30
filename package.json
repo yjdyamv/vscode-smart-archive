@@ -19,6 +19,7 @@
     "onCommand:yjdyamv.smart-archive.compress",
     "onCommand:yjdyamv.smart-archive.decompress",
     "onCommand:yjdyamv.smart-archive.browse",
+    "onCommand:yjdyamv.smart-archive.paste",
     "onCustomEditor:archiveViewer"
   ],
   "main": "./out/extension.js",
@@ -106,6 +107,10 @@
       {
         "command": "yjdyamv.smart-archive.browse",
         "title": "Smart Archive: Browse Contents"
+      },
+      {
+        "command": "yjdyamv.smart-archive.paste",
+        "title": "Smart Archive: Paste Copied Files"
       }
     ],
     "menus": {
