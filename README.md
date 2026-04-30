@@ -7,12 +7,16 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 - **Compress** to 7z, ZIP, TAR, WIM, GZip, BZip2, XZ, tar.gz, tar.bz2, tar.xz, tar.zst
 - **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
-- **Archive browser** — custom editor with tree view, checkbox selection, partial extract
+- **Archive browser** — custom editor with tree view, checkbox selection, partial extract, search, sort
+- **File preview** — double-click any file in the archive to open it in VSCode
+- **In-place editing** — delete files from within archives (`7z d`)
+- **Copy/paste** — copy files from archive to local filesystem via `Ctrl+C` / `Ctrl+V`
+- **Integrity test** — verify archives with `7z t`
+- **Multi-volume RAR** — auto-resolves `.r00`–`.r99` to the base `.rar`
 - **RAR support** — `libarchive-wasm` handles RAR extraction (RAR4 + RAR5)
 - **Bilingual UI** — English / Chinese (auto-detected from VS Code locale)
 - **Security** — Zip Slip protection, zip bomb size limits, path traversal blocking
-- **Folder compression** — nested directories preserved in archive
-- **Multi-select** — select multiple files/folders, compress into one archive
+- **CJK filenames** — recovers GBK / Shift-JIS / EUC-KR encoded filenames in old archives
 - **Context menu** — right-click any file or folder in VS Code Explorer
 - **Keyboard shortcuts** — `Ctrl+Alt+C` compress, `Ctrl+Alt+D` decompress, `Ctrl+Alt+B` browse
 
@@ -48,9 +52,9 @@ RAR files are auto-detected and processed by `libarchive-wasm`. All other format
 | tar.bz2 | — | TAR + BZip2 compressed archive |
 | tar.xz | — | TAR + XZ compressed archive |
 | tar.zst | — | TAR + Zstandard compressed archive |
-| gz | — | Single-file GZip |
-| bz2 | — | Single-file BZip2 |
-| xz | — | Single-file XZ (LZMA2) |
+| gz | — | Single-file GZip (auto-wraps in tar for folders) |
+| bz2 | — | Single-file BZip2 (auto-wraps in tar for folders) |
+| xz | — | Single-file XZ (auto-wraps in tar for folders) |
 | wim | — | Windows Imaging Format |
 | rar | — | **Extraction only** — creation not supported by free tools |
 
@@ -63,7 +67,7 @@ RAR files are auto-detected and processed by `libarchive-wasm`. All other format
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `smart-archive.defaultFormat` | `7z` | Default archive format |
-| `smart-archive.defaultCompressionLevel` | `5` | Compression level (0–9) |
+| `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
 | `smart-archive.defaultOutputDir` | `source` | Output location: next to source file or prompt |
 
 ## Development
