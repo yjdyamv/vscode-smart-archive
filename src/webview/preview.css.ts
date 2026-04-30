@@ -65,6 +65,14 @@ body{
   border:solid var(--vscode-checkbox-selectForeground,#2ea043);
   border-width:0 2px 2px 0;transform:rotate(45deg)
 }
+.ck.part{
+  background:var(--vscode-checkbox-selectBackground,#0e639c);
+  border-color:var(--vscode-checkbox-selectBorder,#007acc)
+}
+.ck.part::after{
+  content:'';position:absolute;left:22%;top:42%;width:40%;height:0;
+  border-top:2px solid var(--vscode-checkbox-selectForeground,#2ea043)
+}
 .ar{width:calc(var(--vscode-font-size) * 1.2);flex-shrink:0;text-align:center;font-size:10px;color:var(--vscode-descriptionForeground)}
 .ic{width:calc(var(--vscode-font-size) * 1.2);text-align:center;flex-shrink:0;font-size:calc(var(--vscode-font-size) * 1.1);line-height:calc(var(--vscode-font-size) * 1.8)}
 .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}

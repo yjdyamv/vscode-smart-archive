@@ -419,6 +419,75 @@ function tryCleanupJS7z(instance: JS7zInstance): void {
 }
 
 /**
+ * Copy from virtual FS to local FS, stripping the parent prefix of each
+ * selected directory so that output paths are relative to the selection root.
+ *
+ * Example: selected "a/b", file "/out/a/b/c.txt" → "b/c.txt"
+ */
+function copyFromFSWithStrip(
+  js7z: JS7zInstance,
+  fsDir: string,
+  localDir: string,
+  selectedPaths: string[],
+): void {
+  const normSel = selectedPaths.map((p) => p.replace(/\\/g, "/"));
+  const strips = new Map<string, string>();
+  for (const sp of normSel) {
+    const parent = sp.substring(0, Math.max(sp.lastIndexOf("/"), 0));
+    strips.set(sp, parent);
+  }
+
+  const walk = (currentDir: string, relPart: string) => {
+    const entries = js7z.FS.readdir(currentDir);
+    for (const name of entries) {
+      if (name === "." || name === "..") continue;
+      const full = currentDir === "/" ? `/${name}` : `${currentDir}/${name}`;
+      const rel = relPart ? `${relPart}/${name}` : name;
+
+      try {
+        const st = js7z.FS.stat(full);
+        if (js7z.FS.isDir(st.mode)) {
+          walk(full, rel);
+          continue;
+        }
+      } catch {
+        /* fall through to read-as-file */
+      }
+
+      let outRel = rel;
+      for (const sp of normSel) {
+        if (rel === sp || rel.startsWith(sp + "/")) {
+          const strip = strips.get(sp) || "";
+          if (strip) outRel = rel.slice(strip.length + 1);
+          break;
+        }
+      }
+
+      const segments = outRel.split("/");
+      const outPath = path.join(localDir, ...segments);
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      const data = js7z.FS.readFile(full, { encoding: "binary" });
+
+      let finalPath = outPath;
+      const dir = path.dirname(outPath);
+      const base = path.basename(outPath);
+      const extIdx = base.lastIndexOf(".");
+      const stem = extIdx > 0 ? base.slice(0, extIdx) : base;
+      const ext = extIdx > 0 ? base.slice(extIdx) : "";
+      let counter = 1;
+      while (fs.existsSync(finalPath)) {
+        finalPath = path.join(dir, `${stem}_${counter}${ext}`);
+        counter++;
+      }
+
+      fs.writeFileSync(finalPath, Buffer.from(data));
+    }
+  };
+
+  walk(fsDir, "");
+}
+
+/**
  * Extract selected files from an archive (webview "Extract Selected").
  *
  * Three code paths based on archive type:
@@ -431,6 +500,7 @@ async function extractSelected(
   archivePath: string,
   selectedPaths: string[],
   password?: string,
+  flat?: boolean,
 ): Promise<void> {
   const ext = getFullExt(archivePath);
   const isRar = isRarExt(ext);
@@ -479,11 +549,15 @@ async function extractSelected(
         await new Promise<void>((resolve, reject) => {
           js7z2.onExit = (c: number) => {
             if (c === 0) resolve();
-            else reject(new Error(`7z x inner: ${c}`));
+            else reject(new Error(`7z ${flat?"e":"x"} inner: ${c}`));
           };
-          js7z2.callMain(["x", `/${innerTar}`, "-o/_x2", "-y", ...normalizedPaths]);
+          js7z2.callMain([flat ? "e" : "x", `/${innerTar}`, "-o/_x2", flat ? "-aou" : "-y", ...normalizedPaths]);
         });
-        copyDirFromFS(js7z2, "/_x2", outputDir);
+        if (flat) {
+          copyDirFromFS(js7z2, "/_x2", outputDir);
+        } else {
+          copyFromFSWithStrip(js7z2, "/_x2", outputDir, selectedPaths);
+        }
         await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
         vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       } finally {
@@ -515,15 +589,19 @@ async function extractSelected(
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (code: number) => {
           if (code === 0) resolve();
-          else reject(new Error(`7z x: ${code}\n${stderr}`));
+          else reject(new Error(`7z ${flat?"e":"x"}: ${code}\n${stderr}`));
         };
         const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
-        const xArgs = ["x", `/${archiveName}`, "-o/out", "-y"];
-        if (password) xArgs.splice(1, 0, `-p${password}`);
-        xArgs.push(...normalizedPaths);
-        js7z.callMain(xArgs);
+        const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
+        if (password) eArgs.splice(1, 0, `-p${password}`);
+        eArgs.push(...normalizedPaths);
+        js7z.callMain(eArgs);
       });
-      copyDirFromFS(js7z, "/out", outputDir);
+      if (flat) {
+        copyDirFromFS(js7z, "/out", outputDir);
+      } else {
+        copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths);
+      }
       await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
       vscode.window.showInformationMessage(t("decompress.done") + outputDir);
     } catch (err) {
@@ -648,7 +726,7 @@ function setupExtractHandlers(
   filePath: string,
   password: string | undefined,
 ): void {
-  webview.onDidReceiveMessage(async (msg: { c: string; paths?: string[]; msg?: string }) => {
+  webview.onDidReceiveMessage(async (msg: { c: string; paths?: string[]; msg?: string; flat?: boolean }) => {
     if (msg.c === "log") {
       logger.debug({ event: "webview.ui", msg: msg.msg });
       return;
@@ -667,7 +745,7 @@ function setupExtractHandlers(
     if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
       logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
       try {
-        await extractSelected(filePath, msg.paths, password);
+        await extractSelected(filePath, msg.paths, password, msg.flat);
         webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
       } catch (err) {
         logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
