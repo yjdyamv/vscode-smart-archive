@@ -85,12 +85,10 @@ const p = pino(
       },
     },
   },
+  // Writing directly to stderr avoids pino.transport() spawning a worker thread
   pino.multistream([
     { stream: channelStream },
-    {
-      level: "info",
-      stream: pino.transport({ target: "pino/file", options: { destination: 2 } }),
-    },
+    { level: "info", stream: process.stderr },
   ]),
 );
 

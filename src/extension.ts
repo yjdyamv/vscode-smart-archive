@@ -1,24 +1,9 @@
 /**
  * Extension entry point — Smart Archive VSCode Extension
  *
- * Handles the VSCode extension lifecycle: activation and deactivation.
- * Registers two commands:
- *   - yjdyamv.smart-archive.compress    → compressCommand
- *   - yjdyamv.smart-archive.decompress  → decompressCommand
- *
- * Architecture overview:
- * ```
- * extension.ts (entry)
- *   ├── commands/compress.ts     → engines/js7z-engine.ts
- *   ├── commands/decompress.ts   → engines/js7z-engine.ts
- *   │                             → engines/libarchive-engine.ts
- *   ├── engines/js7z-engine.ts   → js7z-tools (7-Zip WASM)
- *   ├── engines/libarchive-engine.ts → libarchive.js (libarchive WASM)
- *   ├── ui/prompts.ts            → VSCode dialogs
- *   ├── i18n.ts                  → bilingual UI strings
- *   ├── utils/fs.ts              → local ↔ virtual FS sync
- *   └── utils/path.ts            → Unix-style path helpers
- * ```
+ * Registers three commands (compress, decompress, browse) and the
+ * custom archive viewer editor. All heavy lifting is delegated to
+ * the commands/ and engines/ modules.
  *
  * @module extension
  */

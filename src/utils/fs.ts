@@ -105,7 +105,8 @@ function _copyDirFromFS(
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     if (entry === "." || entry === "..") continue;
 
-    // Reject path traversal in entry names
+    // Reject entries with embedded path separators or null bytes —
+    // these indicate a malicious archive attempting path traversal
     if (entry.includes("/") || entry.includes("\\") || entry.includes("\0")) {
       logger.warn({ event: "fs.pathTraversal", entry }, "Path traversal blocked");
       continue;
@@ -114,6 +115,10 @@ function _copyDirFromFS(
     const fsEntry = path.posix.join(fsDir, entry);
     const localEntry = safeJoinPath(localDir, entry);
 
+    // Try stat-based copy first (handles directories via recursion).
+    // If stat fails (e.g. the entry is a symlink that Emscripten FS
+    // reports as a regular file but can't stat), fall back to reading
+    // as a raw file — this covers edge cases with certain archive formats.
     try {
       const stat = js7z.FS.stat(fsEntry);
       if (js7z.FS.isDir(stat.mode)) {
