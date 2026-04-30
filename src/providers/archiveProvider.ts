@@ -567,13 +567,19 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     return;
   }
 
-  // Encrypted archive — show password dialog inline
-  if (entries.length === 0 && isEncryptableExt(getFullExt(filePath))) {
-    let encrypted = false;
-    try {
-      encrypted = await isEncrypted(filePath);
-    } catch {
-      /* can't detect */
+  // Encrypted archive detection:
+  // - 7z format: listing fails without password → entries.length === 0
+  // - ZIP format: listing succeeds without password (7z can read file list
+  //   but not content) → entries.length > 0 but archive is still encrypted.
+  // For all encryptable formats, verify with isEncrypted() if listing succeeded.
+  if (isEncryptableExt(getFullExt(filePath))) {
+    let encrypted = entries.length === 0;
+    if (!encrypted) {
+      try {
+        encrypted = await isEncrypted(filePath);
+      } catch {
+        /* can't detect — proceed without password */
+      }
     }
     if (encrypted) {
       webview.html = passwordHtml(archiveName);
