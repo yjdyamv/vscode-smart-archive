@@ -16,6 +16,7 @@ import { t, formatCompactSize } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
 import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { isRarExt } from "../utils/rar";
+import { checkFileSize } from "../utils/security";
 import { logger } from "../utils/logger";
 import { PREVIEW_CSS } from "../webview/preview.css";
 import { PREVIEW_JS } from "../webview/preview.js";
@@ -416,6 +417,10 @@ export function pasteCopiedFromArchive(): void {
     vscode.window.showInformationMessage(t("archive.copyNone"));
     return;
   }
+  if (!fs.existsSync(copiedArchivePath)) {
+    vscode.window.showErrorMessage(t("archive.sourceMissing", copiedArchivePath));
+    return;
+  }
   const paths = copiedPaths;
   const source = copiedArchivePath;
   const pw = copiedPassword;
@@ -497,10 +502,32 @@ function copyFromFSWithStrip(
         }
       }
 
+      // Validate: reject path traversal attempts (.. segments, absolute paths)
+      let blocked = false;
       const segments = outRel.split("/");
+      for (const seg of segments) {
+        if (seg === ".." || seg === "." || seg.includes("\\") || seg.includes("\0")) {
+          blocked = true;
+          break;
+        }
+      }
+      if (blocked) {
+        logger.warn({ event: "fs.pathTraversal.strip", path: outRel }, "Path traversal blocked");
+        continue;
+      }
+
       const outPath = path.join(localDir, ...segments);
+      // Defence-in-depth: verify resolved path is still under localDir
+      if (!outPath.startsWith(localDir + path.sep) && outPath !== localDir) {
+        logger.warn(
+          { event: "fs.pathTraversal.resolve", path: outRel, resolved: outPath },
+          "Path traversal blocked",
+        );
+        continue;
+      }
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       const data = js7z.FS.readFile(full, { encoding: "binary" });
+      checkFileSize(data.byteLength);
 
       let finalPath = outPath;
       const dir = path.dirname(outPath);
@@ -510,6 +537,7 @@ function copyFromFSWithStrip(
       const ext = extIdx > 0 ? base.slice(extIdx) : "";
       let counter = 1;
       while (fs.existsSync(finalPath)) {
+        if (counter > 999) throw new Error(`Failed to resolve collision for ${outPath}`);
         finalPath = path.join(dir, `${stem}_${counter}${ext}`);
         counter++;
       }
@@ -584,9 +612,15 @@ async function extractSelected(
         await new Promise<void>((resolve, reject) => {
           js7z2.onExit = (c: number) => {
             if (c === 0) resolve();
-            else reject(new Error(`7z ${flat?"e":"x"} inner: ${c}`));
+            else reject(new Error(`7z ${flat ? "e" : "x"} inner: ${c}`));
           };
-          js7z2.callMain([flat ? "e" : "x", `/${innerTar}`, "-o/_x2", flat ? "-aou" : "-y", ...normalizedPaths]);
+          js7z2.callMain([
+            flat ? "e" : "x",
+            `/${innerTar}`,
+            "-o/_x2",
+            flat ? "-aou" : "-y",
+            ...normalizedPaths,
+          ]);
         });
         if (flat) {
           copyDirFromFS(js7z2, "/_x2", outputDir);
@@ -624,7 +658,7 @@ async function extractSelected(
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (code: number) => {
           if (code === 0) resolve();
-          else reject(new Error(`7z ${flat?"e":"x"}: ${code}\n${stderr}`));
+          else reject(new Error(`7z ${flat ? "e" : "x"}: ${code}\n${stderr}`));
         };
         const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
         const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
@@ -761,53 +795,52 @@ function setupExtractHandlers(
   filePath: string,
   password: string | undefined,
 ): void {
-  webview.onDidReceiveMessage(async (msg: { c: string; paths?: string[]; msg?: string; flat?: boolean }) => {
-    if (msg.c === "log") {
-      logger.debug({ event: "webview.ui", msg: msg.msg });
-      return;
-    }
-    if (msg.c === "extAll") {
-      logger.info({ event: "webview.extAll", archiveName });
-      try {
-        await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", archiveUri);
-        webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
-      } catch (err) {
-        logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
-        webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+  webview.onDidReceiveMessage(
+    async (msg: { c: string; paths?: string[]; msg?: string; flat?: boolean }) => {
+      if (msg.c === "log") {
+        logger.debug({ event: "webview.ui", msg: msg.msg });
+        return;
       }
-    }
-
-    if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
-      logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
-      try {
-        await extractSelected(filePath, msg.paths, password, msg.flat);
-        webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
-      } catch (err) {
-        logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
-        webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+      if (msg.c === "extAll") {
+        logger.info({ event: "webview.extAll", archiveName });
+        try {
+          await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", archiveUri);
+          webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
+        } catch (err) {
+          logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
       }
-    }
 
-    if (msg.c === "copy" && Array.isArray(msg.paths) && msg.paths.length > 0) {
-      copiedPaths = msg.paths;
-      copiedArchivePath = filePath;
-      copiedPassword = password;
-      copiedFlat = msg.flat;
-      logger.info({ event: "webview.copy", count: msg.paths.length, flat: msg.flat });
+      if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+        logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
+        try {
+          await extractSelected(filePath, msg.paths, password, msg.flat);
+          webview.postMessage({ c: "ok", t: t("decompress.done") + archiveName });
+        } catch (err) {
+          logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
+      }
 
-      const pasteAction = t("archive.pasteAction");
-      vscode.window
-        .showInformationMessage(
-          t("archive.copied", String(msg.paths.length)),
-          pasteAction,
-        )
-        .then((action) => {
-          if (action === pasteAction) {
-            vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
-          }
-        });
-    }
-  });
+      if (msg.c === "copy" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+        copiedPaths = msg.paths;
+        copiedArchivePath = filePath;
+        copiedPassword = password;
+        copiedFlat = msg.flat;
+        logger.info({ event: "webview.copy", count: msg.paths.length, flat: msg.flat });
+
+        const pasteAction = t("archive.pasteAction");
+        vscode.window
+          .showInformationMessage(t("archive.copied", String(msg.paths.length)), pasteAction)
+          .then((action) => {
+            if (action === pasteAction) {
+              vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
+            }
+          });
+      }
+    },
+  );
 }
 
 // ── CustomReadonlyEditorProvider ───────────────────────────────────

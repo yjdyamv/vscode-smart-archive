@@ -137,7 +137,10 @@ function _copyDirFromFS(
         totalSize = checkTotalSize(totalSize, data.byteLength);
         fs.writeFileSync(localEntry, Buffer.from(data));
       } catch (err) {
-        logger.error({ event: "fs.copyFailed", path: fsEntry, err }, "Failed to copy file from virtual FS");
+        logger.error(
+          { event: "fs.copyFailed", path: fsEntry, err },
+          "Failed to copy file from virtual FS",
+        );
       }
     }
   }

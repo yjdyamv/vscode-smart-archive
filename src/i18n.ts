@@ -298,6 +298,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "粘贴文件...",
     "zh-tw": "貼上檔案...",
   },
+  "archive.sourceMissing": {
+    en: "The source archive no longer exists: {0}",
+    "zh-cn": "源压缩包文件已不存在: {0}",
+    "zh-tw": "來源壓縮檔已不存在: {0}",
+  },
 };
 
 /**

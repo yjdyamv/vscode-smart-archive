@@ -46,13 +46,17 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // Register paste-from-archive command
-  const pasteDisposable = vscode.commands.registerCommand(
-    "yjdyamv.smart-archive.paste",
-    () => pasteCopiedFromArchive(),
+  const pasteDisposable = vscode.commands.registerCommand("yjdyamv.smart-archive.paste", () =>
+    pasteCopiedFromArchive(),
   );
 
   // Dispose commands when the extension is deactivated
-  context.subscriptions.push(compressDisposable, decompressDisposable, browseDisposable, pasteDisposable);
+  context.subscriptions.push(
+    compressDisposable,
+    decompressDisposable,
+    browseDisposable,
+    pasteDisposable,
+  );
 }
 
 /**
