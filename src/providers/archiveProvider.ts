@@ -15,7 +15,7 @@ import { getFileList, extractSelectedFiles } from "../engines/libarchive-engine"
 import { t, formatCompactSize } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
 import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
-import { isRarExt } from "../utils/rar";
+import { isRarExt, isRarVolume, resolveRarVolume } from "../utils/rar";
 import { checkFileSize } from "../utils/security";
 import { logger } from "../utils/logger";
 import { PREVIEW_CSS } from "../webview/preview.css";
@@ -39,10 +39,16 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
   try {
     if (fs.existsSync(PREVIEW_TMP_DIR)) {
       for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
-        try { fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f)); } catch { /* stale */ }
+        try {
+          fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f));
+        } catch {
+          /* stale */
+        }
       }
     }
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 
   // Clean up tracked files when their editor tab closes
   context.subscriptions.push(
@@ -53,7 +59,11 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
           (tab.input as vscode.TabInputCustom)?.uri ??
           (tab.input as any)?.uri;
         if (uri instanceof vscode.Uri && trackedTempFiles.has(uri.fsPath)) {
-          try { fs.unlinkSync(uri.fsPath); } catch { /* ignore */ }
+          try {
+            fs.unlinkSync(uri.fsPath);
+          } catch {
+            /* ignore */
+          }
           trackedTempFiles.delete(uri.fsPath);
         }
       }
@@ -64,7 +74,11 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
   context.subscriptions.push({
     dispose: () => {
       for (const p of trackedTempFiles) {
-        try { fs.unlinkSync(p); } catch { /* ignore */ }
+        try {
+          fs.unlinkSync(p);
+        } catch {
+          /* ignore */
+        }
       }
       trackedTempFiles.clear();
     },
@@ -798,7 +812,22 @@ const handlerStates = new WeakMap<vscode.Webview, HandlerState>();
 const handlerRegistered = new WeakSet<vscode.Webview>();
 
 async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Promise<void> {
-  const filePath = archiveUri.fsPath;
+  let filePath = archiveUri.fsPath;
+  const ext = getFullExt(filePath);
+
+  // Resolve RAR volume parts (.r00–.r99) to the base .rar file
+  if (isRarVolume(ext)) {
+    const rarPath = resolveRarVolume(filePath);
+    if (rarPath) {
+      filePath = rarPath;
+    } else {
+      webview.html = emptyHtml(
+        `Multi-volume RAR: "${path.basename(filePath)}" requires a .rar file in the same directory.`,
+      );
+      return;
+    }
+  }
+
   const archiveName = path.basename(filePath);
   logger.info({
     event: "setupWebview.start",
@@ -834,7 +863,10 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     if (encrypted) {
       const prev = handlerStates.get(webview);
       handlerStates.set(webview, {
-        archiveUri, archiveName, filePath, password: prev?.password,
+        archiveUri,
+        archiveName,
+        filePath,
+        password: prev?.password,
       });
       webview.html = passwordHtml(archiveName);
       if (!handlerRegistered.has(webview)) {
@@ -849,7 +881,10 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
 
   const prev = handlerStates.get(webview);
   handlerStates.set(webview, {
-    archiveUri, archiveName, filePath, password: prev?.password,
+    archiveUri,
+    archiveName,
+    filePath,
+    password: prev?.password,
   });
   const tree = buildTree(entries, archiveName);
   const fileCount = entries.filter((e) => e.type !== "DIRECTORY").length;
@@ -858,7 +893,6 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
 
   // Send archive properties
   const totalSize = entries.reduce((s, e) => s + (e.size || 0), 0);
-  const ext = getFullExt(filePath);
   setTimeout(() => {
     webview.postMessage({
       c: "props",
@@ -909,6 +943,7 @@ async function previewFileFromArchive(
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
   const archiveName = path.basename(archivePath);
   const normalizedFile = filePath.replace(/\\/g, "/");
+  const archiveExt = getFullExt(archivePath);
 
   let fileData: ArrayBuffer;
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
@@ -916,15 +951,15 @@ async function previewFileFromArchive(
     js7z.FS.writeFile(`/${archiveName}`, data);
     js7z.FS.mkdir("/_pv");
 
-    // Extract everything. For wrapped formats (tar.gz etc.) 7z can't
-    // resolve paths into the inner tar, so the outer layer decompresses
-    // into a single .tar which we then unwrap in a fresh instance.
-    // For normal archives (7z, zip, tar, wim) files land directly in /_pv.
+    // For wrapped formats (tar.gz etc.) the outer layer must be fully
+    // decompressed because the file path refers into the inner tar.
+    // For normal archives, pass the specific file path so only that
+    // file is extracted instead of the entire archive.
     const xArgs = ["x", `/${archiveName}`, "-o/_pv", "-y"];
     if (password) xArgs.splice(1, 0, `-p${password}`);
+    if (!isWrappedFormat(archiveExt)) xArgs.push(normalizedFile);
     await new Promise<void>((resolve, reject) => {
-      js7z.onExit = (c: number) =>
-        c === 0 ? resolve() : reject(new Error(`7z x: ${c}`));
+      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
       js7z.callMain(xArgs);
     });
 
@@ -974,8 +1009,7 @@ async function unwrapAndExtract(
     const args = ["x", "/_inner.tar", "-o/_pv2", "-y", target];
     if (password) args.splice(1, 0, `-p${password}`);
     await new Promise<void>((resolve, reject) => {
-      js7z2.onExit = (c: number) =>
-        c === 0 ? resolve() : reject(new Error(`7z x inner: ${c}`));
+      js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x inner: ${c}`)));
       js7z2.callMain(args);
     });
     const vfsPath = `/_pv2/${target}`;
@@ -986,6 +1020,7 @@ async function unwrapAndExtract(
 }
 
 async function testArchive(archivePath: string, password?: string): Promise<string> {
+  checkFileSize(fs.statSync(archivePath).size);
   const data = fs.readFileSync(archivePath);
   const archiveName = path.basename(archivePath);
   let stdout = "";
@@ -1047,8 +1082,7 @@ function registerHandler(webview: vscode.Webview): void {
           try {
             js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
             await new Promise<void>((resolve, reject) => {
-              js7z.onExit = (c: number) =>
-                c === 0 ? resolve() : reject(new Error(`7z t: ${c}`));
+              js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
               js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
             });
             pwVerified = true;

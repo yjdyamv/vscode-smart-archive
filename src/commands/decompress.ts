@@ -89,7 +89,11 @@ export async function decompressCommand(
 
         if (isRar) {
           progress.report({ message: t("archive.extracting") });
-          const count = await extractWithLibarchive({ inputPath, outputDir, password }, token);
+          const count = await extractWithLibarchive(
+            { inputPath, outputDir, password },
+            token,
+            progress,
+          );
           const elapsed = formatDuration(Date.now() - startTime);
           vscode.window.showInformationMessage(
             t("decompress.rarDone", String(count)) + outputDir + t("time.elapsed", elapsed),
@@ -99,7 +103,11 @@ export async function decompressCommand(
             () => decompressWith7z({ inputPath, outputDir, password }, progress, token),
             async () => {
               progress.report({ message: t("decompress.fallbackToLA") });
-              const count = await extractWithLibarchive({ inputPath, outputDir, password }, token);
+              const count = await extractWithLibarchive(
+                { inputPath, outputDir, password },
+                token,
+                progress,
+              );
               const elapsed = formatDuration(Date.now() - startTime);
               vscode.window.showInformationMessage(
                 t("decompress.rarDone", String(count)) + outputDir + t("time.elapsed", elapsed),

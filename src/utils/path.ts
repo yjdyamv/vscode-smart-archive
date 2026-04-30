@@ -61,15 +61,30 @@ export function fixArchiveEncoding(raw: string): string {
 
   // libarchive uses CP437 for ZIP without UTF-8 flag;
   // fall back to Latin-1 if CP437 doesn't produce CJK.
+  // Try multiple CJK code pages: GBK (Simplified Chinese), Shift-JIS
+  // (Japanese), EUC-KR (Korean).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const encodings: any[] = ["cp437", "latin1"];
-  for (const enc of encodings) {
+  const sourceEncodings: any[] = ["cp437", "latin1"];
+  const cjkCodePages = [
+    { name: "cp936", pattern: /[\u3005\u3040-\u30FF\u4E00-\u9FFF]/ },
+    { name: "cp932", pattern: /[\u3040-\u30FF\uFF66-\uFF9F]/ },
+    { name: "cp949", pattern: /[\uAC00-\uD7AF]/ },
+  ];
+
+  for (const sourceEnc of sourceEncodings) {
+    let bytes: Buffer;
     try {
-      const bytes = enc === "cp437" ? iconv.encode(raw, "cp437") : Buffer.from(raw, "latin1");
-      const decoded = iconv.decode(bytes, "gbk");
-      if (/[\u4E00-\u9FFF]/.test(decoded)) return decoded;
+      bytes = sourceEnc === "cp437" ? iconv.encode(raw, "cp437") : Buffer.from(raw, "latin1");
     } catch {
-      /* try next encoding */
+      continue;
+    }
+    for (const cp of cjkCodePages) {
+      try {
+        const decoded = iconv.decode(bytes, cp.name);
+        if (cp.pattern.test(decoded)) return decoded;
+      } catch {
+        /* try next code page */
+      }
     }
   }
 
