@@ -1,0 +1,294 @@
+/**
+ * Webview handler — Smart Archive VSCode Extension
+ *
+ * Core orchestration for archive webviews: state management, file listing,
+ * encrypted archive password flow, and webview message dispatch.
+ * Shared between the custom editor provider and the standalone browse command.
+ *
+ * @module providers/webviewHandler
+ */
+
+import * as vscode from "vscode";
+import * as path from "path";
+import { isEncrypted } from "../engines/js7z-engine";
+import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { isRarVolume, resolveRarVolume } from "../utils/rar";
+import { logger } from "../utils/logger";
+import { t, formatCompactSize } from "../i18n";
+import { buildTree } from "./treeBuilder";
+import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
+import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
+import { extractSelected } from "./extraction";
+import { deleteFromArchive, previewFileFromArchive, testArchive } from "./archiveOperations";
+import { setCopiedPaths } from "./copyPaste";
+
+const EXT_ID = "yjdyamv.smart-archive";
+
+interface HandlerState {
+  archiveUri: vscode.Uri;
+  archiveName: string;
+  filePath: string;
+  password: string | undefined;
+}
+
+const handlerStates = new WeakMap<vscode.Webview, HandlerState>();
+const handlerRegistered = new WeakSet<vscode.Webview>();
+
+function getWebviewUris(webview: vscode.Webview): { cssUri: string; jsUri: string } {
+  const extUri = vscode.extensions.getExtension(EXT_ID)!.extensionUri;
+  return {
+    cssUri: webview.asWebviewUri(vscode.Uri.joinPath(extUri, "media", "preview.css")).toString(),
+    jsUri: webview.asWebviewUri(vscode.Uri.joinPath(extUri, "media", "preview.js")).toString(),
+  };
+}
+
+async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Promise<void> {
+  let filePath = archiveUri.fsPath;
+  const ext = getFullExt(filePath);
+  const { cssUri, jsUri } = getWebviewUris(webview);
+
+  if (isRarVolume(ext)) {
+    const rarPath = resolveRarVolume(filePath);
+    if (rarPath) {
+      filePath = rarPath;
+    } else {
+      webview.html = emptyHtml(
+        `Multi-volume RAR: "${path.basename(filePath)}" requires a .rar file in the same directory.`,
+        cssUri,
+        jsUri,
+      );
+      return;
+    }
+  }
+
+  const archiveName = path.basename(filePath);
+  logger.info({
+    event: "setupWebview.start",
+    filePath,
+    wrapped: isWrappedFormat(getFullExt(filePath)),
+  });
+
+  webview.html = loadingHtml();
+
+  let entries: { path: string; size: number; type: string }[];
+  try {
+    entries = await fetchFileList(filePath);
+  } catch (err) {
+    logger.error({ event: "setupWebview.fetchFileList.failed", err }, (err as Error).message);
+    webview.html = emptyHtml(t("decompress.failed") + (err as Error).message, cssUri, jsUri);
+    return;
+  }
+
+  if (isEncryptableExt(getFullExt(filePath))) {
+    let encrypted = entries.length === 0;
+    if (!encrypted) {
+      try {
+        encrypted = await isEncrypted(filePath);
+      } catch {
+        /* can't detect — proceed without password */
+      }
+    }
+    if (encrypted) {
+      const prev = handlerStates.get(webview);
+      handlerStates.set(webview, {
+        archiveUri,
+        archiveName,
+        filePath,
+        password: prev?.password,
+      });
+      webview.html = passwordHtml(archiveName, cssUri);
+      if (!handlerRegistered.has(webview)) {
+        handlerRegistered.add(webview);
+        registerHandler(webview);
+      }
+      return;
+    }
+  }
+
+  logger.info({ event: "setupWebview.entries", count: entries.length });
+
+  const prev = handlerStates.get(webview);
+  handlerStates.set(webview, {
+    archiveUri,
+    archiveName,
+    filePath,
+    password: prev?.password,
+  });
+  const tree = buildTree(entries, archiveName);
+  const fileCount = entries.filter((e) => e.type !== "DIRECTORY").length;
+  const dirCount = entries.filter((e) => e.type === "DIRECTORY").length;
+  webview.html = contentHtml(tree, fileCount, dirCount, cssUri, jsUri);
+
+  const totalSize = entries.reduce((s, e) => s + (e.size || 0), 0);
+  setTimeout(() => {
+    webview.postMessage({
+      c: "props",
+      name: archiveName,
+      format: ext,
+      count: entries.length,
+      files: fileCount,
+      dirs: dirCount,
+      size: formatCompactSize(totalSize),
+    });
+  }, 100);
+
+  if (!handlerRegistered.has(webview)) {
+    handlerRegistered.add(webview);
+    registerHandler(webview);
+  }
+}
+
+function registerHandler(webview: vscode.Webview): void {
+  webview.onDidReceiveMessage(
+    async (msg: {
+      c: string;
+      paths?: string[];
+      msg?: string;
+      flat?: boolean;
+      path?: string;
+      dir?: string;
+      pw?: string;
+    }) => {
+      const s = handlerStates.get(webview);
+      if (!s) return;
+
+      if (msg.c === "log") {
+        logger.debug({ event: "webview.ui", msg: msg.msg });
+        return;
+      }
+
+      const { cssUri, jsUri } = getWebviewUris(webview);
+
+      // ── Password submit (encrypted archives) ──
+      if (msg.c === "pw" && msg.pw) {
+        logger.info({ event: "webview.password.attempt" });
+        try {
+          const pwEntries = await fetchFileList(s.filePath, msg.pw);
+          if (pwEntries.length === 0) {
+            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+            return;
+          }
+          const data = await vscode.workspace.fs.readFile(vscode.Uri.file(s.filePath));
+          const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+          let pwVerified = false;
+          try {
+            js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
+            await new Promise<void>((resolve, reject) => {
+              js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
+              js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
+            });
+            pwVerified = true;
+          } catch {
+            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+            return;
+          } finally {
+            tryCleanupJS7z(js7z);
+          }
+          if (!pwVerified) return;
+          logger.info({ event: "webview.password.ok", count: pwEntries.length });
+          s.password = msg.pw;
+          const tree = buildTree(pwEntries, s.archiveName);
+          const fc = pwEntries.filter((e) => e.type !== "DIRECTORY").length;
+          const dc = pwEntries.filter((e) => e.type === "DIRECTORY").length;
+          webview.html = contentHtml(tree, fc, dc, cssUri, jsUri);
+          const totalSize = pwEntries.reduce((sum, e) => sum + (e.size || 0), 0);
+          const ext = getFullExt(s.filePath);
+          setTimeout(() => {
+            webview.postMessage({
+              c: "props",
+              name: s.archiveName,
+              format: ext,
+              count: pwEntries.length,
+              files: fc,
+              dirs: dc,
+              size: formatCompactSize(totalSize),
+            });
+          }, 100);
+        } catch (err) {
+          logger.error({ event: "webview.password.error", err });
+          webview.postMessage({ c: "pwerr", t: "Wrong password" });
+        }
+        return;
+      }
+
+      // ── Extract All ──
+      if (msg.c === "extAll") {
+        logger.info({ event: "webview.extAll", archiveName: s.archiveName });
+        try {
+          await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", s.archiveUri);
+          webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
+        } catch (err) {
+          logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
+      }
+
+      // ── Extract Selected ──
+      if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+        logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
+        try {
+          await extractSelected(s.filePath, msg.paths, s.password, msg.flat);
+          webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
+        } catch (err) {
+          logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
+      }
+
+      // ── Copy ──
+      if (msg.c === "copy" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+        setCopiedPaths(msg.paths, s.filePath, s.password, msg.flat);
+        logger.info({ event: "webview.copy", count: msg.paths.length, flat: msg.flat });
+        const pasteAction = t("archive.pasteAction");
+        vscode.window
+          .showInformationMessage(t("archive.copied", String(msg.paths.length)), pasteAction)
+          .then((action) => {
+            if (action === pasteAction) {
+              vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
+            }
+          });
+      }
+
+      // ── Delete ──
+      if (msg.c === "delSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+        logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
+        try {
+          await deleteFromArchive(s.filePath, msg.paths, s.password);
+          webview.postMessage({
+            c: "del-ok",
+            t: "Deleted " + msg.paths.length + " item(s). Reloading...",
+          });
+          await setupWebview(webview, s.archiveUri);
+        } catch (err) {
+          logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
+      }
+
+      // ── Preview ──
+      if (msg.c === "preview" && typeof msg.path === "string") {
+        logger.info({ event: "webview.preview", path: msg.path });
+        try {
+          await previewFileFromArchive(s.filePath, msg.path, s.password);
+        } catch (err) {
+          logger.error({ event: "webview.preview.failed", err }, (err as Error).message);
+          vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
+        }
+      }
+
+      // ── Test ──
+      if (msg.c === "test") {
+        try {
+          const result = await testArchive(s.filePath, s.password);
+          webview.postMessage({ c: "ok", t: result });
+        } catch (err) {
+          logger.error({ event: "webview.test.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
+      }
+    },
+  );
+}
+
+export type { HandlerState };
+export { setupWebview, handlerStates, handlerRegistered, registerHandler };
