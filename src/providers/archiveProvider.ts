@@ -9,12 +9,13 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import type { JS7zFactory } from "../types";
+import type { JS7zFactory, JS7zInstance } from "../types";
 import { listFiles, isEncrypted } from "../engines/js7z-engine";
 import { getFileList, extractSelectedFiles } from "../engines/libarchive-engine";
 import { t, formatCompactSize } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
-import { isRarExt, getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { isRarExt } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { PREVIEW_CSS } from "../webview/preview.css";
 import { PREVIEW_JS } from "../webview/preview.js";
@@ -33,6 +34,8 @@ function buildTree(
   entries: { path: string; size: number; type: string }[],
   archiveName: string,
 ): TreeNode[] {
+  // Some archivers include the archive name itself as a root entry —
+  // filter it out to avoid a redundant top-level node.
   const filtered = entries.filter((e) => {
     const segs = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
     return segs[segs.length - 1] !== archiveName;
@@ -40,6 +43,7 @@ function buildTree(
   const root: TreeNode[] = [];
   const dirMap = new Map<string, TreeNode>();
 
+  // Sort directories before files, then alphabetically
   const sorted = [...filtered].sort((a, b) => {
     const aD = a.type !== "REGULAR_FILE" ? 0 : 1;
     const bD = b.type !== "REGULAR_FILE" ? 0 : 1;
@@ -298,6 +302,17 @@ ${
 
 // ── Data ───────────────────────────────────────────────────────────
 
+/**
+ * Fetch the file list for an archive, choosing the best engine.
+ *
+ * Strategy (ordered by priority):
+ *   1. Wrapped formats (tar.gz etc.) — must extract to list (7z l doesn't traverse)
+ *   2. js7z l -slt — preferred: reliable UTF-8 output, fast, detects encryption
+ *   3. Encryptable format without password — return [ ] to trigger password prompt;
+ *      intentionally skip libarchive fallback because it may leak file metadata
+ *      without requiring the password
+ *   4. libarchive getFileList — fallback for unsupported formats
+ */
 async function fetchFileList(
   filePath: string,
   password = "",
@@ -310,9 +325,6 @@ async function fetchFileList(
   } catch {
     /* encrypted or unsupported — caller handles */
   }
-  // For encryptable formats without a password, don't fall back to libarchive —
-  // it may leak file structure metadata without requiring the password.
-  // Instead return empty to trigger the encryption check / password prompt.
   if (!password && isEncryptableExt(ext)) return [];
   return getFileList(filePath);
 }
@@ -324,36 +336,46 @@ async function listViaExtract(
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
   const archiveName = path.basename(filePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-  js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
-  js7z.FS.mkdir("/_ls");
-  const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
-  if (password) args.splice(1, 0, `-p${password}`);
-  await new Promise<void>((resolve, reject) => {
-    js7z.onExit = (code: number) => {
-      if (code === 0) resolve();
-      else reject(new Error(`7z x: ${code}`));
-    };
-    js7z.callMain(args);
-  });
-  // Check if output contains a single .tar (inner tar not auto-extracted)
-  const topEntries = js7z.FS.readdir("/_ls").filter((e: string) => e !== "." && e !== "..");
-  if (topEntries.length === 1 && topEntries[0].endsWith(".tar")) {
-    const innerTar = topEntries[0];
-    // Extract inner tar to /_ls2
-    const innerData = js7z.FS.readFile(`/_ls/${innerTar}`, { encoding: "binary" });
-    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
-    js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
-    js7z2.FS.mkdir("/_ls2");
+
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.mkdir("/_ls");
+    const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
+    if (password) args.splice(1, 0, `-p${password}`);
     await new Promise<void>((resolve, reject) => {
-      js7z2.onExit = (code: number) => {
+      js7z.onExit = (code: number) => {
         if (code === 0) resolve();
-        else reject(new Error(`7z x inner tar: ${code}`));
+        else reject(new Error(`7z x: ${code}`));
       };
-      js7z2.callMain(["x", `/${innerTar}`, "-o/_ls2", "-y"]);
+      js7z.callMain(args);
     });
-    return readDirEntries(js7z2, "/_ls2", "");
+    // For wrapped formats (tar.gz etc.), 7z x only extracts the outer layer,
+    // leaving a single .tar file. We must extract the inner tar in a second
+    // js7z instance to expose the actual file tree.
+    const topEntries = js7z.FS.readdir("/_ls").filter((e: string) => e !== "." && e !== "..");
+    if (topEntries.length === 1 && topEntries[0].endsWith(".tar")) {
+      const innerTar = topEntries[0];
+      const innerData = js7z.FS.readFile(`/_ls/${innerTar}`, { encoding: "binary" });
+      const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+      try {
+        js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
+        js7z2.FS.mkdir("/_ls2");
+        await new Promise<void>((resolve, reject) => {
+          js7z2.onExit = (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`7z x inner tar: ${code}`));
+          };
+          js7z2.callMain(["x", `/${innerTar}`, "-o/_ls2", "-y"]);
+        });
+        return readDirEntries(js7z2, "/_ls2", "");
+      } finally {
+        tryCleanupJS7z(js7z2);
+      }
+    }
+    return readDirEntries(js7z, "/_ls", "");
+  } finally {
+    tryCleanupJS7z(js7z);
   }
-  return readDirEntries(js7z, "/_ls", "");
 }
 
 function readDirEntries(
@@ -387,6 +409,24 @@ function readDirEntries(
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const JS7z: JS7zFactory = require("js7z-tools");
 
+function tryCleanupJS7z(instance: JS7zInstance): void {
+  try {
+    if (typeof instance.destroy === "function") instance.destroy();
+    else if (typeof instance._cleanup === "function") instance._cleanup();
+  } catch {
+    /* best-effort cleanup */
+  }
+}
+
+/**
+ * Extract selected files from an archive (webview "Extract Selected").
+ *
+ * Three code paths based on archive type:
+ *   1. RAR → libarchive only (7z cannot read RAR at all)
+ *   2. Wrapped (tar.gz etc.) → two-step: extract outer layer with 7z,
+ *      then extract selected paths from inner .tar with a second 7z instance
+ *   3. Normal → 7z first, fall back to libarchive on failure
+ */
 async function extractSelected(
   archivePath: string,
   selectedPaths: string[],
@@ -397,7 +437,6 @@ async function extractSelected(
   const isWrapped = isWrappedFormat(ext);
   const outputDir = getOutputPath(archivePath, "extracted");
 
-  // RAR: 7z can't extract RAR at all; use libarchive
   if (isRar) {
     fs.mkdirSync(outputDir, { recursive: true });
     const count = await extractSelectedFiles(
@@ -411,39 +450,48 @@ async function extractSelected(
     return;
   }
 
-  // Wrapped (tar.gz etc.): 7z x only extracts outer layer.
-  // Two-step: extract outer → get inner .tar → extract inner with selected paths.
+  // Wrapped (tar.gz etc.): 7z x only extracts the outer compression layer.
+  // We extract the outer layer to get the inner .tar, then run a second
+  // extract on the inner .tar with the user-selected paths.
   if (isWrapped) {
     const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
     const archiveName = path.basename(archivePath);
     const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
-    js7z.FS.mkdir("/_x1");
-    await new Promise<void>((resolve, reject) => {
-      js7z.onExit = (c: number) => {
-        if (c === 0) resolve();
-        else reject(new Error(`7z x outer: ${c}`));
-      };
-      js7z.callMain(["x", `/${archiveName}`, "-o/_x1", "-y"]);
-    });
-    const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
-    const innerTar = top.find((e: string) => e.endsWith(".tar"));
-    if (!innerTar) throw new Error("Wrapped archive: no inner .tar found");
-    const innerData = js7z.FS.readFile(`/_x1/${innerTar}`, { encoding: "binary" });
-    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
-    js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
-    js7z2.FS.mkdir("/_x2");
-    const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
-    await new Promise<void>((resolve, reject) => {
-      js7z2.onExit = (c: number) => {
-        if (c === 0) resolve();
-        else reject(new Error(`7z x inner: ${c}`));
-      };
-      js7z2.callMain(["x", `/${innerTar}`, "-o/_x2", "-y", ...normalizedPaths]);
-    });
-    copyDirFromFS(js7z2, "/_x2", outputDir);
-    await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
-    vscode.window.showInformationMessage(t("decompress.done") + outputDir);
+    try {
+      js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+      js7z.FS.mkdir("/_x1");
+      await new Promise<void>((resolve, reject) => {
+        js7z.onExit = (c: number) => {
+          if (c === 0) resolve();
+          else reject(new Error(`7z x outer: ${c}`));
+        };
+        js7z.callMain(["x", `/${archiveName}`, "-o/_x1", "-y"]);
+      });
+      const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
+      const innerTar = top.find((e: string) => e.endsWith(".tar"));
+      if (!innerTar) throw new Error("Wrapped archive: no inner .tar found");
+      const innerData = js7z.FS.readFile(`/_x1/${innerTar}`, { encoding: "binary" });
+      const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+      try {
+        js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
+        js7z2.FS.mkdir("/_x2");
+        const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
+        await new Promise<void>((resolve, reject) => {
+          js7z2.onExit = (c: number) => {
+            if (c === 0) resolve();
+            else reject(new Error(`7z x inner: ${c}`));
+          };
+          js7z2.callMain(["x", `/${innerTar}`, "-o/_x2", "-y", ...normalizedPaths]);
+        });
+        copyDirFromFS(js7z2, "/_x2", outputDir);
+        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+        vscode.window.showInformationMessage(t("decompress.done") + outputDir);
+      } finally {
+        tryCleanupJS7z(js7z2);
+      }
+    } finally {
+      tryCleanupJS7z(js7z);
+    }
     return;
   }
 
@@ -459,37 +507,41 @@ async function extractSelected(
     },
   });
 
-  js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
-  js7z.FS.mkdir("/out");
-
   try {
-    await new Promise<void>((resolve, reject) => {
-      js7z.onExit = (code: number) => {
-        if (code === 0) resolve();
-        else reject(new Error(`7z x: ${code}\n${stderr}`));
-      };
-      const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
-      const xArgs = ["x", `/${archiveName}`, "-o/out", "-y"];
-      if (password) xArgs.splice(1, 0, `-p${password}`);
-      xArgs.push(...normalizedPaths);
-      js7z.callMain(xArgs);
-    });
-    copyDirFromFS(js7z, "/out", outputDir);
-    await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
-    vscode.window.showInformationMessage(t("decompress.done") + outputDir);
-  } catch (err) {
-    // 7z failed — fall back to libarchive
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.mkdir("/out");
+
     try {
-      const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
-      vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
+      await new Promise<void>((resolve, reject) => {
+        js7z.onExit = (code: number) => {
+          if (code === 0) resolve();
+          else reject(new Error(`7z x: ${code}\n${stderr}`));
+        };
+        const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
+        const xArgs = ["x", `/${archiveName}`, "-o/out", "-y"];
+        if (password) xArgs.splice(1, 0, `-p${password}`);
+        xArgs.push(...normalizedPaths);
+        js7z.callMain(xArgs);
+      });
+      copyDirFromFS(js7z, "/out", outputDir);
       await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
-    } catch (fallbackErr) {
-      // eslint-disable-next-line preserve-caught-error
-      throw new Error(
-        t("decompress.failed") +
-          `\n7z: ${(err as Error).message}\nlibarchive: ${(fallbackErr as Error).message}`,
-      );
+      vscode.window.showInformationMessage(t("decompress.done") + outputDir);
+    } catch (err) {
+      // 7z failed — fall back to libarchive
+      try {
+        const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
+        vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
+        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+      } catch (fallbackErr) {
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error(
+          t("decompress.failed") +
+            `\n7z: ${(err as Error).message}\nlibarchive: ${(fallbackErr as Error).message}`,
+        );
+      }
     }
+  } finally {
+    tryCleanupJS7z(js7z);
   }
 }
 
@@ -542,18 +594,23 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
               }
               const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
               const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-              js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
+              let pwVerified = false;
               try {
+                js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
                 await new Promise<void>((resolve, reject) => {
                   js7z.onExit = (c: number) =>
                     c === 0 ? resolve() : reject(new Error(`7z t: ${c}`));
                   js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
                 });
+                pwVerified = true;
               } catch {
                 logger.warn({ event: "setupWebview.password.failed", reason: "7z t" });
                 webview.postMessage({ c: "pwerr", t: "Wrong password" });
                 return;
+              } finally {
+                tryCleanupJS7z(js7z);
               }
+              if (!pwVerified) return;
               logger.info({ event: "setupWebview.password.ok", count: pwEntries.length });
               const capturedPw = msg.pw;
               const tree = buildTree(pwEntries, archiveName);

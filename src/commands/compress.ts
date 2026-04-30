@@ -37,6 +37,14 @@ export async function compressCommand(
     return;
   }
 
+  // Validate all targets exist before showing any prompts
+  for (const target of targets) {
+    if (!fs.existsSync(target.fsPath)) {
+      vscode.window.showErrorMessage(t("compress.noFiles") + target.fsPath);
+      return;
+    }
+  }
+
   const format = await promptCompressFormat();
   if (!format) return;
 
@@ -58,7 +66,6 @@ export async function compressCommand(
   }
 
   const level = await promptCompressLevel();
-  if (level === -1) return;
 
   if (format.supportsEncryption) {
     const encryptChoice = await promptEncryptChoice();

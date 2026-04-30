@@ -106,9 +106,19 @@ export async function promptSavePath(
 const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
 
 export async function promptCompressLevel(): Promise<number> {
+  const config = vscode.workspace.getConfiguration("smart-archive");
+  const defaultLevel = config.get<number>("defaultCompressionLevel", 5);
   const labels = compressLevels();
-  // Put "Normal" (level 5) first so it's selected by default
-  const order = [3, 2, 1, 0, 4, 5]; // 5, 3, 1, 0, 7, 9
+
+  // Place the configured default level first so it's highlighted and
+  // selected by default when the user presses Enter without picking.
+  const defaultIdx = LEVEL_VALUES.indexOf(defaultLevel);
+  const order = LEVEL_VALUES.map((_, i) => i);
+  if (defaultIdx >= 0) {
+    order.splice(defaultIdx, 1);
+    order.unshift(defaultIdx);
+  }
+
   const items = order.map((i) => ({ label: labels[i] }));
 
   const chosen = await vscode.window.showQuickPick(items, {
@@ -116,7 +126,7 @@ export async function promptCompressLevel(): Promise<number> {
     ignoreFocusOut: true,
   });
 
-  if (!chosen) return -1;
+  if (!chosen) return defaultLevel;
   const idx = labels.indexOf(chosen.label);
-  return idx >= 0 ? LEVEL_VALUES[idx] : 5;
+  return idx >= 0 ? LEVEL_VALUES[idx] : defaultLevel;
 }

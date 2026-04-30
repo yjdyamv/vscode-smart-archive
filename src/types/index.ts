@@ -74,6 +74,10 @@ export interface JS7zInstance {
   printErr?: (text: string) => void;
   /** Abort callback */
   onAbort?: (reason: string) => void;
+  /** Release WASM resources */
+  destroy?: () => void;
+  /** Emscripten internal cleanup (fallback) */
+  _cleanup?: () => void;
   /** Emscripten virtual file system */
   FS: EmscriptenFS;
 }

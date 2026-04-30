@@ -13,11 +13,13 @@
 
 import * as vscode from "vscode";
 import * as fs from "fs";
+import * as path from "path";
 import { decompressWith7z } from "../engines/js7z-engine";
 import { extractArchive as extractWithLibarchive } from "../engines/libarchive-engine";
 import { promptPassword } from "../ui/prompts";
 import { getOutputPath } from "../utils/fs";
-import { DECOMPRESS_EXTENSIONS, isRarExt, getFullExt, isEncryptableExt } from "../constants";
+import { DECOMPRESS_EXTENSIONS, getFullExt, isEncryptableExt } from "../constants";
+import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../utils/rar";
 import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
@@ -36,14 +38,22 @@ export async function decompressCommand(
   const isRar = isRarExt(ext);
   logger.info({ event: "decompress.command.start", inputPath, ext, isRar });
 
-  if (isRar) {
+  if (isRarVolume(ext)) {
+    const rarPath = resolveRarVolume(inputPath);
+    if (rarPath) {
+      logger.info({ event: "decompress.rarVolume.redirect", from: inputPath, to: rarPath });
+      return decompressCommand(vscode.Uri.file(rarPath), undefined);
+    }
+    vscode.window.showErrorMessage(
+      t("decompress.failed") +
+        `Multi-volume RAR: "${path.basename(inputPath)}" requires a .rar file in the same directory.`,
+    );
+    return;
+  }
+
+  if (isRarExt(ext)) {
     try {
-      const buf = fs.readFileSync(inputPath, { flag: "r" });
-      const magic = buf.toString("ascii", 0, 4);
-      if (magic !== "Rar!") {
-        vscode.window.showErrorMessage("Not a valid RAR archive (bad header)");
-        return;
-      }
+      validateRarHeader(inputPath);
     } catch {
       vscode.window.showErrorMessage(t("decompress.failed") + "Cannot read file");
       return;
@@ -98,10 +108,14 @@ export async function decompressCommand(
           );
         }
       } catch (err) {
-        // Clean up on cancellation or failure
+        // Clean up output directory only if it's empty (partial extraction
+        // may have succeeded; deleting non-empty dir would destroy valid data)
         try {
           if (fs.existsSync(outputDir)) {
-            fs.rmSync(outputDir, { recursive: true, force: true });
+            const contents = fs.readdirSync(outputDir);
+            if (contents.length === 0) {
+              fs.rmdirSync(outputDir);
+            }
           }
         } catch {
           /* best-effort cleanup */
@@ -138,6 +152,11 @@ export async function browseCommand(uri: vscode.Uri | undefined): Promise<void> 
   if (!uri) {
     vscode.window.showErrorMessage(t("decompress.noFile"));
     return;
+  }
+
+  const rarPath = resolveRarVolume(uri.fsPath);
+  if (rarPath) {
+    return openArchivePreview(vscode.Uri.file(rarPath));
   }
 
   try {

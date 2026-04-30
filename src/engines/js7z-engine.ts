@@ -45,10 +45,8 @@ const JS7z: JS7zFactory = require("js7z-tools");
 
 function tryCleanup(instance: JS7zInstance): void {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const inst = instance as any;
-    if (typeof inst.destroy === "function") inst.destroy();
-    else if (typeof inst._cleanup === "function") inst._cleanup();
+    if (typeof instance.destroy === "function") instance.destroy();
+    else if (typeof instance._cleanup === "function") instance._cleanup();
   } catch {
     /* best-effort cleanup */
   }
@@ -138,84 +136,89 @@ export async function compressWith7z(
 
   const js7z = await JS7z();
 
-  // Prepare virtual FS
-  js7z.FS.mkdir(INPUT_DIR);
-  js7z.FS.mkdir(OUTPUT_DIR);
+  try {
+    // Prepare virtual FS
+    js7z.FS.mkdir(INPUT_DIR);
+    js7z.FS.mkdir(OUTPUT_DIR);
 
-  // Copy input files into the virtual FS
-  progress.report({ message: t("compress.readingFiles") });
-  const localPaths = options.targets.map((target) => target.fsPath);
-  logger.info({
-    event: "compress.start",
-    format: options.format.label,
-    files: localPaths.length,
-    level: options.level,
-  });
-  const fsInputPaths = copyInputsToFS(js7z, localPaths, token);
-  if (token?.isCancellationRequested) throw new vscode.CancellationError();
-  progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
-
-  const archiveName = getBaseName(options.outputPath);
-  const archiveFsPath = joinFSPath(OUTPUT_DIR, archiveName);
-
-  // Two-step: tar + compress for tar.gz / tar.bz2 / tar.xz
-  if (isWrappedFormat("." + options.format.label)) {
-    const wrapExt = getWrapExtension("." + options.format.label);
-    const tarFsPath = joinFSPath(OUTPUT_DIR, "_tmp.tar");
-
-    // Step 1: create tar in first js7z instance
-    progress.report({ message: t("compress.creatingTar") });
-    await run7z(js7z, ["a", tarFsPath, ...fsInputPaths], progress);
-
-    // Read the tar out of the first instance's virtual FS
-    const tarData = js7z.FS.readFile(tarFsPath, { encoding: "binary" });
-
+    // Copy input files into the virtual FS
+    progress.report({ message: t("compress.readingFiles") });
+    const localPaths = options.targets.map((target) => target.fsPath);
+    logger.info({
+      event: "compress.start",
+      format: options.format.label,
+      files: localPaths.length,
+      level: options.level,
+    });
+    const fsInputPaths = copyInputsToFS(js7z, localPaths, token);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
+    progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
-    let compressedData: Uint8Array;
-    if (wrapExt === "zst") {
-      // Use zstd-wasm for the compression layer (7z WASM lacks zstd codec)
-      progress.report({ message: t("compress.compressingTar", wrapExt) });
-      compressedData = await zstdCompress(new Uint8Array(tarData), options.level);
-    } else {
-      // Step 2: compress tar in a FRESH js7z instance (for gz/bz2/xz)
-      progress.report({ message: t("compress.compressingTar", wrapExt) });
-      const js7z2 = await JS7z();
-      js7z2.FS.writeFile("/_tmp.tar", new Uint8Array(tarData));
-      await run7z(js7z2, ["a", archiveFsPath, "/_tmp.tar"], progress);
-      compressedData = new Uint8Array(js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }));
-      tryCleanup(js7z2);
+    const archiveName = getBaseName(options.outputPath);
+    const archiveFsPath = joinFSPath(OUTPUT_DIR, archiveName);
+
+    // Two-step: tar + compress for tar.gz / tar.bz2 / tar.xz
+    if (isWrappedFormat("." + options.format.label)) {
+      const wrapExt = getWrapExtension("." + options.format.label);
+      const tarFsPath = joinFSPath(OUTPUT_DIR, "_tmp.tar");
+
+      // Step 1: create tar in first js7z instance
+      progress.report({ message: t("compress.creatingTar") });
+      await run7z(js7z, ["a", tarFsPath, ...fsInputPaths], progress);
+
+      // Read the tar out of the first instance's virtual FS
+      const tarData = js7z.FS.readFile(tarFsPath, { encoding: "binary" });
+
+      if (token?.isCancellationRequested) throw new vscode.CancellationError();
+
+      let compressedData: Uint8Array;
+      if (wrapExt === "zst") {
+        // Use zstd-wasm for the compression layer (7z WASM lacks zstd codec)
+        progress.report({ message: t("compress.compressingTar", wrapExt) });
+        compressedData = await zstdCompress(new Uint8Array(tarData), options.level);
+      } else {
+        // Step 2: compress tar in a FRESH js7z instance (for gz/bz2/xz)
+        progress.report({ message: t("compress.compressingTar", wrapExt) });
+        const js7z2 = await JS7z();
+        try {
+          js7z2.FS.writeFile("/_tmp.tar", new Uint8Array(tarData));
+          await run7z(js7z2, ["a", archiveFsPath, "/_tmp.tar"], progress);
+          compressedData = new Uint8Array(js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }));
+        } finally {
+          tryCleanup(js7z2);
+        }
+      }
+
+      if (token?.isCancellationRequested) throw new vscode.CancellationError();
+      fs.writeFileSync(options.outputPath, Buffer.from(compressedData));
+      const elapsed = formatDuration(Date.now() - startTime);
+      vscode.window.showInformationMessage(
+        t("compress.done") + options.outputPath + t("time.elapsed", elapsed),
+      );
+      return;
     }
 
+    // Non-wrapped formats: single-step compression
+    const args = buildCompressArgs(
+      archiveFsPath,
+      fsInputPaths,
+      options.format,
+      options.password,
+      options.level,
+    );
+    await run7z(js7z, args, progress);
+
+    // Read result from virtual FS and write to local disk
+    const data = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    fs.writeFileSync(options.outputPath, Buffer.from(compressedData));
+    fs.writeFileSync(options.outputPath, Buffer.from(data));
     const elapsed = formatDuration(Date.now() - startTime);
     vscode.window.showInformationMessage(
       t("compress.done") + options.outputPath + t("time.elapsed", elapsed),
     );
+  } finally {
     tryCleanup(js7z);
-    return;
   }
-
-  // Non-wrapped formats: single-step compression
-  const args = buildCompressArgs(
-    archiveFsPath,
-    fsInputPaths,
-    options.format,
-    options.password,
-    options.level,
-  );
-  await run7z(js7z, args, progress);
-
-  // Read result from virtual FS and write to local disk
-  const data = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-  if (token?.isCancellationRequested) throw new vscode.CancellationError();
-  fs.writeFileSync(options.outputPath, Buffer.from(data));
-  const elapsed = formatDuration(Date.now() - startTime);
-  vscode.window.showInformationMessage(
-    t("compress.done") + options.outputPath + t("time.elapsed", elapsed),
-  );
-  tryCleanup(js7z);
 }
 
 /** Run a 7z command and wait for completion. Reports progress from stdout. */
@@ -277,33 +280,36 @@ export async function decompressWith7z(
 
   const js7z = await JS7z();
 
-  // Read archive into virtual FS
-  const data = fs.readFileSync(options.inputPath);
-  const archiveName = getBaseName(options.inputPath);
-  js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
-  js7z.FS.mkdir(OUTPUT_DIR);
+  try {
+    // Read archive into virtual FS
+    const data = fs.readFileSync(options.inputPath);
+    const archiveName = getBaseName(options.inputPath);
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+    js7z.FS.mkdir(OUTPUT_DIR);
 
-  // Build extraction args (password inserted before archive path)
-  const extractArgs: string[] = ["x", `/${archiveName}`, `-o${OUTPUT_DIR}`];
-  if (options.password) {
-    extractArgs.splice(1, 0, `-p${options.password}`);
+    // Build extraction args (password inserted before archive path)
+    const extractArgs: string[] = ["x", `/${archiveName}`, `-o${OUTPUT_DIR}`];
+    if (options.password) {
+      extractArgs.splice(1, 0, `-p${options.password}`);
+    }
+
+    progress.report({ message: t("decompress.inProgress") });
+
+    await run7z(js7z, extractArgs, progress);
+    if (token?.isCancellationRequested) throw new vscode.CancellationError();
+    copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+
+    // Auto-extract inner .tar left by tar.gz/tar.bz2/tar.xz decompression.
+    // These layered archives decompress to a single .tar which needs unwrapping.
+    await unwrapInnerTar(options.outputDir, progress);
+
+    const elapsed = formatDuration(Date.now() - startTime);
+    vscode.window.showInformationMessage(
+      t("decompress.done") + options.outputDir + t("time.elapsed", elapsed),
+    );
+  } finally {
+    tryCleanup(js7z);
   }
-
-  progress.report({ message: t("decompress.inProgress") });
-
-  await run7z(js7z, extractArgs, progress);
-  if (token?.isCancellationRequested) throw new vscode.CancellationError();
-  copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
-
-  // Auto-extract inner .tar left by tar.gz/tar.bz2/tar.xz decompression.
-  // These layered archives decompress to a single .tar which needs unwrapping.
-  await unwrapInnerTar(options.outputDir, progress);
-
-  const elapsed = formatDuration(Date.now() - startTime);
-  vscode.window.showInformationMessage(
-    t("decompress.done") + options.outputDir + t("time.elapsed", elapsed),
-  );
-  tryCleanup(js7z);
 }
 
 /**
@@ -325,15 +331,19 @@ async function unwrapInnerTar(
 
   const tarData = fs.readFileSync(tarPath);
   const js7z = await JS7z();
-  js7z.FS.writeFile("/_inner.tar", new Uint8Array(tarData));
-  js7z.FS.mkdir("/_inner_out");
 
-  await run7z(js7z, ["x", "/_inner.tar", "-o/_inner_out"], progress);
-  copyDirFromFS(js7z, "/_inner_out", outputDir);
+  try {
+    js7z.FS.writeFile("/_inner.tar", new Uint8Array(tarData));
+    js7z.FS.mkdir("/_inner_out");
 
-  // Remove the intermediate tar
-  fs.unlinkSync(tarPath);
-  tryCleanup(js7z);
+    await run7z(js7z, ["x", "/_inner.tar", "-o/_inner_out"], progress);
+    copyDirFromFS(js7z, "/_inner_out", outputDir);
+
+    // Remove the intermediate tar
+    fs.unlinkSync(tarPath);
+  } finally {
+    tryCleanup(js7z);
+  }
 }
 
 /**
@@ -367,60 +377,63 @@ export async function listFiles(
     },
   });
 
-  const archiveName = getBaseName(filePath);
-  js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+  try {
+    const archiveName = getBaseName(filePath);
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
 
-  // Dedicated runner — avoids run7z which overwrites js7z.printErr
-  await new Promise<void>((resolve, reject) => {
-    js7z.onExit = (code: number) => {
-      if (code === 0) resolve();
-      else reject(new Error(`7z l: ${code}\n${stderr}`));
+    // Dedicated runner — avoids run7z which overwrites js7z.printErr
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (code: number) => {
+        if (code === 0) resolve();
+        else reject(new Error(`7z l: ${code}\n${stderr}`));
+      };
+      const args = ["l", "-slt", "-sccUTF-8"];
+      if (password) args.splice(1, 0, `-p${password}`);
+      args.push(`/${archiveName}`);
+      js7z.callMain(args);
+    });
+
+    // Parse `7z l -slt` output line by line: each entry starts
+    // with `Path = ...` and contains `Size = ...` / `Attributes = ...`.
+    const results: { path: string; size: number; type: string }[] = [];
+    let curPath = "";
+    let curSize = 0;
+    let curAttr = "";
+
+    const flush = () => {
+      if (curPath) {
+        results.push({
+          path: fixArchiveEncoding(curPath),
+          size: curSize,
+          type: curAttr.includes("D") ? "DIRECTORY" : "REGULAR_FILE",
+        });
+      }
+      curPath = "";
+      curSize = 0;
+      curAttr = "";
     };
-    const args = ["l", "-slt", "-sccUTF-8"];
-    if (password) args.splice(1, 0, `-p${password}`);
-    args.push(`/${archiveName}`);
-    js7z.callMain(args);
-  });
 
-  // Parse `7z l -slt` output line by line: each entry starts
-  // with `Path = ...` and contains `Size = ...` / `Attributes = ...`.
-  const results: { path: string; size: number; type: string }[] = [];
-  let curPath = "";
-  let curSize = 0;
-  let curAttr = "";
-
-  const flush = () => {
-    if (curPath) {
-      results.push({
-        path: fixArchiveEncoding(curPath),
-        size: curSize,
-        type: curAttr.includes("D") ? "DIRECTORY" : "REGULAR_FILE",
-      });
+    for (const line of stdout.split("\n")) {
+      const m = line.match(/^(\w[\w ]*?)\s*=\s*(.*)/);
+      if (!m) continue;
+      const key = m[1].trim();
+      const val = m[2].trim();
+      if (key === "Path") {
+        flush();
+        curPath = val;
+      } else if (key === "Size" && !curSize) {
+        curSize = parseInt(val, 10) || 0;
+      } else if (key === "Attributes") {
+        curAttr = val;
+      }
     }
-    curPath = "";
-    curSize = 0;
-    curAttr = "";
-  };
+    flush();
 
-  for (const line of stdout.split("\n")) {
-    const m = line.match(/^(\w[\w ]*?)\s*=\s*(.*)/);
-    if (!m) continue;
-    const key = m[1].trim();
-    const val = m[2].trim();
-    if (key === "Path") {
-      flush();
-      curPath = val;
-    } else if (key === "Size" && !curSize) {
-      curSize = parseInt(val, 10) || 0;
-    } else if (key === "Attributes") {
-      curAttr = val;
-    }
+    logger.debug({ event: "listFiles.done", count: results.length });
+    return results;
+  } finally {
+    tryCleanup(js7z);
   }
-  flush();
-
-  tryCleanup(js7z);
-  logger.debug({ event: "listFiles.done", count: results.length });
-  return results;
 }
 
 /**
@@ -451,17 +464,21 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
     },
   });
 
-  const archiveName = getBaseName(filePath);
-  js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
-
   try {
-    await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
-    return stdout.includes("Encrypted = +");
-  } catch {
-    const msg = (stdout + stderr).toLowerCase();
-    if (msg.includes("encrypted") || msg.includes("wrong password")) {
-      return true;
+    const archiveName = getBaseName(filePath);
+    js7z.FS.writeFile(`/${archiveName}`, new Uint8Array(data));
+
+    try {
+      await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
+      return stdout.includes("Encrypted = +");
+    } catch {
+      const msg = (stdout + stderr).toLowerCase();
+      if (msg.includes("encrypted") || msg.includes("wrong password")) {
+        return true;
+      }
+      return false;
     }
-    return false;
+  } finally {
+    tryCleanup(js7z);
   }
 }

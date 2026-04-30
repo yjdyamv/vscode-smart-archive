@@ -11,6 +11,7 @@
 
 import type { FormatInfo } from "./types";
 import * as path from "path";
+import { isRarExt } from "./utils/rar";
 
 // ════════════════════════════════════════════════════════════════════
 // Format table — one row per supported archive format
@@ -303,7 +304,7 @@ export const COMPRESS_FORMATS: FormatInfo[] = FORMAT_TABLE.filter((f) => f.canCr
 );
 
 /** Regex for RAR-family extensions (including multi-volume .r00–.r99) */
-export const RAR_PATTERN = /^\.(?:rar|r\d{2})$/i;
+export { isRarExt } from "./utils/rar";
 
 /** Extensions that may contain encrypted data (7z/ZIP/RAR) */
 export const ENCRYPTABLE_EXTS: readonly string[] = FORMAT_TABLE.filter(
@@ -363,10 +364,6 @@ export function isWrappedFormat(ext: string): boolean {
 export function getWrapExtension(ext: string): string {
   const f = getFormatByExt(ext);
   return f?.wrapCompression ?? "";
-}
-
-export function isRarExt(ext: string): boolean {
-  return RAR_PATTERN.test(ext);
 }
 
 export function isEncryptableExt(ext: string): boolean {
