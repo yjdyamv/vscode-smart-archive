@@ -56,13 +56,17 @@ export async function prewarmLibarchive(): Promise<void> {
 export async function extractArchive(
   options: DecompressOptions,
   token?: vscode.CancellationToken,
+  progress?: vscode.Progress<{ message?: string }>,
 ): Promise<number> {
   const mod = await getWasmModule();
 
-  // Read archive into memory
   checkFileSize(fs.statSync(options.inputPath).size);
   const buffer = fs.readFileSync(options.inputPath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength), options.password || undefined);
+  const reader = new ArchiveReader(
+    mod,
+    new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+    options.password || undefined,
+  );
 
   let fileCount = 0;
   let totalSize = 0;
@@ -73,26 +77,23 @@ export async function extractArchive(
       const pathname = fixArchiveEncoding(entry.getPathname());
       if (!pathname) continue;
 
-      // Security: prevent Zip Slip / path traversal
+      if (progress) progress.report({ message: pathname });
+
       const outPath = safeJoinPath(options.outputDir, pathname);
 
-      // Check if it's a directory
       const fileType = entry.getFiletype();
       if (fileType === "DIRECTORY" || pathname.endsWith("/")) {
         fs.mkdirSync(outPath, { recursive: true });
         continue;
       }
 
-      // Ensure parent directory exists
       const dir = path.dirname(outPath);
       fs.mkdirSync(dir, { recursive: true });
 
-      // Security: prevent zip bomb — check reported size before allocating
       const reportedSize = entry.getSize();
       checkFileSize(reportedSize);
       totalSize = checkTotalSize(totalSize, reportedSize);
 
-      // Read and write file data
       const data = entry.readData();
       if (data) {
         if (data.byteLength > reportedSize * 4 && reportedSize > 1024) {
@@ -123,7 +124,10 @@ export async function getFileList(
   const mod = await getWasmModule();
   checkFileSize(fs.statSync(filePath).size);
   const buffer = fs.readFileSync(filePath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength));
+  const reader = new ArchiveReader(
+    mod,
+    new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+  );
 
   const results: { path: string; size: number; type: string }[] = [];
   try {
@@ -160,11 +164,16 @@ export async function extractSelectedFiles(
   selectedPaths: string[],
   password?: string,
   token?: vscode.CancellationToken,
+  progress?: vscode.Progress<{ message?: string }>,
 ): Promise<number> {
   const mod = await getWasmModule();
   checkFileSize(fs.statSync(filePath).size);
   const buffer = fs.readFileSync(filePath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength), password || undefined);
+  const reader = new ArchiveReader(
+    mod,
+    new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+    password || undefined,
+  );
   const selected = new Set(selectedPaths);
   let fileCount = 0;
   let totalSize = 0;
@@ -174,6 +183,8 @@ export async function extractSelectedFiles(
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
       const pathname = fixArchiveEncoding(entry.getPathname());
       if (!pathname || !selected.has(pathname)) continue;
+
+      if (progress) progress.report({ message: pathname });
 
       const outPath = safeJoinPath(outputDir, pathname);
       const fileType = entry.getFiletype();
