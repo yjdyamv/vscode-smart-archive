@@ -32,7 +32,41 @@ body{
 .btn:disabled{opacity:.5;cursor:default}
 .sel-cnt{font-size:calc(var(--vscode-font-size) * 0.92);color:var(--vscode-descriptionForeground)}
 .sel-cnt span{font-weight:600;color:var(--vscode-foreground)}
-.tree{padding:4px 0}
+.tb-m{display:flex;align-items:center;gap:4px}
+.btn-ico{
+  background:transparent;color:var(--vscode-foreground);
+  border:none;padding:2px 4px;border-radius:2px;
+  cursor:pointer;font-size:calc(var(--vscode-font-size) * 0.85);line-height:1
+}
+.btn-ico:hover{background:var(--vscode-toolbar-hoverBackground)}
+.srch{
+  background:var(--vscode-input-background);
+  color:var(--vscode-input-foreground);
+  border:1px solid var(--vscode-input-border,transparent);
+  padding:2px 6px;border-radius:2px;
+  font-size:calc(var(--vscode-font-size) * 0.88);
+  width:140px;outline:none
+}
+.srch:focus{border-color:var(--vscode-focusBorder)}
+select.srch{cursor:pointer;width:auto!important;padding:2px 4px}
+mark{background:var(--vscode-editor-findMatchHighlightBackground,#d4d40066);color:inherit;border-radius:1px}
+.props{
+  margin:0 12px;padding:6px 10px;
+  font-size:calc(var(--vscode-font-size) * 0.88);
+  color:var(--vscode-descriptionForeground);
+  background:var(--vscode-editor-background);
+  border:1px solid var(--vscode-sideBarSectionHeader-border);
+  border-radius:3px;line-height:1.6
+}
+.props b{color:var(--vscode-foreground)}
+.cmi{padding:3px 16px;cursor:pointer;white-space:nowrap}
+.cmi:hover{background:var(--vscode-menu-selectionBackground,var(--vscode-list-hoverBackground))}
+.sort-lbl{cursor:pointer;font-size:calc(var(--vscode-font-size)*0.85);color:var(--vscode-descriptionForeground);padding:1px 4px;border-radius:2px}
+.sort-lbl:hover{color:var(--vscode-foreground)}
+.sort-lbl.on{color:var(--vscode-foreground);font-weight:600}
+.sp{width:24px;height:24px;border:3px solid var(--vscode-panel-border);border-top-color:var(--vscode-progressBar-background);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.tree{padding:4px 0 100vh}
 .rw{
   position:relative;
   height:calc(var(--vscode-font-size) * 1.8);
