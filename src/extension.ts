@@ -11,7 +11,7 @@
 import * as vscode from "vscode";
 import { compressCommand } from "./commands/compress";
 import { decompressCommand, browseCommand } from "./commands/decompress";
-import { registerArchiveEditor } from "./providers/archiveProvider";
+import { registerArchiveEditor, pasteCopiedFromArchive } from "./providers/archiveProvider";
 import { logger } from "./utils/logger";
 
 /**
@@ -45,8 +45,14 @@ export function activate(context: vscode.ExtensionContext): void {
     (uri: vscode.Uri) => browseCommand(uri),
   );
 
+  // Register paste-from-archive command
+  const pasteDisposable = vscode.commands.registerCommand(
+    "yjdyamv.smart-archive.paste",
+    () => pasteCopiedFromArchive(),
+  );
+
   // Dispose commands when the extension is deactivated
-  context.subscriptions.push(compressDisposable, decompressDisposable, browseDisposable);
+  context.subscriptions.push(compressDisposable, decompressDisposable, browseDisposable, pasteDisposable);
 }
 
 /**
