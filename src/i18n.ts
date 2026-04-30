@@ -345,13 +345,7 @@ export function t(key: string, ...args: string[]): string {
   return text;
 }
 
-export function formatDuration(ms: number): string {
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${minutes}m ${secs}s`;
-}
+export { formatDuration, formatCompactSize } from "./utils/format";
 
 const COMPRESSION_LEVEL_LABELS: Record<Locale, string[]> = {
   en: ["0 – Store (fastest)", "1 – Fastest", "3 – Fast", "5 – Normal", "7 – Maximum", "9 – Ultra"],
@@ -361,11 +355,4 @@ const COMPRESSION_LEVEL_LABELS: Record<Locale, string[]> = {
 
 export function compressLevels(): string[] {
   return COMPRESSION_LEVEL_LABELS[detectLocale()];
-}
-
-export function formatCompactSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }

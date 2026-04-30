@@ -5,5 +5,14 @@
     "no-underscore-dangle": "off",
     "unicorn/require-post-message-target-origin": "off",
     "unicorn/no-array-sort": "off"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["media/**/*.js"],
+      "rules": {
+        "no-unused-vars": "off",
+        "no-useless-escape": "off"
+      }
+    }
+  ]
 }
