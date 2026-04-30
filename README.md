@@ -7,18 +7,17 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 - **Compress** to 7z, ZIP, TAR, WIM, GZip, BZip2, XZ, tar.gz, tar.bz2, tar.xz, tar.zst
 - **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
-- **Archive browser** — custom editor with tree view, checkbox selection, partial extract, search, sort
+- **Archive browser** — opens as default editor for archives, tree view with search, sort, partial extract, delete, test
 - **File preview** — double-click any file in the archive to open it in VSCode
 - **In-place editing** — delete files from within archives (`7z d`)
-- **Copy/paste** — copy files from archive to local filesystem via `Ctrl+C` / `Ctrl+V`
+- **Copy/paste** — select files in archive browser, paste to any local folder
 - **Integrity test** — verify archives with `7z t`
 - **Multi-volume RAR** — auto-resolves `.r00`–`.r99` to the base `.rar`
 - **RAR support** — `libarchive-wasm` handles RAR extraction (RAR4 + RAR5)
 - **Bilingual UI** — English / Chinese (auto-detected from VS Code locale)
 - **Security** — Zip Slip protection, zip bomb size limits, path traversal blocking
 - **CJK filenames** — recovers GBK / Shift-JIS / EUC-KR encoded filenames in old archives
-- **Context menu** — right-click any file or folder in VS Code Explorer
-- **Keyboard shortcuts** — `Ctrl+Alt+C` compress, `Ctrl+Alt+D` decompress, `Ctrl+Alt+B` browse
+- **Context menu** — right-click files/folders to compress, right-click archives to decompress or browse
 
 ## Quick Start
 
@@ -60,7 +59,7 @@ RAR files are auto-detected and processed by `libarchive-wasm`. All other format
 
 ### Decompression (extract)
 
-7z · ZIP · RAR (v4/v5) · TAR · GZ · BZ2 · XZ · CAB · ARJ · LZH · CHM · MSI · WIM · CPIO · RPM · DEB · UHA · XAR · ISO · VHD · VMDK · FAT · NTFS · SquashFS · DMG · HFS · ELF · Mach-O · SWF · FLV
+7z · ZIP · RAR (v4/v5) · TAR · GZ · BZ2 · XZ · Z · CAB · ARJ · LZH · CHM · MSI · WIM · CPIO · RPM · DEB · UHA · XAR · ISO · VHD · VMDK · FAT · NTFS · SquashFS · DMG · HFS · APM · MBR · ELF · Mach-O · SWF · FLV
 
 ## Configuration
 
