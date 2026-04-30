@@ -15,9 +15,9 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
-import { t } from "../i18n";
 import { safeJoinPath, checkFileSize, checkTotalSize } from "./security";
 import { getFullExt } from "../constants";
+import { logger } from "./logger";
 
 /**
  * Generate a collision-free output path.
@@ -107,7 +107,7 @@ function _copyDirFromFS(
 
     // Reject path traversal in entry names
     if (entry.includes("/") || entry.includes("\\") || entry.includes("\0")) {
-      console.error(t("fs.copyFailed") + entry, "Path traversal blocked");
+      logger.warn({ event: "fs.pathTraversal", entry }, "Path traversal blocked");
       continue;
     }
 
@@ -132,7 +132,7 @@ function _copyDirFromFS(
         totalSize = checkTotalSize(totalSize, data.byteLength);
         fs.writeFileSync(localEntry, Buffer.from(data));
       } catch (err) {
-        console.error(t("fs.copyFailed") + fsEntry, (err as Error).message);
+        logger.error({ event: "fs.copyFailed", path: fsEntry, err }, "Failed to copy file from virtual FS");
       }
     }
   }

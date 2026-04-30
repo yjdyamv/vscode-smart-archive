@@ -121,7 +121,7 @@ async function tryExtract(
   try {
     await primary();
   } catch (primaryErr) {
-    console.warn("Primary extraction failed:", (primaryErr as Error).message);
+    logger.warn({ event: "decompress.primary.failed", err: primaryErr }, "Primary extraction failed, falling back to libarchive");
     try {
       await fallback();
     } catch (fallbackErr) {

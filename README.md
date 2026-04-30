@@ -4,13 +4,17 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 
 ## Features
 
-- **Compress** to 7z, ZIP, TAR, GZip, BZip2, XZ
+- **Compress** to 7z, ZIP, TAR, WIM, GZip, BZip2, XZ, tar.gz, tar.bz2, tar.xz, tar.zst
 - **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
+- **Archive browser** — custom editor with tree view, checkbox selection, partial extract
 - **RAR support** — `libarchive-wasm` handles RAR extraction (RAR4 + RAR5)
+- **Bilingual UI** — English / Chinese (auto-detected from VS Code locale)
+- **Security** — Zip Slip protection, zip bomb size limits, path traversal blocking
 - **Folder compression** — nested directories preserved in archive
 - **Multi-select** — select multiple files/folders, compress into one archive
-- **Context menu** — right-click any file or folder in VSCode Explorer
+- **Context menu** — right-click any file or folder in VS Code Explorer
+- **Keyboard shortcuts** — `Ctrl+Alt+C` compress, `Ctrl+Alt+D` decompress, `Ctrl+Alt+B` browse
 
 ## Quick Start
 
@@ -27,27 +31,9 @@ Then press `F5` in VSCode to launch the Extension Development Host.
 |--------|-----|
 | Compress | Right-click file(s)/folder(s) → `Smart Archive: Compress` → pick format → optional password → save |
 | Decompress | Right-click archive → `Smart Archive: Decompress` → optional password → extracts to `*.extracted/` |
+| Browse | Right-click archive → `Smart Archive: Browse Contents` → interactive file tree with partial extract |
 
-RAR files are auto-detected and processed by `libarchive-wasm`. All other formats go through `js7z-tools` (7-Zip WASM).
-
-## Architecture
-
-```
-src/
-├── extension.ts            # Entry point — registers commands
-├── constants.ts            # Format lists, RAR detection regex
-├── types/index.ts          # Shared TypeScript interfaces
-├── commands/
-│   ├── compress.ts         # Compress workflow (UI → engine)
-│   └── decompress.ts       # Decompress workflow (auto-detect engine)
-├── engines/
-│   ├── js7z-engine.ts      # 7-Zip WASM wrapper (js7z-tools)
-│   └── libarchive-engine.ts # libarchive WASM wrapper (RAR extraction)
-├── ui/prompts.ts           # VSCode dialog wrappers
-└── utils/
-    ├── fs.ts               # Local ↔ virtual FS bidirectional sync
-    └── path.ts             # Unix-style path helpers for virtual FS
-```
+RAR files are auto-detected and processed by `libarchive-wasm`. All other formats go through `js7z-tools` (7-Zip WASM) with automatic libarchive fallback.
 
 ## Supported Formats
 
@@ -58,14 +44,27 @@ src/
 | 7z | AES-256 | Best ratio, solid archive, header encryption |
 | zip | AES-256 | Universal compatibility |
 | tar | — | No compression, archive only |
+| tar.gz | — | TAR + GZip compressed archive |
+| tar.bz2 | — | TAR + BZip2 compressed archive |
+| tar.xz | — | TAR + XZ compressed archive |
+| tar.zst | — | TAR + Zstandard compressed archive |
 | gz | — | Single-file GZip |
 | bz2 | — | Single-file BZip2 |
 | xz | — | Single-file XZ (LZMA2) |
+| wim | — | Windows Imaging Format |
 | rar | — | **Extraction only** — creation not supported by free tools |
 
 ### Decompression (extract)
 
 7z · ZIP · RAR (v4/v5) · TAR · GZ · BZ2 · XZ · CAB · ARJ · LZH · CHM · MSI · WIM · CPIO · RPM · DEB · UHA · XAR · ISO · VHD · VMDK · FAT · NTFS · SquashFS · DMG · HFS · ELF · Mach-O · SWF · FLV
+
+## Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `smart-archive.defaultFormat` | `7z` | Default archive format |
+| `smart-archive.defaultCompressionLevel` | `5` | Compression level (0–9) |
+| `smart-archive.defaultOutputDir` | `source` | Output location: next to source file or prompt |
 
 ## Development
 
@@ -73,22 +72,20 @@ src/
 npm install          # install dependencies
 npm run compile      # compile TypeScript → out/
 npm run watch        # watch mode
-npm test             # compile + run 15 tests
-npm run lint         # type-check only (no output)
+npm test             # compile + run 82 tests
+npm run lint         # oxlint static analysis
+npm run typecheck    # TypeScript type checking
+npm run format       # oxfmt code formatting
+npm run check        # format + lint + typecheck (CI)
+npm run package      # compile + create VSIX package
 ```
 
 ## Testing
 
-`npm test` runs 15 automated tests:
+`npm test` runs 82 automated tests across two test suites:
 
-- JS7z engine initialization
-- 7z / ZIP / TAR / GZip / XZ round-trip compression+decompression
-- Folder compression with nested directory preservation
-- Mixed files+folders in single archive
-- Full extension flow simulation (local FS → virtual FS → compress → verify)
-- AES-256 encrypted 7z and ZIP round-trips
-- Wrong password rejection
-- libarchive-wasm cross-engine extraction (7z, ZIP, TAR, GZip, XZ, folder, encrypted)
+- **core.test.ts** — 7z/ZIP/TAR/WIM/GZip/BZip2/XZ round-trips, encryption, cross-engine extraction, path traversal protection, zip bomb limits, CJK filename preservation
+- **preview.test.ts** — Selective extraction (7z & libarchive) for all format variants, encrypted archives, two-step wrapped extraction, zstd round-trip
 
 ## Dependencies
 
@@ -96,6 +93,9 @@ npm run lint         # type-check only (no output)
 |---------|---------|
 | [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly port |
 | [libarchive-wasm](https://github.com/ofk/libarchive-wasm) | libarchive WebAssembly port (RAR support) |
+| [@bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm) | Zstandard compression |
+| [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding fix |
+| [pino](https://github.com/pinojs/pino) | Structured logging |
 
 ## License
 
