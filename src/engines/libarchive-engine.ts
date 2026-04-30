@@ -60,8 +60,9 @@ export async function extractArchive(
   const mod = await getWasmModule();
 
   // Read archive into memory
+  checkFileSize(fs.statSync(options.inputPath).size);
   const buffer = fs.readFileSync(options.inputPath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer), options.password || undefined);
+  const reader = new ArchiveReader(mod, new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength), options.password || undefined);
 
   let fileCount = 0;
   let totalSize = 0;
@@ -120,8 +121,9 @@ export async function getFileList(
   filePath: string,
 ): Promise<{ path: string; size: number; type: string }[]> {
   const mod = await getWasmModule();
+  checkFileSize(fs.statSync(filePath).size);
   const buffer = fs.readFileSync(filePath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer));
+  const reader = new ArchiveReader(mod, new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength));
 
   const results: { path: string; size: number; type: string }[] = [];
   try {
@@ -160,8 +162,9 @@ export async function extractSelectedFiles(
   token?: vscode.CancellationToken,
 ): Promise<number> {
   const mod = await getWasmModule();
+  checkFileSize(fs.statSync(filePath).size);
   const buffer = fs.readFileSync(filePath);
-  const reader = new ArchiveReader(mod, new Int8Array(buffer), password || undefined);
+  const reader = new ArchiveReader(mod, new Int8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength), password || undefined);
   const selected = new Set(selectedPaths);
   let fileCount = 0;
   let totalSize = 0;

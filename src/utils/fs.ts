@@ -72,7 +72,7 @@ export function copyDirToFS(
       copyDirToFS(js7z, localEntry, fsEntry, token);
     } else {
       const data = fs.readFileSync(localEntry);
-      js7z.FS.writeFile(fsEntry, new Uint8Array(data));
+      js7z.FS.writeFile(fsEntry, data);
     }
   }
 }
