@@ -12,7 +12,7 @@ import * as vscode from "vscode";
 import { compressCommand } from "./commands/compress";
 import { decompressCommand, browseCommand } from "./commands/decompress";
 import { registerArchiveEditor, pasteCopiedFromArchive } from "./providers/archiveProvider";
-import { runAddToArchive } from "./providers/archiveOperations";
+import { runAddToArchive } from "./providers/archive";
 import { logger } from "./utils/logger";
 
 /**

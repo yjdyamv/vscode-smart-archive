@@ -25,7 +25,7 @@ import {
   initAddToArchive,
   previewFileFromArchive,
   testArchive,
-} from "./archiveOperations";
+} from "./archive";
 import { setCopiedPaths } from "./copyPaste";
 
 const EXT_ID = "yjdyamv.smart-archive";
