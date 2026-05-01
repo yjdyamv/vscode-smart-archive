@@ -20,19 +20,23 @@ const PREVIEW_TMP_DIR = path.join(os.tmpdir(), "vscode-7z-preview");
 
 let tempCleanupRegistered = false;
 
+function cleanupPreviewTemp(): void {
+  try {
+    if (fs.existsSync(PREVIEW_TMP_DIR)) {
+      for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
+        try { fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f)); } catch { /* stale */ }
+      }
+    }
+  } catch { /* best-effort */ }
+}
+
 function initTempCleanup(context: vscode.ExtensionContext): void {
   if (tempCleanupRegistered) return;
   tempCleanupRegistered = true;
 
   try {
     if (fs.existsSync(PREVIEW_TMP_DIR)) {
-      for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
-        try {
-          fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f));
-        } catch {
-          /* stale */
-        }
-      }
+      cleanupPreviewTemp();
     }
   } catch {
     /* best-effort */
@@ -40,21 +44,9 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push({
     dispose: () => {
-      try {
-        if (fs.existsSync(PREVIEW_TMP_DIR)) {
-          for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
-            try {
-              fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f));
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-      } catch {
-        /* best-effort */
-      }
+      try { cleanupPreviewTemp(); } catch { /* best-effort */ }
     },
   });
 }
 
-export { PREVIEW_TMP_DIR, initTempCleanup };
+export { PREVIEW_TMP_DIR, initTempCleanup, cleanupPreviewTemp };

@@ -9,6 +9,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import { extractSelected } from "./extraction";
+import { cleanupPreviewTemp } from "./tempFiles";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 
@@ -41,6 +42,8 @@ export function pasteCopiedFromArchive(): void {
       if (!uris || uris.length === 0) return;
       try {
         await extractSelected(source, paths, pw, fl, uris[0].fsPath);
+        cleanupPreviewTemp();
+        clearCopiedPaths();
       } catch (err) {
         logger.error({ event: "paste.failed", err }, (err as Error).message);
         vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
@@ -58,4 +61,11 @@ export function setCopiedPaths(
   copiedArchivePath = archivePath;
   copiedPassword = password;
   copiedFlat = flat;
+}
+
+function clearCopiedPaths(): void {
+  copiedPaths = null;
+  copiedArchivePath = "";
+  copiedPassword = undefined;
+  copiedFlat = undefined;
 }

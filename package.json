@@ -20,6 +20,7 @@
     "onCommand:yjdyamv.smart-archive.decompress",
     "onCommand:yjdyamv.smart-archive.browse",
     "onCommand:yjdyamv.smart-archive.paste",
+    "onCommand:yjdyamv.smart-archive.addToArchive",
     "onCustomEditor:archiveViewer"
   ],
   "main": "./out/extension.js",
@@ -114,6 +115,12 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "yjdyamv.smart-archive.paste",
+          "when": "false"
+        }
+      ],
       "explorer/context": [
         {
           "command": "yjdyamv.smart-archive.compress",
@@ -228,6 +235,9 @@
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
     "package": "npm run compile && vsce package",
+    "package:ovsx": "npm run compile && npx ovsx package",
+    "publish": "npx vsce publish",
+    "publish:ovsx": "npm run compile && npx ovsx publish",
     "vscode:prepublish": "npm run compile"
   },
   "overrides": {

@@ -141,7 +141,7 @@ async function extractSelected(
       password || undefined,
     );
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-    await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+    await vscode.env.openExternal(vscode.Uri.file(outputDir));
     return;
   }
 
@@ -188,7 +188,7 @@ async function extractSelected(
         } else {
           copyFromFSWithStrip(js7z2, "/_x2", outputDir, selectedPaths);
         }
-        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+        await vscode.env.openExternal(vscode.Uri.file(outputDir));
         vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       } finally {
         tryCleanupJS7z(js7z2);
@@ -232,13 +232,13 @@ async function extractSelected(
       } else {
         copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths);
       }
-      await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+      await vscode.env.openExternal(vscode.Uri.file(outputDir));
       vscode.window.showInformationMessage(t("decompress.done") + outputDir);
     } catch (err) {
       try {
         const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
         vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+        await vscode.env.openExternal(vscode.Uri.file(outputDir));
       } catch (fallbackErr) {
         // eslint-disable-next-line preserve-caught-error
         throw new Error(
