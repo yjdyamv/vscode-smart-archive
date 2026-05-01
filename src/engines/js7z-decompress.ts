@@ -88,7 +88,12 @@ async function unwrapInnerTar(
     await run7z(js7z, ["x", "/_inner.tar", "-o/_inner_out"], progress);
     copyDirFromFS(js7z, "/_inner_out", outputDir);
 
-    fs.unlinkSync(tarPath);
+    // Clean up intermediate .tar (best-effort, may already be removed)
+    try {
+      fs.unlinkSync(tarPath);
+    } catch {
+      /* already cleaned */
+    }
   } finally {
     tryCleanup(js7z);
   }
