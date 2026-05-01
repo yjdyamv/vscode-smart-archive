@@ -655,6 +655,7 @@ function showCtxMenu(x, y, ps, dirPath) {
     '<div class=cmi onclick="ctxExt()">Extract Selected</div>' +
     '<div class=cmi onclick="ctxDel()">Delete</div>' +
     '<div class=cmi onclick="ctxAddHere()">Add Files Here' + dirLabel + '</div>' +
+    '<div class=cmi onclick="ctxNewFolder()">New Folder' + dirLabel + '</div>' +
     '<div class=cmi style="color:var(--vscode-descriptionForeground)">' +
     ps.length +
     " item(s)</div>";
@@ -692,6 +693,17 @@ function ctxDel() {
   document.getElementById("ctxmenu").style.display = "none";
   delSel();
 }
+function ctxNewFolder() {
+  document.getElementById("ctxmenu").style.display = "none";
+  var name = prompt("Folder name:");
+  if (!name || !name.trim()) return;
+  name = name.trim().replace(/[<>:"/\\|?*]/g, "_");
+  var dir = addDirFromSel();
+  if (!dir) dir = window._ctxDir || "";
+  setLoading(true, "Creating folder " + name + " in " + (dir || "archive root") + "\u2026");
+  v.postMessage({ c: "newFolder", dir: dir, name: name });
+}
+
 function ctxAddHere() {
   document.getElementById("ctxmenu").style.display = "none";
   var dir = addDirFromSel();

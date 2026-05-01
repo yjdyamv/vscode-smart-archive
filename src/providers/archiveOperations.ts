@@ -582,4 +582,85 @@ function copyDirToFSRecursive(
   }
 }
 
-export { deleteFromArchive, addToArchive, previewFileFromArchive, unwrapAndExtract, testArchive };
+async function createFolderInArchive(
+  archivePath: string,
+  targetDir: string,
+  folderName: string,
+  password?: string,
+): Promise<void> {
+  const ext = getFullExt(archivePath);
+  const normDir = targetDir.replace(/\\/g, "/").replace(/^\/+/, "");
+  const folderPath = normDir ? `${normDir}/${folderName}` : folderName;
+
+  logger.info({
+    event: "createFolder.start",
+    archivePath,
+    targetDir,
+    folderName,
+    ext,
+  });
+
+  if (isWrappedFormat(ext)) {
+    logger.error({ event: "createFolder.unsupported", ext }, "Create folder not supported for wrapped formats");
+    throw new Error("Creating folders in wrapped archives (tar.gz, etc.) is not yet supported.");
+  }
+
+  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
+  checkFileSize(stat.size);
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, data);
+
+    // Create new folder structure in VFS
+    const vfsFolder = `/${folderPath}`;
+    let cur = "";
+    for (const part of folderPath.split("/").filter(Boolean)) {
+      cur += "/" + part;
+      try { js7z.FS.mkdir(cur); } catch { /* exists */ }
+    }
+    const keepFile = `${vfsFolder}/.keep`;
+    js7z.FS.writeFile(keepFile, new Uint8Array(1));
+
+    // Build add args: use directory form for nested, individual for root-level
+    const parts = folderPath.split("/").filter(Boolean);
+    const firstLevel = parts[0];
+    const args = firstLevel
+      ? ["a", `/${archiveName}`, "-aot", `/${firstLevel}`]
+      : ["a", `/${archiveName}`, "-aot", keepFile];
+    if (password) args.splice(1, 0, `-p${password}`);
+
+    logger.debug({ event: "createFolder.7zAdd", args: args.join(" ") });
+
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
+      js7z.callMain(args);
+    });
+
+    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+
+    // Remove .keep on a fresh instance
+    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+    try {
+      js7z2.FS.writeFile(`/${archiveName}`, new Uint8Array(updated));
+      const dArgs = ["d", `/${archiveName}`, "-y", `${folderPath}/.keep`];
+      if (password) dArgs.splice(1, 0, `-p${password}`);
+      logger.debug({ event: "createFolder.7zDelete", args: dArgs.join(" ") });
+      await new Promise<void>((resolve, reject) => {
+        js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z d keep: ${c}`)));
+        js7z2.callMain(dArgs);
+      });
+      const final = js7z2.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(final));
+      logger.info({ event: "createFolder.ok", archivePath, folderPath });
+    } finally {
+      tryCleanupJS7z(js7z2);
+    }
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}
+
+export { deleteFromArchive, addToArchive, createFolderInArchive, previewFileFromArchive, unwrapAndExtract, testArchive };
