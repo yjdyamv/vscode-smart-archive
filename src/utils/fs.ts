@@ -131,6 +131,10 @@ function _copyDirFromFS(
         fs.writeFileSync(localEntry, Buffer.from(data));
       }
     } catch {
+      logger.warn(
+        { event: "copyDirFromFS.stat.failed" },
+        "Failed to stat virtual FS entry, falling back to raw read",
+      );
       try {
         const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
         checkFileSize(data.byteLength);

@@ -15,6 +15,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import { logger } from "../utils/logger";
 
 const PREVIEW_TMP_DIR = path.join(os.tmpdir(), "vscode-7z-preview");
 
@@ -27,12 +28,12 @@ function cleanupPreviewTemp(): void {
         try {
           fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f));
         } catch {
-          /* stale */
+          logger.warn({ event: "tempFiles.unlink.failed" }, "Failed to remove temp file");
         }
       }
     }
   } catch {
-    /* best-effort */
+    logger.warn({ event: "tempFiles.cleanup.failed" }, "Failed to clean up temp files");
   }
 }
 
@@ -45,7 +46,7 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
       cleanupPreviewTemp();
     }
   } catch {
-    /* best-effort */
+    logger.warn({ event: "tempFiles.initCleanup.failed" }, "Failed to clean up temp directory");
   }
 
   context.subscriptions.push({
@@ -53,7 +54,10 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
       try {
         cleanupPreviewTemp();
       } catch {
-        /* best-effort */
+        logger.warn(
+          { event: "tempFiles.disposeCleanup.failed" },
+          "Failed to clean up temp directory",
+        );
       }
     },
   });

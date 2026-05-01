@@ -118,6 +118,7 @@ function readDirEntries(
         results.push({ path: childPath, size: st.size || 0, type: "REGULAR_FILE" });
       }
     } catch {
+      logger.warn({ event: "readDirEntries.stat.failed" }, "Failed to stat virtual FS entry");
       results.push({ path: childPath, size: 0, type: "REGULAR_FILE" });
     }
   }

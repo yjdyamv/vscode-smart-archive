@@ -123,6 +123,10 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
       await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
       return stdout.includes("Encrypted = +");
     } catch {
+      logger.warn(
+        { event: "isEncrypted.detect.failed" },
+        "Encryption detection via 7z test failed, checking stderr",
+      );
       const msg = (stdout + stderr).toLowerCase();
       return msg.includes("encrypted") || msg.includes("wrong password");
     }

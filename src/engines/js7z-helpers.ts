@@ -20,7 +20,7 @@ function tryCleanup(instance: JS7zInstance): void {
     if (typeof instance.destroy === "function") instance.destroy();
     else if (typeof instance._cleanup === "function") instance._cleanup();
   } catch {
-    /* best-effort cleanup */
+    logger.warn({ event: "js7z.cleanup.failed" }, "Failed to clean up JS7z instance");
   }
 }
 

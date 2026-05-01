@@ -7,6 +7,8 @@
  * @module engines/zstd-codec
  */
 
+import { logger } from "../utils/logger";
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const zstd = require("@bokuweb/zstd-wasm") as {
   init: () => Promise<void>;
@@ -19,6 +21,7 @@ let initP: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
   if (!initP) {
     initP = zstd.init().catch((err) => {
+      logger.error({ event: "zstd.init.failed", err }, "Zstd initialization failed");
       initP = null;
       throw err;
     });

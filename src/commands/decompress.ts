@@ -67,6 +67,7 @@ async function decompressSingleFile(
     try {
       validateRarHeader(inputPath);
     } catch {
+      logger.warn({ event: "decompress.validateRar.failed" }, "RAR header validation failed");
       vscode.window.showErrorMessage(t("decompress.failed") + "Cannot read file");
       return;
     }
@@ -132,6 +133,7 @@ async function decompressSingleFile(
           );
         }
       } catch (err) {
+        logger.error({ event: "decompress.extraction.failed", err }, "Decompression failed");
         // Clean up output directory only if it's empty (partial extraction
         // may have succeeded; deleting non-empty dir would destroy valid data)
         try {
@@ -142,7 +144,10 @@ async function decompressSingleFile(
             }
           }
         } catch {
-          /* best-effort cleanup */
+          logger.warn(
+            { event: "decompress.cleanup.failed" },
+            "Failed to clean up output directory",
+          );
         }
         if (!(err instanceof vscode.CancellationError)) {
           vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
@@ -166,6 +171,10 @@ async function tryExtract(
     try {
       await fallback();
     } catch (fallbackErr) {
+      logger.error(
+        { event: "decompress.fallback.failed", err: fallbackErr },
+        "Fallback extraction failed",
+      );
       // eslint-disable-next-line preserve-caught-error
       throw new Error(
         t("decompress.failed") +
@@ -189,6 +198,7 @@ export async function browseCommand(uri: vscode.Uri | undefined): Promise<void> 
   try {
     await openArchivePreview(uri);
   } catch (err) {
+    logger.error({ event: "decompress.browse.failed", err }, "Browse command failed");
     vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
   }
 }
