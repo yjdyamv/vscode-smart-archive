@@ -152,7 +152,9 @@ async function extractSelected(
       password || undefined,
     );
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-    await vscode.env.openExternal(vscode.Uri.file(outputDir));
+    try { await vscode.env.openExternal(vscode.Uri.file(outputDir)); } catch {
+      /* non-critical: file manager may fail to open */
+    }
     logger.info({
       event: "extractSelected.exit",
       duration: Date.now() - start,
@@ -204,7 +206,9 @@ async function extractSelected(
         } else {
           copyFromFSWithStrip(js7z2, "/_x2", outputDir, selectedPaths);
         }
-        await vscode.env.openExternal(vscode.Uri.file(outputDir));
+        try { await vscode.env.openExternal(vscode.Uri.file(outputDir)); } catch {
+      /* non-critical */
+    }
         vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       } finally {
         tryCleanupJS7z(js7z2);
@@ -253,7 +257,9 @@ async function extractSelected(
       } else {
         copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths);
       }
-      await vscode.env.openExternal(vscode.Uri.file(outputDir));
+      try { await vscode.env.openExternal(vscode.Uri.file(outputDir)); } catch {
+      /* non-critical */
+    }
       vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z" });
     } catch (err) {
@@ -261,7 +267,9 @@ async function extractSelected(
       try {
         const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
         vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-        await vscode.env.openExternal(vscode.Uri.file(outputDir));
+        try { await vscode.env.openExternal(vscode.Uri.file(outputDir)); } catch {
+      /* non-critical */
+    }
         logger.info({
           event: "extractSelected.exit",
           duration: Date.now() - start,
