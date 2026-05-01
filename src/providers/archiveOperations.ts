@@ -601,8 +601,7 @@ async function createFolderInArchive(
   });
 
   if (isWrappedFormat(ext)) {
-    logger.error({ event: "createFolder.unsupported", ext }, "Create folder not supported for wrapped formats");
-    throw new Error("Creating folders in wrapped archives (tar.gz, etc.) is not yet supported.");
+    return createFolderInWrappedArchive(archivePath, targetDir, folderName, password);
   }
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
@@ -642,6 +641,94 @@ async function createFolderInArchive(
     const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}
+
+async function createFolderInWrappedArchive(
+  archivePath: string,
+  targetDir: string,
+  folderName: string,
+  password?: string,
+): Promise<void> {
+  const ext = getFullExt(archivePath);
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
+  const normDir = targetDir.replace(/\\/g, "/").replace(/^\/+/, "");
+  const folderPath = normDir ? `${normDir}/${folderName}` : folderName;
+
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, data);
+    js7z.FS.mkdir("/_cfw1");
+
+    const xArgs = ["x", `/${archiveName}`, "-o/_cfw1", "-y"];
+    if (password) xArgs.splice(1, 0, `-p${password}`);
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
+      js7z.callMain(xArgs);
+    });
+
+    const top = js7z.FS.readdir("/_cfw1").filter((e: string) => e !== "." && e !== "..");
+    const innerTar = top.find((e: string) => e.endsWith(".tar"));
+    if (!innerTar) throw new Error("Wrapped archive: no inner .tar found");
+
+    const innerData = js7z.FS.readFile(`/_cfw1/${innerTar}`, { encoding: "binary" });
+    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+    try {
+      js7z2.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
+
+      // Create new folder in inner tar VFS
+      const vfsFolder = `/${folderPath}`;
+      let cur = "";
+      for (const part of folderPath.split("/").filter(Boolean)) {
+        cur += "/" + part;
+        try { js7z2.FS.mkdir(cur); } catch { /* exists */ }
+      }
+      const dotfile = `${vfsFolder}/.smartarchive`;
+      js7z2.FS.writeFile(dotfile, new Uint8Array(1));
+
+      // Add directory to inner tar
+      const parts = folderPath.split("/").filter(Boolean);
+      const firstLevel = parts[0];
+      const aArgs = firstLevel
+        ? ["a", "/_inner.tar", "-aot", `/${firstLevel}`]
+        : ["a", "/_inner.tar", "-aot", dotfile];
+      if (password) aArgs.splice(1, 0, `-p${password}`);
+      await new Promise<void>((resolve, reject) => {
+        js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a inner: ${c}`)));
+        js7z2.callMain(aArgs);
+      });
+
+      const modifiedTar = js7z2.FS.readFile("/_inner.tar", { encoding: "binary" });
+      const wrapExt = getWrapExtension(ext);
+
+      let compressedData: Uint8Array;
+      if (wrapExt === "zst") {
+        compressedData = await zstdCompress(new Uint8Array(modifiedTar), 5);
+      } else {
+        const js7z3 = await JS7z({ print: () => {}, printErr: () => {} });
+        try {
+          js7z3.FS.writeFile("/_re.tar", new Uint8Array(modifiedTar));
+          const compOut = `/_re.${wrapExt}`;
+          const compArgs = ["a", compOut, "/_re.tar"];
+          if (password) compArgs.splice(1, 0, `-p${password}`);
+          await new Promise<void>((resolve, reject) => {
+            js7z3.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
+            js7z3.callMain(compArgs);
+          });
+          compressedData = new Uint8Array(js7z3.FS.readFile(compOut, { encoding: "binary" }));
+        } finally {
+          tryCleanupJS7z(js7z3);
+        }
+      }
+
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), compressedData);
+      logger.info({ event: "createFolder.wrapped.ok", archivePath, folderPath });
+    } finally {
+      tryCleanupJS7z(js7z2);
+    }
   } finally {
     tryCleanupJS7z(js7z);
   }
