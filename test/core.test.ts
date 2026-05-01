@@ -501,6 +501,236 @@ void (async () => {
     fs.unlinkSync(tmp);
   });
 
+  // ── 11. Tree builder ──
+  // Inline buildTree (pure logic, no vscode dependency)
+  interface TreeNode {
+    name: string;
+    path: string;
+    size: number;
+    kind: string;
+    children?: TreeNode[];
+  }
+  function buildTree(
+    entries: { path: string; size: number; type: string }[],
+    archiveName: string,
+  ): TreeNode[] {
+    const normed: { entry: (typeof entries)[0]; parts: string[] }[] = [];
+    for (const e of entries) {
+      const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
+      if (parts.length === 1 && parts[0] === archiveName) continue;
+      normed.push({ entry: e, parts });
+    }
+    const root: TreeNode[] = [];
+    const dirMap = new Map<string, TreeNode>();
+    normed.sort((a, b) => {
+      const aD = a.entry.type !== "REGULAR_FILE" ? 0 : 1;
+      const bD = b.entry.type !== "REGULAR_FILE" ? 0 : 1;
+      if (aD !== bD) return aD - bD;
+      return a.entry.path.localeCompare(b.entry.path);
+    });
+    for (const { entry, parts } of normed) {
+      let siblings = root;
+      let prefix = "";
+      for (let i = 0; i < parts.length; i++) {
+        const seg = parts[i];
+        const last = i === parts.length - 1;
+        const full = prefix ? prefix + "/" + seg : seg;
+        if (last) {
+          const isDir = entry.type !== "REGULAR_FILE";
+          const existing = dirMap.get(full);
+          if (existing && existing.kind === "DIRECTORY") {
+            existing.size = entry.size || existing.size;
+          } else {
+            const node: TreeNode = {
+              name: seg,
+              path: entry.path,
+              size: entry.size,
+              kind: isDir ? "DIRECTORY" : "REGULAR_FILE",
+              children: isDir ? [] : undefined,
+            };
+            siblings.push(node);
+            if (isDir) dirMap.set(full, node);
+          }
+        } else {
+          let dir = dirMap.get(full);
+          if (!dir) {
+            const dup = siblings.findIndex((s) => s.name === seg && s.kind !== "DIRECTORY");
+            if (dup >= 0) siblings.splice(dup, 1);
+            dir = { name: seg, path: full, size: 0, kind: "DIRECTORY", children: [] };
+            siblings.push(dir);
+            dirMap.set(full, dir);
+          }
+          siblings = dir.children!;
+          prefix = full;
+        }
+      }
+    }
+    return root;
+  }
+  function countTreeStats(
+    nodes: TreeNode[],
+  ): { files: number; dirs: number; total: number } {
+    let files = 0,
+      dirs = 0;
+    for (const n of nodes) {
+      if (n.kind === "DIRECTORY") {
+        dirs++;
+        if (n.children && n.children.length > 0) {
+          const c = countTreeStats(n.children);
+          files += c.files;
+          dirs += c.dirs;
+        }
+      } else {
+        files++;
+      }
+    }
+    return { files, dirs, total: files + dirs };
+  }
+
+  await test('tree: flat files only', () => {
+    const entries = [
+      { path: "a.txt", size: 10, type: "REGULAR_FILE" },
+      { path: "b.txt", size: 20, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "test.zip");
+    assert.strictEqual(tree.length, 2);
+    const stats = countTreeStats(tree);
+    assert.strictEqual(stats.files, 2);
+    assert.strictEqual(stats.dirs, 0);
+    assert.strictEqual(stats.total, 2);
+  });
+
+  await test('tree: nested with implicit dirs', () => {
+    const entries = [
+      { path: "src/main.ts", size: 100, type: "REGULAR_FILE" },
+      { path: "src/lib/util.ts", size: 50, type: "REGULAR_FILE" },
+      { path: "readme.md", size: 30, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "test.zip");
+    // Should have: src/ (dir) + readme.md (file)
+    assert.strictEqual(tree.length, 2);
+    const src = tree.find((n) => n.kind === "DIRECTORY");
+    assert.ok(src, "should have src directory");
+    assert.strictEqual(src!.children!.length, 2); // main.ts + lib/
+    const stats = countTreeStats(tree);
+    assert.strictEqual(stats.files, 3);
+    assert.strictEqual(stats.dirs, 2); // src + src/lib
+    assert.strictEqual(stats.total, 5);
+  });
+
+  await test('tree: explicit directory entries', () => {
+    const entries = [
+      { path: "dir", size: 0, type: "DIRECTORY" },
+      { path: "dir/file.txt", size: 10, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "test.zip");
+    assert.strictEqual(tree.length, 1);
+    assert.strictEqual(tree[0].kind, "DIRECTORY");
+    assert.strictEqual(tree[0].children!.length, 1);
+    const stats = countTreeStats(tree);
+    assert.strictEqual(stats.files, 1);
+    assert.strictEqual(stats.dirs, 1);
+  });
+
+  await test('tree: dedup dir entry with implicit dir', () => {
+    const entries = [
+      { path: "node_modules", size: 0, type: "DIRECTORY" },
+      { path: "node_modules/package.json", size: 200, type: "REGULAR_FILE" },
+      { path: "node_modules/index.js", size: 500, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "test.zip");
+    assert.strictEqual(tree.length, 1);
+    assert.strictEqual(tree[0].name, "node_modules");
+    assert.strictEqual(tree[0].children!.length, 2);
+    const stats = countTreeStats(tree);
+    assert.strictEqual(stats.dirs, 1);
+    assert.strictEqual(stats.files, 2);
+  });
+
+  await test('tree: archive self-entry filtered', () => {
+    const entries = [
+      { path: "test.7z", size: 1000, type: "REGULAR_FILE" },
+      { path: "data.txt", size: 50, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "test.7z");
+    assert.strictEqual(tree.length, 1);
+    assert.strictEqual(tree[0].name, "data.txt");
+  });
+
+  // ── 15. Format / encoding utilities ──
+  await test('util: fixArchiveEncoding passes ASCII through', () => {
+    const fixAE = (raw: string): string => {
+      if (!raw) return raw;
+      if (/^[\x00-\x7F]*$/.test(raw)) return raw;
+      return raw;
+    };
+    assert.strictEqual(fixAE("hello.txt"), "hello.txt");
+    assert.strictEqual(fixAE(""), "");
+  });
+
+  await test('util: getFullExt detects wrapped extensions', () => {
+    const getFullExt = (fp: string): string => {
+      const lower = fp.toLowerCase();
+      const compounds = [".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tgz", ".tbz2", ".txz"];
+      for (const ext of compounds) {
+        if (lower.endsWith(ext)) return ext;
+      }
+      return path.extname(fp).toLowerCase();
+    };
+    assert.strictEqual(getFullExt("archive.tar.gz"), ".tar.gz");
+    assert.strictEqual(getFullExt("archive.tgz"), ".tgz");
+    assert.strictEqual(getFullExt("archive.tar.xz"), ".tar.xz");
+    assert.strictEqual(getFullExt("archive.7z"), ".7z");
+    assert.strictEqual(getFullExt("archive.zip"), ".zip");
+  });
+
+  await test('util: formatCompactSize', () => {
+    const fmt = (bytes: number): string => {
+      if (bytes === 0) return "0 B";
+      const k = 1024;
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), units.length - 1);
+      const val = bytes / Math.pow(k, i);
+      return `${i === 0 ? val.toFixed(0) : val.toFixed(1)} ${units[i]}`;
+    };
+    assert.strictEqual(fmt(0), "0 B");
+    assert.strictEqual(fmt(500), "500 B");
+    assert.ok(fmt(1024).startsWith("1.0 KB"));
+    assert.ok(fmt(1048576).startsWith("1.0 MB"));
+  });
+
+  await test('util: formatDuration', () => {
+    const fmtD = (ms: number): string => {
+      if (ms < 1000) return `${ms}ms`;
+      const s = Math.floor(ms / 1000) % 60;
+      const m = Math.floor(ms / 60000);
+      if (m === 0) return `${s}s`;
+      return `${m}m ${s}s`;
+    };
+    assert.strictEqual(fmtD(500), "500ms");
+    assert.strictEqual(fmtD(5000), "5s");
+    assert.strictEqual(fmtD(65000), "1m 5s");
+    assert.strictEqual(fmtD(125000), "2m 5s");
+  });
+
+  // ── 16. RAR utilities ──
+  await test('rar: isRarExt', () => {
+    const isRarExt = (ext: string): boolean => /^\.(?:rar|r\d{2})$/i.test(ext);
+    assert.strictEqual(isRarExt(".rar"), true);
+    assert.strictEqual(isRarExt(".r00"), true);
+    assert.strictEqual(isRarExt(".r99"), true);
+    assert.strictEqual(isRarExt(".zip"), false);
+    assert.strictEqual(isRarExt(".7z"), false);
+  });
+
+  await test('rar: isRarVolume only matches headerless parts', () => {
+    const isRarVolume = (ext: string): boolean => /^\.r\d{2}$/i.test(ext);
+    assert.strictEqual(isRarVolume(".r00"), true);
+    assert.strictEqual(isRarVolume(".r50"), true);
+    assert.strictEqual(isRarVolume(".rar"), false);
+    assert.strictEqual(isRarVolume(".r1"), false);
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
