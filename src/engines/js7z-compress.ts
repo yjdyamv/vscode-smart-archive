@@ -38,6 +38,7 @@ function buildCompressArgs(
   }
 
   args.push(`-mx${level}`);
+  args.push("-mmt=on");
   args.push(...inputPaths);
   return args;
 }
@@ -76,7 +77,7 @@ export async function compressWith7z(
       const tarFsPath = joinFSPath(OUTPUT_DIR, "_tmp.tar");
 
       progress.report({ message: t("compress.creatingTar") });
-      await run7z(js7z, ["a", tarFsPath, ...fsInputPaths], progress);
+      await run7z(js7z, ["a", tarFsPath, ...fsInputPaths, "-mmt=on"], progress);
 
       const tarData = js7z.FS.readFile(tarFsPath, { encoding: "binary" });
 
@@ -91,7 +92,7 @@ export async function compressWith7z(
         const js7z2 = await JS7z();
         try {
           js7z2.FS.writeFile("/_tmp.tar", new Uint8Array(tarData));
-          await run7z(js7z2, ["a", archiveFsPath, "/_tmp.tar"], progress);
+          await run7z(js7z2, ["a", archiveFsPath, "/_tmp.tar", "-mmt=on"], progress);
           compressedData = new Uint8Array(js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }));
         } finally {
           tryCleanup(js7z2);
