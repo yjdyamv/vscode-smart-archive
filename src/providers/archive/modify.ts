@@ -256,6 +256,11 @@ export async function renameInArchive(
 ): Promise<void> {
   logger.info({ event: "rename.start", archivePath, oldPath, newPath });
 
+  const ext = getFullExt(archivePath);
+  if (isWrappedFormat(ext)) {
+    return renameInWrappedArchive(archivePath, oldPath, newPath, password);
+  }
+
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
@@ -281,4 +286,22 @@ export async function renameInArchive(
   } finally {
     tryCleanupJS7z(js7z);
   }
+}
+
+async function renameInWrappedArchive(
+  archivePath: string,
+  oldPath: string,
+  newPath: string,
+  password?: string,
+): Promise<void> {
+  const oldNorm = oldPath.replace(/\\/g, "/");
+  const newNorm = newPath.replace(/\\/g, "/");
+  return withWrappedArchive(archivePath, password, async (js7z2) => {
+    const rnArgs = ["rn", "/inner.tar", oldNorm, newNorm];
+    if (password) rnArgs.splice(1, 0, `-p${password}`);
+    await new Promise<void>((resolve, reject) => {
+      js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z rn inner: ${c}`)));
+      js7z2.callMain(rnArgs);
+    });
+  });
 }
