@@ -518,8 +518,6 @@ void (async () => {
     for (const e of entries) {
       const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
       if (parts.length === 1 && parts[0] === archiveName) continue;
-      const lastName = parts[parts.length - 1];
-      if (lastName === ".smartarchive") continue;
       normed.push({ entry: e, parts });
     }
     const root: TreeNode[] = [];
@@ -538,6 +536,7 @@ void (async () => {
         const last = i === parts.length - 1;
         const full = prefix ? prefix + "/" + seg : seg;
         if (last) {
+          if (seg === ".smartarchive") continue;
           const isDir = entry.type !== "REGULAR_FILE";
           const existing = dirMap.get(full);
           if (existing && existing.kind === "DIRECTORY") {
@@ -738,7 +737,7 @@ void (async () => {
     assert.strictEqual(f['f.txt'], 'x');
     assert.strictEqual(f['sub/newdir/.smartarchive'], '.');
 
-    // treeBuilder filters .smartarchive from display
+    // treeBuilder filters .smartarchive leaf but keeps directory structure
     const tree = buildTree(
       [
         { path: "f.txt", size: 1, type: "REGULAR_FILE" },
@@ -746,8 +745,12 @@ void (async () => {
       ],
       "test.7z",
     );
-    assert.strictEqual(tree.length, 1);
-    assert.strictEqual(tree[0].name, 'f.txt');
+    assert.strictEqual(tree.length, 2, 'should have f.txt + sub/ dir');
+    const subDir = tree.find((n: any) => n.kind === "DIRECTORY" && n.name === "sub") as any;
+    assert.ok(subDir, 'sub/ should exist as implicit directory');
+    assert.strictEqual(subDir!.children!.length, 1);
+    assert.strictEqual(subDir!.children![0].name, 'newdir');
+    assert.strictEqual(subDir!.children![0].kind, 'DIRECTORY');
   });
 
   // ── 16. Format / encoding utilities ──
