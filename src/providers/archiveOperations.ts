@@ -10,11 +10,12 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import * as crypto from "crypto";
 import type { JS7zInstance } from "../types";
 import { JS7z, tryCleanupJS7z } from "./fileListing";
 import { getFullExt, isWrappedFormat, getWrapExtension } from "../constants";
 import { checkFileSize } from "../utils/security";
-import { PREVIEW_TMP_DIR, trackedTempFiles } from "./tempFiles";
+import { PREVIEW_TMP_DIR } from "./tempFiles";
 import { zstdCompress } from "../engines/zstd-codec";
 
 async function deleteFromArchive(
@@ -155,11 +156,12 @@ async function previewFileFromArchive(
 
     const buf = Buffer.from(fileData);
     fs.mkdirSync(PREVIEW_TMP_DIR, { recursive: true });
+    const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 16);
     const ext = path.extname(normalizedFile);
-    const base = path.basename(normalizedFile, ext);
-    const tmpPath = path.join(PREVIEW_TMP_DIR, `${base}_${Date.now()}${ext}`);
-    fs.writeFileSync(tmpPath, buf);
-    trackedTempFiles.add(tmpPath);
+    const tmpPath = path.join(PREVIEW_TMP_DIR, `${hash}${ext}`);
+    if (!fs.existsSync(tmpPath)) {
+      fs.writeFileSync(tmpPath, buf);
+    }
     const uri = vscode.Uri.file(tmpPath);
     await vscode.commands.executeCommand("vscode.open", uri, {
       preview: true,

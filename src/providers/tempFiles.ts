@@ -2,8 +2,11 @@
  * Temp file lifecycle — Smart Archive VSCode Extension
  *
  * Manages preview temp files created when previewing individual archive
- * entries. Handles cleanup from previous sessions, tab-close tracking,
- * and final cleanup on extension deactivation.
+ * entries. Files are named by content SHA256 hash so that repeated
+ * previews of the same content reuse the same file on disk.
+ *
+ * Cleanup runs at extension activate (stale from previous session)
+ * and deactivate (current session).
  *
  * @module providers/tempFiles
  */
@@ -17,7 +20,6 @@ const PREVIEW_TMP_DIR = path.join(
   "vscode-7z-preview",
 );
 
-const trackedTempFiles = new Set<string>();
 let tempCleanupRegistered = false;
 
 function initTempCleanup(context: vscode.ExtensionContext): void {
@@ -38,37 +40,23 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
     /* best-effort */
   }
 
-  context.subscriptions.push(
-    vscode.window.tabGroups.onDidChangeTabs((e) => {
-      for (const tab of e.closed) {
-        const uri =
-          (tab.input as vscode.TabInputText)?.uri ??
-          (tab.input as vscode.TabInputCustom)?.uri ??
-          (tab.input as any)?.uri;
-        if (uri instanceof vscode.Uri && trackedTempFiles.has(uri.fsPath)) {
-          try {
-            fs.unlinkSync(uri.fsPath);
-          } catch {
-            /* ignore */
-          }
-          trackedTempFiles.delete(uri.fsPath);
-        }
-      }
-    }),
-  );
-
   context.subscriptions.push({
     dispose: () => {
-      for (const p of trackedTempFiles) {
-        try {
-          fs.unlinkSync(p);
-        } catch {
-          /* ignore */
+      try {
+        if (fs.existsSync(PREVIEW_TMP_DIR)) {
+          for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
+            try {
+              fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f));
+            } catch {
+              /* ignore */
+            }
+          }
         }
+      } catch {
+        /* best-effort */
       }
-      trackedTempFiles.clear();
     },
   });
 }
 
-export { PREVIEW_TMP_DIR, trackedTempFiles, initTempCleanup };
+export { PREVIEW_TMP_DIR, initTempCleanup };
