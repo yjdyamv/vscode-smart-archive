@@ -524,7 +524,7 @@ document.addEventListener("keydown", function (e) {
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   if ((e.ctrlKey || e.metaKey) && e.key === "a") {
     e.preventDefault();
-    var all = document.querySelectorAll(".rw:not(.dir)");
+    var all = document.querySelectorAll(".rw");
     for (var i = 0; i < all.length; i++) sel.add(getPath(all[i]));
     updateUI();
   }

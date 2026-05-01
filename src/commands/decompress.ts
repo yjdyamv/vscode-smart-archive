@@ -26,13 +26,19 @@ import { logger } from "../utils/logger";
 
 export async function decompressCommand(
   uri: vscode.Uri | undefined,
-  _selectedUris: readonly vscode.Uri[] | undefined,
+  selectedUris: readonly vscode.Uri[] | undefined,
 ): Promise<void> {
-  if (!uri) {
+  const uris = selectedUris && selectedUris.length > 0 ? selectedUris : uri ? [uri] : [];
+  if (uris.length === 0) {
     vscode.window.showErrorMessage(t("decompress.noFile"));
     return;
   }
+  for (const fileUri of uris) {
+    await decompressSingleFile(fileUri);
+  }
+}
 
+async function decompressSingleFile(uri: vscode.Uri): Promise<void> {
   const inputPath = uri.fsPath;
   const ext = getFullExt(inputPath);
   const isRar = isRarExt(ext);
@@ -42,7 +48,7 @@ export async function decompressCommand(
     const rarPath = resolveRarVolume(inputPath);
     if (rarPath) {
       logger.info({ event: "decompress.rarVolume.redirect", from: inputPath, to: rarPath });
-      return decompressCommand(vscode.Uri.file(rarPath), undefined);
+      return decompressSingleFile(vscode.Uri.file(rarPath));
     }
     vscode.window.showErrorMessage(
       t("decompress.failed") +

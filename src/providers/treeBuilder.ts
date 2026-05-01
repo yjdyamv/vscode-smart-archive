@@ -80,11 +80,26 @@ function buildTree(
     }
   }
 
-  if (root.length === 1 && root[0].kind === "DIRECTORY" && root[0].children) {
-    return root[0].children;
-  }
   return root;
 }
 
+function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total: number } {
+  let files = 0;
+  let dirs = 0;
+  for (const node of nodes) {
+    if (node.kind === "DIRECTORY") {
+      dirs++;
+      if (node.children && node.children.length > 0) {
+        const child = countTreeStats(node.children);
+        files += child.files;
+        dirs += child.dirs;
+      }
+    } else {
+      files++;
+    }
+  }
+  return { files, dirs, total: files + dirs };
+}
+
 export type { TreeNode };
-export { buildTree };
+export { buildTree, countTreeStats };

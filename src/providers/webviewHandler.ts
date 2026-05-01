@@ -15,7 +15,7 @@ import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
-import { buildTree } from "./treeBuilder";
+import { buildTree, countTreeStats } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
 import { extractSelected } from "./extraction";
@@ -115,8 +115,10 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     password: prev?.password,
   });
   const tree = buildTree(entries, archiveName);
-  const fileCount = entries.filter((e) => e.type !== "DIRECTORY").length;
-  const dirCount = entries.filter((e) => e.type === "DIRECTORY").length;
+  const stats = countTreeStats(tree);
+  const fileCount = stats.files;
+  const dirCount = stats.dirs;
+  const itemCount = stats.total;
   webview.html = contentHtml(tree, fileCount, dirCount, cssUri, jsUri);
 
   const totalSize = entries.reduce((s, e) => s + (e.size || 0), 0);
@@ -125,7 +127,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
       c: "props",
       name: archiveName,
       format: ext,
-      count: entries.length,
+      count: itemCount,
       files: fileCount,
       dirs: dirCount,
       size: formatCompactSize(totalSize),
@@ -188,8 +190,10 @@ function registerHandler(webview: vscode.Webview): void {
           logger.info({ event: "webview.password.ok", count: pwEntries.length });
           s.password = msg.pw;
           const tree = buildTree(pwEntries, s.archiveName);
-          const fc = pwEntries.filter((e) => e.type !== "DIRECTORY").length;
-          const dc = pwEntries.filter((e) => e.type === "DIRECTORY").length;
+          const stats = countTreeStats(tree);
+          const fc = stats.files;
+          const dc = stats.dirs;
+          const itemCount = stats.total;
           webview.html = contentHtml(tree, fc, dc, cssUri, jsUri);
           const totalSize = pwEntries.reduce((sum, e) => sum + (e.size || 0), 0);
           const ext = getFullExt(s.filePath);
@@ -198,7 +202,7 @@ function registerHandler(webview: vscode.Webview): void {
               c: "props",
               name: s.archiveName,
               format: ext,
-              count: pwEntries.length,
+              count: itemCount,
               files: fc,
               dirs: dc,
               size: formatCompactSize(totalSize),
