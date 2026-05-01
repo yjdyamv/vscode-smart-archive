@@ -19,7 +19,7 @@ import { buildTree, countTreeStats } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
 import { extractSelected } from "./extraction";
-import { deleteFromArchive, initAddToArchive, previewFileFromArchive, testArchive } from "./archiveOperations";
+import { createFolderInArchive, deleteFromArchive, initAddToArchive, previewFileFromArchive, testArchive } from "./archiveOperations";
 import { setCopiedPaths } from "./copyPaste";
 
 const EXT_ID = "yjdyamv.smart-archive";
@@ -162,6 +162,7 @@ function registerHandler(webview: vscode.Webview): void {
       flat?: boolean;
       path?: string;
       dir?: string;
+      name?: string;
       pw?: string;
     }) => {
       logger.info({ event: "webview.msg", c: msg.c, dir: msg.dir });
@@ -281,6 +282,22 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.addFiles", dir: targetDir });
         initAddToArchive(s.filePath, targetDir, s.password, webview, s.archiveUri);
         vscode.commands.executeCommand("yjdyamv.smart-archive.addToArchive");
+      }
+
+      // ── New Folder ──
+      if (msg.c === "newFolder" && typeof msg.name === "string") {
+        const targetDir = typeof msg.dir === "string" ? msg.dir : "";
+        const folderName = msg.name.trim();
+        if (!folderName) return;
+        logger.info({ event: "webview.newFolder", dir: targetDir, name: folderName });
+        try {
+          await createFolderInArchive(s.filePath, targetDir, folderName, s.password);
+          webview.postMessage({ c: "del-ok", t: "done" });
+          if (s.archiveUri) await setupWebview(webview, s.archiveUri);
+        } catch (err) {
+          logger.error({ event: "webview.newFolder.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
       }
 
       // ── Preview ──
