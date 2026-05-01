@@ -24,10 +24,16 @@ function cleanupPreviewTemp(): void {
   try {
     if (fs.existsSync(PREVIEW_TMP_DIR)) {
       for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
-        try { fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f)); } catch { /* stale */ }
+        try {
+          fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f));
+        } catch {
+          /* stale */
+        }
       }
     }
-  } catch { /* best-effort */ }
+  } catch {
+    /* best-effort */
+  }
 }
 
 function initTempCleanup(context: vscode.ExtensionContext): void {
@@ -44,7 +50,11 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push({
     dispose: () => {
-      try { cleanupPreviewTemp(); } catch { /* best-effort */ }
+      try {
+        cleanupPreviewTemp();
+      } catch {
+        /* best-effort */
+      }
     },
   });
 }

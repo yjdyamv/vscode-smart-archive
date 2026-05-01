@@ -153,7 +153,11 @@ async function extractSelected(
     );
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
     await vscode.env.openExternal(vscode.Uri.file(outputDir));
-    logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "libarchive" });
+    logger.info({
+      event: "extractSelected.exit",
+      duration: Date.now() - start,
+      engine: "libarchive",
+    });
     return;
   }
 
@@ -208,7 +212,11 @@ async function extractSelected(
     } finally {
       tryCleanupJS7z(js7z);
     }
-    logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z-wrapped" });
+    logger.info({
+      event: "extractSelected.exit",
+      duration: Date.now() - start,
+      engine: "7z-wrapped",
+    });
     return;
   }
 
@@ -254,7 +262,11 @@ async function extractSelected(
         const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
         vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
         await vscode.env.openExternal(vscode.Uri.file(outputDir));
-        logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "libarchive" });
+        logger.info({
+          event: "extractSelected.exit",
+          duration: Date.now() - start,
+          engine: "libarchive",
+        });
       } catch (fallbackErr) {
         // eslint-disable-next-line preserve-caught-error
         throw new Error(

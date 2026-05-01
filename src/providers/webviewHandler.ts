@@ -19,7 +19,13 @@ import { buildTree, countTreeStats } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
 import { extractSelected } from "./extraction";
-import { createFolderInArchive, deleteFromArchive, initAddToArchive, previewFileFromArchive, testArchive } from "./archiveOperations";
+import {
+  createFolderInArchive,
+  deleteFromArchive,
+  initAddToArchive,
+  previewFileFromArchive,
+  testArchive,
+} from "./archiveOperations";
 import { setCopiedPaths } from "./copyPaste";
 
 const EXT_ID = "yjdyamv.smart-archive";
@@ -297,7 +303,11 @@ function registerHandler(webview: vscode.Webview): void {
           prompt: "Folder name",
           placeHolder: "new-folder",
           validateInput: (v) =>
-            !v.trim() ? "Folder name cannot be empty" : /[<>:"/\\|?*]/.test(v) ? "Invalid characters: < > : \" / \\ | ? *" : null,
+            !v.trim()
+              ? "Folder name cannot be empty"
+              : /[<>:"/\\|?*]/.test(v)
+                ? 'Invalid characters: < > : " / \\ | ? *'
+                : null,
         });
         if (!folderName || !folderName.trim()) {
           logger.info({ event: "webview.newFolder.cancelled" });
