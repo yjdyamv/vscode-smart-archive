@@ -50,12 +50,6 @@ export async function promptOversizeFile(label: string, size: number): Promise<b
   return choice === "Extract anyway";
 }
 
-/** Maximum allowed decompressed file size (1 GiB) */
-export const MAX_FILE_SIZE = 1024 * 1024 * 1024;
-
-/** Maximum total decompressed size across all files (10 GiB) */
-export const MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024;
-
 /**
  * Sanitize and validate an archive entry path against Zip Slip attacks.
  *

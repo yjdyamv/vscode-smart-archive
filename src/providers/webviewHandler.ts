@@ -179,21 +179,18 @@ function registerHandler(webview: vscode.Webview): void {
             return;
           }
           const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-          let pwVerified = false;
           try {
             js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
             await new Promise<void>((resolve, reject) => {
               js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
               js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
             });
-            pwVerified = true;
           } catch {
             webview.postMessage({ c: "pwerr", t: "Wrong password" });
             return;
           } finally {
             tryCleanupJS7z(js7z);
           }
-          if (!pwVerified) return;
           logger.info({ event: "webview.password.ok", count: pwEntries.length });
           s.password = msg.pw;
           const tree = buildTree(pwEntries, s.archiveName);

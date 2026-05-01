@@ -47,15 +47,7 @@ async function fetchFileList(
       "js7z listing failed, will try fallback",
     );
   }
-  if (!password && isEncryptableExt(ext)) {
-    try {
-      const laEntries = await getFileList(filePath);
-      if (laEntries && laEntries.length > 0) return laEntries;
-    } catch {
-      /* libarchive also failed */
-    }
-    return [];
-  }
+  if (!password && isEncryptableExt(ext)) return [];
   return getFileList(filePath);
 }
 

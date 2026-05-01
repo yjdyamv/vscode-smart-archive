@@ -17,7 +17,12 @@ const zstd = require("@bokuweb/zstd-wasm") as {
 let initP: Promise<void> | null = null;
 
 function ensureInit(): Promise<void> {
-  if (!initP) initP = zstd.init();
+  if (!initP) {
+    initP = zstd.init().catch((err) => {
+      initP = null;
+      throw err;
+    });
+  }
   return initP;
 }
 
