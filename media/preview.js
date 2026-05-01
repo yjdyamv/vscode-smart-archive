@@ -5,31 +5,27 @@ var sortKey = "name",
   sortAsc = true;
 var _totFiles = 0,
   _totDirs = 0;
+var _lastAddDir = "";
 
 (function initProps() {
   var p = window._xtProps;
   if (!p) return;
   _totFiles = p.files;
   _totDirs = p.dirs;
-  var el = document.getElementById("props");
+  var el = document.getElementById("propsInfo");
   if (el)
     el.innerHTML =
       "<b>" +
       escHtml(p.name) +
-      "</b><br>" +
-      "Format: <b>" +
+      "</b>  |  " +
       escHtml(p.format) +
-      "</b> | " +
-      "Items: <b>" +
+      "  |  Items: <b>" +
       p.count +
-      "</b> | " +
-      "Files: <b>" +
+      "</b> |  Files: <b>" +
       p.files +
-      "</b> | " +
-      "Dirs: <b>" +
+      "</b> |  Dirs: <b>" +
       p.dirs +
-      "</b> | " +
-      "Size: <b>" +
+      "</b> |  Size: <b>" +
       escHtml(p.size) +
       "</b>";
 })();
@@ -102,6 +98,10 @@ function cssEsc(s) {
   return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
+function addDirFromSel() {
+  return _lastAddDir;
+}
+
 function updateUI() {
   var all = document.querySelectorAll(".rw");
   for (var i = 0; i < all.length; i++) {
@@ -140,6 +140,12 @@ function updateUI() {
   document.getElementById("cnt").textContent = parts.join("  ");
   document.getElementById("bSel").disabled = bd.dirs + bd.files === 0;
   document.getElementById("bDel").disabled = bd.dirs + bd.files === 0;
+  var d = addDirFromSel();
+  var btn = document.getElementById("bAdd");
+  if (btn) {
+    btn.innerHTML = "\u2795 Add Files to" + (d ? "<br><span class=add-dir>" + escHtml(d) + "</span>" : "");
+    btn.title = d ? "Add files to " + d : "Add files to archive root";
+  }
 }
 
 function toggleRow(el) {
@@ -150,6 +156,12 @@ function toggleRow(el) {
     unselDescendants(el);
   } else {
     sel.add(p);
+    var d = p;
+    if (!el.classList.contains("dir")) {
+      var j = p.lastIndexOf("/");
+      d = j > 0 ? p.substring(0, j) : "";
+    }
+    if (d !== _lastAddDir) _lastAddDir = d;
     var prw = parentRow(el);
     if (prw) {
       var pp = getPath(prw);
@@ -268,18 +280,25 @@ function delSel() {
   v.postMessage({ c: "delSel", paths: ps });
 }
 
-function setLoading(on) {
+function addFileSel() {
+  var dir = addDirFromSel();
+  showToast("Adding to " + (dir || "archive root"), true);
+  setLoading(true, "Adding files to " + (dir || "archive root") + "\u2026");
+  v.postMessage({ c: "addFiles", dir: dir });
+}
+
+function setLoading(on, msg) {
   var o = document.getElementById("loading");
   if (on) {
     if (!o) {
       o = document.createElement("div");
       o.id = "loading";
-      o.innerHTML =
-        "<div style=text-align:center;padding:40px;color:var(--vscode-descriptionForeground)><div class=sp style=margin:0 auto 10px></div>Working\u2026</div>";
+      o.innerHTML = "<div style=text-align:center;padding:40px;color:var(--vscode-descriptionForeground)><div class=sp style=margin:0 auto 10px></div><span id=loadingMsg>Working\u2026</span></div>";
       o.style.cssText =
         "position:fixed;inset:0;z-index:998;background:var(--vscode-sideBar-background);display:flex;align-items:center;justify-content:center";
       document.body.appendChild(o);
     }
+    if (msg) document.getElementById("loadingMsg").textContent = msg;
     o.style.display = "flex";
     document.getElementById("bSel").disabled = true;
     document.getElementById("bDel").disabled = true;
@@ -505,6 +524,10 @@ function escHtml(s) {
 
 window.addEventListener("message", function (e) {
   var s = document.getElementById("s");
+  if (e.data.c === "loading") {
+    setLoading(e.data.t === true);
+    return;
+  }
   if (e.data.c === "ok") {
     setLoading(false);
     s.className = "st ok";
@@ -515,8 +538,10 @@ window.addEventListener("message", function (e) {
     s.textContent = e.data.t;
   } else if (e.data.c === "del-ok") {
     setLoading(false);
-    s.className = "st ok";
-    s.textContent = e.data.t;
+    if (e.data.t) {
+      s.className = "st ok";
+      s.textContent = e.data.t;
+    }
   } else if (e.data.c === "log") {
     v.postMessage({ c: "log", msg: e.data.msg });
   }
@@ -623,10 +648,13 @@ function showCtxMenu(x, y, ps, dirPath) {
   m.style.left = x + "px";
   m.style.top = y + "px";
   m.style.display = "";
+  var d = addDirFromSel();
+  var dirLabel = d ? " → " + d : " → (root)";
   m.innerHTML =
     '<div class=cmi onclick="ctxCopy()">Copy</div>' +
     '<div class=cmi onclick="ctxExt()">Extract Selected</div>' +
     '<div class=cmi onclick="ctxDel()">Delete</div>' +
+    '<div class=cmi onclick="ctxAddHere()">Add Files Here' + dirLabel + '</div>' +
     '<div class=cmi style="color:var(--vscode-descriptionForeground)">' +
     ps.length +
     " item(s)</div>";
@@ -663,6 +691,14 @@ function ctxExt() {
 function ctxDel() {
   document.getElementById("ctxmenu").style.display = "none";
   delSel();
+}
+function ctxAddHere() {
+  document.getElementById("ctxmenu").style.display = "none";
+  var dir = addDirFromSel();
+  if (!dir) dir = window._ctxDir || "";
+  showToast("Adding to " + (dir || "archive root"), true);
+  setLoading(true, "Adding files to " + (dir || "archive root") + "\u2026");
+  v.postMessage({ c: "addFiles", dir: dir });
 }
 
 // ── Toast ────────────────────────────────────────────────────────
