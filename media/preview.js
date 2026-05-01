@@ -558,6 +558,8 @@ document.addEventListener("keydown", function (e) {
     updateUI();
   }
   if ((e.ctrlKey || e.metaKey) && e.key === "c" && sel.size > 0) {
+    var ts = window.getSelection();
+    if (ts && ts.toString().length > 0) return;
     e.preventDefault();
     var ps = dedupPaths(sel),
       flat = true,

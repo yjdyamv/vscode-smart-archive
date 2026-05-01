@@ -24,6 +24,12 @@ import { setCopiedPaths } from "./copyPaste";
 
 const EXT_ID = "yjdyamv.smart-archive";
 
+function showErrorWithCopy(msg: string): void {
+  vscode.window.showErrorMessage(msg, "Copy").then((action) => {
+    if (action === "Copy") vscode.env.clipboard.writeText(msg);
+  });
+}
+
 interface HandlerState {
   archiveUri: vscode.Uri;
   archiveName: string;
@@ -317,7 +323,7 @@ function registerHandler(webview: vscode.Webview): void {
           await previewFileFromArchive(s.filePath, msg.path, s.password);
         } catch (err) {
           logger.error({ event: "webview.preview.failed", err }, (err as Error).message);
-          vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
+          showErrorWithCopy(t("decompress.failed") + (err as Error).message);
         }
       }
 
