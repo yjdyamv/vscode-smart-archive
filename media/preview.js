@@ -665,6 +665,7 @@ function showCtxMenu(x, y, ps, dirPath) {
     '<div class=cmi onclick="ctxDel()">Delete</div>' +
     '<div class=cmi onclick="ctxAddHere()">Add Files Here' + dirLabel + '</div>' +
     '<div class=cmi onclick="ctxNewFolder()">New Folder' + dirLabel + '</div>' +
+    (ps.length === 1 ? '<div class=cmi onclick="ctxRename()" title="F2">Rename</div>' : "") +
     '<div class=cmi style="color:var(--vscode-descriptionForeground)">' +
     ps.length +
     " item(s)</div>";
@@ -708,6 +709,14 @@ function ctxNewFolder() {
   if (!dir) dir = window._ctxDir || "";
   setLoading(true, "Creating folder in " + (dir || "archive root") + "\u2026");
   v.postMessage({ c: "newFolderPrompt", dir: dir });
+}
+
+function ctxRename() {
+  document.getElementById("ctxmenu").style.display = "none";
+  var ps = dedupPaths(sel);
+  if (ps.length === 1) {
+    v.postMessage({ c: "renamePrompt", path: ps[0] });
+  }
 }
 
 function ctxAddHere() {
