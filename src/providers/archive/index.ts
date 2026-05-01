@@ -9,6 +9,7 @@ export { initAddToArchive, runAddToArchive, addToArchive } from "./add";
 export {
   createFolderInArchive,
   previewFileFromArchive,
+  renameInArchive,
   unwrapAndExtract,
   testArchive,
 } from "./modify";

@@ -247,3 +247,38 @@ export async function testArchive(archivePath: string, password?: string): Promi
     tryCleanupJS7z(js7z);
   }
 }
+
+export async function renameInArchive(
+  archivePath: string,
+  oldPath: string,
+  newPath: string,
+  password?: string,
+): Promise<void> {
+  logger.info({ event: "rename.start", archivePath, oldPath, newPath });
+
+  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
+  checkFileSize(stat.size);
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
+  const oldNorm = oldPath.replace(/\\/g, "/");
+  const newNorm = newPath.replace(/\\/g, "/");
+
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, data);
+    const rnArgs = ["rn", `/${archiveName}`, oldNorm, newNorm];
+    if (password) rnArgs.splice(1, 0, `-p${password}`);
+    logger.debug({ event: "rename.7zArgs", args: rnArgs.join(" ") });
+
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z rn: ${c}`)));
+      js7z.callMain(rnArgs);
+    });
+
+    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}

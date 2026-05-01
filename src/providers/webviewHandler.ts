@@ -24,6 +24,7 @@ import {
   deleteFromArchive,
   initAddToArchive,
   previewFileFromArchive,
+  renameInArchive,
   testArchive,
 } from "./archive";
 import { setCopiedPaths } from "./copyPaste";
@@ -289,6 +290,41 @@ function registerHandler(webview: vscode.Webview): void {
         } catch (err) {
           logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        }
+      }
+
+      // ── Rename ──
+      if (msg.c === "renamePrompt" && typeof msg.path === "string") {
+        const oldPath = msg.path;
+        const oldName = path.basename(oldPath);
+        const newName = await vscode.window.showInputBox({
+          prompt: "Rename to",
+          value: oldName,
+          validateInput: (v) =>
+            !v.trim()
+              ? "Name cannot be empty"
+              : /[<>:"/\\|?*]/.test(v)
+                ? 'Invalid characters: < > : " / \\ | ? *'
+                : v.trim() === oldName
+                  ? "New name is the same as current"
+                  : null,
+        });
+        if (!newName || !newName.trim() || newName.trim() === oldName) {
+          logger.info({ event: "webview.rename.cancelled", oldPath });
+          return;
+        }
+        const parentDir = oldPath.includes("/")
+          ? oldPath.slice(0, oldPath.lastIndexOf("/") + 1)
+          : "";
+        const newPath = parentDir + newName.trim();
+        logger.info({ event: "webview.rename", oldPath, newPath });
+        try {
+          await renameInArchive(s.filePath, oldPath, newPath, s.password);
+          webview.postMessage({ c: "del-ok", t: "done" });
+          if (s.archiveUri) await setupWebview(webview, s.archiveUri);
+        } catch (err) {
+          logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
+          showErrorWithCopy(t("decompress.failed") + (err as Error).message);
         }
       }
 
