@@ -154,8 +154,11 @@ async function extractSelected(
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
     try {
       await vscode.env.openExternal(vscode.Uri.file(outputDir));
-    } catch {
-      /* non-critical: file manager may fail to open */
+    } catch (err) {
+      logger.warn(
+        { event: "extractSelected.openExternalFailed", outputDir, err },
+        "Failed to open output directory in file manager",
+      );
     }
     logger.info({
       event: "extractSelected.exit",
