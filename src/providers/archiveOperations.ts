@@ -2,7 +2,7 @@
  * Archive operations — Smart Archive VSCode Extension
  *
  * Archive mutation and inspection operations triggered from the webview:
- * delete files, preview a single file, and integrity test.
+ * delete files, add files, preview a single file, and integrity test.
  *
  * @module providers/archiveOperations
  */
@@ -17,6 +17,86 @@ import { getFullExt, isWrappedFormat, getWrapExtension } from "../constants";
 import { checkFileSize } from "../utils/security";
 import { PREVIEW_TMP_DIR } from "./tempFiles";
 import { zstdCompress } from "../engines/zstd-codec";
+import { getBaseName } from "../utils/path";
+import { logger } from "../utils/logger";
+
+// ── Module-level state for add-to-archive ──
+
+let _pendingAdd: {
+  archivePath: string;
+  targetDir: string;
+  password: string | undefined;
+  webview: vscode.Webview | null;
+  archiveUri: vscode.Uri | null;
+} | null = null;
+
+export function initAddToArchive(
+  archivePath: string,
+  targetDir: string,
+  password: string | undefined,
+  webview: vscode.Webview | null,
+  archiveUri: vscode.Uri | null,
+): void {
+  _pendingAdd = { archivePath, targetDir, password, webview, archiveUri };
+}
+
+export async function runAddToArchive(): Promise<void> {
+  const ctx = _pendingAdd;
+  _pendingAdd = null;
+  if (!ctx) return;
+
+  try {
+    ctx.webview?.postMessage({ c: "loading", t: true });
+
+    const pick = await vscode.window.showQuickPick(
+      [
+        { label: "$(new-file) Add Files", desc: "files", description: "Select individual files" },
+        { label: "$(new-folder) Add Folders", desc: "folders", description: "Select whole folders" },
+        { label: "$(files) Add Both", desc: "both", description: "Select files then folders" },
+      ],
+      { placeHolder: "Choose what to add to the archive" },
+    );
+    if (!pick) return;
+
+    const uris: vscode.Uri[] = [];
+
+    if (pick.desc === "files" || pick.desc === "both") {
+      const furis = await vscode.window.showOpenDialog({
+        canSelectMany: true,
+        canSelectFiles: true,
+        canSelectFolders: false,
+        openLabel: pick.desc === "both" ? "Select Files" : "Select",
+      });
+      if (furis) uris.push(...furis);
+    }
+
+    if (pick.desc === "folders" || pick.desc === "both") {
+      const duris = await vscode.window.showOpenDialog({
+        canSelectMany: true,
+        canSelectFiles: false,
+        canSelectFolders: true,
+        openLabel: pick.desc === "both" ? "Select Folders" : "Select",
+      });
+      if (duris) uris.push(...duris);
+    }
+
+    if (uris.length === 0) return;
+
+    await addToArchive(ctx.archivePath, uris.map((u) => u.fsPath), ctx.targetDir, ctx.password);
+
+    if (ctx.webview) ctx.webview.postMessage({ c: "del-ok", t: "done" });
+    if (ctx.webview && ctx.archiveUri) {
+      const { setupWebview } = require("./webviewHandler") as {
+        setupWebview: (w: vscode.Webview, u: vscode.Uri) => Promise<void>;
+      };
+      await setupWebview(ctx.webview, ctx.archiveUri);
+    }
+  } catch (err) {
+    if (ctx.webview) ctx.webview.postMessage({ c: "err", t: (err as Error).message });
+  } finally {
+    ctx.webview?.postMessage({ c: "loading", t: false });
+  }
+}
 
 async function deleteFromArchive(
   archivePath: string,
@@ -227,4 +307,212 @@ async function testArchive(archivePath: string, password?: string): Promise<stri
   }
 }
 
-export { deleteFromArchive, previewFileFromArchive, unwrapAndExtract, testArchive };
+/**
+ * Add local files/folders to an existing archive at the specified path.
+ *
+ * @param archivePath - Path to the archive file on disk
+ * @param localPaths - Local file/folder paths to add
+ * @param targetDir - Target directory inside the archive (empty = root)
+ * @param password - Archive password if encrypted
+ */
+async function addToArchive(
+  archivePath: string,
+  localPaths: string[],
+  targetDir: string,
+  password?: string,
+): Promise<void> {
+  const ext = getFullExt(archivePath);
+
+  if (isWrappedFormat(ext)) {
+    return addToWrappedArchive(archivePath, localPaths, targetDir, password);
+  }
+
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, data);
+
+    // Copy local files into VFS
+    const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z, localPaths, targetDir);
+
+    // Build 7z args: use directory form when targetDir is set (preserves path),
+    // individual file paths otherwise (root-level)
+    const args = vfsDir
+      ? ["a", `/${archiveName}`, "-aot", vfsDir]
+      : ["a", `/${archiveName}`, "-aot", ...vfsPaths];
+    if (password) args.splice(1, 0, `-p${password}`);
+
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
+      js7z.callMain(args);
+    });
+
+    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+
+    logger.info({
+      event: "addToArchive.ok",
+      archivePath,
+      files: localPaths.length,
+      targetDir,
+    });
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}
+
+async function addToWrappedArchive(
+  archivePath: string,
+  localPaths: string[],
+  targetDir: string,
+  password?: string,
+): Promise<void> {
+  const ext = getFullExt(archivePath);
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
+
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    js7z.FS.writeFile(`/${archiveName}`, data);
+    js7z.FS.mkdir("/_aw1");
+
+    // Step 1: Extract outer compression layer
+    const xArgs = ["x", `/${archiveName}`, "-o/_aw1", "-y"];
+    if (password) xArgs.splice(1, 0, `-p${password}`);
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
+      js7z.callMain(xArgs);
+    });
+
+    const top = js7z.FS.readdir("/_aw1").filter((e: string) => e !== "." && e !== "..");
+    const innerTar = top.find((e: string) => e.endsWith(".tar"));
+    if (!innerTar) throw new Error("Wrapped archive: no inner .tar found");
+
+    const innerData = js7z.FS.readFile(`/_aw1/${innerTar}`, { encoding: "binary" });
+    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+    try {
+      js7z2.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
+
+      // Step 2: Copy local files into VFS and add to inner tar
+      const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z2, localPaths, targetDir);
+
+      const aArgs = vfsDir
+        ? ["a", "/_inner.tar", "-aot", vfsDir]
+        : ["a", "/_inner.tar", "-aot", ...vfsPaths];
+      if (password) aArgs.splice(1, 0, `-p${password}`);
+
+      await new Promise<void>((resolve, reject) => {
+        js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a inner: ${c}`)));
+        js7z2.callMain(aArgs);
+      });
+
+      const modifiedTar = js7z2.FS.readFile("/_inner.tar", { encoding: "binary" });
+      const wrapExt = getWrapExtension(ext);
+
+      // Step 3: Recompress
+      let compressedData: Uint8Array;
+      if (wrapExt === "zst") {
+        compressedData = await zstdCompress(new Uint8Array(modifiedTar), 5);
+      } else {
+        const js7z3 = await JS7z({ print: () => {}, printErr: () => {} });
+        try {
+          js7z3.FS.writeFile("/_re.tar", new Uint8Array(modifiedTar));
+          const compOut = `/_re.${wrapExt}`;
+          const compArgs = ["a", compOut, "/_re.tar"];
+          if (password) compArgs.splice(1, 0, `-p${password}`);
+          await new Promise<void>((resolve, reject) => {
+            js7z3.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
+            js7z3.callMain(compArgs);
+          });
+          compressedData = new Uint8Array(js7z3.FS.readFile(compOut, { encoding: "binary" }));
+        } finally {
+          tryCleanupJS7z(js7z3);
+        }
+      }
+
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), compressedData);
+
+      logger.info({
+        event: "addToArchive.wrapped.ok",
+        archivePath,
+        files: localPaths.length,
+        targetDir,
+      });
+    } finally {
+      tryCleanupJS7z(js7z2);
+    }
+  } finally {
+    tryCleanupJS7z(js7z);
+  }
+}
+
+/**
+ * Copy local file/folder paths into the JS7z virtual FS.
+ * Returns individual VFS paths and the top-level VFS directory (first component).
+ *
+ * Strategy (matching j7zCompressDir):
+ *   - targetDir non-empty → files at /<targetDir>/<name>, pass first-level dir /<first>
+ *   - targetDir empty     → files at /<name>, pass individual file paths
+ * Passing the first-level directory preserves the full nested structure;
+ * individual paths lose the common prefix.
+ */
+function copyLocalToFSWithPrefix(
+  js7z: JS7zInstance,
+  localPaths: string[],
+  targetDir: string,
+): { vfsPaths: string[]; vfsDir: string | null } {
+  const normDir = targetDir.replace(/\\/g, "/").replace(/^\/+/, "");
+  const parts = normDir ? normDir.split("/").filter(Boolean) : [];
+  const firstLevel = parts[0] || null;
+  const vfsBase = normDir ? `/${normDir}` : "";
+  // Pass the first-level directory (like j7zCompressDir) to preserve nested structure
+  const vfsDir = firstLevel ? `/${firstLevel}` : null;
+
+  if (normDir) {
+    let cur = "";
+    for (const part of parts) {
+      cur += "/" + part;
+      try { js7z.FS.mkdir(cur); } catch { /* already exists */ }
+    }
+  }
+
+  const vfsPaths: string[] = [];
+
+  for (const localPath of localPaths) {
+    const name = getBaseName(localPath);
+    const vfsTarget = vfsBase ? `${vfsBase}/${name}` : `/${name}`;
+    const stat = fs.statSync(localPath);
+
+    if (stat.isDirectory()) {
+      js7z.FS.mkdir(vfsTarget);
+      copyDirToFSRecursive(js7z, localPath, vfsTarget);
+    } else {
+      const fileData = fs.readFileSync(localPath);
+      js7z.FS.writeFile(vfsTarget, fileData);
+    }
+    vfsPaths.push(vfsTarget);
+  }
+  return { vfsPaths, vfsDir };
+}
+
+function copyDirToFSRecursive(
+  js7z: JS7zInstance,
+  localDir: string,
+  vfsDir: string,
+): void {
+  const entries = fs.readdirSync(localDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const localEntry = path.join(localDir, entry.name);
+    const vfsEntry = `${vfsDir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      js7z.FS.mkdir(vfsEntry);
+      copyDirToFSRecursive(js7z, localEntry, vfsEntry);
+    } else {
+      const data = fs.readFileSync(localEntry);
+      js7z.FS.writeFile(vfsEntry, data);
+    }
+  }
+}
+
+export { deleteFromArchive, addToArchive, previewFileFromArchive, unwrapAndExtract, testArchive };

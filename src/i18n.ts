@@ -303,6 +303,21 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "源压缩包文件已不存在: {0}",
     "zh-tw": "來源壓縮檔已不存在: {0}",
   },
+  "archive.addFilesLabel": {
+    en: "Add to Archive",
+    "zh-cn": "添加到压缩包",
+    "zh-tw": "新增到壓縮檔",
+  },
+  "archive.addedFiles": {
+    en: "Added {0} file(s) to archive: ",
+    "zh-cn": "已向压缩包添加 {0} 个文件: ",
+    "zh-tw": "已向壓縮檔新增 {0} 個檔案: ",
+  },
+  "archive.addingFiles": {
+    en: "Adding files to ",
+    "zh-cn": "正在向压缩包添加文件: ",
+    "zh-tw": "正在向壓縮檔新增檔案: ",
+  },
 };
 
 /**
