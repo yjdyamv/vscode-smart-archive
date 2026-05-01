@@ -143,7 +143,7 @@ function updateUI() {
   var d = addDirFromSel();
   var btn = document.getElementById("bAdd");
   if (btn) {
-    btn.innerHTML = "\u2795 Add Files to" + (d ? "<br><span class=add-dir>" + escHtml(d) + "</span>" : "");
+    btn.innerHTML = d ? "\u2795 Add Files to<br><span class=add-dir>" + escHtml(d) + "</span>" : "\u2795 Add Files";
     btn.title = d ? "Add files to " + d : "Add files to archive root";
   }
 }
