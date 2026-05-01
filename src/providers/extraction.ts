@@ -127,10 +127,21 @@ async function extractSelected(
   flat?: boolean,
   outputOverride?: string,
 ): Promise<void> {
+  const start = Date.now();
   const ext = getFullExt(archivePath);
   const rarExt = isRarExt(ext);
   const isWrapped = isWrappedFormat(ext);
   const outputDir = outputOverride || getOutputPath(archivePath, "extracted");
+
+  logger.info({
+    event: "extractSelected.enter",
+    archivePath,
+    pathCount: selectedPaths.length,
+    flat,
+    outputDir,
+    isRar: rarExt,
+    isWrapped,
+  });
 
   if (rarExt) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -142,6 +153,7 @@ async function extractSelected(
     );
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
     await vscode.env.openExternal(vscode.Uri.file(outputDir));
+    logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "libarchive" });
     return;
   }
 
@@ -196,6 +208,7 @@ async function extractSelected(
     } finally {
       tryCleanupJS7z(js7z);
     }
+    logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z-wrapped" });
     return;
   }
 
@@ -234,11 +247,14 @@ async function extractSelected(
       }
       await vscode.env.openExternal(vscode.Uri.file(outputDir));
       vscode.window.showInformationMessage(t("decompress.done") + outputDir);
+      logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z" });
     } catch (err) {
+      logger.warn({ event: "extractSelected.fallback", err }, (err as Error).message);
       try {
         const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
         vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
         await vscode.env.openExternal(vscode.Uri.file(outputDir));
+        logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "libarchive" });
       } catch (fallbackErr) {
         // eslint-disable-next-line preserve-caught-error
         throw new Error(

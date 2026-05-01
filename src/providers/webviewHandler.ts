@@ -65,6 +65,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   logger.info({
     event: "setupWebview.start",
     filePath,
+    ext,
     wrapped: isWrappedFormat(getFullExt(filePath)),
   });
 
@@ -92,19 +93,24 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
       }
     }
 
+    logger.info({ event: "setupWebview.encrypted", encrypted });
+
     if (encrypted && prev?.password) {
+      logger.info({ event: "setupWebview.password.retry" });
       try {
         const pwEntries = await fetchFileList(filePath, prev.password);
         if (pwEntries.length > 0) {
           entries = pwEntries;
           encrypted = false;
+          logger.info({ event: "setupWebview.password.retrySuccess", count: pwEntries.length });
         }
       } catch {
-        /* retry with saved password failed, show password form */
+        logger.warn({ event: "setupWebview.password.retryFailed" });
       }
     }
 
     if (encrypted) {
+      logger.info({ event: "setupWebview.passwordRequired" });
       handlerStates.set(webview, {
         archiveUri,
         archiveName,
@@ -290,6 +296,7 @@ function registerHandler(webview: vscode.Webview): void {
 
       // ── Test ──
       if (msg.c === "test") {
+        logger.info({ event: "webview.test", path: s.filePath });
         try {
           const result = await testArchive(s.filePath, s.password);
           webview.postMessage({ c: "ok", t: result });

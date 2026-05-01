@@ -19,11 +19,14 @@ let copiedPassword: string | undefined;
 let copiedFlat: boolean | undefined;
 
 export function pasteCopiedFromArchive(): void {
+  logger.info({ event: "pasteCopied.enter", pathCount: copiedPaths?.length || 0 });
+
   if (!copiedPaths || copiedPaths.length === 0 || !copiedArchivePath) {
     vscode.window.showInformationMessage(t("archive.copyNone"));
     return;
   }
   if (!fs.existsSync(copiedArchivePath)) {
+    logger.warn({ event: "pasteCopied.sourceMissing", archivePath: copiedArchivePath });
     vscode.window.showErrorMessage(t("archive.sourceMissing", copiedArchivePath));
     return;
   }
@@ -42,6 +45,7 @@ export function pasteCopiedFromArchive(): void {
       if (!uris || uris.length === 0) return;
       try {
         await extractSelected(source, paths, pw, fl, uris[0].fsPath);
+        logger.info({ event: "pasteCopied.success", pathCount: paths.length, outputDir: uris[0].fsPath });
         cleanupPreviewTemp();
         clearCopiedPaths();
       } catch (err) {
@@ -57,6 +61,7 @@ export function setCopiedPaths(
   password?: string,
   flat?: boolean,
 ): void {
+  logger.info({ event: "setCopiedPaths", pathCount: paths.length, archivePath, flat });
   copiedPaths = paths;
   copiedArchivePath = archivePath;
   copiedPassword = password;

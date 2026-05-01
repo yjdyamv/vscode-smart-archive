@@ -43,7 +43,10 @@ export function initAddToArchive(
 export async function runAddToArchive(): Promise<void> {
   const ctx = _pendingAdd;
   _pendingAdd = null;
-  if (!ctx) return;
+  if (!ctx) {
+    logger.warn({ event: "addToArchive.run.noCtx" }, "runAddToArchive called without pending state");
+    return;
+  }
 
   try {
     ctx.webview?.postMessage({ c: "loading", t: true });
@@ -56,7 +59,10 @@ export async function runAddToArchive(): Promise<void> {
       ],
       { placeHolder: "Choose what to add to the archive" },
     );
-    if (!pick) return;
+    if (!pick) {
+      logger.info({ event: "addToArchive.cancelled", phase: "quickPick" });
+      return;
+    }
 
     const uris: vscode.Uri[] = [];
 
@@ -80,9 +86,27 @@ export async function runAddToArchive(): Promise<void> {
       if (duris) uris.push(...duris);
     }
 
-    if (uris.length === 0) return;
+    if (uris.length === 0) {
+      logger.info({ event: "addToArchive.cancelled", phase: "fileDialog" });
+      return;
+    }
 
-    await addToArchive(ctx.archivePath, uris.map((u) => u.fsPath), ctx.targetDir, ctx.password);
+    const filePaths = uris.map((u) => u.fsPath);
+    logger.info({
+      event: "addToArchive.start",
+      archivePath: ctx.archivePath,
+      files: filePaths.length,
+      targetDir: ctx.targetDir,
+      sample: filePaths.slice(0, 3).join(", "),
+    });
+
+    const start = Date.now();
+    await addToArchive(ctx.archivePath, filePaths, ctx.targetDir, ctx.password);
+    logger.info({
+      event: "addToArchive.complete",
+      durationMs: Date.now() - start,
+      archivePath: ctx.archivePath,
+    });
 
     if (ctx.webview) ctx.webview.postMessage({ c: "del-ok", t: "done" });
     if (ctx.webview && ctx.archiveUri) {
@@ -106,8 +130,19 @@ async function deleteFromArchive(
   const ext = getFullExt(archivePath);
 
   if (isWrappedFormat(ext)) {
+    logger.info({ event: "deleteFromArchive.wrapped", archivePath, ext });
     return deleteFromWrappedArchive(archivePath, selectedPaths, password);
   }
+
+  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
+  checkFileSize(stat.size);
+  logger.info({
+    event: "deleteFromArchive.start",
+    archivePath,
+    sizeBytes: stat.size,
+    items: selectedPaths.length,
+    sample: selectedPaths.slice(0, 3).join(", "),
+  });
 
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
   const archiveName = path.basename(archivePath);
@@ -117,11 +152,20 @@ async function deleteFromArchive(
     const dArgs = ["d", `/${archiveName}`, "-y"];
     if (password) dArgs.splice(1, 0, `-p${password}`);
     dArgs.push(...selectedPaths.map((p) => p.replace(/\\/g, "/")));
+    logger.debug({ event: "deleteFromArchive.7zArgs", args: dArgs.join(" ") });
+
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z d: ${c}`)));
       js7z.callMain(dArgs);
     });
+
     const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+    logger.info({
+      event: "deleteFromArchive.ok",
+      archivePath,
+      items: selectedPaths.length,
+      newSizeBytes: updated.byteLength,
+    });
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
   } finally {
     tryCleanupJS7z(js7z);
@@ -203,10 +247,19 @@ async function previewFileFromArchive(
   filePath: string,
   password?: string,
 ): Promise<void> {
+  const archiveExt = getFullExt(archivePath);
+  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
+  checkFileSize(stat.size);
+  logger.info({
+    event: "previewFile.start",
+    archivePath,
+    file: filePath,
+    sizeBytes: stat.size,
+  });
+
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
   const archiveName = path.basename(archivePath);
   const normalizedFile = filePath.replace(/\\/g, "/");
-  const archiveExt = getFullExt(archivePath);
 
   let fileData: ArrayBuffer;
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
@@ -324,8 +377,19 @@ async function addToArchive(
   const ext = getFullExt(archivePath);
 
   if (isWrappedFormat(ext)) {
+    logger.info({ event: "addToArchive.wrapped", archivePath, ext });
     return addToWrappedArchive(archivePath, localPaths, targetDir, password);
   }
+
+  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
+  checkFileSize(stat.size);
+  logger.info({
+    event: "addToArchive.readArchive",
+    archivePath,
+    sizeBytes: stat.size,
+    files: localPaths.length,
+    targetDir,
+  });
 
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
   const archiveName = path.basename(archivePath);
@@ -343,12 +407,15 @@ async function addToArchive(
       : ["a", `/${archiveName}`, "-aot", ...vfsPaths];
     if (password) args.splice(1, 0, `-p${password}`);
 
+    logger.debug({ event: "addToArchive.7zArgs", args: args.join(" ") });
+
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
       js7z.callMain(args);
     });
 
     const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+    logger.debug({ event: "addToArchive.writeResult", newSizeBytes: updated.byteLength });
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
 
     logger.info({

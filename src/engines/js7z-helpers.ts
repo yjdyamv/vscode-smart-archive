@@ -13,6 +13,7 @@ import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
 import { copyDirToFS } from "../utils/fs";
 import { t } from "../i18n";
+import { logger } from "../utils/logger";
 
 function tryCleanup(instance: JS7zInstance): void {
   try {
@@ -56,6 +57,7 @@ function run7z(
   progress?: vscode.Progress<{ message?: string; increment?: number }>,
   onStdout?: (text: string) => void,
 ): Promise<void> {
+  logger.info({ event: "run7z.enter", args });
   const prevPrint = js7z.print;
   const prevPrintErr = js7z.printErr;
   let stderr = "";
@@ -80,6 +82,7 @@ function run7z(
     js7z.onExit = (exitCode: number) => {
       js7z.print = prevPrint;
       js7z.printErr = prevPrintErr;
+      logger.info({ event: "run7z.exit", exitCode });
       if (exitCode === 0) {
         resolve();
       } else {
