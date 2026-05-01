@@ -573,6 +573,13 @@ document.addEventListener("keydown", function (e) {
     v.postMessage({ c: "copy", paths: ps, flat: flat });
     showToast("Copied " + ps.length + " item(s)", true);
   }
+  if (e.key === "F2" && sel.size === 1) {
+    e.preventDefault();
+    var ps = dedupPaths(sel);
+    if (ps.length === 1) {
+      v.postMessage({ c: "renamePrompt", path: ps[0] });
+    }
+  }
   if (e.key === "Enter" && sel.size > 0) {
     e.preventDefault();
     extSel();
