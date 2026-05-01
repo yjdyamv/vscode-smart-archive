@@ -119,20 +119,13 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
-  webview.html = contentHtml(tree, fileCount, dirCount, cssUri, jsUri);
-
   const totalSize = entries.reduce((s, e) => s + (e.size || 0), 0);
-  setTimeout(() => {
-    webview.postMessage({
-      c: "props",
-      name: archiveName,
-      format: ext,
-      count: itemCount,
-      files: fileCount,
-      dirs: dirCount,
-      size: formatCompactSize(totalSize),
-    });
-  }, 100);
+  webview.html = contentHtml(tree, fileCount, dirCount, cssUri, jsUri, {
+    name: archiveName,
+    format: ext,
+    count: itemCount,
+    size: formatCompactSize(totalSize),
+  });
 
   if (!handlerRegistered.has(webview)) {
     handlerRegistered.add(webview);
@@ -165,12 +158,12 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "pw" && msg.pw) {
         logger.info({ event: "webview.password.attempt" });
         try {
-          const pwEntries = await fetchFileList(s.filePath, msg.pw);
+          const data = await vscode.workspace.fs.readFile(vscode.Uri.file(s.filePath));
+          const pwEntries = await fetchFileList(s.filePath, msg.pw, new Uint8Array(data));
           if (pwEntries.length === 0) {
             webview.postMessage({ c: "pwerr", t: "Wrong password" });
             return;
           }
-          const data = await vscode.workspace.fs.readFile(vscode.Uri.file(s.filePath));
           const js7z = await JS7z({ print: () => {}, printErr: () => {} });
           let pwVerified = false;
           try {
@@ -194,20 +187,14 @@ function registerHandler(webview: vscode.Webview): void {
           const fc = stats.files;
           const dc = stats.dirs;
           const itemCount = stats.total;
-          webview.html = contentHtml(tree, fc, dc, cssUri, jsUri);
           const totalSize = pwEntries.reduce((sum, e) => sum + (e.size || 0), 0);
           const ext = getFullExt(s.filePath);
-          setTimeout(() => {
-            webview.postMessage({
-              c: "props",
-              name: s.archiveName,
-              format: ext,
-              count: itemCount,
-              files: fc,
-              dirs: dc,
-              size: formatCompactSize(totalSize),
-            });
-          }, 100);
+          webview.html = contentHtml(tree, fc, dc, cssUri, jsUri, {
+            name: s.archiveName,
+            format: ext,
+            count: itemCount,
+            size: formatCompactSize(totalSize),
+          });
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: "Wrong password" });

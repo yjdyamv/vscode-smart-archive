@@ -34,11 +34,12 @@ const JS7z: JS7zFactory = require("js7z-tools");
 async function fetchFileList(
   filePath: string,
   password = "",
+  data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
   const ext = getFullExt(filePath);
-  if (isWrappedFormat(ext)) return listViaExtract(filePath, password);
+  if (isWrappedFormat(ext)) return listViaExtract(filePath, password, data);
   try {
-    const f = await listFiles(filePath, password);
+    const f = await listFiles(filePath, password, data);
     if (f && f.length > 0) return f;
   } catch (err) {
     logger.warn(
@@ -53,13 +54,14 @@ async function fetchFileList(
 async function listViaExtract(
   filePath: string,
   password = "",
+  data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
+  const buf = data ?? (await vscode.workspace.fs.readFile(vscode.Uri.file(filePath)));
   const archiveName = path.basename(filePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    js7z.FS.writeFile(`/${archiveName}`, buf);
     js7z.FS.mkdir("/_ls");
     const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
     if (password) args.splice(1, 0, `-p${password}`);

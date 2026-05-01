@@ -21,10 +21,15 @@ const JS7z: JS7zFactory = require("js7z-tools");
 export async function listFiles(
   filePath: string,
   password = "",
+  data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
   logger.debug({ event: "listFiles.start", filePath, hasPassword: !!password });
-  checkFileSize(fs.statSync(filePath).size);
-  const data = fs.readFileSync(filePath);
+  const buf =
+    data ??
+    (() => {
+      checkFileSize(fs.statSync(filePath).size);
+      return fs.readFileSync(filePath);
+    })();
   let stdout = "";
   let stderr = "";
 
@@ -39,7 +44,7 @@ export async function listFiles(
 
   try {
     const archiveName = getBaseName(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    js7z.FS.writeFile(`/${archiveName}`, buf);
 
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (code: number) => {

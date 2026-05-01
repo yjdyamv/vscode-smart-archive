@@ -14,11 +14,9 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 
-const PREVIEW_TMP_DIR = path.join(
-  fs.existsSync(process.env.TEMP || "/tmp") ? process.env.TEMP || "/tmp" : "/tmp",
-  "vscode-7z-preview",
-);
+const PREVIEW_TMP_DIR = path.join(os.tmpdir(), "vscode-7z-preview");
 
 let tempCleanupRegistered = false;
 

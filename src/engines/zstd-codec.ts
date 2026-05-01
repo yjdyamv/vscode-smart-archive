@@ -14,13 +14,11 @@ const zstd = require("@bokuweb/zstd-wasm") as {
   decompress: (data: Uint8Array) => Uint8Array;
 };
 
-let initialized = false;
+let initP: Promise<void> | null = null;
 
-async function ensureInit(): Promise<void> {
-  if (!initialized) {
-    await zstd.init();
-    initialized = true;
-  }
+function ensureInit(): Promise<void> {
+  if (!initP) initP = zstd.init();
+  return initP;
 }
 
 export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Array> {

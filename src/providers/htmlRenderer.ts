@@ -139,9 +139,21 @@ export function contentHtml(
   dirCount: number,
   cssUri: string,
   jsUri: string,
+  props?: { name: string; format: string; count: number; size: string },
 ): string {
   const treeHtml = renderTree(tree, 0);
   const emptyMsg = esc(t("decompress.previewTitle") + ": (empty)");
+
+  const propsScript = props
+    ? `<script>window._xtProps=${JSON.stringify({
+        name: props.name,
+        format: props.format,
+        count: props.count,
+        files: fileCount,
+        dirs: dirCount,
+        size: props.size,
+      })};</script>`
+    : "";
 
   return `<!DOCTYPE html>
 <html><head><meta charset='UTF-8'>
@@ -172,6 +184,7 @@ ${
     : `<div class='empty'>${emptyMsg}</div>`
 }
   <div id='s' class='st'></div>
+  ${propsScript}
   ${jsScript(jsUri)}
   <script>var _totFiles=${fileCount},_totDirs=${dirCount};</script>
 </body></html>`;

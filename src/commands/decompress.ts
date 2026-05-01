@@ -33,12 +33,17 @@ export async function decompressCommand(
     vscode.window.showErrorMessage(t("decompress.noFile"));
     return;
   }
+  let idx = 0;
   for (const fileUri of uris) {
-    await decompressSingleFile(fileUri);
+    await decompressSingleFile(fileUri, uris.length > 1 ? ++idx : 0, uris.length);
   }
 }
 
-async function decompressSingleFile(uri: vscode.Uri): Promise<void> {
+async function decompressSingleFile(
+  uri: vscode.Uri,
+  batchIdx: number,
+  batchTotal: number,
+): Promise<void> {
   const inputPath = uri.fsPath;
   const ext = getFullExt(inputPath);
   const isRar = isRarExt(ext);
@@ -48,7 +53,7 @@ async function decompressSingleFile(uri: vscode.Uri): Promise<void> {
     const rarPath = resolveRarVolume(inputPath);
     if (rarPath) {
       logger.info({ event: "decompress.rarVolume.redirect", from: inputPath, to: rarPath });
-      return decompressSingleFile(vscode.Uri.file(rarPath));
+      return decompressSingleFile(vscode.Uri.file(rarPath), batchIdx, batchTotal);
     }
     vscode.window.showErrorMessage(
       t("decompress.failed") +
@@ -81,10 +86,12 @@ async function decompressSingleFile(uri: vscode.Uri): Promise<void> {
 
   const outputDir = getOutputPath(inputPath, "extracted");
 
+  const batchLabel = batchTotal > 1 ? ` (${batchIdx}/${batchTotal})` : "";
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: isRar ? t("decompress.rarProgressTitle") : t("decompress.progressTitle"),
+      title:
+        (isRar ? t("decompress.rarProgressTitle") : t("decompress.progressTitle")) + batchLabel,
       cancellable: true,
     },
     async (progress, token) => {
