@@ -27,6 +27,9 @@ function buildTree(
   for (const e of entries) {
     const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
     if (parts.length === 1 && parts[0] === archiveName) continue;
+    // Filter out internal marker files
+    const lastName = parts[parts.length - 1];
+    if (lastName === ".smartarchive") continue;
     normed.push({ entry: e, parts });
   }
 

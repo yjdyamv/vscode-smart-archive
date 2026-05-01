@@ -518,6 +518,8 @@ void (async () => {
     for (const e of entries) {
       const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
       if (parts.length === 1 && parts[0] === archiveName) continue;
+      const lastName = parts[parts.length - 1];
+      if (lastName === ".smartarchive") continue;
       normed.push({ entry: e, parts });
     }
     const root: TreeNode[] = [];
@@ -719,7 +721,7 @@ void (async () => {
     assert.strictEqual(f['b.txt'], 'b');
   });
 
-  await test('createFolder: new empty directory in archive', async () => {
+  await test('createFolder: new directory with .smartarchive marker', async () => {
     const j = await JS7z();
     j.FS.writeFile('/f.txt', new Uint8Array(Buffer.from('x')));
     await run7z(j, ['a', '/test.7z', '/f.txt']);
@@ -728,25 +730,24 @@ void (async () => {
     const j2 = await JS7z();
     j2.FS.writeFile('/test.7z', new Uint8Array(buf));
     mkdirP(j2, '/sub/newdir');
-    j2.FS.writeFile('/sub/newdir/.keep', new Uint8Array(1));
+    j2.FS.writeFile('/sub/newdir/.smartarchive', new Uint8Array(Buffer.from('.')));
     await run7z(j2, ['a', '/test.7z', '-aot', '/sub']);
 
-    // Verify directory created (with .keep inside)
     buf = Buffer.from(j2.FS.readFile('/test.7z', { encoding: 'binary' }));
-    const f1 = await j7zDecompress(buf);
-    assert.strictEqual(f1['f.txt'], 'x', 'original file should exist');
-    assert.strictEqual(f1['sub/newdir/.keep'], '\x00', '.keep should exist');
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['f.txt'], 'x');
+    assert.strictEqual(f['sub/newdir/.smartarchive'], '.');
 
-    // Delete .keep on fresh instance
-    const j3 = await JS7z();
-    j3.FS.writeFile('/test.7z', new Uint8Array(buf));
-    await run7z(j3, ['d', '/test.7z', '-y', 'sub/newdir/.keep']);
-    const finalBuf = Buffer.from(j3.FS.readFile('/test.7z', { encoding: 'binary' }));
-
-    // Verify .keep is gone, original file remains
-    const f2 = await j7zDecompress(finalBuf);
-    assert.strictEqual(f2['f.txt'], 'x', 'original file should still exist');
-    assert.ok(!f2['sub/newdir/.keep'], '.keep should be deleted');
+    // treeBuilder filters .smartarchive from display
+    const tree = buildTree(
+      [
+        { path: "f.txt", size: 1, type: "REGULAR_FILE" },
+        { path: "sub/newdir/.smartarchive", size: 1, type: "REGULAR_FILE" },
+      ],
+      "test.7z",
+    );
+    assert.strictEqual(tree.length, 1);
+    assert.strictEqual(tree[0].name, 'f.txt');
   });
 
   // ── 16. Format / encoding utilities ──
