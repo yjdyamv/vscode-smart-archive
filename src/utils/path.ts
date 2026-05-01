@@ -9,6 +9,7 @@
 
 import * as path from "path";
 import * as iconv from "iconv-lite";
+import { logger } from "./logger";
 
 /**
  * Join a virtual FS directory with a file/directory name.
@@ -76,6 +77,10 @@ export function fixArchiveEncoding(raw: string): string {
     try {
       bytes = sourceEnc === "cp437" ? iconv.encode(raw, "cp437") : Buffer.from(raw, "latin1");
     } catch {
+      logger.warn(
+        { event: "fixArchiveEncoding.encode.failed", sourceEnc },
+        "Failed to encode string",
+      );
       continue;
     }
     for (const cp of cjkCodePages) {
@@ -83,7 +88,10 @@ export function fixArchiveEncoding(raw: string): string {
         const decoded = iconv.decode(bytes, cp.name);
         if (cp.pattern.test(decoded)) return decoded;
       } catch {
-        /* try next code page */
+        logger.warn(
+          { event: "fixArchiveEncoding.decode.failed", cpName: cp.name },
+          "Failed to decode with code page",
+        );
       }
     }
   }

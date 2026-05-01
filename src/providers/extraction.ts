@@ -54,7 +54,10 @@ function copyFromFSWithStrip(
           continue;
         }
       } catch {
-        /* fall through to read-as-file */
+        logger.warn(
+          { event: "extractSelected.copyStat.failed" },
+          "Failed to stat entry, trying as file",
+        );
       }
 
       let outRel = rel;
@@ -214,7 +217,10 @@ async function extractSelected(
         try {
           await vscode.env.openExternal(vscode.Uri.file(outputDir));
         } catch {
-          /* non-critical */
+          logger.warn(
+            { event: "extractSelected.openExternal.failed" },
+            "Failed to open output directory",
+          );
         }
         vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       } finally {
@@ -279,7 +285,10 @@ async function extractSelected(
         try {
           await vscode.env.openExternal(vscode.Uri.file(outputDir));
         } catch {
-          /* non-critical */
+          logger.warn(
+            { event: "extractSelected.openExternal.failed" },
+            "Failed to open output directory",
+          );
         }
         logger.info({
           event: "extractSelected.exit",
@@ -287,6 +296,10 @@ async function extractSelected(
           engine: "libarchive",
         });
       } catch (fallbackErr) {
+        logger.error(
+          { event: "extractSelected.fallback.failed", err: fallbackErr },
+          "Fallback extraction failed",
+        );
         // eslint-disable-next-line preserve-caught-error
         throw new Error(
           t("decompress.failed") +

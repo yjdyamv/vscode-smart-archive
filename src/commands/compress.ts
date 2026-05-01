@@ -23,6 +23,7 @@ import {
 } from "../ui/prompts";
 import type { CompressOptions } from "../types";
 import { t } from "../i18n";
+import { logger } from "../utils/logger";
 
 /** Stream-only formats that auto-wrap in tar when folders/multi-file are selected */
 const STREAM_FORMATS = new Set(["gz", "bz2", "xz"]);
@@ -117,13 +118,17 @@ async function executeCompress(
       try {
         await compressWith7z(options, progress, token);
       } catch (err) {
+        logger.error({ event: "compress.command.failed", err }, "Compression failed");
         // Clean up partial output file on cancellation or failure
         try {
           if (fs.existsSync(options.outputPath)) {
             fs.unlinkSync(options.outputPath);
           }
         } catch {
-          /* best-effort cleanup */
+          logger.warn(
+            { event: "compress.cleanup.failed" },
+            "Failed to clean up partial output file",
+          );
         }
         if (!(err instanceof vscode.CancellationError)) {
           vscode.window.showErrorMessage(t("compress.failed") + (err as Error).message);

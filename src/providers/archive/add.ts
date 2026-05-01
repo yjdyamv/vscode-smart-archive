@@ -118,6 +118,7 @@ export async function runAddToArchive(): Promise<void> {
       await setupWebview(ctx.webview, ctx.archiveUri);
     }
   } catch (err) {
+    logger.error({ event: "addToArchive.run.failed", err }, "Add to archive failed");
     if (ctx.webview) ctx.webview.postMessage({ c: "err", t: (err as Error).message });
   } finally {
     ctx.webview?.postMessage({ c: "loading", t: false });
@@ -228,7 +229,10 @@ function copyLocalToFSWithPrefix(
       try {
         js7z.FS.mkdir(cur);
       } catch {
-        /* already exists */
+        logger.warn(
+          { event: "addToArchive.mkdir.failed" },
+          "Failed to create directory in virtual FS",
+        );
       }
     }
   }

@@ -100,7 +100,10 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
       try {
         encrypted = await isEncrypted(filePath);
       } catch {
-        /* can't detect — treat as encrypted to be safe */
+        logger.warn(
+          { event: "setupWebview.encryptDetect.failed" },
+          "Failed to detect encryption state",
+        );
         encrypted = true;
       }
     }
@@ -206,6 +209,7 @@ function registerHandler(webview: vscode.Webview): void {
               js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
             });
           } catch {
+            logger.warn({ event: "webview.password.testFailed" }, "Password verification failed");
             webview.postMessage({ c: "pwerr", t: "Wrong password" });
             return;
           } finally {

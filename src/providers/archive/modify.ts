@@ -54,7 +54,10 @@ export async function createFolderInArchive(
       try {
         js7z.FS.mkdir(cur);
       } catch {
-        /* exists */
+        logger.warn(
+          { event: "createFolder.mkdir.failed" },
+          "Failed to create directory in virtual FS",
+        );
       }
     }
     const dotfile = `${vfsFolder}/.smartarchive`;
@@ -99,7 +102,10 @@ async function createFolderInWrappedArchive(
       try {
         js7z2.FS.mkdir(cur);
       } catch {
-        /* exists */
+        logger.warn(
+          { event: "createFolderWrapped.mkdir.failed" },
+          "Failed to create directory in virtual FS",
+        );
       }
     }
     const dotfile = `${vfsFolder}/.smartarchive`;
@@ -159,6 +165,10 @@ export async function previewFileFromArchive(
       try {
         fileData = js7z.FS.readFile(vfsPath, { encoding: "binary" });
       } catch {
+        logger.error(
+          { event: "previewFile.notFound", path: normalizedFile },
+          "Preview file not found in extracted content",
+        );
         throw new Error(`Preview file not found: ${normalizedFile}`);
       }
     }
