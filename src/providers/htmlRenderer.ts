@@ -100,6 +100,7 @@ ${cssLink(cssUri)}</head>
     <button class='pw-eye' title='Show password' onmousedown='document.getElementById("pw").type="text"' onmouseup='document.getElementById("pw").type="password"' onmouseleave='document.getElementById("pw").type="password"'>\u{1F441}</button>
   </div>
   <button class='btn' onclick='submitPw()' style='margin-top:4px'>Unlock</button>
+  <button class='btn' onclick='skipPw()' style='margin-top:4px;background:transparent;color:var(--vscode-descriptionForeground)'>Open without password</button>
   <div id='pwe' class='pw-err'>Wrong password</div>
 </div>
 <script>
@@ -109,6 +110,9 @@ function submitPw(){
   if(!pw)return;
   el.classList.remove('err');document.getElementById('pwe').classList.remove('on');
   v.postMessage({c:'pw',pw:pw})
+}
+function skipPw(){
+  v.postMessage({c:'skipPw'})
 }
 window.addEventListener('message',function(e){
   if(e.data.c==='pwerr'){
