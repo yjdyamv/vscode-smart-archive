@@ -753,6 +753,58 @@ void (async () => {
     assert.strictEqual(subDir!.children![0].kind, 'DIRECTORY');
   });
 
+  // ── Rename ──
+  await test('rename: simple file rename via 7z rn', async () => {
+    const j = await JS7z();
+    j.FS.writeFile('/old.txt', new Uint8Array(Buffer.from('hello')));
+    await run7z(j, ['a', '/test.7z', '/old.txt']);
+    let buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+
+    const j2 = await JS7z();
+    j2.FS.writeFile('/test.7z', new Uint8Array(buf));
+    await run7z(j2, ['rn', '/test.7z', 'old.txt', 'new.txt']);
+    buf = Buffer.from(j2.FS.readFile('/test.7z', { encoding: 'binary' }));
+
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['new.txt'], 'hello', 'file should be renamed');
+    assert.ok(!f['old.txt'], 'old name should not exist');
+  });
+
+  await test('rename: file in subdirectory', async () => {
+    const j = await JS7z();
+    mkdirP(j, '/sub');
+    j.FS.writeFile('/sub/old.txt', new Uint8Array(Buffer.from('x')));
+    await run7z(j, ['a', '/test.7z', '/sub']);
+    let buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+
+    const j2 = await JS7z();
+    j2.FS.writeFile('/test.7z', new Uint8Array(buf));
+    await run7z(j2, ['rn', '/test.7z', 'sub/old.txt', 'sub/new.txt']);
+    buf = Buffer.from(j2.FS.readFile('/test.7z', { encoding: 'binary' }));
+
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['sub/new.txt'], 'x');
+    assert.ok(!f['sub/old.txt']);
+  });
+
+  await test('rename: move to different directory', async () => {
+    const j = await JS7z();
+    mkdirP(j, '/a');
+    mkdirP(j, '/b');
+    j.FS.writeFile('/a/file.txt', new Uint8Array(Buffer.from('move')));
+    await run7z(j, ['a', '/test.7z', '/a', '/b']);
+    let buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+
+    const j2 = await JS7z();
+    j2.FS.writeFile('/test.7z', new Uint8Array(buf));
+    await run7z(j2, ['rn', '/test.7z', 'a/file.txt', 'b/file.txt']);
+    buf = Buffer.from(j2.FS.readFile('/test.7z', { encoding: 'binary' }));
+
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['b/file.txt'], 'move');
+    assert.ok(!f['a/file.txt']);
+  });
+
   // ── 16. Format / encoding utilities ──
   await test('util: fixArchiveEncoding passes ASCII through', () => {
     const fixAE = (raw: string): string => {
