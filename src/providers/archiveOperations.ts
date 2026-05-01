@@ -44,7 +44,10 @@ export async function runAddToArchive(): Promise<void> {
   const ctx = _pendingAdd;
   _pendingAdd = null;
   if (!ctx) {
-    logger.warn({ event: "addToArchive.run.noCtx" }, "runAddToArchive called without pending state");
+    logger.warn(
+      { event: "addToArchive.run.noCtx" },
+      "runAddToArchive called without pending state",
+    );
     return;
   }
 
@@ -54,7 +57,11 @@ export async function runAddToArchive(): Promise<void> {
     const pick = await vscode.window.showQuickPick(
       [
         { label: "$(new-file) Add Files", desc: "files", description: "Select individual files" },
-        { label: "$(new-folder) Add Folders", desc: "folders", description: "Select whole folders" },
+        {
+          label: "$(new-folder) Add Folders",
+          desc: "folders",
+          description: "Select whole folders",
+        },
         { label: "$(files) Add Both", desc: "both", description: "Select files then folders" },
       ],
       { placeHolder: "Choose what to add to the archive" },
@@ -540,7 +547,11 @@ function copyLocalToFSWithPrefix(
     let cur = "";
     for (const part of parts) {
       cur += "/" + part;
-      try { js7z.FS.mkdir(cur); } catch { /* already exists */ }
+      try {
+        js7z.FS.mkdir(cur);
+      } catch {
+        /* already exists */
+      }
     }
   }
 
@@ -563,11 +574,7 @@ function copyLocalToFSWithPrefix(
   return { vfsPaths, vfsDir };
 }
 
-function copyDirToFSRecursive(
-  js7z: JS7zInstance,
-  localDir: string,
-  vfsDir: string,
-): void {
+function copyDirToFSRecursive(js7z: JS7zInstance, localDir: string, vfsDir: string): void {
   const entries = fs.readdirSync(localDir, { withFileTypes: true });
   for (const entry of entries) {
     const localEntry = path.join(localDir, entry.name);
@@ -618,7 +625,11 @@ async function createFolderInArchive(
     let cur = "";
     for (const part of folderPath.split("/").filter(Boolean)) {
       cur += "/" + part;
-      try { js7z.FS.mkdir(cur); } catch { /* exists */ }
+      try {
+        js7z.FS.mkdir(cur);
+      } catch {
+        /* exists */
+      }
     }
     const dotfile = `${vfsFolder}/.smartarchive`;
     js7z.FS.writeFile(dotfile, new Uint8Array(1));
@@ -684,7 +695,11 @@ async function createFolderInWrappedArchive(
       let cur = "";
       for (const part of folderPath.split("/").filter(Boolean)) {
         cur += "/" + part;
-        try { js7z2.FS.mkdir(cur); } catch { /* exists */ }
+        try {
+          js7z2.FS.mkdir(cur);
+        } catch {
+          /* exists */
+        }
       }
       const dotfile = `${vfsFolder}/.smartarchive`;
       js7z2.FS.writeFile(dotfile, new Uint8Array(1));
@@ -734,4 +749,11 @@ async function createFolderInWrappedArchive(
   }
 }
 
-export { deleteFromArchive, addToArchive, createFolderInArchive, previewFileFromArchive, unwrapAndExtract, testArchive };
+export {
+  deleteFromArchive,
+  addToArchive,
+  createFolderInArchive,
+  previewFileFromArchive,
+  unwrapAndExtract,
+  testArchive,
+};

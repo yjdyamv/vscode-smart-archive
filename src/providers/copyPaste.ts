@@ -27,9 +27,12 @@ export function pasteCopiedFromArchive(): void {
   }
   if (!fs.existsSync(copiedArchivePath)) {
     logger.warn({ event: "pasteCopied.sourceMissing", archivePath: copiedArchivePath });
-    vscode.window.showErrorMessage(t("archive.sourceMissing", copiedArchivePath), "Copy").then((action) => {
-      if (action === "Copy") vscode.env.clipboard.writeText(t("archive.sourceMissing", copiedArchivePath));
-    });
+    vscode.window
+      .showErrorMessage(t("archive.sourceMissing", copiedArchivePath), "Copy")
+      .then((action) => {
+        if (action === "Copy")
+          vscode.env.clipboard.writeText(t("archive.sourceMissing", copiedArchivePath));
+      });
     return;
   }
   const paths = copiedPaths;
@@ -47,14 +50,21 @@ export function pasteCopiedFromArchive(): void {
       if (!uris || uris.length === 0) return;
       try {
         await extractSelected(source, paths, pw, fl, uris[0].fsPath);
-        logger.info({ event: "pasteCopied.success", pathCount: paths.length, outputDir: uris[0].fsPath });
+        logger.info({
+          event: "pasteCopied.success",
+          pathCount: paths.length,
+          outputDir: uris[0].fsPath,
+        });
         cleanupPreviewTemp();
         clearCopiedPaths();
       } catch (err) {
         logger.error({ event: "paste.failed", err }, (err as Error).message);
-        vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message, "Copy").then((action) => {
-          if (action === "Copy") vscode.env.clipboard.writeText(t("decompress.failed") + (err as Error).message);
-        });
+        vscode.window
+          .showErrorMessage(t("decompress.failed") + (err as Error).message, "Copy")
+          .then((action) => {
+            if (action === "Copy")
+              vscode.env.clipboard.writeText(t("decompress.failed") + (err as Error).message);
+          });
       }
     });
 }
