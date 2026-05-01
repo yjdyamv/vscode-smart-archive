@@ -23,6 +23,7 @@ import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../u
 import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
+import { promptOversizeFile } from "../utils/security";
 
 export async function decompressCommand(
   uri: vscode.Uri | undefined,
@@ -85,6 +86,8 @@ async function decompressSingleFile(
   }
 
   const outputDir = getOutputPath(inputPath, "extracted");
+
+  if (!(await promptOversizeFile(path.basename(inputPath), fs.statSync(inputPath).size))) return;
 
   const batchLabel = batchTotal > 1 ? ` (${batchIdx}/${batchTotal})` : "";
   await vscode.window.withProgress(
