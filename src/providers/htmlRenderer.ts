@@ -169,6 +169,7 @@ ${
     <div class='tb-l'>
       <button class='btn' onclick='extSel()' id='bSel' disabled>${"\u{1F4E6}"} Extract</button>
       <button class='btn' onclick='delSel()' id='bDel' disabled>${"\u{1F5D1}"} Delete</button>
+      <button class='btn' onclick='addFileSel()' id='bAdd'>${"\u{2795}"} Add Files</button>
       <span class='sel-cnt'><span id='cnt'>0</span></span>
       <button class='btn-ico' title='Expand All' onclick='expandAll()'>${"\u{1F4C2}"}</button>
       <button class='btn-ico' title='Collapse All' onclick='collapseAll()'>${"\u{1F4C1}"}</button>
@@ -176,14 +177,15 @@ ${
     <div class='tb-m'>
       <span class='sort-lbl' onclick='doSort("name")' id='sortName'>Name</span>
       <span class='sort-lbl' onclick='doSort("size")' id='sortSize'>Size</span>
-      <span id='sortLbl' style='font-size:calc(var(--vscode-font-size)*0.78);color:var(--vscode-descriptionForeground)'></span>
+      <span id='sortLbl'></span>
       <input class='srch' type='text' placeholder='Filter\u2026' oninput='doSearch(this.value)'>
-      <button class='btn-ico' title='Test Archive' onclick='testArchive()'>${"\u{2705}"}</button>
-      <button class='btn-ico' title='Properties' onclick='var p=document.getElementById("props");p.style.display=p.style.display=="none"?"":"none"'>${"\u{2139}"}</button>
       <button class='btn' onclick='extAll()'>${"\u{1F4E6}"} Extract All</button>
     </div>
   </div>
-  <div id='props' class='props' style='display:none'></div>
+  <div class='props'>
+    <button class='btn-ico' onclick='testArchive()' title='Test Archive Integrity'>${"\u{2705}"}</button>
+    <span class='props-info' id='propsInfo'></span>
+  </div>
 <div class='tree'>${treeHtml}</div>`
     : `<div class='empty'>${emptyMsg}</div>`
 }

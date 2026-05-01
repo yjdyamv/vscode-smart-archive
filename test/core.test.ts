@@ -657,7 +657,69 @@ void (async () => {
     assert.strictEqual(tree[0].name, "data.txt");
   });
 
-  // ── 15. Format / encoding utilities ──
+  // ── 15. Add-to-archive path preservation ──
+  await test('add: individual file paths lose dir structure', async () => {
+    // 7z strips the common prefix — subdir/ is lost
+    const j = await JS7z();
+    j.FS.mkdir('/subdir');
+    j.FS.writeFile('/subdir/a.txt', new Uint8Array(Buffer.from('a')));
+    j.FS.writeFile('/subdir/b.txt', new Uint8Array(Buffer.from('b')));
+    await run7z(j, ['a', '/test.7z', '-aot', '/subdir/a.txt', '/subdir/b.txt']);
+    const buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+    const f = await j7zDecompress(buf);
+    assert.ok(f['a.txt'], 'a.txt should exist at root');
+    assert.ok(f['b.txt'], 'b.txt should exist at root');
+    assert.ok(!f['subdir/a.txt'], 'subdir/a.txt should NOT exist (stripped)');
+  });
+
+  await test('add: passing a directory preserves structure', async () => {
+    // 7z preserves directory name when passing the dir itself
+    const j = await JS7z();
+    j.FS.mkdir('/subdir');
+    j.FS.writeFile('/subdir/a.txt', new Uint8Array(Buffer.from('a')));
+    j.FS.writeFile('/subdir/b.txt', new Uint8Array(Buffer.from('b')));
+    await run7z(j, ['a', '/test.7z', '-aot', '/subdir']);
+    const buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['subdir/a.txt'], 'a', 'should preserve subdir/');
+    assert.strictEqual(f['subdir/b.txt'], 'b');
+  });
+
+  await test('add: single file in directory preserves dir name', async () => {
+    const j = await JS7z();
+    j.FS.mkdir('/subdir');
+    j.FS.writeFile('/subdir/a.txt', new Uint8Array(Buffer.from('a')));
+    await run7z(j, ['a', '/test.7z', '-aot', '/subdir']);
+    const buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['subdir/a.txt'], 'a');
+  });
+
+  await test('add: deeply nested dir via first-level directory', async () => {
+    // Passing only the first-level dir /a preserves full path a/b/c/file.txt
+    const j = await JS7z();
+    mkdirP(j, '/a/b/c');
+    j.FS.writeFile('/a/b/c/d.txt', new Uint8Array(Buffer.from('deep')));
+    j.FS.writeFile('/a/b/e.txt', new Uint8Array(Buffer.from('e')));
+    await run7z(j, ['a', '/test.7z', '-aot', '/a']);
+    const buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['a/b/c/d.txt'], 'deep');
+    assert.strictEqual(f['a/b/e.txt'], 'e');
+  });
+
+  await test('add: root-level files via individual paths', async () => {
+    const j = await JS7z();
+    j.FS.writeFile('/a.txt', new Uint8Array(Buffer.from('a')));
+    j.FS.writeFile('/b.txt', new Uint8Array(Buffer.from('b')));
+    await run7z(j, ['a', '/test.7z', '-aot', '/a.txt', '/b.txt']);
+    const buf = Buffer.from(j.FS.readFile('/test.7z', { encoding: 'binary' }));
+    const f = await j7zDecompress(buf);
+    assert.strictEqual(f['a.txt'], 'a');
+    assert.strictEqual(f['b.txt'], 'b');
+  });
+
+  // ── 16. Format / encoding utilities ──
   await test('util: fixArchiveEncoding passes ASCII through', () => {
     const fixAE = (raw: string): string => {
       if (!raw) return raw;
@@ -713,7 +775,7 @@ void (async () => {
     assert.strictEqual(fmtD(125000), "2m 5s");
   });
 
-  // ── 16. RAR utilities ──
+  // ── 17. RAR utilities ──
   await test('rar: isRarExt', () => {
     const isRarExt = (ext: string): boolean => /^\.(?:rar|r\d{2})$/i.test(ext);
     assert.strictEqual(isRarExt(".rar"), true);

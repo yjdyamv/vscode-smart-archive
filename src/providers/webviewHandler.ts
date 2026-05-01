@@ -19,7 +19,7 @@ import { buildTree, countTreeStats } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
 import { extractSelected } from "./extraction";
-import { deleteFromArchive, previewFileFromArchive, testArchive } from "./archiveOperations";
+import { deleteFromArchive, initAddToArchive, previewFileFromArchive, testArchive } from "./archiveOperations";
 import { setCopiedPaths } from "./copyPaste";
 
 const EXT_ID = "yjdyamv.smart-archive";
@@ -158,6 +158,7 @@ function registerHandler(webview: vscode.Webview): void {
       dir?: string;
       pw?: string;
     }) => {
+      logger.info({ event: "webview.msg", c: msg.c, dir: msg.dir });
       const s = handlerStates.get(webview);
       if (!s) return;
 
@@ -248,14 +249,8 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "copy" && Array.isArray(msg.paths) && msg.paths.length > 0) {
         setCopiedPaths(msg.paths, s.filePath, s.password, msg.flat);
         logger.info({ event: "webview.copy", count: msg.paths.length, flat: msg.flat });
-        const pasteAction = t("archive.pasteAction");
-        vscode.window
-          .showInformationMessage(t("archive.copied", String(msg.paths.length)), pasteAction)
-          .then((action) => {
-            if (action === pasteAction) {
-              vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
-            }
-          });
+        vscode.window.showInformationMessage(t("archive.copied", String(msg.paths.length)));
+        vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
       }
 
       // ── Delete ──
@@ -272,6 +267,14 @@ function registerHandler(webview: vscode.Webview): void {
           logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
         }
+      }
+
+      // ── Add Files ──
+      if (msg.c === "addFiles") {
+        const targetDir = typeof msg.dir === "string" ? msg.dir : "";
+        logger.info({ event: "webview.addFiles", dir: targetDir });
+        initAddToArchive(s.filePath, targetDir, s.password, webview, s.archiveUri);
+        vscode.commands.executeCommand("yjdyamv.smart-archive.addToArchive");
       }
 
       // ── Preview ──
