@@ -91,8 +91,11 @@ async function unwrapInnerTar(
     // Clean up intermediate .tar (best-effort, may already be removed)
     try {
       fs.unlinkSync(tarPath);
-    } catch {
-      /* already cleaned */
+    } catch (err) {
+      logger.warn(
+        { event: "decompress.unlinkFailed", path: tarPath, err },
+        "Failed to remove intermediate .tar",
+      );
     }
   } finally {
     tryCleanup(js7z);
