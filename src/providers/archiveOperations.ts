@@ -621,15 +621,15 @@ async function createFolderInArchive(
       cur += "/" + part;
       try { js7z.FS.mkdir(cur); } catch { /* exists */ }
     }
-    const keepFile = `${vfsFolder}/.keep`;
-    js7z.FS.writeFile(keepFile, new Uint8Array(1));
+    const dotfile = `${vfsFolder}/.smartarchive`;
+    js7z.FS.writeFile(dotfile, new Uint8Array(1));
 
     // Build add args: use directory form for nested, individual for root-level
     const parts = folderPath.split("/").filter(Boolean);
     const firstLevel = parts[0];
     const args = firstLevel
       ? ["a", `/${archiveName}`, "-aot", `/${firstLevel}`]
-      : ["a", `/${archiveName}`, "-aot", keepFile];
+      : ["a", `/${archiveName}`, "-aot", dotfile];
     if (password) args.splice(1, 0, `-p${password}`);
 
     logger.debug({ event: "createFolder.7zAdd", args: args.join(" ") });
@@ -640,24 +640,8 @@ async function createFolderInArchive(
     });
 
     const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
-
-    // Remove .keep on a fresh instance
-    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
-    try {
-      js7z2.FS.writeFile(`/${archiveName}`, new Uint8Array(updated));
-      const dArgs = ["d", `/${archiveName}`, "-y", `${folderPath}/.keep`];
-      if (password) dArgs.splice(1, 0, `-p${password}`);
-      logger.debug({ event: "createFolder.7zDelete", args: dArgs.join(" ") });
-      await new Promise<void>((resolve, reject) => {
-        js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z d keep: ${c}`)));
-        js7z2.callMain(dArgs);
-      });
-      const final = js7z2.FS.readFile(`/${archiveName}`, { encoding: "binary" });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(final));
-      logger.info({ event: "createFolder.ok", archivePath, folderPath });
-    } finally {
-      tryCleanupJS7z(js7z2);
-    }
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
     tryCleanupJS7z(js7z);
   }
