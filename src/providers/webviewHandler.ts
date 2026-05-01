@@ -79,17 +79,32 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     return;
   }
 
+  const prev = handlerStates.get(webview);
+
   if (isEncryptableExt(getFullExt(filePath))) {
-    let encrypted = entries.length === 0;
-    if (!encrypted) {
+    let encrypted = false;
+    if (entries.length === 0) {
       try {
         encrypted = await isEncrypted(filePath);
       } catch {
-        /* can't detect — proceed without password */
+        /* can't detect — treat as encrypted to be safe */
+        encrypted = true;
       }
     }
+
+    if (encrypted && prev?.password) {
+      try {
+        const pwEntries = await fetchFileList(filePath, prev.password);
+        if (pwEntries.length > 0) {
+          entries = pwEntries;
+          encrypted = false;
+        }
+      } catch {
+        /* retry with saved password failed, show password form */
+      }
+    }
+
     if (encrypted) {
-      const prev = handlerStates.get(webview);
       handlerStates.set(webview, {
         archiveUri,
         archiveName,
@@ -107,7 +122,6 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
 
   logger.info({ event: "setupWebview.entries", count: entries.length });
 
-  const prev = handlerStates.get(webview);
   handlerStates.set(webview, {
     archiveUri,
     archiveName,
