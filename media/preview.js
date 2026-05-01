@@ -6,6 +6,34 @@ var sortKey = "name",
 var _totFiles = 0,
   _totDirs = 0;
 
+(function initProps() {
+  var p = window._xtProps;
+  if (!p) return;
+  _totFiles = p.files;
+  _totDirs = p.dirs;
+  var el = document.getElementById("props");
+  if (el)
+    el.innerHTML =
+      "<b>" +
+      escHtml(p.name) +
+      "</b><br>" +
+      "Format: <b>" +
+      escHtml(p.format) +
+      "</b> | " +
+      "Items: <b>" +
+      p.count +
+      "</b> | " +
+      "Files: <b>" +
+      p.files +
+      "</b> | " +
+      "Dirs: <b>" +
+      p.dirs +
+      "</b> | " +
+      "Size: <b>" +
+      escHtml(p.size) +
+      "</b>";
+})();
+
 function getPath(el) {
   return el.closest(".rw").dataset.path;
 }
@@ -489,30 +517,6 @@ window.addEventListener("message", function (e) {
     setLoading(false);
     s.className = "st ok";
     s.textContent = e.data.t;
-  } else if (e.data.c === "props") {
-    _totFiles = e.data.files;
-    _totDirs = e.data.dirs;
-    var p = document.getElementById("props");
-    if (p)
-      p.innerHTML =
-        "<b>" +
-        escHtml(e.data.name) +
-        "</b><br>" +
-        "Format: <b>" +
-        escHtml(e.data.format) +
-        "</b> | " +
-        "Items: <b>" +
-        e.data.count +
-        "</b> | " +
-        "Files: <b>" +
-        e.data.files +
-        "</b> | " +
-        "Dirs: <b>" +
-        e.data.dirs +
-        "</b> | " +
-        "Size: <b>" +
-        escHtml(e.data.size) +
-        "</b>";
   } else if (e.data.c === "log") {
     v.postMessage({ c: "log", msg: e.data.msg });
   }
