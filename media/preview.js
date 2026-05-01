@@ -695,13 +695,10 @@ function ctxDel() {
 }
 function ctxNewFolder() {
   document.getElementById("ctxmenu").style.display = "none";
-  var name = prompt("Folder name:");
-  if (!name || !name.trim()) return;
-  name = name.trim().replace(/[<>:"/\\|?*]/g, "_");
   var dir = addDirFromSel();
   if (!dir) dir = window._ctxDir || "";
-  setLoading(true, "Creating folder " + name + " in " + (dir || "archive root") + "\u2026");
-  v.postMessage({ c: "newFolder", dir: dir, name: name });
+  setLoading(true, "Creating folder in " + (dir || "archive root") + "\u2026");
+  v.postMessage({ c: "newFolderPrompt", dir: dir });
 }
 
 function ctxAddHere() {

@@ -285,13 +285,23 @@ function registerHandler(webview: vscode.Webview): void {
       }
 
       // ── New Folder ──
-      if (msg.c === "newFolder" && typeof msg.name === "string") {
+      if (msg.c === "newFolderPrompt") {
         const targetDir = typeof msg.dir === "string" ? msg.dir : "";
-        const folderName = msg.name.trim();
-        if (!folderName) return;
-        logger.info({ event: "webview.newFolder", dir: targetDir, name: folderName });
+        const folderName = await vscode.window.showInputBox({
+          prompt: "Folder name",
+          placeHolder: "new-folder",
+          validateInput: (v) =>
+            !v.trim() ? "Folder name cannot be empty" : /[<>:"/\\|?*]/.test(v) ? "Invalid characters: < > : \" / \\ | ? *" : null,
+        });
+        if (!folderName || !folderName.trim()) {
+          logger.info({ event: "webview.newFolder.cancelled" });
+          webview.postMessage({ c: "loading", t: false });
+          return;
+        }
+        const name = folderName.trim();
+        logger.info({ event: "webview.newFolder", dir: targetDir, name });
         try {
-          await createFolderInArchive(s.filePath, targetDir, folderName, s.password);
+          await createFolderInArchive(s.filePath, targetDir, name, s.password);
           webview.postMessage({ c: "del-ok", t: "done" });
           if (s.archiveUri) await setupWebview(webview, s.archiveUri);
         } catch (err) {
