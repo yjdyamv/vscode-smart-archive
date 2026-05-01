@@ -86,8 +86,11 @@ export async function listFiles(
     }
     flush();
 
-    logger.debug({ event: "listFiles.done", count: results.length });
-    return results;
+    // 7z l -slt lists the archive file itself as the first entry; filter it out.
+    const filtered = results.filter((r) => r.path !== `/${archiveName}` && r.path !== archiveName);
+
+    logger.debug({ event: "listFiles.done", count: filtered.length });
+    return filtered;
   } finally {
     tryCleanup(js7z);
   }
@@ -114,12 +117,12 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
     try {
       await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
       return stdout.includes("Encrypted = +");
-    } catch {
+    } catch (err) {
       const msg = (stdout + stderr).toLowerCase();
       if (msg.includes("encrypted") || msg.includes("wrong password")) {
         return true;
       }
-      return false;
+      throw err;
     }
   } finally {
     tryCleanup(js7z);

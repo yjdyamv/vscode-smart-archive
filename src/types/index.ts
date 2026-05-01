@@ -90,7 +90,7 @@ export interface EmscriptenFS {
   writeFile(path: string, data: Uint8Array): void;
   readFile(path: string, options?: { encoding: "binary" }): ArrayBuffer;
   readdir(path: string): string[];
-  stat(path: string): { mode: number };
+  stat(path: string): { mode: number; size: number };
   isDir(mode: number): boolean;
 }
 

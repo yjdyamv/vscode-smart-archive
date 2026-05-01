@@ -56,6 +56,8 @@ function run7z(
   progress?: vscode.Progress<{ message?: string; increment?: number }>,
   onStdout?: (text: string) => void,
 ): Promise<void> {
+  const prevPrint = js7z.print;
+  const prevPrintErr = js7z.printErr;
   let stderr = "";
   let lastPct = -1;
   js7z.print = (text: string) => {
@@ -76,6 +78,8 @@ function run7z(
 
   return new Promise<void>((resolve, reject) => {
     js7z.onExit = (exitCode: number) => {
+      js7z.print = prevPrint;
+      js7z.printErr = prevPrintErr;
       if (exitCode === 0) {
         resolve();
       } else {

@@ -25,7 +25,7 @@ import { t, compressLevels } from "../i18n";
  * @returns The chosen format, or undefined if the user cancelled
  */
 export async function promptCompressFormat(): Promise<FormatInfo | undefined> {
-  const items = COMPRESS_FORMATS.filter((f) => f.canCreate).map((f) => ({
+  const items = COMPRESS_FORMATS.map((f) => ({
     label: f.label,
     description: f.description,
   }));

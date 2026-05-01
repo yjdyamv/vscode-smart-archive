@@ -14,18 +14,11 @@ import type { JS7zFactory, JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
 import { getFileList } from "../engines/libarchive-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { logger } from "../utils/logger";
+import { tryCleanup } from "../engines/js7z-helpers";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const JS7z: JS7zFactory = require("js7z-tools");
-
-function tryCleanupJS7z(instance: JS7zInstance): void {
-  try {
-    if (typeof instance.destroy === "function") instance.destroy();
-    else if (typeof instance._cleanup === "function") instance._cleanup();
-  } catch {
-    /* best-effort cleanup */
-  }
-}
 
 /**
  * Fetch the file list for an archive, choosing the best engine.
@@ -47,8 +40,11 @@ async function fetchFileList(
   try {
     const f = await listFiles(filePath, password);
     if (f && f.length > 0) return f;
-  } catch {
-    /* encrypted or unsupported — caller handles */
+  } catch (err) {
+    logger.warn(
+      { event: "fetchFileList.listFiles.failed", err, filePath },
+      "js7z listing failed, will try fallback",
+    );
   }
   if (!password && isEncryptableExt(ext)) return [];
   return getFileList(filePath);
@@ -91,17 +87,17 @@ async function listViaExtract(
         });
         return readDirEntries(js7z2, "/_ls2", "");
       } finally {
-        tryCleanupJS7z(js7z2);
+        tryCleanup(js7z2);
       }
     }
     return readDirEntries(js7z, "/_ls", "");
   } finally {
-    tryCleanupJS7z(js7z);
+    tryCleanup(js7z);
   }
 }
 
 function readDirEntries(
-  js7z: any,
+  js7z: JS7zInstance,
   dir: string,
   prefix: string,
 ): { path: string; size: number; type: string }[] {
@@ -117,7 +113,7 @@ function readDirEntries(
         results.push({ path: childPath, size: 0, type: "DIRECTORY" });
         results.push(...readDirEntries(js7z, fp, childPath));
       } else {
-        results.push({ path: childPath, size: (st as any).size || 0, type: "REGULAR_FILE" });
+        results.push({ path: childPath, size: st.size || 0, type: "REGULAR_FILE" });
       }
     } catch {
       results.push({ path: childPath, size: 0, type: "REGULAR_FILE" });
@@ -126,4 +122,4 @@ function readDirEntries(
   return results;
 }
 
-export { JS7z, tryCleanupJS7z, fetchFileList, listViaExtract, readDirEntries };
+export { JS7z, tryCleanup as tryCleanupJS7z, fetchFileList, listViaExtract, readDirEntries };
