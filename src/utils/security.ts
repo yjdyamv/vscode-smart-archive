@@ -10,6 +10,45 @@
  */
 
 import * as path from "path";
+import * as vscode from "vscode";
+
+function getLimit(key: string, defaultMiB: number): number {
+  return (
+    vscode.workspace.getConfiguration("smart-archive").get<number>(key, defaultMiB) * 1024 * 1024
+  );
+}
+
+export function getMaxFileSize(): number {
+  return getLimit("maxFileSizeMiB", 1024);
+}
+
+export function getMaxTotalSize(): number {
+  return getLimit("maxTotalSizeMiB", 10240);
+}
+
+/** Human-readable size string used in dialogs */
+function fmtSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const k = 1024;
+  const units = ["KiB", "MiB", "GiB", "TiB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), units.length - 1);
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
+}
+
+/**
+ * Prompt the user to confirm extraction of an oversized file.
+ * Returns true if the user chooses to continue.
+ */
+export async function promptOversizeFile(label: string, size: number): Promise<boolean> {
+  const maxSize = getMaxFileSize();
+  if (size <= maxSize) return true;
+  const choice = await vscode.window.showWarningMessage(
+    `"${label}" is ${fmtSize(size)}, exceeding the limit of ${fmtSize(maxSize)}.\n\nExtracting may cause high memory usage or disk exhaustion.`,
+    { modal: true },
+    "Extract anyway",
+  );
+  return choice === "Extract anyway";
+}
 
 /** Maximum allowed decompressed file size (1 GiB) */
 export const MAX_FILE_SIZE = 1024 * 1024 * 1024;
@@ -62,11 +101,12 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
  * Check if a file size exceeds the configured maximum.
  *
  * @param size - File size in bytes
- * @throws If the size exceeds MAX_FILE_SIZE
+ * @throws If the size exceeds the configured limit
  */
 export function checkFileSize(size: number): void {
-  if (size > MAX_FILE_SIZE) {
-    throw new Error(`File size ${size} exceeds maximum allowed ${MAX_FILE_SIZE} bytes`);
+  const max = getMaxFileSize();
+  if (size > max) {
+    throw new Error(`File size ${fmtSize(size)} exceeds maximum ${fmtSize(max)}`);
   }
 }
 
@@ -76,12 +116,13 @@ export function checkFileSize(size: number): void {
  * @param current - Current accumulated size in bytes
  * @param added - New bytes to add
  * @returns New total
- * @throws If the new total exceeds MAX_TOTAL_SIZE
+ * @throws If the new total exceeds the configured limit
  */
 export function checkTotalSize(current: number, added: number): number {
   const total = current + added;
-  if (total > MAX_TOTAL_SIZE) {
-    throw new Error(`Total decompressed size ${total} exceeds maximum ${MAX_TOTAL_SIZE} bytes`);
+  const max = getMaxTotalSize();
+  if (total > max) {
+    throw new Error(`Total decompressed size ${fmtSize(total)} exceeds maximum ${fmtSize(max)}`);
   }
   return total;
 }
