@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, provide } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted, provide, watch } from "vue";
 import type { TreeNodeData, ArchiveProps } from "./types";
 import { useMessage } from "./composables/useMessage";
 import { useSelection } from "./composables/useSelection";
@@ -29,6 +29,11 @@ const sort = useSort(treeData);
 const tree = useTreeFlatten(treeData);
 
 const sortedTree = computed(() => sort.sortNodes(treeData.value));
+
+// Apply sort to treeData when sort key/direction changes
+watch([sort.sortKey, sort.sortAsc], () => {
+  treeData.value = sort.sortNodes([...treeData.value]);
+});
 
 const visibleFlatNodes = computed(() => {
   return tree.flatNodes.value.filter((fn) => {
@@ -318,40 +323,16 @@ function expandOrLoad(path: string) {
 
 // Selection counts for toolbar
 const selectionBreakdown = computed(() => {
-  const { paths: selected } = getEffectivePaths();
   let dirs = 0;
   let files = 0;
-  for (const p of selected) {
+  for (const p of selection.state.selected) {
     const node = findNode(treeData.value, p);
     if (!node) continue;
-    if (node.kind === "DIRECTORY") {
-      dirs++;
-      const childStats = countChildren(node.children);
-      dirs += childStats.dirs;
-      files += childStats.files;
-    } else {
-      files++;
-    }
+    if (node.kind === "DIRECTORY") dirs++;
+    else files++;
   }
   return { dirs, files };
 });
-
-function countChildren(nodes: TreeNodeData[] | undefined): { dirs: number; files: number } {
-  let d = 0;
-  let f = 0;
-  if (!nodes) return { dirs: d, files: f };
-  for (const n of nodes) {
-    if (n.kind === "DIRECTORY") {
-      d++;
-      const child = countChildren(n.children);
-      d += child.dirs;
-      f += child.files;
-    } else {
-      f++;
-    }
-  }
-  return { dirs: d, files: f };
-}
 
 onMounted(() => {
   const rawTree = window._xTree ?? [];
@@ -495,7 +476,7 @@ provide("showToast", showToast);
 </script>
 
 <template>
-  <div class="app">
+  <div class="flex flex-col h-screen text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)] font-[var(--vscode-font-family)]" style="font-size:var(--vscode-font-size)">
     <LoadingSpinner v-if="viewState === 'loading'" :msg="loadingMsg" />
     <PasswordBox
       v-else-if="viewState === 'password'"
@@ -549,7 +530,7 @@ provide("showToast", showToast);
         @test="testArchive"
       />
     </template>
-    <div v-else class="empty-state">
+    <div v-else class="text-center text-[var(--vscode-descriptionForeground)] py-16 px-6">
       {{ archiveProps?.name ?? "Archive" }} (empty)
     </div>
 
@@ -570,29 +551,3 @@ provide("showToast", showToast);
     />
   </div>
 </template>
-
-<style>
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-body {
-  font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
-  color: var(--vscode-foreground);
-  background: var(--vscode-sideBar-background);
-  overflow: hidden;
-}
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-.empty-state {
-  text-align: center;
-  color: var(--vscode-descriptionForeground);
-  padding: 4em 1.5em;
-  font-size: var(--vscode-font-size);
-}
-</style>

@@ -54,10 +54,8 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
 </script>
 
 <template>
-  <div ref="containerRef" class="tree-container">
-    <div
-      class="virtual-wrapper"
-      :style="{ height: virtualizer.getTotalSize() + 'px' }"
+  <div ref="containerRef" class="flex-1 overflow-y-auto overflow-x-hidden relative">
+    <div class="relative w-full" :style="{ height: virtualizer.getTotalSize() + 'px' }">
     >
       <div
         v-for="item in virtualItems"
@@ -88,16 +86,3 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
     </div>
   </div>
 </template>
-
-<style scoped>
-.tree-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  position: relative;
-}
-.virtual-wrapper {
-  position: relative;
-  width: 100%;
-}
-</style>
