@@ -14,6 +14,7 @@ interface TreeNode {
   kind: string;
   children?: TreeNode[];
   hasMore?: boolean;
+  collapsed?: boolean;
 }
 
 type FlatEntry = { path: string; size: number; type: string };
@@ -304,6 +305,19 @@ function getDirChildren(
   return children;
 }
 
+// ── Noisy directory marking ────────────────────────────────────────
+
+function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
+  if (noisyPatterns.length === 0) return;
+  const set = new Set(noisyPatterns);
+  for (const node of nodes) {
+    if (node.kind === "DIRECTORY" && set.has(node.name)) {
+      node.collapsed = true;
+    }
+    if (node.children) markNoisyDirs(node.children, noisyPatterns);
+  }
+}
+
 // ── Stats helpers ──────────────────────────────────────────────────
 
 function countFlatStats(entries: FlatEntry[]): { files: number; dirs: number; total: number; totalSize: number } {
@@ -337,4 +351,4 @@ function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total
 }
 
 export type { TreeNode, FlatEntry, EntryIndex };
-export { buildTree, buildTreeRootOnly, getDirChildren, countTreeStats, countFlatStats, buildEntryIndex };
+export { buildTree, buildTreeRootOnly, getDirChildren, countTreeStats, countFlatStats, buildEntryIndex, markNoisyDirs };

@@ -99,6 +99,7 @@ export function contentHtml(
   cssUri: string,
   jsUri: string,
   props?: { name: string; format: string; count: number; size: string },
+  noisyPatterns?: string[],
 ): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
@@ -111,6 +112,7 @@ ${cssLink(cssUri)}
 <script>window._xFiles=${fileCount}</script>
 <script>window._xDirs=${dirCount}</script>
 <script>window._xProps=${JSON.stringify(props ?? null)}</script>
+<script>window._xNoisy=${JSON.stringify(noisyPatterns ?? [])}</script>
 ${jsModule(jsUri)}
 </body></html>`;
 }

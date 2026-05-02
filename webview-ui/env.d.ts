@@ -19,4 +19,5 @@ interface Window {
   _xTree?: TreeNodeData[];
   _xFiles?: number;
   _xDirs?: number;
+  _xNoisy?: string[];
 }

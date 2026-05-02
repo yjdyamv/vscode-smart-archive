@@ -22,6 +22,7 @@ const emit = defineEmits<{
 
 const node = computed(() => props.flatNode.node);
 const isDir = computed(() => node.value.kind === "DIRECTORY");
+const isCollapsedDir = computed(() => isDir.value && node.value.collapsed === true);
 const icon = computed(() => getFileIcon(node.value.name, isDir.value));
 const indentPx = 16;
 
@@ -104,7 +105,7 @@ function onExpandClick(e: MouseEvent) {
 <template>
   <div
     class="row"
-    :class="{ dir: isDir, sel: selected }"
+    :class="{ dir: isDir, sel: selected, noisy: isCollapsedDir }"
     :style="{ paddingLeft: depth * indentPx + 'px' }"
     :data-path="node.path"
     @click="onRowClick"
@@ -148,6 +149,9 @@ function onExpandClick(e: MouseEvent) {
 .row.sel {
   background: var(--vscode-list-activeSelectionBackground);
   color: var(--vscode-list-activeSelectionForeground);
+}
+.row.noisy {
+  opacity: 0.55;
 }
 .guide {
   position: absolute;
