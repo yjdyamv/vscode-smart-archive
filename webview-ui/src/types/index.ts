@@ -4,6 +4,7 @@ export interface TreeNodeData {
   size: number;
   kind: "DIRECTORY" | "REGULAR_FILE";
   children?: TreeNodeData[];
+  hasMore?: boolean;
 }
 
 export interface ArchiveProps {

@@ -15,7 +15,8 @@ import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
-import { buildTree, countTreeStats } from "./treeBuilder";
+import { buildTreeRootOnly, getDirChildren, countFlatStats } from "./treeBuilder";
+import type { FlatEntry } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
 import { extractSelected } from "./extraction";
@@ -42,6 +43,7 @@ interface HandlerState {
   archiveName: string;
   filePath: string;
   password: string | undefined;
+  entries: FlatEntry[];
 }
 
 const handlerStates = new WeakMap<vscode.Webview, HandlerState>();
@@ -136,6 +138,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
         archiveName,
         filePath,
         password: prev?.password,
+        entries,
       });
       webview.html = passwordHtml(archiveName, cssUri);
       if (!handlerRegistered.has(webview)) {
@@ -153,18 +156,19 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     archiveName,
     filePath,
     password: prev?.password,
+    entries,
   });
-  const tree = buildTree(entries, archiveName);
-  const stats = countTreeStats(tree);
+  // Lazy: only build root-level nodes, children load on demand
+  const tree = buildTreeRootOnly(entries, archiveName);
+  const stats = countFlatStats(entries);
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
-  const totalSize = entries.reduce((s, e) => s + (e.size || 0), 0);
   webview.html = contentHtml(tree, fileCount, dirCount, cssUri, jsUri, {
     name: archiveName,
     format: ext,
     count: itemCount,
-    size: formatCompactSize(totalSize),
+    size: formatCompactSize(stats.totalSize),
   });
 
   if (!handlerRegistered.has(webview)) {
@@ -191,6 +195,13 @@ function registerHandler(webview: vscode.Webview): void {
 
       if (msg.c === "log") {
         logger.debug({ event: "webview.ui", msg: msg.msg });
+        return;
+      }
+
+      // ── Lazy tree: expand directory → fetch children on demand ──
+      if (msg.c === "expandDir" && typeof msg.path === "string") {
+        const children = getDirChildren(s.entries, msg.path);
+        webview.postMessage({ c: "dirChildren", path: msg.path, children });
         return;
       }
 
@@ -222,18 +233,18 @@ function registerHandler(webview: vscode.Webview): void {
           }
           logger.info({ event: "webview.password.ok", count: pwEntries.length });
           s.password = msg.pw;
-          const tree = buildTree(pwEntries, s.archiveName);
-          const stats = countTreeStats(tree);
-          const fc = stats.files;
-          const dc = stats.dirs;
-          const itemCount = stats.total;
-          const totalSize = pwEntries.reduce((sum, e) => sum + (e.size || 0), 0);
+          s.entries = pwEntries;
+          const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
+          const pwStats = countFlatStats(pwEntries);
+          const fc = pwStats.files;
+          const dc = pwStats.dirs;
+          const itemCount = pwStats.total;
           const ext = getFullExt(s.filePath);
-          webview.html = contentHtml(tree, fc, dc, cssUri, jsUri, {
+          webview.html = contentHtml(pwTree, fc, dc, cssUri, jsUri, {
             name: s.archiveName,
             format: ext,
             count: itemCount,
-            size: formatCompactSize(totalSize),
+            size: formatCompactSize(pwStats.totalSize),
           });
         } catch (err) {
           logger.error({ event: "webview.password.error", err });

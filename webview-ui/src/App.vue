@@ -175,10 +175,14 @@ function handleRowClick(path: string, isDir: boolean, shift: boolean, ctrl: bool
 
 function handleRowDblClick(path: string, isDir: boolean) {
   if (isDir) {
-    tree.toggleExpand(path);
+    expandOrLoad(path);
   } else {
     previewFile(path);
   }
+}
+
+function handleExpandClick(path: string) {
+  expandOrLoad(path);
 }
 
 function handleCheckClick(path: string) {
@@ -186,7 +190,31 @@ function handleCheckClick(path: string) {
   selection.state.anchorPath = path;
 }
 
-function handleExpandClick(path: string) {
+function expandOrLoad(path: string) {
+  const node = tree.findNode(treeData.value, path);
+  if (!node || node.kind !== "DIRECTORY") return;
+
+  // If already expanded, just toggle
+  if (tree.expandedPaths.value.has(path)) {
+    tree.toggleExpand(path);
+    return;
+  }
+
+  // If directory has children already loaded, expand normally
+  if (node.children && node.children.length > 0) {
+    tree.toggleExpand(path);
+    return;
+  }
+
+  // If directory has more children but not loaded, request them
+  if (node.hasMore && (!node.children || node.children.length === 0)) {
+    tree.toggleExpand(path); // expand to show loading state
+    tree.setLoading(path);
+    post({ c: "expandDir", path });
+    return;
+  }
+
+  // Empty directory - just toggle
   tree.toggleExpand(path);
 }
 
@@ -242,7 +270,6 @@ onMounted(() => {
   if (rawTree.length > 0) {
     treeData.value = rawTree;
     viewState.value = "content";
-    tree.expandAll();
   } else {
     viewState.value = "empty";
   }
@@ -265,6 +292,14 @@ onMounted(() => {
       case "pwerr":
         showToast(msg.t as string || "Wrong password", false);
         break;
+      case "dirChildren": {
+        const parentPath = msg.path as string;
+        const children = msg.children as TreeNodeData[];
+        if (parentPath && Array.isArray(children)) {
+          tree.insertChildren(parentPath, children);
+        }
+        break;
+      }
     }
   });
 
@@ -384,6 +419,7 @@ provide("showToast", showToast);
         :expanded="tree.expandedPaths.value"
         :search-query="search.query.value"
         :match-set="search.matchSet.value"
+        :loading-paths="tree.loadingPaths.value"
         @row-click="handleRowClick"
         @row-dblclick="handleRowDblClick"
         @check-click="handleCheckClick"
