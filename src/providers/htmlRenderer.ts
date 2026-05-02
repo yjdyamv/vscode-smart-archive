@@ -1,20 +1,13 @@
 /**
- * HTML renderer — Smart Archive VSCode Extension
+ * HTML Renderer — Smart Archive VSCode Extension
  *
- * Generates full HTML pages for the archive browser webview.
- * CSS and JS are loaded from separate files via webview URIs
- * for proper caching and devtools debugging.
+ * Vue 3 + TanStack Virtual webview renderer.
+ * Generates HTML pages that load the Vue app with archive data injected.
  *
  * @module providers/htmlRenderer
  */
 
 import type { TreeNode } from "./treeBuilder";
-import { fileIcon } from "./fileIcons";
-import { t, formatCompactSize } from "../i18n";
-
-const INDENT_PX = 16;
-
-// ── Escaping ───────────────────────────────────────────────────────
 
 function esc(s: string): string {
   return s
@@ -25,116 +18,78 @@ function esc(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// ── Tree Rendering ──────────────────────────────────────────────────
-
-function renderRow(node: TreeNode, depth: number): string {
-  const isDir = node.kind === "DIRECTORY";
-  const hasKids = isDir && node.children && node.children.length > 0;
-  const { color, emoji } = fileIcon(node.name, isDir);
-  const size =
-    !isDir && node.size > 0 ? `<span class='sz'>${formatCompactSize(node.size)}</span>` : "";
-
-  let guides = "";
-  for (let i = 0; i < depth; i++) {
-    guides += `<span class='gd' style='left:${i * INDENT_PX + INDENT_PX / 2}px'></span>`;
-  }
-
-  return (
-    `<div class='rw${isDir ? " dir" : ""}' style='padding-left:${depth * INDENT_PX}px' data-path='${esc(node.path)}' data-name='${esc(node.name)}' data-size='${node.size}'` +
-    (hasKids ? " onclick='togDir(event,this)'" : " onclick='selRow(event,this)'") +
-    ">" +
-    guides +
-    "<span class='cb' onclick='selOne(event)'><span class='ck'></span></span>" +
-    `<span class='ar'>${hasKids ? "\u25BC" : isDir ? "\u25B6" : ""}</span>` +
-    `<span class='ic' style='color:${color}'>${emoji}</span>` +
-    `<span class='nm' title='${esc(node.path)}'>${esc(node.name)}</span>` +
-    size +
-    "</div>"
-  );
+function cssLink(uri: string): string {
+  return `<link rel="stylesheet" href="${uri}">`;
 }
 
-function renderTree(nodes: TreeNode[], depth: number): string {
-  let html = "";
-  for (const node of nodes) {
-    html += renderRow(node, depth);
-    if (node.children && node.children.length > 0) {
-      html += `<div class='grp'>${renderTree(node.children, depth + 1)}</div>`;
-    }
-  }
-  return html;
+function jsModule(uri: string): string {
+  return `<script type="module" src="${uri}"></script>`;
 }
-
-// ── URI helpers ─────────────────────────────────────────────────────
-
-function cssLink(uri: string | undefined): string {
-  if (!uri) return "";
-  return `<link rel='stylesheet' href='${uri}'>`;
-}
-
-function jsScript(uri: string | undefined): string {
-  if (!uri) return "";
-  return `<script src='${uri}'></script>`;
-}
-
-// ── HTML Page Generators ────────────────────────────────────────────
 
 export function emptyHtml(msg: string, cssUri?: string, jsUri?: string): string {
-  return `<!DOCTYPE html><html><head><meta charset='UTF-8'>
-${cssLink(cssUri)}</head>
-<body><div class='empty'>${esc(msg)}</div>
-${jsScript(jsUri)}</body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+${cssUri ? cssLink(cssUri) : ""}
+</head>
+<body><div style="text-align:center;color:var(--vscode-descriptionForeground);padding:4em 1.5em;font-size:var(--vscode-font-size)">${esc(msg)}</div>
+${jsUri ? jsModule(jsUri) : ""}</body></html>`;
 }
 
 export function passwordHtml(archiveName: string, cssUri?: string): string {
   return `<!DOCTYPE html>
-<html><head><meta charset='UTF-8'>
-${cssLink(cssUri)}</head>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+${cssUri ? cssLink(cssUri) : ""}
+<style>
+  body{font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-sideBar-background);display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+  .pw-box{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px}
+  .pw-box input{background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);padding:6px 36px 6px 12px;border-radius:3px;font-size:var(--vscode-font-size);width:248px;transition:border-color .2s}
+  .pw-box input.err{border-color:var(--vscode-inputValidation-errorBorder,#e51400);box-shadow:0 0 0 1px var(--vscode-inputValidation-errorBorder,#e5140033)}
+  .pw-box input:focus{outline:1px solid var(--vscode-focusBorder)}
+  .pw-inp{position:relative;display:flex;align-items:center}
+  .pw-eye,.pw-clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--vscode-descriptionForeground);font-size:14px;padding:2px 4px;line-height:1}
+  .pw-clr{right:28px}
+  .pw-eye:hover,.pw-clr:hover{color:var(--vscode-foreground)}
+  .btn{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;padding:2px 8px;border-radius:2px;cursor:pointer;font-size:calc(var(--vscode-font-size)*.92);margin-top:4px}
+  .btn:hover{background:var(--vscode-button-hoverBackground)}
+  .btn-skip{background:transparent;color:var(--vscode-descriptionForeground)}
+  .pw-err{color:var(--vscode-inputValidation-errorForeground,#f14c4c);font-size:calc(var(--vscode-font-size)*.92);min-height:1.4em;opacity:0;transition:opacity .2s}
+  .pw-err.on{opacity:1}
+</style></head>
 <body>
-<div class='pw-box'>
-  <div style='font-size:3em'>\u{1F512}</div>
-  <div style='color:var(--vscode-foreground);font-size:calc(var(--vscode-font-size) * 1.1)'>${esc(archiveName)}</div>
-  <div style='color:var(--vscode-descriptionForeground);font-size:calc(var(--vscode-font-size) * 0.92);margin-bottom:4px'>Encrypted \u2014 enter password</div>
-  <div class='pw-inp'>
-    <input id='pw' type='password' placeholder='Password' autofocus onkeydown='if(event.key==="Enter"||event.keyCode===13)submitPw()'>
-    <button class='pw-clr' title='Clear' onclick='var i=document.getElementById("pw");i.value="";i.focus();i.classList.remove("err");document.getElementById("pwe").classList.remove("on")'>\u2715</button>
-    <button class='pw-eye' title='Show password' onmousedown='document.getElementById("pw").type="text"' onmouseup='document.getElementById("pw").type="password"' onmouseleave='document.getElementById("pw").type="password"'>\u{1F441}</button>
+<div class="pw-box">
+  <div style="font-size:3em">&#x1F512;</div>
+  <div style="color:var(--vscode-foreground);font-size:calc(var(--vscode-font-size)*1.1)">${esc(archiveName)}</div>
+  <div style="color:var(--vscode-descriptionForeground);font-size:calc(var(--vscode-font-size)*.92);margin-bottom:4px">Encrypted &mdash; enter password</div>
+  <div class="pw-inp">
+    <input id="pw" type="password" placeholder="Password" autofocus onkeydown="if(event.key==='Enter'||event.keyCode===13)submitPw()">
+    <button class="pw-clr" title="Clear" onclick="var i=document.getElementById('pw');i.value='';i.focus();i.classList.remove('err');document.getElementById('pwe').classList.remove('on')">&#x2715;</button>
+    <button class="pw-eye" title="Show password" onmousedown="document.getElementById('pw').type='text'" onmouseup="document.getElementById('pw').type='password'" onmouseleave="document.getElementById('pw').type='password'">&#x1F441;</button>
   </div>
-  <button class='btn' onclick='submitPw()' style='margin-top:4px'>Unlock</button>
-  <button class='btn' onclick='skipPw()' style='margin-top:4px;background:transparent;color:var(--vscode-descriptionForeground)'>Open without password</button>
-  <div id='pwe' class='pw-err'>Wrong password</div>
+  <button class="btn" onclick="submitPw()">Unlock</button>
+  <button class="btn btn-skip" onclick="skipPw()">Open without password</button>
+  <div id="pwe" class="pw-err">Wrong password</div>
 </div>
 <script>
 var v=acquireVsCodeApi();
-function submitPw(){
-  var el=document.getElementById('pw'),pw=el.value;
-  if(!pw)return;
-  el.classList.remove('err');document.getElementById('pwe').classList.remove('on');
-  v.postMessage({c:'pw',pw:pw})
-}
-function skipPw(){
-  v.postMessage({c:'skipPw'})
-}
-window.addEventListener('message',function(e){
-  if(e.data.c==='pwerr'){
-    document.getElementById('pw').classList.add('err');
-    document.getElementById('pwe').classList.add('on');
-    document.getElementById('pwe').textContent=e.data.t || 'Wrong password'
-  }
-});
+function submitPw(){var i=document.getElementById('pw'),pw=i.value;if(!pw)return;i.classList.remove('err');document.getElementById('pwe').classList.remove('on');v.postMessage({c:'pw',pw:pw})}
+function skipPw(){v.postMessage({c:'skipPw'})}
+window.addEventListener('message',function(e){if(e.data.c==='pwerr'){document.getElementById('pw').classList.add('err');document.getElementById('pwe').classList.add('on');document.getElementById('pwe').textContent=e.data.t||'Wrong password'}});
 </script>
 </body></html>`;
 }
 
 export function loadingHtml(): string {
   return `<!DOCTYPE html>
-<html><head><meta charset='UTF-8'>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body{font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-sideBar-background);display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
   .sp{width:24px;height:24px;border:3px solid var(--vscode-panel-border);border-top-color:var(--vscode-progressBar-background);border-radius:50%;animation:sp .8s linear infinite;margin-right:10px}
   @keyframes sp{to{transform:rotate(360deg)}}
   .msg{display:flex;align-items:center;color:var(--vscode-descriptionForeground)}
 </style></head>
-<body><div class='msg'><div class='sp'></div>${esc(t("archive.reading"))}</div></body></html>`;
+<body><div class="msg"><div class="sp"></div>Reading archive...</div></body></html>`;
 }
 
 export function contentHtml(
@@ -145,55 +100,17 @@ export function contentHtml(
   jsUri: string,
   props?: { name: string; format: string; count: number; size: string },
 ): string {
-  const treeHtml = renderTree(tree, 0);
-  const emptyMsg = esc(t("decompress.previewTitle") + ": (empty)");
-
-  const propsScript = props
-    ? `<script>window._xtProps=${JSON.stringify({
-        name: props.name,
-        format: props.format,
-        count: props.count,
-        files: fileCount,
-        dirs: dirCount,
-        size: props.size,
-      })};</script>`
-    : "";
-
   return `<!DOCTYPE html>
-<html><head><meta charset='UTF-8'>
-${cssLink(cssUri)}</head>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+${cssLink(cssUri)}
+</head>
 <body>
-${
-  fileCount > 0
-    ? `<div class='tb'>
-    <div class='tb-l'>
-      <button class='btn' onclick='extSel()' id='bSel' disabled>${"\u{1F4E6}"} Extract</button>
-      <button class='btn' onclick='delSel()' id='bDel' disabled>${"\u{1F5D1}"} Delete</button>
-      <button class='btn' onclick='addFileSel()' id='bAdd'>${"\u{2795}"} Add Files</button>
-      <span class='sel-cnt'><span id='cnt'>0</span></span>
-      <button class='btn-ico' title='Expand All' onclick='expandAll()'>${"\u{1F4C2}"}</button>
-      <button class='btn-ico' title='Collapse All' onclick='collapseAll()'>${"\u{1F4C1}"}</button>
-    </div>
-    <div class='tb-m'>
-      <span class='sort-lbl' onclick='doSort("name")' id='sortName'>Name</span>
-      <span class='sort-lbl' onclick='doSort("size")' id='sortSize'>Size</span>
-      <span id='sortLbl'></span>
-      <input class='srch' type='text' placeholder='Filter\u2026' oninput='doSearch(this.value)'>
-      <button class='btn' onclick='extAll()'>${"\u{1F4E6}"} Extract All</button>
-    </div>
-  </div>
-  <div class='props'>
-    <button class='btn-ico' onclick='testArchive()' title='Test Archive Integrity'>${"\u{2705}"}</button>
-    <span class='props-info' id='propsInfo'></span>
-  </div>
-<div class='tree'>${treeHtml}</div>`
-    : `<div class='empty'>${emptyMsg}</div>`
-}
-  <div id='s' class='st'></div>
-  ${propsScript}
-  ${jsScript(jsUri)}
-  <script>var _totFiles=${fileCount},_totDirs=${dirCount};</script>
+<div id="app"></div>
+<script>window._xTree=${JSON.stringify(tree)}</script>
+<script>window._xFiles=${fileCount}</script>
+<script>window._xDirs=${dirCount}</script>
+<script>window._xProps=${JSON.stringify(props ?? null)}</script>
+${jsModule(jsUri)}
 </body></html>`;
 }
-
-export { esc, renderRow, renderTree };
