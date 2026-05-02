@@ -28,7 +28,10 @@ interface EntryWithParts {
 function normalizeEntries(entries: FlatEntry[], archiveName: string): EntryWithParts[] {
   const normed: EntryWithParts[] = [];
   for (const e of entries) {
-    const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
+    let p = e.path.replace(/\\/g, "/");
+    // Strip leading "./" (libarchive convention)
+    if (p.startsWith("./")) p = p.slice(2);
+    const parts = p.split("/").filter(Boolean);
     // Only skip non-directory self-references (e.g. libarchive lists the archive
     // itself as a file entry). Keep directory entries — they provide the root
     // structure for lazy-loaded trees.
@@ -122,20 +125,21 @@ function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[
   let normed = normalizeEntries(entries, archiveName);
   sortEntries(normed);
 
-  // Detect common prefix: if ALL entries share the same first segment
-  // (e.g. "test.tar/" from libarchive, "./" prefix), strip it so
-  // the root shows actual top-level contents.
+  // Detect common prefix: if ALL entries share the same first segment,
+  // promote it as root directory so the tree shows actual contents.
   if (normed.length >= 2) {
     const firstSeg = normed[0].parts[0];
     const allSame = firstSeg !== undefined && normed.every((e) => e.parts[0] === firstSeg);
-    if (allSame && (firstSeg === archiveName || firstSeg === ".")) {
-      // Strip the wrapper prefix: treat it as root, build from second segment
+    if (allSame) {
+      const isWrapper = firstSeg === archiveName || firstSeg === ".";
       normed = normed.map(({ entry, parts }) => ({
         entry,
         parts: parts.length > 1 ? parts.slice(1) : parts,
       }));
       const rootChildren = buildNodes(normed);
-      const rootNode = mkdirNode(firstSeg === "." ? archiveName : firstSeg, firstSeg === "." ? "" : firstSeg, rootChildren.length > 0);
+      const rootName = isWrapper ? archiveName : firstSeg;
+      const rootPath = firstSeg;
+      const rootNode = mkdirNode(rootName, rootPath, rootChildren.length > 0);
       rootNode.children = rootChildren;
       return [rootNode];
     }
@@ -193,7 +197,9 @@ function buildEntryIndex(entries: FlatEntry[]): EntryIndex {
   const index: EntryIndex = new Map();
   index.set("", []); // root
   for (const e of entries) {
-    const p = e.path.replace(/\\/g, "/");
+    let p = e.path.replace(/\\/g, "/");
+    // Strip leading "./" for consistency with normalizeEntries
+    if (p.startsWith("./")) p = p.slice(2);
     const lastSlash = p.lastIndexOf("/");
     const parent = lastSlash > 0 ? p.slice(0, lastSlash) : "";
     let bucket = index.get(parent);
