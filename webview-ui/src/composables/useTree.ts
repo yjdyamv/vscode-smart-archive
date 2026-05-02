@@ -10,8 +10,21 @@ export interface FlatNode {
   visible: boolean;
 }
 
+const vscodeApi = (() => {
+  try { return acquireVsCodeApi(); } catch { return null; }
+})();
+
+function persistExpanded(paths: Set<string>): void {
+  vscodeApi?.setState({ expanded: [...paths] });
+}
+
+function loadExpanded(): Set<string> {
+  const state = vscodeApi?.getState() as { expanded?: string[] } | undefined;
+  return new Set(state?.expanded ?? []);
+}
+
 export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
-  const expandedPaths = ref(new Set<string>());
+  const expandedPaths = ref(loadExpanded());
   const loadingPaths = ref(new Set<string>());
 
   const flatNodes = computed<FlatNode[]>(() => {
@@ -44,6 +57,7 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     } else {
       expandedPaths.value.add(path);
     }
+    persistExpanded(expandedPaths.value);
   }
 
   function expandAll(): void {
@@ -58,10 +72,12 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
       }
     }
     collect(treeData.value);
+    persistExpanded(expandedPaths.value);
   }
 
   function collapseAll(): void {
     expandedPaths.value.clear();
+    persistExpanded(expandedPaths.value);
   }
 
   function expandTo(path: string): void {
@@ -84,14 +100,39 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     return null;
   }
 
-  function insertChildren(parentPath: string, children: TreeNodeData[]): void {
+  function insertChildren(parentPath: string, children: TreeNodeData[]): string[] {
     const node = findNode(treeData.value, parentPath);
-    if (!node) return;
+    if (!node) return [];
     node.children = children;
     node.hasMore = false;
     loadingPaths.value.delete(parentPath);
     // re-trigger reactivity
     treeData.value = [...treeData.value];
+
+    // Return child paths that need lazy loading (in expanded set + hasMore + no children)
+    const needsLoad: string[] = [];
+    for (const child of children) {
+      if (child.hasMore && (!child.children || child.children.length === 0)
+        && expandedPaths.value.has(child.path)) {
+        needsLoad.push(child.path);
+      }
+    }
+    return needsLoad;
+  }
+
+  function getPathsNeedingLoad(): string[] {
+    const result: string[] = [];
+    function walk(nodes: TreeNodeData[]) {
+      for (const node of nodes) {
+        if (node.hasMore && (!node.children || node.children.length === 0)
+          && expandedPaths.value.has(node.path)) {
+          result.push(node.path);
+        }
+        if (node.children) walk(node.children);
+      }
+    }
+    walk(treeData.value);
+    return result;
   }
 
   function setLoading(path: string): void {
@@ -112,6 +153,7 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     expandTo,
     findNode,
     insertChildren,
+    getPathsNeedingLoad,
     setLoading,
     isLoading,
   };

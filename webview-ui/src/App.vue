@@ -199,6 +199,14 @@ function handleCheckClick(path: string) {
   selection.state.anchorPath = path;
 }
 
+function loadExpandedPaths() {
+  const needsLoad = tree.getPathsNeedingLoad();
+  for (const path of needsLoad) {
+    tree.setLoading(path);
+    post({ c: "expandDir", path });
+  }
+}
+
 function expandOrLoad(path: string) {
   const node = tree.findNode(treeData.value, path);
   if (!node || node.kind !== "DIRECTORY") return;
@@ -279,6 +287,8 @@ onMounted(() => {
   if (rawTree.length > 0) {
     treeData.value = rawTree;
     viewState.value = "content";
+    // Restore saved expanded paths → trigger lazy loading for them
+    loadExpandedPaths();
   } else {
     viewState.value = "empty";
   }
@@ -305,7 +315,12 @@ onMounted(() => {
         const parentPath = msg.path as string;
         const children = msg.children as TreeNodeData[];
         if (parentPath && Array.isArray(children)) {
-          tree.insertChildren(parentPath, children);
+          const needsLoad = tree.insertChildren(parentPath, children);
+          // Chain-load descendants that are in expanded set
+          for (const childPath of needsLoad) {
+            tree.setLoading(childPath);
+            post({ c: "expandDir", path: childPath });
+          }
         }
         break;
       }
