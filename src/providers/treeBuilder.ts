@@ -176,9 +176,8 @@ function buildNodes(normed: EntryWithParts[]): TreeNode[] {
       continue;
     }
 
-    const isDir = entry.type !== "REGULAR_FILE" || implicitDir;
     const hasKids = dirHasChildren.has(seg);
-
+    const isDir = entry.type !== "REGULAR_FILE" || implicitDir || hasKids;
     const node: TreeNode = isDir
       ? mkdirNode(seg, seg, hasKids)
       : mknondirNode(seg, seg, entry.size);
@@ -269,18 +268,31 @@ function getDirChildren(
     const seg = parts[0];
     if (seg === ".smartarchive") continue;
 
-    const isDir = entry.type !== "REGULAR_FILE";
     const fullChildPath = parentPath ? parentPath + "/" + seg : seg;
     const hasKids = dirHasChildren.has(seg) || (index ? (index.get(fullChildPath)?.length ?? 0) > 0 : false);
 
     const existing = seen.get(seg);
+    const implicitDir = parts.length > 1;
+
+    // Upgrade existing file to directory if sub-entries prove it's a dir
+    if (existing && existing.kind !== "DIRECTORY" && (implicitDir || entry.type !== "REGULAR_FILE")) {
+      existing.kind = "DIRECTORY";
+      existing.children = [];
+      existing.path = fullChildPath;
+      existing.hasMore = hasKids;
+    }
+
     if (existing) {
-      if (existing.kind === "DIRECTORY" && isDir) {
-        existing.size = entry.size || existing.size;
+      if (existing.kind === "DIRECTORY") {
+        if (entry.type !== "REGULAR_FILE") {
+          existing.size = entry.size || existing.size;
+        }
+        continue;
       }
       continue;
     }
 
+    const isDir = entry.type !== "REGULAR_FILE" || implicitDir || hasKids;
     const node: TreeNode = isDir
       ? mkdirNode(seg, fullChildPath, hasKids)
       : { name: seg, path: fullChildPath, size: entry.size, kind: "REGULAR_FILE" };
