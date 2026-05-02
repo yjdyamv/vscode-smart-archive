@@ -219,6 +219,7 @@ async function extractSelected(
             ...normalizedPaths,
           ]);
         });
+        fs.mkdirSync(outputDir, { recursive: true });
         if (flat) {
           copyDirFromFS(js7z2, "/_x2", outputDir);
         } else {
@@ -275,6 +276,7 @@ async function extractSelected(
         eArgs.push(...normalizedPaths);
         js7z.callMain(eArgs);
       });
+      fs.mkdirSync(outputDir, { recursive: true });
       if (flat) {
         copyDirFromFS(js7z, "/out", outputDir);
       } else {
