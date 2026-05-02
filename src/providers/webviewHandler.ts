@@ -50,8 +50,12 @@ const handlerRegistered = new WeakSet<vscode.Webview>();
 function getWebviewUris(webview: vscode.Webview): { cssUri: string; jsUri: string } {
   const extUri = vscode.extensions.getExtension(EXT_ID)!.extensionUri;
   return {
-    cssUri: webview.asWebviewUri(vscode.Uri.joinPath(extUri, "media", "preview.css")).toString(),
-    jsUri: webview.asWebviewUri(vscode.Uri.joinPath(extUri, "media", "preview.js")).toString(),
+    cssUri: webview
+      .asWebviewUri(vscode.Uri.joinPath(extUri, "media", "vue", "assets", "style.css"))
+      .toString(),
+    jsUri: webview
+      .asWebviewUri(vscode.Uri.joinPath(extUri, "media", "vue", "assets", "index.js"))
+      .toString(),
   };
 }
 
