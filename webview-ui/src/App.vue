@@ -168,16 +168,49 @@ function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
   return null;
 }
 
+function collectDescendantPaths(node: TreeNodeData): string[] {
+  const result: string[] = [];
+  if (!node.children) return result;
+  function walk(n: TreeNodeData) {
+    if (!n.children) return;
+    for (const child of n.children) {
+      result.push(child.path);
+      walk(child);
+    }
+  }
+  walk(node);
+  return result;
+}
+
+function toggleWithDescendants(path: string) {
+  if (selection.state.selected.has(path)) {
+    selection.state.selected.delete(path);
+    const node = tree.findNode(treeData.value, path);
+    if (node) {
+      for (const childPath of collectDescendantPaths(node)) {
+        selection.state.selected.delete(childPath);
+      }
+    }
+  } else {
+    selection.state.selected.add(path);
+    const node = tree.findNode(treeData.value, path);
+    if (node) {
+      for (const childPath of collectDescendantPaths(node)) {
+        selection.state.selected.add(childPath);
+      }
+    }
+  }
+}
+
 function handleRowClick(path: string, isDir: boolean, shift: boolean, ctrl: boolean) {
   if (shift && selection.state.anchorPath) {
-    // Range select
     const flatList = visibleFlatNodes.value;
     const anchorIdx = flatList.findIndex((f) => f.path === selection.state.anchorPath);
     const targetIdx = flatList.findIndex((f) => f.path === path);
     if (anchorIdx >= 0 && targetIdx >= 0) {
       const [from, to] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
       for (let i = from; i <= to; i++) {
-        selection.state.selected.add(flatList[i].path);
+        toggleWithDescendants(flatList[i].path);
       }
     }
   } else if (ctrl) {
@@ -202,7 +235,7 @@ function handleExpandClick(path: string) {
 }
 
 function handleCheckClick(path: string) {
-  selection.toggle(path);
+  toggleWithDescendants(path);
   selection.state.anchorPath = path;
 }
 
