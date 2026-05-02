@@ -18,7 +18,7 @@ import { getFullExt, isWrappedFormat } from "../constants";
 import { isRarExt } from "../utils/rar";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
-import { checkFileSize } from "../utils/security";
+import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
 
 /**
@@ -94,6 +94,12 @@ function copyFromFSWithStrip(
 
       let data: Uint8Array | ArrayBuffer;
       try {
+        // Pre-check size from VFS stat before reading into memory
+        try {
+          checkFileSize(js7z.FS.stat(full).size);
+        } catch {
+          /* stat may fail, fall through */
+        }
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
         logger.warn(
@@ -190,7 +196,10 @@ async function extractSelected(
           else reject(new Error(`7z x outer: ${c}`));
         };
         const outerArgs = ["x", `/${archiveName}`, "-o/_x1", "-y"];
-        if (password) outerArgs.splice(1, 0, `-p${password}`);
+        if (password) {
+          validatePassword(password);
+          outerArgs.splice(1, 0, `-p${password}`);
+        }
         js7z.callMain(outerArgs);
       });
       const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
@@ -265,7 +274,10 @@ async function extractSelected(
         };
         const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
         const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
-        if (password) eArgs.splice(1, 0, `-p${password}`);
+        if (password) {
+          validatePassword(password);
+          eArgs.splice(1, 0, `-p${password}`);
+        }
         eArgs.push(...normalizedPaths);
         // Add exclusion flags for deselected children
         if (excludes && excludes.length > 0) {
