@@ -11,13 +11,13 @@ export function useMessage() {
     return () => window.removeEventListener("message", listener);
   }
 
-  function saveState(state: unknown): void {
-    vscode.setState(state);
-  }
+  return { post, onMessage };
+}
 
-  function loadState<T>(): T | undefined {
-    return vscode.getState() as T | undefined;
-  }
+export function saveState(state: unknown): void {
+  vscode.setState(state);
+}
 
-  return { post, onMessage, saveState, loadState };
+export function loadState<T>(): T | undefined {
+  return vscode.getState() as T | undefined;
 }
