@@ -9,6 +9,7 @@ const props = defineProps<{
   selected: boolean;
   matchSet: Set<string>;
   searchQuery: string;
+  isLoading: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -120,7 +121,8 @@ function onExpandClick(e: MouseEvent) {
       <span class="ck" :class="{ on: selected }"></span>
     </span>
     <span class="ar" @click="onExpandClick">
-      {{ flatNode.hasChildren ? (flatNode.expanded ? '▼' : '▶') : isDir ? '▶' : '' }}
+      <span v-if="isLoading" class="ar-loading"></span>
+      <template v-else>{{ flatNode.hasChildren ? (flatNode.expanded ? '▼' : '▶') : isDir ? '▶' : '' }}</template>
     </span>
     <span class="ic" :style="{ color: icon.color }">{{ icon.emoji }}</span>
     <span class="nm" :title="node.path" v-html="getNameHtml()"></span>
@@ -212,6 +214,19 @@ function onExpandClick(e: MouseEvent) {
   font-size: 10px;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
+}
+.ar-loading {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--vscode-descriptionForeground);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ar-spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes ar-spin {
+  to { transform: rotate(360deg); }
 }
 .ic {
   width: calc(var(--vscode-font-size) * 1.2);

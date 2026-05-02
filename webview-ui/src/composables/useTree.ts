@@ -12,12 +12,14 @@ export interface FlatNode {
 
 export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   const expandedPaths = ref(new Set<string>());
+  const loadingPaths = ref(new Set<string>());
 
   const flatNodes = computed<FlatNode[]>(() => {
     const result: FlatNode[] = [];
     function walk(nodes: TreeNodeData[], depth: number) {
       for (const node of nodes) {
-        const hasKids = !!(node.kind === "DIRECTORY" && node.children && node.children.length > 0);
+        const hasKids = !!(node.kind === "DIRECTORY"
+          && ((node.children && node.children.length > 0) || node.hasMore));
         const exp = expandedPaths.value.has(node.path);
         result.push({
           node,
@@ -47,9 +49,11 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   function expandAll(): void {
     function collect(nodes: TreeNodeData[]) {
       for (const node of nodes) {
-        if (node.kind === "DIRECTORY" && node.children && node.children.length > 0) {
+        const hasKids = !!(node.kind === "DIRECTORY"
+          && ((node.children && node.children.length > 0) || node.hasMore));
+        if (hasKids) {
           expandedPaths.value.add(node.path);
-          collect(node.children);
+          if (node.children) collect(node.children);
         }
       }
     }
@@ -69,17 +73,46 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     }
   }
 
-  function flatNodesToTree(): TreeNodeData[] {
-    return treeData.value;
+  function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
+    for (const node of nodes) {
+      if (node.path === path) return node;
+      if (node.children) {
+        const found = findNode(node.children, path);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function insertChildren(parentPath: string, children: TreeNodeData[]): void {
+    const node = findNode(treeData.value, parentPath);
+    if (!node) return;
+    node.children = children;
+    node.hasMore = false;
+    loadingPaths.value.delete(parentPath);
+    // re-trigger reactivity
+    treeData.value = [...treeData.value];
+  }
+
+  function setLoading(path: string): void {
+    loadingPaths.value.add(path);
+  }
+
+  function isLoading(path: string): boolean {
+    return loadingPaths.value.has(path);
   }
 
   return {
     expandedPaths,
+    loadingPaths,
     flatNodes,
     toggleExpand,
     expandAll,
     collapseAll,
     expandTo,
-    flatNodesToTree,
+    findNode,
+    insertChildren,
+    setLoading,
+    isLoading,
   };
 }

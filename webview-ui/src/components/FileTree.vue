@@ -12,6 +12,7 @@ const props = defineProps<{
   expanded: Set<string>;
   searchQuery: string;
   matchSet: Set<string>;
+  loadingPaths: Set<string>;
 }>();
 
 const emit = defineEmits<{
@@ -80,6 +81,7 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
           :selected="selected.has(flatNodes[item.index].path)"
           :match-set="matchSet"
           :search-query="searchQuery"
+          :is-loading="loadingPaths.has(flatNodes[item.index].path)"
           @click="(shift, ctrl) => emit('row-click', flatNodes[item.index].path, flatNodes[item.index].node.kind === 'DIRECTORY', shift, ctrl)"
           @dblclick="emit('row-dblclick', flatNodes[item.index].path, flatNodes[item.index].node.kind === 'DIRECTORY')"
           @check="emit('check-click', flatNodes[item.index].path)"
