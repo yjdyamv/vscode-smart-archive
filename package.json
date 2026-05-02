@@ -150,9 +150,6 @@
             "tar.bz2",
             "tar.xz",
             "tar.zst",
-            "gz",
-            "bz2",
-            "xz",
             "wim"
           ],
           "enumDescriptions": [
@@ -163,9 +160,6 @@
             "TAR + BZip2 — high compression with directory structure",
             "TAR + XZ — best compression with directory structure",
             "TAR + Zstandard — fast compression with directory structure",
-            "GZip — single-file compression (auto-wraps in TAR for folders)",
-            "BZip2 — high compression for single files",
-            "XZ — high compression for single files",
             "WIM — Windows Imaging Format"
           ],
           "description": "Default archive format used when compressing files."

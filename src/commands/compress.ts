@@ -26,9 +26,6 @@ import type { CompressOptions } from "../types";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 
-/** Stream-only formats that auto-wrap in tar when folders/multi-file are selected */
-const STREAM_FORMATS = new Set(["gz", "bz2", "xz"]);
-
 export async function compressCommand(
   uri: vscode.Uri | undefined,
   selectedUris: readonly vscode.Uri[] | undefined,
@@ -55,18 +52,6 @@ export async function compressCommand(
     return;
   }
 
-  // Auto-wrap stream formats in tar when needed
-  let effectiveFormat = format;
-  let outputExtension = format.label;
-  const needsTarWrap =
-    STREAM_FORMATS.has(format.label) &&
-    (targets.length > 1 || targets.some((target) => fs.statSync(target.fsPath).isDirectory()));
-
-  if (needsTarWrap) {
-    effectiveFormat = { ...format, label: "tar." + format.label };
-    outputExtension = "tar." + format.label;
-  }
-
   const level = await promptCompressLevel();
 
   if (format.supportsEncryption) {
@@ -78,11 +63,11 @@ export async function compressCommand(
       if (!pwd) {
         vscode.window.showWarningMessage(t("encrypt.noPassword"));
       }
-      return executeCompress(targets, effectiveFormat, pwd, outputExtension, level);
+      return executeCompress(targets, format, pwd, format.label, level);
     }
   }
 
-  await executeCompress(targets, effectiveFormat, "", outputExtension, level);
+  await executeCompress(targets, format, "", format.label, level);
 }
 
 async function executeCompress(
