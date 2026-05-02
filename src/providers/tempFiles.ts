@@ -23,17 +23,9 @@ let tempCleanupRegistered = false;
 
 function cleanupPreviewTemp(): void {
   try {
-    if (fs.existsSync(PREVIEW_TMP_DIR)) {
-      for (const f of fs.readdirSync(PREVIEW_TMP_DIR)) {
-        try {
-          fs.unlinkSync(path.join(PREVIEW_TMP_DIR, f));
-        } catch {
-          logger.warn({ event: "tempFiles.unlink.failed" }, "Failed to remove temp file");
-        }
-      }
-    }
-  } catch {
-    logger.warn({ event: "tempFiles.cleanup.failed" }, "Failed to clean up temp files");
+    fs.rmSync(PREVIEW_TMP_DIR, { recursive: true, force: true });
+  } catch (err) {
+    logger.warn({ event: "tempFiles.cleanup.failed", err }, "Failed to clean up temp files");
   }
 }
 
