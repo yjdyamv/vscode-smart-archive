@@ -165,13 +165,8 @@ async function extractSelected(
       password || undefined,
     );
     vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-    try {
-      await vscode.env.openExternal(vscode.Uri.file(outputDir));
-    } catch (err) {
-      logger.warn(
-        { event: "extractSelected.openExternalFailed", outputDir, err },
-        "Failed to open output directory in file manager",
-      );
+    if (fs.existsSync(outputDir)) {
+      await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
     }
     logger.info({
       event: "extractSelected.exit",
@@ -225,13 +220,8 @@ async function extractSelected(
         } else {
           copyFromFSWithStrip(js7z2, "/_x2", outputDir, selectedPaths);
         }
-        try {
-          await vscode.env.openExternal(vscode.Uri.file(outputDir));
-        } catch {
-          logger.warn(
-            { event: "extractSelected.openExternal.failed" },
-            "Failed to open output directory",
-          );
+        if (fs.existsSync(outputDir)) {
+          await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
         }
         vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       } finally {
@@ -282,10 +272,8 @@ async function extractSelected(
       } else {
         copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths);
       }
-      try {
-        await vscode.env.openExternal(vscode.Uri.file(outputDir));
-      } catch {
-        /* non-critical */
+      if (fs.existsSync(outputDir)) {
+        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
       }
       vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z" });
@@ -294,13 +282,8 @@ async function extractSelected(
       try {
         const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
         vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-        try {
-          await vscode.env.openExternal(vscode.Uri.file(outputDir));
-        } catch {
-          logger.warn(
-            { event: "extractSelected.openExternal.failed" },
-            "Failed to open output directory",
-          );
+        if (fs.existsSync(outputDir)) {
+          await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
         }
         logger.info({
           event: "extractSelected.exit",
