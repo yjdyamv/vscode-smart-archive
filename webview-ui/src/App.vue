@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, provide } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted, provide, watch } from "vue";
 import type { TreeNodeData, ArchiveProps } from "./types";
 import { useMessage } from "./composables/useMessage";
 import { useSelection } from "./composables/useSelection";
@@ -29,6 +29,11 @@ const sort = useSort(treeData);
 const tree = useTreeFlatten(treeData);
 
 const sortedTree = computed(() => sort.sortNodes(treeData.value));
+
+// Apply sort to treeData when sort key/direction changes
+watch([sort.sortKey, sort.sortAsc], () => {
+  treeData.value = sort.sortNodes([...treeData.value]);
+});
 
 const visibleFlatNodes = computed(() => {
   return tree.flatNodes.value.filter((fn) => {
