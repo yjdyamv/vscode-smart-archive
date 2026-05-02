@@ -29,7 +29,10 @@ function normalizeEntries(entries: FlatEntry[], archiveName: string): EntryWithP
   const normed: EntryWithParts[] = [];
   for (const e of entries) {
     const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
-    if (parts.length === 1 && parts[0] === archiveName) continue;
+    // Only skip non-directory self-references (e.g. libarchive lists the archive
+    // itself as a file entry). Keep directory entries — they provide the root
+    // structure for lazy-loaded trees.
+    if (parts.length === 1 && parts[0] === archiveName && e.type === "REGULAR_FILE") continue;
     normed.push({ entry: e, parts });
   }
   return normed;

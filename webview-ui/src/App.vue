@@ -106,8 +106,8 @@ function isAnyDirSelected(paths: string[]): boolean {
 function extSel() {
   const paths = selection.getSelectedPaths();
   if (!paths.length) return;
-  const flat = !isAnyDirSelected(paths);
-  post({ c: "extSel", paths, flat });
+  // Always use flat=false (7z x) — 7z e (flat=true) is unreliable in js7z-tools WASM
+  post({ c: "extSel", paths, flat: false });
   showToast("Extracting " + paths.length + " item(s)...", true);
 }
 
