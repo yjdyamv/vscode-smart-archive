@@ -329,7 +329,8 @@ onMounted(() => {
   if (rawTree.length > 0) {
     treeData.value = rawTree;
     viewState.value = "content";
-    // Restore saved expanded paths → trigger lazy loading for them
+    tree.initExpandedFromTree();
+    // Trigger lazy loading for auto-expanded (non-noisy) directories
     loadExpandedPaths();
   } else {
     viewState.value = "empty";
