@@ -10,7 +10,7 @@ import * as fs from "fs";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { getFullExt, isWrappedFormat } from "../../constants";
-import { checkFileSize } from "../../utils/security";
+import { checkFileSize, validatePassword } from "../../utils/security";
 import { getBaseName } from "../../utils/path";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
@@ -162,7 +162,10 @@ export async function addToArchive(
     const args = vfsDir
       ? ["a", `/${archiveName}`, "-aot", vfsDir]
       : ["a", `/${archiveName}`, "-aot", ...vfsPaths];
-    if (password) args.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      args.splice(1, 0, `-p${password}`);
+    }
 
     logger.debug({ event: "addToArchive.7zArgs", args: args.join(" ") });
 
@@ -198,7 +201,10 @@ async function addToWrappedArchive(
     const aArgs = vfsDir
       ? ["a", "/inner.tar", "-aot", vfsDir]
       : ["a", "/inner.tar", "-aot", ...vfsPaths];
-    if (password) aArgs.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      aArgs.splice(1, 0, `-p${password}`);
+    }
 
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a inner: ${c}`)));

@@ -8,7 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { getFullExt, isWrappedFormat } from "../../constants";
-import { checkFileSize } from "../../utils/security";
+import { checkFileSize, validatePassword } from "../../utils/security";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
 
@@ -40,7 +40,10 @@ export async function deleteFromArchive(
   try {
     js7z.FS.writeFile(`/${archiveName}`, data);
     const dArgs = ["d", `/${archiveName}`, "-y"];
-    if (password) dArgs.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      dArgs.splice(1, 0, `-p${password}`);
+    }
     dArgs.push(...selectedPaths.map((p) => p.replace(/\\/g, "/")));
     logger.debug({ event: "deleteFromArchive.7zArgs", args: dArgs.join(" ") });
 
@@ -69,7 +72,10 @@ async function deleteFromWrappedArchive(
 ): Promise<void> {
   return withWrappedArchive(archivePath, password, async (js7z2) => {
     const dArgs = ["d", "/inner.tar", "-y"];
-    if (password) dArgs.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      dArgs.splice(1, 0, `-p${password}`);
+    }
     dArgs.push(...selectedPaths.map((p) => p.replace(/\\/g, "/")));
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z d: ${c}`)));

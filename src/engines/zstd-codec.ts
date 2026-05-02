@@ -8,6 +8,7 @@
  */
 
 import { logger } from "../utils/logger";
+import { checkFileSize } from "../utils/security";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const zstd = require("@bokuweb/zstd-wasm") as {
@@ -48,5 +49,10 @@ export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Ar
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
   await ensureInit();
-  return zstd.decompress(data);
+  // Guard against zstd decompression bombs: compressed data should be < 256 MiB
+  // and decompressed output must pass size checks
+  checkFileSize(data.byteLength);
+  const result = zstd.decompress(data);
+  checkFileSize(result.byteLength);
+  return result;
 }

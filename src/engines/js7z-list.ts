@@ -12,7 +12,7 @@ import * as fs from "fs";
 import type { JS7zFactory } from "../types";
 import { tryCleanup, run7z } from "./js7z-helpers";
 import { getBaseName, fixArchiveEncoding } from "../utils/path";
-import { checkFileSize } from "../utils/security";
+import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -52,7 +52,10 @@ export async function listFiles(
         else reject(new Error(`7z l: ${code}\n${stderr}`));
       };
       const args = ["l", "-slt", "-sccUTF-8"];
-      if (password) args.splice(1, 0, `-p${password}`);
+      if (password) {
+        validatePassword(password);
+        args.splice(1, 0, `-p${password}`);
+      }
       args.push(`/${archiveName}`);
       js7z.callMain(args);
     });

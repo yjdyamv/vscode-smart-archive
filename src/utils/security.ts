@@ -67,6 +67,11 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
     throw new Error(`Archive entry contains null byte: ${entryName}`);
   }
 
+  // Reject Windows Alternate Data Streams (e.g., file.txt:evil)
+  if (process.platform === "win32" && entryName.includes(":")) {
+    throw new Error(`Archive entry contains invalid character ':' (ADS): ${entryName}`);
+  }
+
   // Strip leading slashes and drive letters (cross-platform)
   const safe = entryName
     .replace(/^[a-zA-Z]:\\/, "") // Windows drive letter with backslash
@@ -119,4 +124,15 @@ export function checkTotalSize(current: number, added: number): number {
     throw new Error(`Total decompressed size ${fmtSize(total)} exceeds maximum ${fmtSize(max)}`);
   }
   return total;
+}
+
+/**
+ * Validate password for safe use in 7z CLI arguments.
+ * Rejects passwords starting with '-' (could be parsed as flags),
+ * containing null bytes, newlines, or invalid characters.
+ */
+export function validatePassword(pw: string): void {
+  if (pw.startsWith("-")) throw new Error("Password must not start with '-'");
+  if (pw.includes("\0")) throw new Error("Password contains null byte");
+  if (pw.includes("\n") || pw.includes("\r")) throw new Error("Password contains newline");
 }
