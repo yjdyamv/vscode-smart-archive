@@ -97,9 +97,9 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     return null;
   }
 
-  function insertChildren(parentPath: string, children: TreeNodeData[]): string[] {
+  function insertChildren(parentPath: string, children: TreeNodeData[]): { needsLoad: string[]; childPaths: string[] } {
     const node = findNode(treeData.value, parentPath);
-    if (!node) return [];
+    if (!node) return { needsLoad: [], childPaths: [] };
     node.children = children;
     node.hasMore = false;
     loadingPaths.value.delete(parentPath);
@@ -108,13 +108,15 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
 
     // Return child paths that need lazy loading (in expanded set + hasMore + no children)
     const needsLoad: string[] = [];
+    const childPaths: string[] = [];
     for (const child of children) {
+      childPaths.push(child.path);
       if (child.hasMore && (!child.children || child.children.length === 0)
         && expandedPaths.value.has(child.path)) {
         needsLoad.push(child.path);
       }
     }
-    return needsLoad;
+    return { needsLoad, childPaths };
   }
 
   function getPathsNeedingLoad(): string[] {
