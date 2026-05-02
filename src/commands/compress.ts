@@ -116,7 +116,10 @@ async function executeCompress(
     },
     async (progress, token) => {
       try {
-        await compressWith7z(options, progress, token);
+        const excludePatterns: string[] | undefined = vscode.workspace
+          .getConfiguration("smart-archive")
+          .get("compressExcludePatterns");
+        await compressWith7z(options, progress, token, excludePatterns);
       } catch (err) {
         logger.error({ event: "compress.command.failed", err }, "Compression failed");
         // Clean up partial output file on cancellation or failure
