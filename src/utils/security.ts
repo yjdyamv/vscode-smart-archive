@@ -67,6 +67,11 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
     throw new Error(`Archive entry contains null byte: ${entryName}`);
   }
 
+  // Reject Windows Alternate Data Streams (e.g., file.txt:evil)
+  if (process.platform === "win32" && entryName.includes(":")) {
+    throw new Error(`Archive entry contains invalid character ':' (ADS): ${entryName}`);
+  }
+
   // Strip leading slashes and drive letters (cross-platform)
   const safe = entryName
     .replace(/^[a-zA-Z]:\\/, "") // Windows drive letter with backslash
