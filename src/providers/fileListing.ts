@@ -17,6 +17,7 @@ import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { logger } from "../utils/logger";
 import { tryCleanup } from "../engines/js7z-helpers";
 import { fixArchiveEncoding } from "../utils/path";
+import { validatePassword } from "../utils/security";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const JS7z: JS7zFactory = require("js7z-tools");
@@ -65,7 +66,10 @@ async function listViaExtract(
     js7z.FS.writeFile(`/${archiveName}`, buf);
     js7z.FS.mkdir("/_ls");
     const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
-    if (password) args.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      args.splice(1, 0, `-p${password}`);
+    }
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (code: number) => {
         if (code === 0) resolve();
