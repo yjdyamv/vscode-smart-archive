@@ -309,9 +309,20 @@ function getDirChildren(
 
 function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
   if (noisyPatterns.length === 0) return;
-  const set = new Set(noisyPatterns);
+  // Pre-process patterns: extract basenames from glob patterns like "*/.venv"
+  const exactSet = new Set<string>();
+  const basenameSet = new Set<string>();
+  for (const p of noisyPatterns) {
+    // Strip leading **/ or */ to get basename; preserve exact matches
+    const stripped = p.replace(/^(\*\*?\/)+/, "");
+    if (stripped.includes("/")) {
+      exactSet.add(p);
+    } else {
+      basenameSet.add(stripped);
+    }
+  }
   for (const node of nodes) {
-    if (node.kind === "DIRECTORY" && set.has(node.name)) {
+    if (node.kind === "DIRECTORY" && (basenameSet.has(node.name) || exactSet.has(node.name))) {
       node.collapsed = true;
     }
     if (node.children) markNoisyDirs(node.children, noisyPatterns);

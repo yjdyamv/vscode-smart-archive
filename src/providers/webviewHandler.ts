@@ -12,6 +12,17 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { isEncrypted } from "../engines/js7z-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt, NOISY_DIR_PATTERNS } from "../constants";
+
+// ...
+
+function getNoisyPatterns(): string[] {
+  const config: string[] | undefined = vscode.workspace
+    .getConfiguration("smart-archive")
+    .get("collapsedDirPatterns");
+  const userPatterns = config ?? [];
+  // Merge built-in defaults with user patterns, deduplicate
+  return [...new Set([...NOISY_DIR_PATTERNS, ...userPatterns])];
+}
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
@@ -165,7 +176,8 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   });
   // Build full tree, mark noisy directories as collapsed
   const tree = buildTree(entries, archiveName);
-  markNoisyDirs(tree, NOISY_DIR_PATTERNS);
+  const patterns = getNoisyPatterns();
+  markNoisyDirs(tree, patterns);
   const stats = countFlatStats(entries);
   const fileCount = stats.files;
   const dirCount = stats.dirs;
@@ -175,7 +187,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     format: ext,
     count: itemCount,
     size: formatCompactSize(stats.totalSize),
-  }, NOISY_DIR_PATTERNS);
+  }, patterns);
 
   if (!handlerRegistered.has(webview)) {
     handlerRegistered.add(webview);
@@ -242,7 +254,7 @@ function registerHandler(webview: vscode.Webview): void {
           s.entries = pwEntries;
           s.entryIndex = buildEntryIndex(pwEntries);
           const pwTree = buildTree(pwEntries, s.archiveName);
-          markNoisyDirs(pwTree, NOISY_DIR_PATTERNS);
+          markNoisyDirs(pwTree, getNoisyPatterns());
           const pwStats = countFlatStats(pwEntries);
           const fc = pwStats.files;
           const dc = pwStats.dirs;
@@ -253,7 +265,7 @@ function registerHandler(webview: vscode.Webview): void {
             format: ext,
             count: itemCount,
             size: formatCompactSize(pwStats.totalSize),
-          }, NOISY_DIR_PATTERNS);
+          }, getNoisyPatterns());
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: "Wrong password" });

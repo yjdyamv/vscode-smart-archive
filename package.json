@@ -219,6 +219,12 @@
           "minimum": 1,
           "maximum": 512000,
           "description": "Maximum total decompressed size across all files (MiB). Default: 10240 MiB (= 10 GiB)."
+        },
+        "smart-archive.collapsedDirPatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Directory name patterns to keep collapsed by default in the archive preview. Merged with built-in defaults (node_modules, .venv, .git, dist, etc.)."
         }
       }
     }
