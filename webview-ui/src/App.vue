@@ -323,40 +323,16 @@ function expandOrLoad(path: string) {
 
 // Selection counts for toolbar
 const selectionBreakdown = computed(() => {
-  const { paths: selected } = getEffectivePaths();
   let dirs = 0;
   let files = 0;
-  for (const p of selected) {
+  for (const p of selection.state.selected) {
     const node = findNode(treeData.value, p);
     if (!node) continue;
-    if (node.kind === "DIRECTORY") {
-      dirs++;
-      const childStats = countChildren(node.children);
-      dirs += childStats.dirs;
-      files += childStats.files;
-    } else {
-      files++;
-    }
+    if (node.kind === "DIRECTORY") dirs++;
+    else files++;
   }
   return { dirs, files };
 });
-
-function countChildren(nodes: TreeNodeData[] | undefined): { dirs: number; files: number } {
-  let d = 0;
-  let f = 0;
-  if (!nodes) return { dirs: d, files: f };
-  for (const n of nodes) {
-    if (n.kind === "DIRECTORY") {
-      d++;
-      const child = countChildren(n.children);
-      d += child.dirs;
-      f += child.files;
-    } else {
-      f++;
-    }
-  }
-  return { dirs: d, files: f };
-}
 
 onMounted(() => {
   const rawTree = window._xTree ?? [];
