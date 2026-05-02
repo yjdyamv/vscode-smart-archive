@@ -500,7 +500,7 @@ provide("showToast", showToast);
 </script>
 
 <template>
-  <div class="app">
+  <div class="flex flex-col h-screen text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)] font-[var(--vscode-font-family)]" style="font-size:var(--vscode-font-size)">
     <LoadingSpinner v-if="viewState === 'loading'" :msg="loadingMsg" />
     <PasswordBox
       v-else-if="viewState === 'password'"
@@ -554,7 +554,7 @@ provide("showToast", showToast);
         @test="testArchive"
       />
     </template>
-    <div v-else class="empty-state">
+    <div v-else class="text-center text-[var(--vscode-descriptionForeground)] py-16 px-6">
       {{ archiveProps?.name ?? "Archive" }} (empty)
     </div>
 
@@ -575,29 +575,3 @@ provide("showToast", showToast);
     />
   </div>
 </template>
-
-<style>
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-body {
-  font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
-  color: var(--vscode-foreground);
-  background: var(--vscode-sideBar-background);
-  overflow: hidden;
-}
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-.empty-state {
-  text-align: center;
-  color: var(--vscode-descriptionForeground);
-  padding: 4em 1.5em;
-  font-size: var(--vscode-font-size);
-}
-</style>
