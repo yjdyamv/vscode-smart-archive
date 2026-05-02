@@ -369,3 +369,59 @@ export function getWrapExtension(ext: string): string {
 export function isEncryptableExt(ext: string): boolean {
   return ENCRYPTABLE_EXTS_SET.has(ext.toLowerCase());
 }
+
+// ── Noisy directory patterns (collapsed by default in preview) ─────
+
+export const NOISY_DIR_PATTERNS = [
+  // JavaScript / Node
+  "node_modules",
+  ".npm",
+  ".yarn",
+  // Python
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".tox",
+  ".eggs",
+  "site-packages",
+  // VCS
+  ".git",
+  ".svn",
+  ".hg",
+  // Build outputs
+  "dist",
+  "build",
+  "target",
+  "out",
+  "output",
+  ".next",
+  ".nuxt",
+  ".output",
+  ".svelte-kit",
+  // IDE / editors
+  ".idea",
+  ".vscode",
+  ".vs",
+  // Coverage / testing
+  "coverage",
+  ".nyc_output",
+  // Cache
+  ".cache",
+  ".turbo",
+  ".parcel-cache",
+  // Other dependency dirs
+  "vendor",
+  "bower_components",
+  // Infrastructure
+  ".terraform",
+];
+
+export function isNoisyDir(name: string): boolean {
+  return NOISY_DIR_PATTERNS.includes(name);
+}
+
+// ── Default compression exclude patterns ────────────────────────────
+
+export const COMPRESS_EXCLUDE_DEFAULTS = NOISY_DIR_PATTERNS;

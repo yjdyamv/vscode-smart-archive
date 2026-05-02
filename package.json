@@ -219,6 +219,18 @@
           "minimum": 1,
           "maximum": 512000,
           "description": "Maximum total decompressed size across all files (MiB). Default: 10240 MiB (= 10 GiB)."
+        },
+        "smart-archive.collapsedDirPatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Directory name patterns to keep collapsed by default in the archive preview. Merged with built-in defaults (node_modules, .venv, .git, dist, etc.)."
+        },
+        "smart-archive.compressExcludePatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Glob patterns (gitignore syntax) for files/directories to exclude when compressing. Example: ['node_modules', '.venv', '*.log', '**/dist']"
         }
       }
     }
@@ -252,6 +264,7 @@
     "iconv-lite": "^0.7.2",
     "js7z-tools": "^2.5.0",
     "libarchive-wasm": "^1.2.0",
+    "minimatch": "^10.2.5",
     "pino": "^10.3.1"
   },
   "devDependencies": {
