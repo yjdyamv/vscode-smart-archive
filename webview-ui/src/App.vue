@@ -111,40 +111,55 @@ function isAnyDirSelected(paths: string[]): boolean {
  */
 function getEffectivePaths(): string[] {
   const raw = [...selection.state.selected];
-  const result: string[] = [];
-  const covered = new Set<string>();
+  const result = new Set<string>();
+  const parentsToRemove = new Set<string>();
 
   for (const p of raw) {
-    // Check if any ancestor covers this path
-    const parts = p.replace(/\\/g, "/").split("/");
-    let skip = false;
-    for (let j = parts.length - 2; j >= 0; j--) {
-      const ancestor = parts.slice(0, j + 1).join("/");
-      if (selection.state.selected.has(ancestor)) {
-        // Ancestor is selected — but does it fully cover this child?
-        const ancNode = findNode(treeData.value, ancestor);
-        if (ancNode && ancNode.children && ancNode.children.length > 0) {
-          const allChildrenSelected = ancNode.children.every((c) =>
-            selection.state.selected.has(c.path),
-          );
-          if (allChildrenSelected) {
-            skip = true; // fully covered by ancestor
-            covered.add(ancestor);
-          }
-          // If not all children selected, don't skip — let this child through
-        }
-        break; // only check first ancestor in selection
+    // If this path is a directory with children
+    const node = findNode(treeData.value, p);
+    if (node && node.kind === "DIRECTORY" && node.children && node.children.length > 0) {
+      const childSelected = node.children.filter((c) => selection.state.selected.has(c.path));
+      const allSelected = childSelected.length === node.children.length;
+      const someSelected = childSelected.length > 0;
+      if (allSelected) {
+        // All children selected → keep parent, skip children
+        result.add(p);
+      } else if (someSelected) {
+        // Partial selection → exclude parent, keep selected children
+        parentsToRemove.add(p);
+        for (const c of childSelected) result.add(c.path);
+      } else {
+        // No children selected → keep parent
+        result.add(p);
       }
+    } else {
+      // File or empty dir: check if covered by a fully-selected parent
+      const parts = p.replace(/\\/g, "/").split("/");
+      let covered = false;
+      for (let j = parts.length - 2; j >= 0; j--) {
+        const ancestor = parts.slice(0, j + 1).join("/");
+        if (selection.state.selected.has(ancestor)) {
+          const ancNode = findNode(treeData.value, ancestor);
+          if (ancNode && ancNode.children && ancNode.children.length > 0) {
+            const allSelected = ancNode.children.every((c) =>
+              selection.state.selected.has(c.path),
+            );
+            if (allSelected) {
+              covered = true;
+              result.add(ancestor); // parent covers it
+            }
+          }
+          break;
+        }
+      }
+      if (!covered) result.add(p);
     }
-    if (!skip) result.push(p);
   }
 
-  // Add ancestors that fully cover all their children
-  for (const p of covered) {
-    if (!result.includes(p)) result.push(p);
-  }
+  // Remove parents that were broken into children
+  for (const p of parentsToRemove) result.delete(p);
 
-  return result;
+  return [...result];
 }
 
 function extSel() {
