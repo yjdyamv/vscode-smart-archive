@@ -33,7 +33,8 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
       const paths: string[] = [];
       function collect(nodes: TreeNodeData[]) {
         for (const node of nodes) {
-          if (node.kind === "DIRECTORY" && !node.collapsed && (node.children?.length ?? 0) > 0) {
+          const hasKids = (node.children?.length ?? 0) > 0 || node.hasMore;
+          if (node.kind === "DIRECTORY" && !node.collapsed && hasKids) {
             paths.push(node.path);
             if (node.children) collect(node.children);
           }
