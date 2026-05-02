@@ -1,46 +1,15 @@
 <script setup lang="ts">
-defineProps<{
-  msg: string;
-  ok: boolean;
-  visible: boolean;
-}>();
+defineProps<{ msg: string; ok: boolean; visible: boolean }>();
 </script>
-
 <template>
   <Transition name="fade">
-    <div v-if="visible" class="toast" :class="{ ok, err: !ok }">
+    <div v-if="visible" class="fixed top-3 left-1/2 -translate-x-1/2 px-5 py-1.5 rounded text-[0.92em] z-[999] pointer-events-none"
+      :class="ok ? 'bg-[var(--vscode-terminal-ansiGreen)] text-[var(--vscode-editor-background)]' : 'bg-[var(--vscode-inputValidation-errorBackground)] text-[var(--vscode-inputValidation-errorForeground)] border border-[var(--vscode-inputValidation-errorBorder)]'">
       {{ msg }}
     </div>
   </Transition>
 </template>
-
 <style scoped>
-.toast {
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 6px 20px;
-  border-radius: 4px;
-  font-size: calc(var(--vscode-font-size) * 0.92);
-  z-index: 999;
-  pointer-events: none;
-}
-.toast.ok {
-  background: var(--vscode-terminal-ansiGreen);
-  color: var(--vscode-editor-background);
-}
-.toast.err {
-  background: var(--vscode-inputValidation-errorBackground);
-  color: var(--vscode-inputValidation-errorForeground);
-  border: 1px solid var(--vscode-inputValidation-errorBorder);
-}
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
