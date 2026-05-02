@@ -95,13 +95,18 @@ function extAll() {
   showToast("Extracting all files...", true);
 }
 
+function isAnyDirSelected(paths: string[]): boolean {
+  for (const p of paths) {
+    const node = findNode(treeData.value, p);
+    if (node && node.kind === "DIRECTORY") return true;
+  }
+  return false;
+}
+
 function extSel() {
   const paths = selection.getSelectedPaths();
   if (!paths.length) return;
-  const flat = !paths.some((p) => {
-    const node = findNode(treeData.value, p);
-    return node && node.kind === "DIRECTORY";
-  });
+  const flat = !isAnyDirSelected(paths);
   post({ c: "extSel", paths, flat });
   showToast("Extracting " + paths.length + " item(s)...", true);
 }
@@ -117,11 +122,8 @@ function delSel() {
 function copySel() {
   const paths = selection.getSelectedPaths();
   if (!paths.length) return;
-  const flat = !paths.some((p) => {
-    const node = findNode(treeData.value, p);
-    return node && node.kind === "DIRECTORY";
-  });
-  post({ c: "copy", paths, flat });
+  const flat = !isAnyDirSelected(paths);
+  post({ c: "copy", paths, flat: flat });
   showToast("Copied " + paths.length + " item(s)", true);
 }
 
