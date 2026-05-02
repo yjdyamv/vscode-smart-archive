@@ -139,6 +139,7 @@ async function extractSelected(
   password?: string,
   flat?: boolean,
   outputOverride?: string,
+  excludes?: string[],
 ): Promise<void> {
   const start = Date.now();
   const ext = getFullExt(archivePath);
@@ -201,6 +202,7 @@ async function extractSelected(
         js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
         js7z2.FS.mkdir("/_x2");
         const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
+        const excludeFlags = (excludes ?? []).map((ex) => "-xr!" + ex.replace(/\\/g, "/"));
         await new Promise<void>((resolve, reject) => {
           js7z2.onExit = (c: number) => {
             if (c === 0) resolve();
@@ -212,6 +214,7 @@ async function extractSelected(
             "-o/_x2",
             flat ? "-aou" : "-y",
             ...normalizedPaths,
+            ...excludeFlags,
           ]);
         });
         fs.mkdirSync(outputDir, { recursive: true });
@@ -264,6 +267,12 @@ async function extractSelected(
         const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
         if (password) eArgs.splice(1, 0, `-p${password}`);
         eArgs.push(...normalizedPaths);
+        // Add exclusion flags for deselected children
+        if (excludes && excludes.length > 0) {
+          for (const ex of excludes) {
+            eArgs.push("-xr!" + ex.replace(/\\/g, "/"));
+          }
+        }
         js7z.callMain(eArgs);
       });
       fs.mkdirSync(outputDir, { recursive: true });

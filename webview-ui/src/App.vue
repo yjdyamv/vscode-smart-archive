@@ -67,7 +67,7 @@ function handleContextMenu(e: MouseEvent, path: string, dirPath: string) {
     selection.toggle(path);
     selection.state.anchorPath = path;
   }
-  const selectedPaths = selection.getSelectedPaths();
+  const { paths: selectedPaths } = getEffectivePaths();
   if (!selectedPaths.length) return;
 
   ctxMenu.show = true;
@@ -103,28 +103,67 @@ function isAnyDirSelected(paths: string[]): boolean {
   return false;
 }
 
+/**
+ * Returns selected paths with parent-duplication removed,
+ * but ONLY if parent's ALL children are also selected.
+ * If some children are deselected, the parent is broken into
+ * individual selected children instead of covering them.
+ */
+function getEffectivePaths(): { paths: string[]; excludes: string[] } {
+  const raw = [...selection.state.selected];
+  const paths = new Set<string>();
+  const excludes = new Set<string>();
+
+  for (const p of raw) {
+    const node = findNode(treeData.value, p);
+    if (node && node.kind === "DIRECTORY" && node.children && node.children.length > 0) {
+      // Directory with children: keep dir, exclude only deselected children
+      paths.add(p);
+      for (const child of node.children) {
+        if (!selection.state.selected.has(child.path)) {
+          excludes.add(child.path);
+        }
+      }
+    } else {
+      // File or empty dir: check if covered by a parent
+      const parts = p.replace(/\\/g, "/").split("/");
+      let covered = false;
+      for (let j = parts.length - 2; j >= 0; j--) {
+        const ancestor = parts.slice(0, j + 1).join("/");
+        if (selection.state.selected.has(ancestor)) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) paths.add(p);
+    }
+  }
+
+  return { paths: [...paths], excludes: [...excludes] };
+}
+
 function extSel() {
-  const paths = selection.getSelectedPaths();
+  const { paths, excludes } = getEffectivePaths();
   if (!paths.length) return;
-  // Always use flat=false (7z x) — 7z e (flat=true) is unreliable in js7z-tools WASM
-  post({ c: "extSel", paths, flat: false });
+  const flat = !isAnyDirSelected(paths);
+  post({ c: "extSel", paths, excludes, flat });
   showToast("Extracting " + paths.length + " item(s)...", true);
 }
 
-function delSel() {
-  const paths = selection.getSelectedPaths();
-  if (!paths.length) return;
-  post({ c: "delSel", paths });
-  loadingMsg.value = "Deleting " + paths.length + " item(s)...";
-  viewState.value = "loading";
-}
-
 function copySel() {
-  const paths = selection.getSelectedPaths();
+  const { paths, excludes } = getEffectivePaths();
   if (!paths.length) return;
   const flat = !isAnyDirSelected(paths);
   post({ c: "copy", paths, flat: flat });
   showToast("Copied " + paths.length + " item(s)", true);
+}
+
+function delSel() {
+  const { paths } = getEffectivePaths();
+  if (!paths.length) return;
+  post({ c: "delSel", paths });
+  loadingMsg.value = "Deleting " + paths.length + " item(s)...";
+  viewState.value = "loading";
 }
 
 function addFiles() {
@@ -279,7 +318,7 @@ function expandOrLoad(path: string) {
 
 // Selection counts for toolbar
 const selectionBreakdown = computed(() => {
-  const selected = selection.getSelectedPaths();
+  const { paths: selected } = getEffectivePaths();
   let dirs = 0;
   let files = 0;
   for (const p of selected) {

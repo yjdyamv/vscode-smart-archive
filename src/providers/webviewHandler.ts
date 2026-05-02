@@ -204,6 +204,7 @@ function registerHandler(webview: vscode.Webview): void {
       paths?: string[];
       msg?: string;
       flat?: boolean;
+      excludes?: string[];
       path?: string;
       dir?: string;
       name?: string;
@@ -299,7 +300,7 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
         logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
         try {
-          await extractSelected(s.filePath, msg.paths, s.password, msg.flat);
+          await extractSelected(s.filePath, msg.paths, s.password, msg.flat, undefined, msg.excludes);
           webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
         } catch (err) {
           logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
