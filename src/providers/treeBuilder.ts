@@ -122,30 +122,20 @@ function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
 // ── Lazy: root-only build ─────────────────────────────────────────
 
 function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[] {
-  let normed = normalizeEntries(entries, archiveName);
+  const normed = normalizeEntries(entries, archiveName);
   sortEntries(normed);
 
-  // Detect common prefix: if ALL entries share the same first segment,
-  // promote it as root directory so the tree shows actual contents.
-  if (normed.length >= 2) {
-    const firstSeg = normed[0].parts[0];
-    const allSame = firstSeg !== undefined && normed.every((e) => e.parts[0] === firstSeg);
-    if (allSame) {
-      const isWrapper = firstSeg === archiveName || firstSeg === ".";
-      normed = normed.map(({ entry, parts }) => ({
-        entry,
-        parts: parts.length > 1 ? parts.slice(1) : parts,
-      }));
-      const rootChildren = buildNodes(normed);
-      const rootName = isWrapper ? archiveName : firstSeg;
-      const rootPath = firstSeg;
-      const rootNode = mkdirNode(rootName, rootPath, rootChildren.length > 0);
-      rootNode.children = rootChildren;
-      return [rootNode];
-    }
+  // buildNodes handles common-prefix directories natively via
+  // implicitDir detection (parts.length > 1 → seg is a directory).
+  const nodes = buildNodes(normed);
+
+  // If all entries collapsed into a single directory node and its name
+  // matches the archive name, show that dir instead of "nothing to see".
+  if (nodes.length === 1 && nodes[0].kind === "DIRECTORY" && nodes[0].name === archiveName && nodes[0].hasMore) {
+    return nodes;
   }
 
-  return buildNodes(normed);
+  return nodes;
 }
 
 function buildNodes(normed: EntryWithParts[]): TreeNode[] {
@@ -160,10 +150,21 @@ function buildNodes(normed: EntryWithParts[]): TreeNode[] {
   }
 
   for (const { entry, parts } of normed) {
-    const seg = parts[0];
+    let seg = parts[0];
     if (!seg || seg === ".smartarchive") continue;
 
-    const existing = seen.get(seg);
+    // If this entry has sub-segments, its first segment is implicitly a directory
+    const implicitDir = parts.length > 1;
+
+    let existing = seen.get(seg);
+    // If existing is a FILE but this entry proves seg is a directory, upgrade it
+    if (existing && existing.kind !== "DIRECTORY" && (implicitDir || entry.type !== "REGULAR_FILE")) {
+      existing.kind = "DIRECTORY";
+      existing.children = [];
+      existing.path = seg;
+      existing.hasMore = dirHasChildren.has(seg);
+    }
+
     if (existing) {
       if (existing.kind === "DIRECTORY") {
         if (entry.type !== "REGULAR_FILE") {
@@ -174,13 +175,12 @@ function buildNodes(normed: EntryWithParts[]): TreeNode[] {
       continue;
     }
 
-    const isDir = entry.type !== "REGULAR_FILE";
-    const fullPath = entry.path;
+    const isDir = entry.type !== "REGULAR_FILE" || implicitDir;
     const hasKids = dirHasChildren.has(seg);
 
     const node: TreeNode = isDir
-      ? mkdirNode(seg, isDir ? seg : fullPath, hasKids)
-      : mknondirNode(seg, fullPath, entry.size);
+      ? mkdirNode(seg, seg, hasKids)
+      : mknondirNode(seg, entry.path, entry.size);
 
     root.push(node);
     seen.set(seg, node);
