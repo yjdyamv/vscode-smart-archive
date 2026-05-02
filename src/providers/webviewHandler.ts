@@ -26,7 +26,13 @@ function getNoisyPatterns(): string[] {
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
-import { buildTreeRootOnly, getDirChildren, buildEntryIndex, markNoisyDirs, countFlatStats } from "./treeBuilder";
+import {
+  buildTreeRootOnly,
+  getDirChildren,
+  buildEntryIndex,
+  markNoisyDirs,
+  countFlatStats,
+} from "./treeBuilder";
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
@@ -184,12 +190,20 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
-  webview.html = contentHtml(tree, fileCount, dirCount, cssUri, jsUri, {
-    name: archiveName,
-    format: ext,
-    count: itemCount,
-    size: formatCompactSize(stats.totalSize),
-  }, patterns);
+  webview.html = contentHtml(
+    tree,
+    fileCount,
+    dirCount,
+    cssUri,
+    jsUri,
+    {
+      name: archiveName,
+      format: ext,
+      count: itemCount,
+      size: formatCompactSize(stats.totalSize),
+    },
+    patterns,
+  );
 
   if (!handlerRegistered.has(webview)) {
     handlerRegistered.add(webview);
@@ -264,12 +278,20 @@ function registerHandler(webview: vscode.Webview): void {
           const dc = pwStats.dirs;
           const itemCount = pwStats.total;
           const ext = getFullExt(s.filePath);
-          webview.html = contentHtml(pwTree, fc, dc, cssUri, jsUri, {
-            name: s.archiveName,
-            format: ext,
-            count: itemCount,
-            size: formatCompactSize(pwStats.totalSize),
-          }, getNoisyPatterns());
+          webview.html = contentHtml(
+            pwTree,
+            fc,
+            dc,
+            cssUri,
+            jsUri,
+            {
+              name: s.archiveName,
+              format: ext,
+              count: itemCount,
+              size: formatCompactSize(pwStats.totalSize),
+            },
+            getNoisyPatterns(),
+          );
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: "Wrong password" });
@@ -300,7 +322,14 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
         logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
         try {
-          await extractSelected(s.filePath, msg.paths, s.password, msg.flat, undefined, msg.excludes);
+          await extractSelected(
+            s.filePath,
+            msg.paths,
+            s.password,
+            msg.flat,
+            undefined,
+            msg.excludes,
+          );
           webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
         } catch (err) {
           logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);

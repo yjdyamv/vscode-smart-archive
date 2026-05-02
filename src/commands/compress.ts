@@ -120,10 +120,9 @@ async function executeCompress(
         const userPatterns: string[] | undefined = vscode.workspace
           .getConfiguration("smart-archive")
           .get("compressExcludePatterns");
-        const excludePatterns = [...new Set([
-          ...COMPRESS_EXCLUDE_DEFAULTS,
-          ...(userPatterns ?? []),
-        ])];
+        const excludePatterns = [
+          ...new Set([...COMPRESS_EXCLUDE_DEFAULTS, ...(userPatterns ?? [])]),
+        ];
         await compressWith7z(options, progress, token, excludePatterns);
       } catch (err) {
         logger.error({ event: "compress.command.failed", err }, "Compression failed");

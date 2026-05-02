@@ -81,8 +81,12 @@ async function listViaExtract(
       let stdout = "";
       let stderr = "";
       const js7z2 = await JS7z({
-        print: (text: string) => { stdout += text + "\n"; },
-        printErr: (text: string) => { stderr += text + "\n"; },
+        print: (text: string) => {
+          stdout += text + "\n";
+        },
+        printErr: (text: string) => {
+          stderr += text + "\n";
+        },
       });
       try {
         js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
@@ -177,4 +181,11 @@ function parse7zListing(
   return results.filter((r) => r.path !== `/${archiveName}` && r.path !== archiveName);
 }
 
-export { JS7z, tryCleanup as tryCleanupJS7z, fetchFileList, listViaExtract, readDirEntries, parse7zListing };
+export {
+  JS7z,
+  tryCleanup as tryCleanupJS7z,
+  fetchFileList,
+  listViaExtract,
+  readDirEntries,
+  parse7zListing,
+};
