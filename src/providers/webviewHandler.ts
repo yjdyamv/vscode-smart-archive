@@ -221,6 +221,7 @@ function registerHandler(webview: vscode.Webview): void {
       // ── Lazy tree: expand directory → fetch children on demand ──
       if (msg.c === "expandDir" && typeof msg.path === "string") {
         const children = getDirChildren(msg.path, s.entries, s.entryIndex);
+        markNoisyDirs(children, getNoisyPatterns());
         webview.postMessage({ c: "dirChildren", path: msg.path, children });
         return;
       }
