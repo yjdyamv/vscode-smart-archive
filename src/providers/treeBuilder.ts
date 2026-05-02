@@ -31,7 +31,10 @@ function normalizeEntries(entries: FlatEntry[], archiveName: string): EntryWithP
     let p = e.path.replace(/\\/g, "/");
     // Strip leading "./" (libarchive convention)
     if (p.startsWith("./")) p = p.slice(2);
+    // Skip root self-reference entries
+    if (!p || p === ".") continue;
     const parts = p.split("/").filter(Boolean);
+    if (parts.length === 0) continue;
     // Only skip non-directory self-references (e.g. libarchive lists the archive
     // itself as a file entry). Keep directory entries — they provide the root
     // structure for lazy-loaded trees.
@@ -153,11 +156,9 @@ function buildNodes(normed: EntryWithParts[]): TreeNode[] {
     let seg = parts[0];
     if (!seg || seg === ".smartarchive") continue;
 
-    // If this entry has sub-segments, its first segment is implicitly a directory
     const implicitDir = parts.length > 1;
 
     let existing = seen.get(seg);
-    // If existing is a FILE but this entry proves seg is a directory, upgrade it
     if (existing && existing.kind !== "DIRECTORY" && (implicitDir || entry.type !== "REGULAR_FILE")) {
       existing.kind = "DIRECTORY";
       existing.children = [];
@@ -180,7 +181,7 @@ function buildNodes(normed: EntryWithParts[]): TreeNode[] {
 
     const node: TreeNode = isDir
       ? mkdirNode(seg, seg, hasKids)
-      : mknondirNode(seg, entry.path, entry.size);
+      : mknondirNode(seg, seg, entry.size);
 
     root.push(node);
     seen.set(seg, node);
@@ -198,8 +199,9 @@ function buildEntryIndex(entries: FlatEntry[]): EntryIndex {
   index.set("", []); // root
   for (const e of entries) {
     let p = e.path.replace(/\\/g, "/");
-    // Strip leading "./" for consistency with normalizeEntries
     if (p.startsWith("./")) p = p.slice(2);
+    // Strip trailing slash so directory entries index under their parent
+    if (p.endsWith("/")) p = p.slice(0, -1);
     const lastSlash = p.lastIndexOf("/");
     const parent = lastSlash > 0 ? p.slice(0, lastSlash) : "";
     let bucket = index.get(parent);
@@ -224,8 +226,16 @@ function getDirChildren(
   if (index) {
     const bucket = index.get(parentPath);
     if (!bucket) return [];
-    candidates = bucket.map((e) => {
-      const relative = e.path.replace(/\\/g, "/").slice(parentPath ? parentPath.length + 1 : 0);
+    candidates = bucket.filter((e) => {
+      let p = e.path.replace(/\\/g, "/");
+      if (p.startsWith("./")) p = p.slice(2);
+      // Skip the directory's own entry (e.g. "subdir/" when expanding "subdir")
+      if (p === parentPath || p === parentPath + "/") return false;
+      return true;
+    }).map((e) => {
+      let p = e.path.replace(/\\/g, "/");
+      if (p.startsWith("./")) p = p.slice(2);
+      const relative = p.slice(parentPath ? parentPath.length + 1 : 0);
       return { entry: e, parts: relative.split("/").filter(Boolean) };
     });
   } else {
