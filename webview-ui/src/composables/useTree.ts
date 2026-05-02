@@ -21,22 +21,28 @@ function loadExpanded(): Set<string> {
 }
 
 export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
-  // Load persisted state or auto-expand all non-collapsed dirs
-  const saved = loadState<{ expanded?: string[] }>();
-  const expandedPaths = ref(new Set<string>(saved?.expanded ?? (() => {
-    const paths: string[] = [];
-    function collect(nodes: TreeNodeData[]) {
-      for (const node of nodes) {
-        if (node.kind === "DIRECTORY" && !node.collapsed && (node.children?.length ?? 0) > 0) {
-          paths.push(node.path);
-          if (node.children) collect(node.children);
+  const expandedPaths = ref(new Set<string>());
+  const loadingPaths = ref(new Set<string>());
+
+  function initExpandedFromTree() {
+    const saved = loadState<{ expanded?: string[] }>();
+    if (saved?.expanded?.length) {
+      expandedPaths.value = new Set(saved.expanded);
+    } else {
+      // Auto-expand all non-collapsed directories
+      const paths: string[] = [];
+      function collect(nodes: TreeNodeData[]) {
+        for (const node of nodes) {
+          if (node.kind === "DIRECTORY" && !node.collapsed && (node.children?.length ?? 0) > 0) {
+            paths.push(node.path);
+            if (node.children) collect(node.children);
+          }
         }
       }
+      collect(treeData.value);
+      expandedPaths.value = new Set(paths);
     }
-    collect(treeData.value);
-    return paths;
-  })()));
-  const loadingPaths = ref(new Set<string>());
+  }
 
   const flatNodes = computed<FlatNode[]>(() => {
     const result: FlatNode[] = [];
@@ -167,6 +173,7 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     findNode,
     insertChildren,
     getPathsNeedingLoad,
+    initExpandedFromTree,
     setLoading,
     isLoading,
   };

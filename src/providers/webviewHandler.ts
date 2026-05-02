@@ -26,7 +26,7 @@ function getNoisyPatterns(): string[] {
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
-import { buildTree, getDirChildren, buildEntryIndex, markNoisyDirs, countFlatStats } from "./treeBuilder";
+import { buildTreeRootOnly, getDirChildren, buildEntryIndex, markNoisyDirs, countFlatStats } from "./treeBuilder";
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
@@ -174,8 +174,10 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     entries,
     entryIndex,
   });
-  // Build full tree, mark noisy directories as collapsed
-  const tree = buildTree(entries, archiveName);
+  // Lazy root-only build for fast initial load.
+  // Noisy dirs (node_modules etc.) stay collapsed — no loading triggered.
+  // Non-noisy dirs are auto-expanded by the Vue app after mount.
+  const tree = buildTreeRootOnly(entries, archiveName);
   const patterns = getNoisyPatterns();
   markNoisyDirs(tree, patterns);
   const stats = countFlatStats(entries);
@@ -253,7 +255,7 @@ function registerHandler(webview: vscode.Webview): void {
           s.password = msg.pw;
           s.entries = pwEntries;
           s.entryIndex = buildEntryIndex(pwEntries);
-          const pwTree = buildTree(pwEntries, s.archiveName);
+          const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
           markNoisyDirs(pwTree, getNoisyPatterns());
           const pwStats = countFlatStats(pwEntries);
           const fc = pwStats.files;
