@@ -92,7 +92,14 @@ function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
           existing.hasMore = !!(existing.children && existing.children.length > 0);
         } else {
           const node: TreeNode = isDir
-            ? { name: seg, path: entry.path, size: entry.size, kind: "DIRECTORY", children: [], hasMore: false }
+            ? {
+                name: seg,
+                path: entry.path,
+                size: entry.size,
+                kind: "DIRECTORY",
+                children: [],
+                hasMore: false,
+              }
             : { name: seg, path: entry.path, size: entry.size, kind: "REGULAR_FILE" };
           // Track in siblingMap so intermediate dirs from other entries can replace this file
           if (!isDir) siblingMap.set(seg, siblings.length);
@@ -139,7 +146,12 @@ function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[
 
   // If all entries collapsed into a single directory node and its name
   // matches the archive name, show that dir instead of "nothing to see".
-  if (nodes.length === 1 && nodes[0].kind === "DIRECTORY" && nodes[0].name === archiveName && nodes[0].hasMore) {
+  if (
+    nodes.length === 1 &&
+    nodes[0].kind === "DIRECTORY" &&
+    nodes[0].name === archiveName &&
+    nodes[0].hasMore
+  ) {
     return nodes;
   }
 
@@ -164,7 +176,11 @@ function buildNodes(normed: EntryWithParts[]): TreeNode[] {
     const implicitDir = parts.length > 1;
 
     let existing = seen.get(seg);
-    if (existing && existing.kind !== "DIRECTORY" && (implicitDir || entry.type !== "REGULAR_FILE")) {
+    if (
+      existing &&
+      existing.kind !== "DIRECTORY" &&
+      (implicitDir || entry.type !== "REGULAR_FILE")
+    ) {
       existing.kind = "DIRECTORY";
       existing.children = [];
       existing.path = seg;
@@ -220,28 +236,26 @@ function buildEntryIndex(entries: FlatEntry[]): EntryIndex {
 
 // ── Lazy: get children of a specific directory ────────────────────
 
-function getDirChildren(
-  parentPath: string,
-  entries: FlatEntry[],
-  index?: EntryIndex,
-): TreeNode[] {
+function getDirChildren(parentPath: string, entries: FlatEntry[], index?: EntryIndex): TreeNode[] {
   let candidates: EntryWithParts[];
 
   if (index) {
     const bucket = index.get(parentPath);
     if (!bucket) return [];
-    candidates = bucket.filter((e) => {
-      let p = e.path.replace(/\\/g, "/");
-      if (p.startsWith("./")) p = p.slice(2);
-      // Skip the directory's own entry (e.g. "subdir/" when expanding "subdir")
-      if (p === parentPath || p === parentPath + "/") return false;
-      return true;
-    }).map((e) => {
-      let p = e.path.replace(/\\/g, "/");
-      if (p.startsWith("./")) p = p.slice(2);
-      const relative = p.slice(parentPath ? parentPath.length + 1 : 0);
-      return { entry: e, parts: relative.split("/").filter(Boolean) };
-    });
+    candidates = bucket
+      .filter((e) => {
+        let p = e.path.replace(/\\/g, "/");
+        if (p.startsWith("./")) p = p.slice(2);
+        // Skip the directory's own entry (e.g. "subdir/" when expanding "subdir")
+        if (p === parentPath || p === parentPath + "/") return false;
+        return true;
+      })
+      .map((e) => {
+        let p = e.path.replace(/\\/g, "/");
+        if (p.startsWith("./")) p = p.slice(2);
+        const relative = p.slice(parentPath ? parentPath.length + 1 : 0);
+        return { entry: e, parts: relative.split("/").filter(Boolean) };
+      });
   } else {
     const prefix = parentPath ? parentPath + "/" : "";
     candidates = [];
@@ -274,13 +288,18 @@ function getDirChildren(
     if (seg === ".smartarchive") continue;
 
     const fullChildPath = parentPath ? parentPath + "/" + seg : seg;
-    const hasKids = dirHasChildren.has(seg) || (index ? (index.get(fullChildPath)?.length ?? 0) > 0 : false);
+    const hasKids =
+      dirHasChildren.has(seg) || (index ? (index.get(fullChildPath)?.length ?? 0) > 0 : false);
 
     const existing = seen.get(seg);
     const implicitDir = parts.length > 1;
 
     // Upgrade existing file to directory if sub-entries prove it's a dir
-    if (existing && existing.kind !== "DIRECTORY" && (implicitDir || entry.type !== "REGULAR_FILE")) {
+    if (
+      existing &&
+      existing.kind !== "DIRECTORY" &&
+      (implicitDir || entry.type !== "REGULAR_FILE")
+    ) {
       existing.kind = "DIRECTORY";
       existing.children = [];
       existing.path = fullChildPath;
@@ -316,8 +335,10 @@ function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
   for (const node of nodes) {
     if (node.kind === "DIRECTORY") {
       for (const pattern of noisyPatterns) {
-        if (minimatch(node.path, pattern, { dot: true })
-          || minimatch(node.name, pattern, { dot: true })) {
+        if (
+          minimatch(node.path, pattern, { dot: true }) ||
+          minimatch(node.name, pattern, { dot: true })
+        ) {
           node.collapsed = true;
           break;
         }
@@ -329,7 +350,12 @@ function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
 
 // ── Stats helpers ──────────────────────────────────────────────────
 
-function countFlatStats(entries: FlatEntry[]): { files: number; dirs: number; total: number; totalSize: number } {
+function countFlatStats(entries: FlatEntry[]): {
+  files: number;
+  dirs: number;
+  total: number;
+  totalSize: number;
+} {
   let files = 0;
   let dirs = 0;
   let totalSize = 0;
@@ -360,4 +386,12 @@ function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total
 }
 
 export type { TreeNode, FlatEntry, EntryIndex };
-export { buildTree, buildTreeRootOnly, getDirChildren, countTreeStats, countFlatStats, buildEntryIndex, markNoisyDirs };
+export {
+  buildTree,
+  buildTreeRootOnly,
+  getDirChildren,
+  countTreeStats,
+  countFlatStats,
+  buildEntryIndex,
+  markNoisyDirs,
+};
