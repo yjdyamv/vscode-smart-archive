@@ -350,6 +350,34 @@ function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
 
 // ── Stats helpers ──────────────────────────────────────────────────
 
+function countAllStats(entries: FlatEntry[]): { files: number; dirs: number; total: number; totalSize: number } {
+  // Detect implicit directories: entries whose path is a prefix of another entry
+  const dirSet = new Set<string>();
+  for (const e of entries) {
+    const p = e.path.replace(/\\/g, "/");
+    // Walk parent segments
+    let lastSlash = -1;
+    while ((lastSlash = p.indexOf("/", lastSlash + 1)) !== -1) {
+      dirSet.add(p.slice(0, lastSlash));
+    }
+  }
+
+  let files = 0;
+  let dirs = 0;
+  let totalSize = 0;
+  const seenDirs = new Set<string>();
+  for (const e of entries) {
+    totalSize += e.size || 0;
+    const p = e.path.replace(/\\/g, "/");
+    if (e.type !== "REGULAR_FILE" || dirSet.has(p)) {
+      if (!seenDirs.has(p)) { dirs++; seenDirs.add(p); }
+    } else {
+      files++;
+    }
+  }
+  return { files, dirs, total: files + dirs, totalSize };
+}
+
 function countFlatStats(entries: FlatEntry[]): {
   files: number;
   dirs: number;
@@ -394,4 +422,5 @@ export {
   countFlatStats,
   buildEntryIndex,
   markNoisyDirs,
+  countAllStats,
 };
