@@ -3,6 +3,13 @@
   "tasks": [
     {
       "type": "npm",
+      "script": "compile",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: compile"
+    },
+    {
+      "type": "npm",
       "script": "test",
       "group": "test",
       "problemMatcher": []

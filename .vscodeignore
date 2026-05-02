@@ -6,3 +6,6 @@ src/**
 tsconfig.json
 package-lock.json
 *.vsix
+webview-ui/**
+!webview-ui/package.json
+media/vue/assets/*.map
