@@ -14,6 +14,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import { compressWith7z } from "../engines/js7z-engine";
+import { COMPRESS_EXCLUDE_DEFAULTS } from "../constants";
 import {
   promptCompressFormat,
   promptEncryptChoice,
@@ -116,9 +117,13 @@ async function executeCompress(
     },
     async (progress, token) => {
       try {
-        const excludePatterns: string[] | undefined = vscode.workspace
+        const userPatterns: string[] | undefined = vscode.workspace
           .getConfiguration("smart-archive")
           .get("compressExcludePatterns");
+        const excludePatterns = [...new Set([
+          ...COMPRESS_EXCLUDE_DEFAULTS,
+          ...(userPatterns ?? []),
+        ])];
         await compressWith7z(options, progress, token, excludePatterns);
       } catch (err) {
         logger.error({ event: "compress.command.failed", err }, "Compression failed");
