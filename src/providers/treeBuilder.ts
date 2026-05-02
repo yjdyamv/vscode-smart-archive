@@ -7,6 +7,8 @@
  * @module providers/treeBuilder
  */
 
+import { minimatch } from "minimatch";
+
 interface TreeNode {
   name: string;
   path: string;
@@ -92,6 +94,8 @@ function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
           const node: TreeNode = isDir
             ? { name: seg, path: entry.path, size: entry.size, kind: "DIRECTORY", children: [], hasMore: false }
             : { name: seg, path: entry.path, size: entry.size, kind: "REGULAR_FILE" };
+          // Track in siblingMap so intermediate dirs from other entries can replace this file
+          if (!isDir) siblingMap.set(seg, siblings.length);
           siblings.push(node);
           if (isDir) dirMap.set(full, node);
         }
@@ -309,21 +313,15 @@ function getDirChildren(
 
 function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
   if (noisyPatterns.length === 0) return;
-  // Pre-process patterns: extract basenames from glob patterns like "*/.venv"
-  const exactSet = new Set<string>();
-  const basenameSet = new Set<string>();
-  for (const p of noisyPatterns) {
-    // Strip leading **/ or */ to get basename; preserve exact matches
-    const stripped = p.replace(/^(\*\*?\/)+/, "");
-    if (stripped.includes("/")) {
-      exactSet.add(p);
-    } else {
-      basenameSet.add(stripped);
-    }
-  }
   for (const node of nodes) {
-    if (node.kind === "DIRECTORY" && (basenameSet.has(node.name) || exactSet.has(node.name))) {
-      node.collapsed = true;
+    if (node.kind === "DIRECTORY") {
+      for (const pattern of noisyPatterns) {
+        if (minimatch(node.path, pattern, { dot: true })
+          || minimatch(node.name, pattern, { dot: true })) {
+          node.collapsed = true;
+          break;
+        }
+      }
     }
     if (node.children) markNoisyDirs(node.children, noisyPatterns);
   }

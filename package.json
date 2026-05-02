@@ -222,7 +222,9 @@
         },
         "smart-archive.collapsedDirPatterns": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Directory name patterns to keep collapsed by default in the archive preview. Merged with built-in defaults (node_modules, .venv, .git, dist, etc.)."
         }
@@ -258,6 +260,7 @@
     "iconv-lite": "^0.7.2",
     "js7z-tools": "^2.5.0",
     "libarchive-wasm": "^1.2.0",
+    "minimatch": "^10.2.5",
     "pino": "^10.3.1"
   },
   "devDependencies": {
