@@ -67,7 +67,7 @@ function handleContextMenu(e: MouseEvent, path: string, dirPath: string) {
     selection.toggle(path);
     selection.state.anchorPath = path;
   }
-  const selectedPaths = getEffectivePaths();
+  const { paths: selectedPaths } = getEffectivePaths();
   if (!selectedPaths.length) return;
 
   ctxMenu.show = true;
@@ -109,76 +109,61 @@ function isAnyDirSelected(paths: string[]): boolean {
  * If some children are deselected, the parent is broken into
  * individual selected children instead of covering them.
  */
-function getEffectivePaths(): string[] {
+function getEffectivePaths(): { paths: string[]; excludes: string[] } {
   const raw = [...selection.state.selected];
-  const result = new Set<string>();
-  const parentsToRemove = new Set<string>();
+  const paths = new Set<string>();
+  const excludes = new Set<string>();
 
   for (const p of raw) {
-    // If this path is a directory with children
     const node = findNode(treeData.value, p);
     if (node && node.kind === "DIRECTORY" && node.children && node.children.length > 0) {
-      const childSelected = node.children.filter((c) => selection.state.selected.has(c.path));
-      const allSelected = childSelected.length === node.children.length;
-      const someSelected = childSelected.length > 0;
-      if (allSelected) {
-        // All children selected → keep parent, skip children
-        result.add(p);
-      } else if (someSelected) {
-        // Partial selection → exclude parent, keep selected children
-        parentsToRemove.add(p);
-        for (const c of childSelected) result.add(c.path);
-      } else {
-        // No children selected → keep parent
-        result.add(p);
+      // Directory with children: keep dir, exclude only deselected children
+      paths.add(p);
+      for (const child of node.children) {
+        if (!selection.state.selected.has(child.path)) {
+          excludes.add(child.path);
+        }
       }
     } else {
-      // File or empty dir: check if covered by a fully-selected parent
+      // File or empty dir: check if covered by a parent
       const parts = p.replace(/\\/g, "/").split("/");
       let covered = false;
       for (let j = parts.length - 2; j >= 0; j--) {
         const ancestor = parts.slice(0, j + 1).join("/");
         if (selection.state.selected.has(ancestor)) {
-          const ancNode = findNode(treeData.value, ancestor);
-          if (ancNode && ancNode.children && ancNode.children.length > 0) {
-            const allSelected = ancNode.children.every((c) =>
-              selection.state.selected.has(c.path),
-            );
-            if (allSelected) {
-              covered = true;
-              result.add(ancestor); // parent covers it
-            }
-          }
+          covered = true;
           break;
         }
       }
-      if (!covered) result.add(p);
+      if (!covered) paths.add(p);
     }
   }
 
-  // Remove parents that were broken into children
-  for (const p of parentsToRemove) result.delete(p);
-
-  return [...result];
+  return { paths: [...paths], excludes: [...excludes] };
 }
 
 function extSel() {
-  const paths = getEffectivePaths();
+  const { paths, excludes } = getEffectivePaths();
   if (!paths.length) return;
   const flat = !isAnyDirSelected(paths);
-  post({ c: "extSel", paths, flat });
+  post({ c: "extSel", paths, excludes, flat });
   showToast("Extracting " + paths.length + " item(s)...", true);
 }
 
+function copySel() {
+  const { paths, excludes } = getEffectivePaths();
+  if (!paths.length) return;
+  const flat = !isAnyDirSelected(paths);
+  post({ c: "copy", paths, flat: flat });
+  showToast("Copied " + paths.length + " item(s)", true);
+}
+
 function delSel() {
-  const paths = getEffectivePaths();
+  const { paths } = getEffectivePaths();
   if (!paths.length) return;
   post({ c: "delSel", paths });
   loadingMsg.value = "Deleting " + paths.length + " item(s)...";
   viewState.value = "loading";
-}
-
-function copySel() {
 }
 
 function addFiles() {
@@ -333,7 +318,7 @@ function expandOrLoad(path: string) {
 
 // Selection counts for toolbar
 const selectionBreakdown = computed(() => {
-  const selected = getEffectivePaths();
+  const { paths: selected } = getEffectivePaths();
   let dirs = 0;
   let files = 0;
   for (const p of selected) {
