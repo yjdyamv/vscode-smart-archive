@@ -20,7 +20,7 @@ const emit = defineEmits<{
   (e: "row-dblclick", path: string, isDir: boolean): void;
   (e: "check-click", path: string): void;
   (e: "expand-click", path: string): void;
-  (e: "context-menu", event: MouseEvent, paths: string[], dirPath: string): void;
+  (e: "context-menu", event: MouseEvent, path: string, dirPath: string): void;
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -43,17 +43,13 @@ const virtualizer = useVirtualizer(
 
 const virtualItems = computed(() => virtualizer.value.getVirtualItems());
 
-function getIndent(depth: number): number[] {
-  return Array.from({ length: depth }, (_, i) => i);
-}
-
 function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
   const dirPath = fn.node.kind === "DIRECTORY"
     ? fn.path
     : fn.path.includes("/")
       ? fn.path.substring(0, fn.path.lastIndexOf("/"))
       : "";
-  emit("context-menu", e, [fn.path], dirPath);
+  emit("context-menu", e, fn.path, dirPath);
 }
 </script>
 

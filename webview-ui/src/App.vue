@@ -60,11 +60,20 @@ const ctxMenu = reactive({
   dirPath: "",
 });
 
-function handleContextMenu(e: MouseEvent, paths: string[], dirPath: string) {
+function handleContextMenu(e: MouseEvent, path: string, dirPath: string) {
+  // If right-clicked row is not in selection, select it alone
+  if (!selection.state.selected.has(path)) {
+    selection.clearAll();
+    selection.toggle(path);
+    selection.state.anchorPath = path;
+  }
+  const selectedPaths = selection.getSelectedPaths();
+  if (!selectedPaths.length) return;
+
   ctxMenu.show = true;
   ctxMenu.x = e.clientX;
   ctxMenu.y = e.clientY;
-  ctxMenu.paths = paths;
+  ctxMenu.paths = selectedPaths;
   ctxMenu.dirPath = dirPath;
   e.preventDefault();
 }
@@ -452,9 +461,9 @@ provide("showToast", showToast);
       @extract="extSel; closeContextMenu()"
       @delete="delSel; closeContextMenu()"
       @copy="copySel; closeContextMenu()"
-      @add-here="addFiles; closeContextMenu()"
-      @new-folder="newFolder; closeContextMenu()"
-      @rename="(() => { if (ctxMenu.paths.length === 1) renameFile(ctxMenu.paths[0]); closeContextMenu(); })"
+      @add-here="post({ c: 'addFiles', dir: ctxMenu.dirPath }); closeContextMenu()"
+      @new-folder="post({ c: 'newFolderPrompt', dir: ctxMenu.dirPath }); closeContextMenu()"
+      @rename="renameFile(ctxMenu.paths[0]); closeContextMenu()"
     />
   </div>
 </template>
