@@ -67,7 +67,7 @@ function handleContextMenu(e: MouseEvent, path: string, dirPath: string) {
     selection.toggle(path);
     selection.state.anchorPath = path;
   }
-  const selectedPaths = selection.getSelectedPaths();
+  const selectedPaths = getEffectivePaths();
   if (!selectedPaths.length) return;
 
   ctxMenu.show = true;
@@ -103,16 +103,60 @@ function isAnyDirSelected(paths: string[]): boolean {
   return false;
 }
 
+/**
+ * Returns selected paths with parent-duplication removed,
+ * but ONLY if parent's ALL children are also selected.
+ * If some children are deselected, the parent is broken into
+ * individual selected children instead of covering them.
+ */
+function getEffectivePaths(): string[] {
+  const raw = [...selection.state.selected];
+  const result: string[] = [];
+  const covered = new Set<string>();
+
+  for (const p of raw) {
+    // Check if any ancestor covers this path
+    const parts = p.replace(/\\/g, "/").split("/");
+    let skip = false;
+    for (let j = parts.length - 2; j >= 0; j--) {
+      const ancestor = parts.slice(0, j + 1).join("/");
+      if (selection.state.selected.has(ancestor)) {
+        // Ancestor is selected — but does it fully cover this child?
+        const ancNode = findNode(treeData.value, ancestor);
+        if (ancNode && ancNode.children && ancNode.children.length > 0) {
+          const allChildrenSelected = ancNode.children.every((c) =>
+            selection.state.selected.has(c.path),
+          );
+          if (allChildrenSelected) {
+            skip = true; // fully covered by ancestor
+            covered.add(ancestor);
+          }
+          // If not all children selected, don't skip — let this child through
+        }
+        break; // only check first ancestor in selection
+      }
+    }
+    if (!skip) result.push(p);
+  }
+
+  // Add ancestors that fully cover all their children
+  for (const p of covered) {
+    if (!result.includes(p)) result.push(p);
+  }
+
+  return result;
+}
+
 function extSel() {
-  const paths = selection.getSelectedPaths();
+  const paths = getEffectivePaths();
   if (!paths.length) return;
-  // Always use flat=false (7z x) — 7z e (flat=true) is unreliable in js7z-tools WASM
-  post({ c: "extSel", paths, flat: false });
+  const flat = !isAnyDirSelected(paths);
+  post({ c: "extSel", paths, flat });
   showToast("Extracting " + paths.length + " item(s)...", true);
 }
 
 function delSel() {
-  const paths = selection.getSelectedPaths();
+  const paths = getEffectivePaths();
   if (!paths.length) return;
   post({ c: "delSel", paths });
   loadingMsg.value = "Deleting " + paths.length + " item(s)...";
@@ -120,11 +164,6 @@ function delSel() {
 }
 
 function copySel() {
-  const paths = selection.getSelectedPaths();
-  if (!paths.length) return;
-  const flat = !isAnyDirSelected(paths);
-  post({ c: "copy", paths, flat: flat });
-  showToast("Copied " + paths.length + " item(s)", true);
 }
 
 function addFiles() {
@@ -279,7 +318,7 @@ function expandOrLoad(path: string) {
 
 // Selection counts for toolbar
 const selectionBreakdown = computed(() => {
-  const selected = selection.getSelectedPaths();
+  const selected = getEffectivePaths();
   let dirs = 0;
   let files = 0;
   for (const p of selected) {
