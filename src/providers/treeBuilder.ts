@@ -119,46 +119,63 @@ function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
 // ── Lazy: root-only build ─────────────────────────────────────────
 
 function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[] {
-  const normed = normalizeEntries(entries, archiveName);
+  let normed = normalizeEntries(entries, archiveName);
   sortEntries(normed);
 
+  // Detect common prefix: if ALL entries share the same first segment
+  // (e.g. "test.tar/" from libarchive, "./" prefix), strip it so
+  // the root shows actual top-level contents.
+  if (normed.length >= 2) {
+    const firstSeg = normed[0].parts[0];
+    const allSame = firstSeg !== undefined && normed.every((e) => e.parts[0] === firstSeg);
+    if (allSame && (firstSeg === archiveName || firstSeg === ".")) {
+      // Strip the wrapper prefix: treat it as root, build from second segment
+      normed = normed.map(({ entry, parts }) => ({
+        entry,
+        parts: parts.length > 1 ? parts.slice(1) : parts,
+      }));
+      const rootChildren = buildNodes(normed);
+      const rootNode = mkdirNode(firstSeg === "." ? archiveName : firstSeg, firstSeg === "." ? "" : firstSeg, rootChildren.length > 0);
+      rootNode.children = rootChildren;
+      return [rootNode];
+    }
+  }
+
+  return buildNodes(normed);
+}
+
+function buildNodes(normed: EntryWithParts[]): TreeNode[] {
   const root: TreeNode[] = [];
   const seen = new Map<string, TreeNode>();
   const dirHasChildren = new Set<string>();
 
-  // First pass: detect which directories have children
   for (const { parts } of normed) {
     for (let i = 0; i < parts.length - 1; i++) {
-      const prefix = parts.slice(0, i + 1).join("/");
-      dirHasChildren.add(prefix);
+      dirHasChildren.add(parts.slice(0, i + 1).join("/"));
     }
   }
 
   for (const { entry, parts } of normed) {
     const seg = parts[0];
-    if (seg === ".smartarchive") continue;
+    if (!seg || seg === ".smartarchive") continue;
 
     const existing = seen.get(seg);
     if (existing) {
-      // If a directory was already created for this segment (from another entry),
-      // preserve it and only update size for directory entries
       if (existing.kind === "DIRECTORY") {
         if (entry.type !== "REGULAR_FILE") {
           existing.size = entry.size || existing.size;
         }
         continue;
       }
-      // Two non-directory entries with the same name — keep first
       continue;
     }
 
     const isDir = entry.type !== "REGULAR_FILE";
     const fullPath = entry.path;
-    const fullSegPath = seg;
-    const hasKids = dirHasChildren.has(fullSegPath);
+    const hasKids = dirHasChildren.has(seg);
 
     const node: TreeNode = isDir
-      ? mkdirNode(seg, isDir ? fullSegPath : fullPath, hasKids)
+      ? mkdirNode(seg, isDir ? seg : fullPath, hasKids)
       : mknondirNode(seg, fullPath, entry.size);
 
     root.push(node);
