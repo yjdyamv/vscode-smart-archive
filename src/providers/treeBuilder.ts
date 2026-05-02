@@ -350,7 +350,12 @@ function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
 
 // ── Stats helpers ──────────────────────────────────────────────────
 
-function countAllStats(entries: FlatEntry[]): { files: number; dirs: number; total: number; totalSize: number } {
+function countAllStats(entries: FlatEntry[]): {
+  files: number;
+  dirs: number;
+  total: number;
+  totalSize: number;
+} {
   // First pass: collect all implicit directories from path prefixes
   const dirSet = new Set<string>();
   for (const e of entries) {

@@ -125,6 +125,7 @@ function _copyDirFromFS(
         fs.mkdirSync(localEntry, { recursive: true });
         totalSize = _copyDirFromFS(js7z, fsEntry, localEntry, totalSize, token);
       } else {
+        checkFileSize(stat.size);
         const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
         checkFileSize(data.byteLength);
         totalSize = checkTotalSize(totalSize, data.byteLength);
