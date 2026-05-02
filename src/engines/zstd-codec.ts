@@ -29,9 +29,21 @@ function ensureInit(): Promise<void> {
   return initP;
 }
 
+/**
+ * Map VSCode 0-9 compression level to zstd's 0-22 range.
+ * zstd supports much higher levels than 7z/zip.
+ */
+function mapZstdLevel(uiLevel: number): number {
+  if (uiLevel <= 0) return 1;
+  if (uiLevel <= 3) return 3;
+  if (uiLevel <= 5) return 9;
+  if (uiLevel <= 7) return 15;
+  return 22;
+}
+
 export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Array> {
   await ensureInit();
-  return zstd.compress(data, level);
+  return zstd.compress(data, mapZstdLevel(level));
 }
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
