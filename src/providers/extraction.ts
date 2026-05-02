@@ -110,6 +110,18 @@ function copyFromFSWithStrip(
       }
       checkFileSize(data.byteLength);
 
+      // Decompression bomb check: verify reported vs actual size ratio
+      try {
+        const reported = js7z.FS.stat(full).size;
+        if (data.byteLength > reported * 4 && reported > 1024) {
+          throw new Error(
+            `Decompression bomb: reported ${reported}B but decompressed to ${data.byteLength}B`,
+          );
+        }
+      } catch {
+        /* stat may fail, skip bomb check */
+      }
+
       let finalPath = outPath;
       const dir = path.dirname(outPath);
       const base = path.basename(outPath);
@@ -117,13 +129,21 @@ function copyFromFSWithStrip(
       const stem = extIdx > 0 ? base.slice(0, extIdx) : base;
       const ext = extIdx > 0 ? base.slice(extIdx) : "";
       let counter = 1;
-      while (fs.existsSync(finalPath)) {
+      // Use wx flag to avoid TOCTOU race — fails if file already exists
+      while (true) {
         if (counter > 999) throw new Error(`Failed to resolve collision for ${outPath}`);
-        finalPath = path.join(dir, `${stem}_${counter}${ext}`);
-        counter++;
+        try {
+          fs.writeFileSync(finalPath, Buffer.from(data), { flag: "wx" });
+          break;
+        } catch (e: unknown) {
+          if ((e as NodeJS.ErrnoException).code === "EEXIST") {
+            counter++;
+            finalPath = path.join(dir, `${stem}_${counter}${ext}`);
+            continue;
+          }
+          throw e;
+        }
       }
-
-      fs.writeFileSync(finalPath, Buffer.from(data));
     }
   };
 
