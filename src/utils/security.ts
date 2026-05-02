@@ -120,3 +120,14 @@ export function checkTotalSize(current: number, added: number): number {
   }
   return total;
 }
+
+/**
+ * Validate password for safe use in 7z CLI arguments.
+ * Rejects passwords starting with '-' (could be parsed as flags),
+ * containing null bytes, newlines, or invalid characters.
+ */
+export function validatePassword(pw: string): void {
+  if (pw.startsWith("-")) throw new Error("Password must not start with '-'");
+  if (pw.includes("\0")) throw new Error("Password contains null byte");
+  if (pw.includes("\n") || pw.includes("\r")) throw new Error("Password contains newline");
+}
