@@ -91,7 +91,17 @@ function copyFromFSWithStrip(
         continue;
       }
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
-      const data = js7z.FS.readFile(full, { encoding: "binary" });
+
+      let data: Uint8Array | ArrayBuffer;
+      try {
+        data = js7z.FS.readFile(full, { encoding: "binary" });
+      } catch (readErr) {
+        logger.warn(
+          { event: "extractSelected.readFile.failed", path: full, err: readErr },
+          "Failed to read entry from virtual FS, skipping",
+        );
+        continue;
+      }
       checkFileSize(data.byteLength);
 
       let finalPath = outPath;
