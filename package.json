@@ -222,11 +222,15 @@
         },
         "smart-archive.collapsedDirPatterns": {
           "type": "array",
-          "items": {
-            "type": "string"
-          },
+          "items": { "type": "string" },
           "default": [],
           "description": "Directory name patterns to keep collapsed by default in the archive preview. Merged with built-in defaults (node_modules, .venv, .git, dist, etc.)."
+        },
+        "smart-archive.compressExcludePatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Glob patterns (gitignore syntax) for files/directories to exclude when compressing. Example: ['node_modules', '.venv', '*.log', '**/dist']"
         }
       }
     }

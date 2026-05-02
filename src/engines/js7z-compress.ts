@@ -47,11 +47,15 @@ export async function compressWith7z(
   options: CompressOptions,
   progress: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
+  excludePatterns?: string[],
 ): Promise<void> {
   const startTime = Date.now();
   progress.report({ message: t("compress.initEngine") });
 
   const js7z = await JS7z();
+
+  // Convert gitignore patterns to 7z -xr! flags
+  const excludeArgs = (excludePatterns ?? []).map((p) => "-xr!" + p.replace(/^(\*\*\/)+/, ""));
 
   try {
     js7z.FS.mkdir(INPUT_DIR);
@@ -77,7 +81,7 @@ export async function compressWith7z(
       const tarFsPath = joinFSPath(OUTPUT_DIR, "_tmp.tar");
 
       progress.report({ message: t("compress.creatingTar") });
-      await run7z(js7z, ["a", tarFsPath, ...fsInputPaths, "-mmt=on"], progress);
+      await run7z(js7z, ["a", tarFsPath, ...fsInputPaths, ...excludeArgs, "-mmt=on"], progress);
 
       const tarData = js7z.FS.readFile(tarFsPath, { encoding: "binary" });
 
@@ -115,7 +119,7 @@ export async function compressWith7z(
       options.password,
       options.level,
     );
-    await run7z(js7z, args, progress);
+    await run7z(js7z, [...args, ...excludeArgs], progress);
 
     const data = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
