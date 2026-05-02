@@ -373,25 +373,49 @@ export function isEncryptableExt(ext: string): boolean {
 // ── Noisy directory patterns (collapsed by default in preview) ─────
 
 export const NOISY_DIR_PATTERNS = [
+  // JavaScript / Node
   "node_modules",
+  ".npm",
+  ".yarn",
+  // Python
   ".venv",
   "venv",
   "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".tox",
+  ".eggs",
+  "site-packages",
+  // VCS
   ".git",
   ".svn",
   ".hg",
-  ".next",
+  // Build outputs
   "dist",
   "build",
   "target",
-  ".cache",
-  ".npm",
-  ".yarn",
-  "vendor",
-  "bower_components",
+  "out",
+  "output",
+  ".next",
+  ".nuxt",
+  ".output",
+  ".svelte-kit",
+  // IDE / editors
   ".idea",
   ".vscode",
+  ".vs",
+  // Coverage / testing
   "coverage",
+  ".nyc_output",
+  // Cache
+  ".cache",
+  ".turbo",
+  ".parcel-cache",
+  // Other dependency dirs
+  "vendor",
+  "bower_components",
+  // Infrastructure
+  ".terraform",
 ];
 
 export function isNoisyDir(name: string): boolean {
