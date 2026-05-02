@@ -7,6 +7,8 @@
  * @module providers/treeBuilder
  */
 
+import { minimatch } from "minimatch";
+
 interface TreeNode {
   name: string;
   path: string;
@@ -14,6 +16,7 @@ interface TreeNode {
   kind: string;
   children?: TreeNode[];
   hasMore?: boolean;
+  collapsed?: boolean;
 }
 
 type FlatEntry = { path: string; size: number; type: string };
@@ -91,6 +94,8 @@ function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
           const node: TreeNode = isDir
             ? { name: seg, path: entry.path, size: entry.size, kind: "DIRECTORY", children: [], hasMore: false }
             : { name: seg, path: entry.path, size: entry.size, kind: "REGULAR_FILE" };
+          // Track in siblingMap so intermediate dirs from other entries can replace this file
+          if (!isDir) siblingMap.set(seg, siblings.length);
           siblings.push(node);
           if (isDir) dirMap.set(full, node);
         }
@@ -304,6 +309,24 @@ function getDirChildren(
   return children;
 }
 
+// ── Noisy directory marking ────────────────────────────────────────
+
+function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
+  if (noisyPatterns.length === 0) return;
+  for (const node of nodes) {
+    if (node.kind === "DIRECTORY") {
+      for (const pattern of noisyPatterns) {
+        if (minimatch(node.path, pattern, { dot: true })
+          || minimatch(node.name, pattern, { dot: true })) {
+          node.collapsed = true;
+          break;
+        }
+      }
+    }
+    if (node.children) markNoisyDirs(node.children, noisyPatterns);
+  }
+}
+
 // ── Stats helpers ──────────────────────────────────────────────────
 
 function countFlatStats(entries: FlatEntry[]): { files: number; dirs: number; total: number; totalSize: number } {
@@ -337,4 +360,4 @@ function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total
 }
 
 export type { TreeNode, FlatEntry, EntryIndex };
-export { buildTree, buildTreeRootOnly, getDirChildren, countTreeStats, countFlatStats, buildEntryIndex };
+export { buildTree, buildTreeRootOnly, getDirChildren, countTreeStats, countFlatStats, buildEntryIndex, markNoisyDirs };

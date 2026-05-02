@@ -11,11 +11,22 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { isEncrypted } from "../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { getFullExt, isWrappedFormat, isEncryptableExt, NOISY_DIR_PATTERNS } from "../constants";
+
+// ...
+
+function getNoisyPatterns(): string[] {
+  const config: string[] | undefined = vscode.workspace
+    .getConfiguration("smart-archive")
+    .get("collapsedDirPatterns");
+  const userPatterns = config ?? [];
+  // Merge built-in defaults with user patterns, deduplicate
+  return [...new Set([...NOISY_DIR_PATTERNS, ...userPatterns])];
+}
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
-import { buildTreeRootOnly, getDirChildren, countFlatStats, buildEntryIndex } from "./treeBuilder";
+import { buildTreeRootOnly, getDirChildren, buildEntryIndex, markNoisyDirs, countFlatStats } from "./treeBuilder";
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
@@ -163,8 +174,12 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     entries,
     entryIndex,
   });
-  // Lazy: only build root-level nodes, children load on demand
+  // Lazy root-only build for fast initial load.
+  // Noisy dirs (node_modules etc.) stay collapsed — no loading triggered.
+  // Non-noisy dirs are auto-expanded by the Vue app after mount.
   const tree = buildTreeRootOnly(entries, archiveName);
+  const patterns = getNoisyPatterns();
+  markNoisyDirs(tree, patterns);
   const stats = countFlatStats(entries);
   const fileCount = stats.files;
   const dirCount = stats.dirs;
@@ -174,7 +189,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     format: ext,
     count: itemCount,
     size: formatCompactSize(stats.totalSize),
-  });
+  }, patterns);
 
   if (!handlerRegistered.has(webview)) {
     handlerRegistered.add(webview);
@@ -206,6 +221,7 @@ function registerHandler(webview: vscode.Webview): void {
       // ── Lazy tree: expand directory → fetch children on demand ──
       if (msg.c === "expandDir" && typeof msg.path === "string") {
         const children = getDirChildren(msg.path, s.entries, s.entryIndex);
+        markNoisyDirs(children, getNoisyPatterns());
         webview.postMessage({ c: "dirChildren", path: msg.path, children });
         return;
       }
@@ -241,6 +257,7 @@ function registerHandler(webview: vscode.Webview): void {
           s.entries = pwEntries;
           s.entryIndex = buildEntryIndex(pwEntries);
           const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
+          markNoisyDirs(pwTree, getNoisyPatterns());
           const pwStats = countFlatStats(pwEntries);
           const fc = pwStats.files;
           const dc = pwStats.dirs;
@@ -251,7 +268,7 @@ function registerHandler(webview: vscode.Webview): void {
             format: ext,
             count: itemCount,
             size: formatCompactSize(pwStats.totalSize),
-          });
+          }, getNoisyPatterns());
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: "Wrong password" });
