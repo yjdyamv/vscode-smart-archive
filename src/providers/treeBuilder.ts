@@ -159,29 +159,62 @@ function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[
   return root;
 }
 
+// ── Entry index (fast child lookup) ────────────────────────────────
+
+type EntryIndex = Map<string, FlatEntry[]>;
+
+function buildEntryIndex(entries: FlatEntry[]): EntryIndex {
+  const index: EntryIndex = new Map();
+  index.set("", []); // root
+  for (const e of entries) {
+    const p = e.path.replace(/\\/g, "/");
+    const lastSlash = p.lastIndexOf("/");
+    const parent = lastSlash > 0 ? p.slice(0, lastSlash) : "";
+    let bucket = index.get(parent);
+    if (!bucket) {
+      bucket = [];
+      index.set(parent, bucket);
+    }
+    bucket.push(e);
+  }
+  return index;
+}
+
 // ── Lazy: get children of a specific directory ────────────────────
 
 function getDirChildren(
-  entries: FlatEntry[],
   parentPath: string,
+  entries: FlatEntry[],
+  index?: EntryIndex,
 ): TreeNode[] {
-  const prefix = parentPath + "/";
+  let candidates: EntryWithParts[];
+
+  if (index) {
+    const bucket = index.get(parentPath);
+    if (!bucket) return [];
+    candidates = bucket.map((e) => {
+      const relative = e.path.replace(/\\/g, "/").slice(parentPath ? parentPath.length + 1 : 0);
+      return { entry: e, parts: relative.split("/").filter(Boolean) };
+    });
+  } else {
+    const prefix = parentPath ? parentPath + "/" : "";
+    candidates = [];
+    for (const e of entries) {
+      const p = e.path.replace(/\\/g, "/");
+      if (!p.startsWith(prefix)) continue;
+      const relative = p.slice(prefix.length);
+      if (!relative) continue;
+      const parts = relative.split("/");
+      if (parts.length === 0) continue;
+      candidates.push({ entry: e, parts });
+    }
+  }
+
+  // Detect which sub-directories have further children
   const dirHasChildren = new Set<string>();
   const children: TreeNode[] = [];
   const seen = new Map<string, TreeNode>();
 
-  // Collect all entries under the parent
-  const candidates: EntryWithParts[] = [];
-  for (const e of entries) {
-    if (!e.path.startsWith(prefix)) continue;
-    const relative = e.path.slice(prefix.length);
-    if (!relative) continue;
-    const parts = relative.split("/");
-    if (parts.length === 0) continue;
-    candidates.push({ entry: e, parts });
-  }
-
-  // Detect which sub-directories have further children
   for (const { parts } of candidates) {
     if (parts.length > 1) {
       dirHasChildren.add(parts[0]);
@@ -195,8 +228,8 @@ function getDirChildren(
     if (seg === ".smartarchive") continue;
 
     const isDir = entry.type !== "REGULAR_FILE";
-    const fullChildPath = prefix + seg;
-    const hasKids = dirHasChildren.has(seg);
+    const fullChildPath = parentPath ? parentPath + "/" + seg : seg;
+    const hasKids = dirHasChildren.has(seg) || (index ? (index.get(fullChildPath)?.length ?? 0) > 0 : false);
 
     const existing = seen.get(seg);
     if (existing) {
@@ -249,5 +282,5 @@ function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total
   return { files, dirs, total: files + dirs };
 }
 
-export type { TreeNode, FlatEntry };
-export { buildTree, buildTreeRootOnly, getDirChildren, countTreeStats, countFlatStats };
+export type { TreeNode, FlatEntry, EntryIndex };
+export { buildTree, buildTreeRootOnly, getDirChildren, countTreeStats, countFlatStats, buildEntryIndex };

@@ -1,5 +1,6 @@
 import { ref, computed, type Ref } from "vue";
 import type { TreeNodeData } from "../types";
+import { saveState, loadState } from "./useMessage";
 
 export interface FlatNode {
   node: TreeNodeData;
@@ -10,16 +11,12 @@ export interface FlatNode {
   visible: boolean;
 }
 
-const vscodeApi = (() => {
-  try { return acquireVsCodeApi(); } catch { return null; }
-})();
-
 function persistExpanded(paths: Set<string>): void {
-  vscodeApi?.setState({ expanded: [...paths] });
+  saveState({ expanded: [...paths] });
 }
 
 function loadExpanded(): Set<string> {
-  const state = vscodeApi?.getState() as { expanded?: string[] } | undefined;
+  const state = loadState<{ expanded?: string[] }>();
   return new Set(state?.expanded ?? []);
 }
 

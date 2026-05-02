@@ -15,8 +15,8 @@ import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
-import { buildTreeRootOnly, getDirChildren, countFlatStats } from "./treeBuilder";
-import type { FlatEntry } from "./treeBuilder";
+import { buildTreeRootOnly, getDirChildren, countFlatStats, buildEntryIndex } from "./treeBuilder";
+import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
 import { extractSelected } from "./extraction";
@@ -44,6 +44,7 @@ interface HandlerState {
   filePath: string;
   password: string | undefined;
   entries: FlatEntry[];
+  entryIndex: EntryIndex;
 }
 
 const handlerStates = new WeakMap<vscode.Webview, HandlerState>();
@@ -99,6 +100,8 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     return;
   }
 
+  const entryIndex = buildEntryIndex(entries);
+
   const prev = handlerStates.get(webview);
 
   if (isEncryptableExt(getFullExt(filePath))) {
@@ -139,6 +142,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
         filePath,
         password: prev?.password,
         entries,
+        entryIndex,
       });
       webview.html = passwordHtml(archiveName, cssUri);
       if (!handlerRegistered.has(webview)) {
@@ -157,6 +161,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     filePath,
     password: prev?.password,
     entries,
+    entryIndex,
   });
   // Lazy: only build root-level nodes, children load on demand
   const tree = buildTreeRootOnly(entries, archiveName);
@@ -200,7 +205,7 @@ function registerHandler(webview: vscode.Webview): void {
 
       // ── Lazy tree: expand directory → fetch children on demand ──
       if (msg.c === "expandDir" && typeof msg.path === "string") {
-        const children = getDirChildren(s.entries, msg.path);
+        const children = getDirChildren(msg.path, s.entries, s.entryIndex);
         webview.postMessage({ c: "dirChildren", path: msg.path, children });
         return;
       }
@@ -234,6 +239,7 @@ function registerHandler(webview: vscode.Webview): void {
           logger.info({ event: "webview.password.ok", count: pwEntries.length });
           s.password = msg.pw;
           s.entries = pwEntries;
+          s.entryIndex = buildEntryIndex(pwEntries);
           const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
           const pwStats = countFlatStats(pwEntries);
           const fc = pwStats.files;
