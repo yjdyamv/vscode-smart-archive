@@ -127,16 +127,20 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     // re-trigger reactivity
     treeData.value = [...treeData.value];
 
-    // Return child paths that need lazy loading (in expanded set + hasMore + no children)
+    // Auto-expand non-collapsed children and chain-load them
     const needsLoad: string[] = [];
     const childPaths: string[] = [];
     for (const child of children) {
       childPaths.push(child.path);
-      if (child.hasMore && (!child.children || child.children.length === 0)
-        && expandedPaths.value.has(child.path)) {
-        needsLoad.push(child.path);
+      const hasKids = (child.children?.length ?? 0) > 0 || child.hasMore;
+      if (child.kind === "DIRECTORY" && !child.collapsed && hasKids) {
+        expandedPaths.value.add(child.path);
+        if (child.hasMore && (!child.children || child.children.length === 0)) {
+          needsLoad.push(child.path);
+        }
       }
     }
+    persistExpanded(expandedPaths.value);
     return { needsLoad, childPaths };
   }
 
