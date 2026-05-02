@@ -31,7 +31,7 @@ import {
   getDirChildren,
   buildEntryIndex,
   markNoisyDirs,
-  countTreeStats,
+  countAllStats,
 } from "./treeBuilder";
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
@@ -186,8 +186,8 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   const tree = buildTreeRootOnly(entries, archiveName);
   const patterns = getNoisyPatterns();
   markNoisyDirs(tree, patterns);
-  const stats = countTreeStats(tree);
-  const totalSize = entries.reduce((s, e) => s + (e.size || 0), 0);
+  const stats = countAllStats(entries);
+  const totalSize = stats.totalSize;
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
@@ -274,8 +274,8 @@ function registerHandler(webview: vscode.Webview): void {
           s.entryIndex = buildEntryIndex(pwEntries);
           const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
           markNoisyDirs(pwTree, getNoisyPatterns());
-          const pwStats = countTreeStats(pwTree);
-          const pwTotalSize = pwEntries.reduce((sum, e) => sum + (e.size || 0), 0);
+          const pwStats = countAllStats(pwEntries);
+          const pwTotalSize = pwStats.totalSize;
           const fc = pwStats.files;
           const dc = pwStats.dirs;
           const itemCount = pwStats.total;
