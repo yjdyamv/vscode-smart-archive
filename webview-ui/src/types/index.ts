@@ -5,6 +5,7 @@ export interface TreeNodeData {
   kind: "DIRECTORY" | "REGULAR_FILE";
   children?: TreeNodeData[];
   hasMore?: boolean;
+  collapsed?: boolean;
 }
 
 export interface ArchiveProps {

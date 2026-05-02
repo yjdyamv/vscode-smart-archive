@@ -11,11 +11,11 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { isEncrypted } from "../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { getFullExt, isWrappedFormat, isEncryptableExt, NOISY_DIR_PATTERNS } from "../constants";
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
-import { buildTreeRootOnly, getDirChildren, countFlatStats, buildEntryIndex } from "./treeBuilder";
+import { buildTree, getDirChildren, buildEntryIndex, markNoisyDirs, countFlatStats } from "./treeBuilder";
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
@@ -163,8 +163,9 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     entries,
     entryIndex,
   });
-  // Lazy: only build root-level nodes, children load on demand
-  const tree = buildTreeRootOnly(entries, archiveName);
+  // Build full tree, mark noisy directories as collapsed
+  const tree = buildTree(entries, archiveName);
+  markNoisyDirs(tree, NOISY_DIR_PATTERNS);
   const stats = countFlatStats(entries);
   const fileCount = stats.files;
   const dirCount = stats.dirs;
@@ -174,7 +175,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     format: ext,
     count: itemCount,
     size: formatCompactSize(stats.totalSize),
-  });
+  }, NOISY_DIR_PATTERNS);
 
   if (!handlerRegistered.has(webview)) {
     handlerRegistered.add(webview);
@@ -240,7 +241,8 @@ function registerHandler(webview: vscode.Webview): void {
           s.password = msg.pw;
           s.entries = pwEntries;
           s.entryIndex = buildEntryIndex(pwEntries);
-          const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
+          const pwTree = buildTree(pwEntries, s.archiveName);
+          markNoisyDirs(pwTree, NOISY_DIR_PATTERNS);
           const pwStats = countFlatStats(pwEntries);
           const fc = pwStats.files;
           const dc = pwStats.dirs;
@@ -251,7 +253,7 @@ function registerHandler(webview: vscode.Webview): void {
             format: ext,
             count: itemCount,
             size: formatCompactSize(pwStats.totalSize),
-          });
+          }, NOISY_DIR_PATTERNS);
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: "Wrong password" });
