@@ -21,7 +21,10 @@ class ArchiveEditorProvider implements vscode.CustomReadonlyEditorProvider {
     document: vscode.CustomDocument,
     webviewPanel: vscode.WebviewPanel,
   ): Promise<void> {
-    webviewPanel.webview.options = { enableScripts: true };
+    webviewPanel.webview.options = {
+      enableScripts: true,
+      enableCommandUris: true,
+    };
     await setupWebview(webviewPanel.webview, document.uri);
   }
 }

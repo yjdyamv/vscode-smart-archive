@@ -3,4 +3,4 @@ out/
 test/out/
 *.vsix
 .vscode/settings.json
-
+media/vue/

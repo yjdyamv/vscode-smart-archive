@@ -226,6 +226,10 @@
   "scripts": {
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
+    "build:webview": "cd webview-ui && npm run build",
+    "dev:webview": "cd webview-ui && npm run dev",
+    "install:webview": "cd webview-ui && npm install",
+    "precompile": "npm run build:webview",
     "test": "npm run compile && tsc -p test && node test/out/core.test.js && node test/out/preview.test.js",
     "test:extension": "node test/runTest.js",
     "format": "oxfmt --write src/",
@@ -238,7 +242,7 @@
     "package:ovsx": "npm run compile && npx ovsx package",
     "publish": "npx vsce publish",
     "publish:ovsx": "npm run compile && npx ovsx publish",
-    "vscode:prepublish": "npm run compile"
+    "vscode:prepublish": "npm run build:webview && npm run compile"
   },
   "overrides": {
     "encoding-sniffer": "1.0.2"
