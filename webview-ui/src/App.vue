@@ -82,6 +82,13 @@ function closeContextMenu() {
   ctxMenu.show = false;
 }
 
+function ctxExtract() { extSel(); closeContextMenu(); }
+function ctxDelete() { delSel(); closeContextMenu(); }
+function ctxCopy() { copySel(); closeContextMenu(); }
+function ctxAddHere() { post({ c: "addFiles", dir: ctxMenu.dirPath }); closeContextMenu(); }
+function ctxNewFolder() { post({ c: "newFolderPrompt", dir: ctxMenu.dirPath }); closeContextMenu(); }
+function ctxRename() { if (ctxMenu.paths.length === 1) renameFile(ctxMenu.paths[0]); closeContextMenu(); }
+
 // Message handlers
 function extAll() {
   post({ c: "extAll" });
@@ -473,12 +480,12 @@ provide("showToast", showToast);
       :paths="ctxMenu.paths"
       :dir-path="ctxMenu.dirPath"
       @close="closeContextMenu"
-      @extract="extSel; closeContextMenu()"
-      @delete="delSel; closeContextMenu()"
-      @copy="copySel; closeContextMenu()"
-      @add-here="post({ c: 'addFiles', dir: ctxMenu.dirPath }); closeContextMenu()"
-      @new-folder="post({ c: 'newFolderPrompt', dir: ctxMenu.dirPath }); closeContextMenu()"
-      @rename="renameFile(ctxMenu.paths[0]); closeContextMenu()"
+      @extract="ctxExtract"
+      @delete="ctxDelete"
+      @copy="ctxCopy"
+      @add-here="ctxAddHere"
+      @new-folder="ctxNewFolder"
+      @rename="ctxRename"
     />
   </div>
 </template>

@@ -137,15 +137,21 @@ function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[
 
     const existing = seen.get(seg);
     if (existing) {
-      if (existing.kind === "DIRECTORY" && entry.type !== "REGULAR_FILE") {
-        existing.size = entry.size || existing.size;
+      // If a directory was already created for this segment (from another entry),
+      // preserve it and only update size for directory entries
+      if (existing.kind === "DIRECTORY") {
+        if (entry.type !== "REGULAR_FILE") {
+          existing.size = entry.size || existing.size;
+        }
+        continue;
       }
+      // Two non-directory entries with the same name — keep first
       continue;
     }
 
     const isDir = entry.type !== "REGULAR_FILE";
     const fullPath = entry.path;
-    const fullSegPath = seg; // root-level path
+    const fullSegPath = seg;
     const hasKids = dirHasChildren.has(fullSegPath);
 
     const node: TreeNode = isDir
