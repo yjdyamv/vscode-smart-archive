@@ -13,6 +13,7 @@ import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { getFullExt, getWrapExtension } from "../../constants";
 import { zstdCompress } from "../../engines/zstd-codec";
+import { validatePassword } from "../../utils/security";
 
 /**
  * Run a mutation on a wrapped archive (tar.gz, tar.xz, etc.).
@@ -37,7 +38,10 @@ export async function withWrappedArchive(
     js7z.FS.mkdir(tmpDir);
 
     const xArgs = ["x", `/${archiveName}`, `-o${tmpDir}`, "-y"];
-    if (password) xArgs.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      xArgs.splice(1, 0, `-p${password}`);
+    }
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
       js7z.callMain(xArgs);
@@ -66,7 +70,10 @@ export async function withWrappedArchive(
           js7z3.FS.writeFile("/_re.tar", new Uint8Array(modifiedTar));
           const compOut = `/_re.${wrapExt}`;
           const compArgs = ["a", compOut, "/_re.tar"];
-          if (password) compArgs.splice(1, 0, `-p${password}`);
+          if (password) {
+            validatePassword(password);
+            compArgs.splice(1, 0, `-p${password}`);
+          }
           await new Promise<void>((resolve, reject) => {
             js7z3.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
             js7z3.callMain(compArgs);

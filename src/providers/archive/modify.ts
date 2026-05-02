@@ -11,7 +11,7 @@ import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { getFullExt, isWrappedFormat } from "../../constants";
-import { checkFileSize } from "../../utils/security";
+import { checkFileSize, validatePassword } from "../../utils/security";
 import { PREVIEW_TMP_DIR } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
@@ -68,7 +68,10 @@ export async function createFolderInArchive(
     const args = firstLevel
       ? ["a", `/${archiveName}`, "-aot", `/${firstLevel}`]
       : ["a", `/${archiveName}`, "-aot", dotfile];
-    if (password) args.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      args.splice(1, 0, `-p${password}`);
+    }
 
     logger.debug({ event: "createFolder.7zAdd", args: args.join(" ") });
 
@@ -204,7 +207,10 @@ async function unwrapAndExtract(
     js7z2.FS.writeFile("/_inner.tar", new Uint8Array(tarData));
     js7z2.FS.mkdir("/_pv2");
     const args = ["x", "/_inner.tar", "-o/_pv2", "-y", target];
-    if (password) args.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      args.splice(1, 0, `-p${password}`);
+    }
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x inner: ${c}`)));
       js7z2.callMain(args);

@@ -18,7 +18,7 @@ import { getFullExt, isWrappedFormat } from "../constants";
 import { isRarExt } from "../utils/rar";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
-import { checkFileSize } from "../utils/security";
+import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
 
 /**
@@ -94,6 +94,12 @@ function copyFromFSWithStrip(
 
       let data: Uint8Array | ArrayBuffer;
       try {
+        // Pre-check size from VFS stat before reading into memory
+        try {
+          checkFileSize(js7z.FS.stat(full).size);
+        } catch {
+          /* stat may fail, fall through */
+        }
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
         logger.warn(
@@ -104,6 +110,18 @@ function copyFromFSWithStrip(
       }
       checkFileSize(data.byteLength);
 
+      // Decompression bomb check: verify reported vs actual size ratio
+      try {
+        const reported = js7z.FS.stat(full).size;
+        if (data.byteLength > reported * 4 && reported > 1024) {
+          throw new Error(
+            `Decompression bomb: reported ${reported}B but decompressed to ${data.byteLength}B`,
+          );
+        }
+      } catch {
+        /* stat may fail, skip bomb check */
+      }
+
       let finalPath = outPath;
       const dir = path.dirname(outPath);
       const base = path.basename(outPath);
@@ -111,13 +129,21 @@ function copyFromFSWithStrip(
       const stem = extIdx > 0 ? base.slice(0, extIdx) : base;
       const ext = extIdx > 0 ? base.slice(extIdx) : "";
       let counter = 1;
-      while (fs.existsSync(finalPath)) {
+      // Use wx flag to avoid TOCTOU race — fails if file already exists
+      while (true) {
         if (counter > 999) throw new Error(`Failed to resolve collision for ${outPath}`);
-        finalPath = path.join(dir, `${stem}_${counter}${ext}`);
-        counter++;
+        try {
+          fs.writeFileSync(finalPath, Buffer.from(data), { flag: "wx" });
+          break;
+        } catch (e: unknown) {
+          if ((e as NodeJS.ErrnoException).code === "EEXIST") {
+            counter++;
+            finalPath = path.join(dir, `${stem}_${counter}${ext}`);
+            continue;
+          }
+          throw e;
+        }
       }
-
-      fs.writeFileSync(finalPath, Buffer.from(data));
     }
   };
 
@@ -190,7 +216,10 @@ async function extractSelected(
           else reject(new Error(`7z x outer: ${c}`));
         };
         const outerArgs = ["x", `/${archiveName}`, "-o/_x1", "-y"];
-        if (password) outerArgs.splice(1, 0, `-p${password}`);
+        if (password) {
+          validatePassword(password);
+          outerArgs.splice(1, 0, `-p${password}`);
+        }
         js7z.callMain(outerArgs);
       });
       const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
@@ -265,7 +294,10 @@ async function extractSelected(
         };
         const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
         const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
-        if (password) eArgs.splice(1, 0, `-p${password}`);
+        if (password) {
+          validatePassword(password);
+          eArgs.splice(1, 0, `-p${password}`);
+        }
         eArgs.push(...normalizedPaths);
         // Add exclusion flags for deselected children
         if (excludes && excludes.length > 0) {
