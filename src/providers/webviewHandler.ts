@@ -34,6 +34,7 @@ import {
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
+import { mountArchive } from "../engines/js7z-helpers";
 import { extractSelected } from "./extraction";
 import {
   createFolderInArchive,
@@ -249,18 +250,17 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "pw" && msg.pw) {
         logger.info({ event: "webview.password.attempt" });
         try {
-          const data = await vscode.workspace.fs.readFile(vscode.Uri.file(s.filePath));
-          const pwEntries = await fetchFileList(s.filePath, msg.pw, new Uint8Array(data));
+          const pwEntries = await fetchFileList(s.filePath, msg.pw);
           if (pwEntries.length === 0) {
             webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
             return;
           }
           const js7z = await JS7z({ print: () => {}, printErr: () => {} });
           try {
-            js7z.FS.writeFile("/_pwtest", new Uint8Array(data));
+            const testPath = mountArchive(js7z, s.filePath);
             await new Promise<void>((resolve, reject) => {
               js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
-              js7z.callMain(["t", `-p${msg.pw}`, "/_pwtest"]);
+              js7z.callMain(["t", `-p${msg.pw}`, testPath]);
             });
           } catch {
             logger.warn({ event: "webview.password.testFailed" }, "Password verification failed");

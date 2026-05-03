@@ -8,6 +8,7 @@
  */
 
 import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
@@ -93,4 +94,29 @@ function run7z(
   });
 }
 
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z };
+const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
+
+let _mntCount = 0;
+
+function mountArchive(js7z: JS7zInstance, filePath: string): string {
+  const stat = fs.statSync(filePath);
+  const archiveName = getBaseName(filePath);
+
+  if (stat.size <= MAX_BUFFER) {
+    const data = fs.readFileSync(filePath);
+    js7z.FS.writeFile(`/${archiveName}`, data);
+    return `/${archiveName}`;
+  }
+
+  const parentDir = path.dirname(filePath);
+  const mnt = `/mnt_${_mntCount++}`;
+  try {
+    js7z.FS.mkdir(mnt);
+  } catch {
+    /* already exists */
+  }
+  js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
+  return `${mnt}/${archiveName}`;
+}
+
+export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z, mountArchive, MAX_BUFFER };

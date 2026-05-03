@@ -10,7 +10,7 @@
 
 import * as fs from "fs";
 import type { JS7zFactory } from "../types";
-import { tryCleanup, run7z } from "./js7z-helpers";
+import { tryCleanup, run7z, mountArchive } from "./js7z-helpers";
 import { getBaseName, fixArchiveEncoding } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
@@ -24,12 +24,7 @@ export async function listFiles(
   data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
   logger.debug({ event: "listFiles.start", filePath, hasPassword: !!password });
-  const buf =
-    data ??
-    (() => {
-      checkFileSize(fs.statSync(filePath).size);
-      return fs.readFileSync(filePath);
-    })();
+  const useData = !!data;
   let stdout = "";
   let stderr = "";
 
@@ -44,7 +39,12 @@ export async function listFiles(
 
   try {
     const archiveName = getBaseName(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, buf);
+    if (useData) {
+      js7z.FS.writeFile(`/${archiveName}`, data);
+    } else {
+      checkFileSize(fs.statSync(filePath).size);
+      mountArchive(js7z, filePath);
+    }
 
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (code: number) => {
@@ -106,7 +106,6 @@ export async function listFiles(
 
 export async function isEncrypted(filePath: string): Promise<boolean> {
   checkFileSize(fs.statSync(filePath).size);
-  const data = fs.readFileSync(filePath);
   let stdout = "",
     stderr = "";
   const js7z = await JS7z({
@@ -120,7 +119,7 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
 
   try {
     const archiveName = getBaseName(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    mountArchive(js7z, filePath);
 
     try {
       await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
