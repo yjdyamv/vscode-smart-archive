@@ -13,6 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { JS7z, tryCleanupJS7z } from "./fileListing";
+import { mountArchive } from "../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../constants";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
@@ -179,18 +180,16 @@ async function extractSelected(
   });
 
   if (isWrapped) {
-    const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-    const archiveName = path.basename(archivePath);
     const js7z = await JS7z({ print: () => {}, printErr: () => {} });
     try {
-      js7z.FS.writeFile(`/${archiveName}`, data);
+      const outerFsPath = mountArchive(js7z, archivePath);
       js7z.FS.mkdir("/_x1");
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (c: number) => {
           if (c === 0) resolve();
           else reject(new Error(`7z x outer: ${c}`));
         };
-        const outerArgs = ["x", `/${archiveName}`, "-o/_x1", "-y"];
+        const outerArgs = ["x", outerFsPath, "-o/_x1", "-y"];
         if (password) {
           validatePassword(password);
           outerArgs.splice(1, 0, `-p${password}`);
@@ -246,7 +245,6 @@ async function extractSelected(
   }
 
   // Normal archives: 7z only
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
   const archiveName = path.basename(archivePath);
   let stderr = "";
 
@@ -258,7 +256,7 @@ async function extractSelected(
   });
 
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    const archiveFsPath = mountArchive(js7z, archivePath);
     js7z.FS.mkdir("/out");
 
     await new Promise<void>((resolve, reject) => {
@@ -267,7 +265,7 @@ async function extractSelected(
         else reject(new Error(`7z ${flat ? "e" : "x"}: ${code}\n${stderr}`));
       };
       const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
-      const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
+      const eArgs = [flat ? "e" : "x", archiveFsPath, "-o/out", flat ? "-aou" : "-y"];
       if (password) {
         validatePassword(password);
         eArgs.splice(1, 0, `-p${password}`);
