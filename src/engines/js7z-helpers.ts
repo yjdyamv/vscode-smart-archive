@@ -119,4 +119,18 @@ function mountArchive(js7z: JS7zInstance, filePath: string): string {
   return `${mnt}/${archiveName}`;
 }
 
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z, mountArchive, MAX_BUFFER };
+async function mutateArchive(
+  archivePath: string,
+  js7z: JS7zInstance,
+  action: (fsPath: string) => Promise<void>,
+): Promise<void> {
+  const fsPath = mountArchive(js7z, archivePath);
+  const usesMount = fsPath.startsWith("/mnt_");
+  await action(fsPath);
+  if (!usesMount) {
+    const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+  }
+}
+
+export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z, mountArchive, mutateArchive, MAX_BUFFER };
