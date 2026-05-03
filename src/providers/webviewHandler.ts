@@ -402,7 +402,7 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "addFiles") {
         const targetDir = typeof msg.dir === "string" ? msg.dir : "";
         logger.info({ event: "webview.addFiles", dir: targetDir });
-        initAddToArchive(s.filePath, targetDir, s.password, webview, s.archiveUri);
+        initAddToArchive(s.filePath, targetDir, s.password, webview, s.archiveUri, setupWebview);
         vscode.commands.executeCommand("yjdyamv.smart-archive.addToArchive");
       }
 
