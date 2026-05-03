@@ -52,7 +52,7 @@ function showToast(msg: string, ok = true) {
   toast.ok = ok;
   toast.show = true;
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.show = false; }, 1800);
+  toastTimer = setTimeout(() => { toast.show = false; }, ok ? 1800 : 4000);
 }
 
 const loadingMsg = ref("Reading archive...");
@@ -335,6 +335,13 @@ onMounted(() => {
   const props = window._xProps;
   const files = window._xFiles ?? 0;
   const dirs = window._xDirs ?? 0;
+  const initView = window._xViewState;
+
+  if (initView === "password") {
+    if (props) archiveProps.value = props;
+    viewState.value = "password";
+    return;
+  }
 
   if (props) {
     archiveProps.value = props;
@@ -346,6 +353,9 @@ onMounted(() => {
     treeData.value = rawTree;
     viewState.value = "content";
     tree.initExpandedFromTree();
+    // Show toast from page reload (after delete/rename/add/folder operations)
+    const toastMsg = window._xToast;
+    if (toastMsg) showToast(toastMsg, true);
     // Trigger lazy loading for auto-expanded (non-noisy) directories
     loadExpandedPaths();
   } else {
@@ -359,9 +369,6 @@ onMounted(() => {
         break;
       case "err":
         showToast(msg.t as string, false);
-        break;
-      case "del-ok":
-        showToast(msg.t as string, true);
         break;
       case "loading":
         loadingMsg.value = (msg.t as string) || "Working...";
