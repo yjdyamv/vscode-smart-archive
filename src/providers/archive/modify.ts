@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
+import { mountArchive, MAX_BUFFER } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { PREVIEW_TMP_DIR } from "../tempFiles";
@@ -40,25 +41,17 @@ export async function createFolderInArchive(
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-  const archiveName = path.basename(archivePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    const fsPath = mountArchive(js7z, archivePath);
+    const usesMount = fsPath.startsWith("/mnt_");
 
     const vfsFolder = `/${folderPath}`;
     let cur = "";
     for (const part of folderPath.split("/").filter(Boolean)) {
       cur += "/" + part;
-      try {
-        js7z.FS.mkdir(cur);
-      } catch {
-        logger.warn(
-          { event: "createFolder.mkdir.failed" },
-          "Failed to create directory in virtual FS",
-        );
-      }
+      try { js7z.FS.mkdir(cur); } catch { /* ignore */ }
     }
     const dotfile = `${vfsFolder}/.smartarchive`;
     js7z.FS.writeFile(dotfile, new Uint8Array(1));
@@ -66,8 +59,8 @@ export async function createFolderInArchive(
     const parts = folderPath.split("/").filter(Boolean);
     const firstLevel = parts[0];
     const args = firstLevel
-      ? ["a", `/${archiveName}`, "-aot", `/${firstLevel}`]
-      : ["a", `/${archiveName}`, "-aot", dotfile];
+      ? ["a", fsPath, "-aot", `/${firstLevel}`]
+      : ["a", fsPath, "-aot", dotfile];
     if (password) {
       validatePassword(password);
       args.splice(1, 0, `-p${password}`);
@@ -80,8 +73,10 @@ export async function createFolderInArchive(
       js7z.callMain(args);
     });
 
-    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    if (!usesMount) {
+      const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    }
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
     tryCleanupJS7z(js7z);
@@ -267,15 +262,14 @@ export async function renameInArchive(
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-  const archiveName = path.basename(archivePath);
   const oldNorm = oldPath.replace(/\\/g, "/");
   const newNorm = newPath.replace(/\\/g, "/");
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
-    const rnArgs = ["rn", `/${archiveName}`, oldNorm, newNorm];
+    const fsPath = mountArchive(js7z, archivePath);
+    const usesMount = fsPath.startsWith("/mnt_");
+    const rnArgs = ["rn", fsPath, oldNorm, newNorm];
     if (password) rnArgs.splice(1, 0, `-p${password}`);
     logger.debug({ event: "rename.7zArgs", args: rnArgs.join(" ") });
 
@@ -284,8 +278,10 @@ export async function renameInArchive(
       js7z.callMain(rnArgs);
     });
 
-    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    if (!usesMount) {
+      const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    }
     logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
   } finally {
     tryCleanupJS7z(js7z);
