@@ -296,4 +296,4 @@ async function extractSelected(
   }
 }
 
-export { copyFromFSWithStrip, extractSelected };
+export { extractSelected };

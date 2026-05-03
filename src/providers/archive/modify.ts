@@ -222,8 +222,6 @@ async function unwrapAndExtract(
   }
 }
 
-export { unwrapAndExtract };
-
 export async function testArchive(archivePath: string, password?: string): Promise<string> {
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);

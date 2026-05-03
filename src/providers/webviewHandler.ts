@@ -13,8 +13,6 @@ import * as path from "path";
 import { isEncrypted } from "../engines/js7z-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt, NOISY_DIR_PATTERNS } from "../constants";
 
-// ...
-
 function getNoisyPatterns(): string[] {
   const config: string[] | undefined = vscode.workspace
     .getConfiguration("smart-archive")
@@ -353,7 +351,7 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
         try {
           await deleteFromArchive(s.filePath, msg.paths, s.password);
-          await setupWebview(webview, s.archiveUri, "Deleted " + msg.paths.length + " item(s)");
+          await setupWebview(webview, s.archiveUri, t("archive.toastDeleted", String(msg.paths.length)));
         } catch (err) {
           logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
@@ -387,7 +385,7 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.rename", oldPath, newPath });
         try {
           await renameInArchive(s.filePath, oldPath, newPath, s.password);
-          if (s.archiveUri) await setupWebview(webview, s.archiveUri, "Renamed");
+          if (s.archiveUri) await setupWebview(webview, s.archiveUri, t("archive.toastRenamed"));
         } catch (err) {
           logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
           showErrorWithCopy(t("decompress.failed") + (err as Error).message);
@@ -424,7 +422,7 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.newFolder", dir: targetDir, name });
         try {
           await createFolderInArchive(s.filePath, targetDir, name, s.password);
-          if (s.archiveUri) await setupWebview(webview, s.archiveUri, "Created folder");
+          if (s.archiveUri) await setupWebview(webview, s.archiveUri, t("archive.toastCreatedFolder"));
         } catch (err) {
           logger.error({ event: "webview.newFolder.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
