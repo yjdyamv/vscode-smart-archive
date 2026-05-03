@@ -318,6 +318,42 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "正在向压缩包添加文件: ",
     "zh-tw": "正在向壓縮檔新增檔案: ",
   },
+  // ---- Security / Validation ----
+  "security.passwordStartDash": {
+    en: "Password must not start with '-'",
+    "zh-cn": "密码不能以 '-' 开头",
+    "zh-tw": "密碼不能以 '-' 開頭",
+  },
+  "security.passwordNullByte": {
+    en: "Password contains null byte",
+    "zh-cn": "密码包含空字节",
+    "zh-tw": "密碼包含空字節",
+  },
+  "security.passwordNewline": {
+    en: "Password contains newline",
+    "zh-cn": "密码包含换行符",
+    "zh-tw": "密碼包含換行符",
+  },
+  "security.fileSizeExceeded": {
+    en: "File size {0} exceeds maximum {1}",
+    "zh-cn": "文件大小 {0} 超过最大限制 {1}",
+    "zh-tw": "檔案大小 {0} 超過最大限制 {1}",
+  },
+  "security.totalSizeExceeded": {
+    en: "Total decompressed size {0} exceeds maximum {1}",
+    "zh-cn": "解压后总大小 {0} 超过最大限制 {1}",
+    "zh-tw": "解壓後總大小 {0} 超過最大限制 {1}",
+  },
+  "security.decompressionBomb": {
+    en: "Decompression bomb: reported {0}B but decompressed to {1}B",
+    "zh-cn": "检测到解压炸弹: 报告 {0}B 但解压后为 {1}B",
+    "zh-tw": "偵測到解壓炸彈: 報告 {0}B 但解壓後為 {1}B",
+  },
+  "decompress.rarVolume": {
+    en: 'Multi-volume RAR: "{0}" requires a .rar file in the same directory.',
+    "zh-cn": '多卷 RAR: "{0}" 需要同目录下的 .rar 文件。',
+    "zh-tw": '多卷 RAR: "{0}" 需要同目錄下的 .rar 檔案。',
+  },
 };
 
 /**
