@@ -199,10 +199,6 @@ function submitPassword(pw: string) {
   post({ c: "pw", pw });
 }
 
-function skipPassword() {
-  post({ c: "skipPw" });
-}
-
 function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
   for (const node of nodes) {
     if (node.path === path) return node;
@@ -482,7 +478,6 @@ provide("showToast", showToast);
       v-else-if="viewState === 'password'"
       :archive-name="archiveProps?.name ?? ''"
       @submit="submitPassword"
-      @skip="skipPassword"
     />
     <template v-else-if="viewState === 'content'">
       <Toolbar
