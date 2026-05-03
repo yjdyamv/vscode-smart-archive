@@ -239,6 +239,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "输入 AES-256 加密/解密密码（留空跳过）",
     "zh-tw": "輸入 AES-256 加密/解密密碼（留空跳過）",
   },
+  "password.wrongPassword": {
+    en: "Wrong password",
+    "zh-cn": "密码错误",
+    "zh-tw": "密碼錯誤",
+  },
 
   // ---- Timing ----
   "time.elapsed": {

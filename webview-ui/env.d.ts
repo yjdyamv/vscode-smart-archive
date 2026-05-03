@@ -20,4 +20,6 @@ interface Window {
   _xFiles?: number;
   _xDirs?: number;
   _xNoisy?: string[];
+  _xToast?: string;
+  _xViewState?: string;
 }

@@ -34,7 +34,7 @@ import {
   countAllStats,
 } from "./treeBuilder";
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
-import { loadingHtml, emptyHtml, passwordHtml, contentHtml } from "./htmlRenderer";
+import { loadingHtml, emptyHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
 import { extractSelected } from "./extraction";
 import {
@@ -79,7 +79,7 @@ function getWebviewUris(webview: vscode.Webview): { cssUri: string; jsUri: strin
   };
 }
 
-async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Promise<void> {
+async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri, toast?: string): Promise<void> {
   let filePath = archiveUri.fsPath;
   const ext = getFullExt(filePath);
   const { cssUri, jsUri } = getWebviewUris(webview);
@@ -143,7 +143,17 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
         entries: [],
         entryIndex: new Map(),
       });
-      webview.html = passwordHtml(archiveName, cssUri);
+      webview.html = contentHtml(
+        [],
+        0,
+        0,
+        cssUri,
+        jsUri,
+        { name: archiveName, format: ext, count: 0, size: "" },
+        undefined,
+        undefined,
+        "password",
+      );
       if (!handlerRegistered.has(webview)) {
         handlerRegistered.add(webview);
         registerHandler(webview);
@@ -195,6 +205,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
       size: formatCompactSize(totalSize),
     },
     patterns,
+    toast,
   );
 
   if (!handlerRegistered.has(webview)) {
@@ -242,7 +253,7 @@ function registerHandler(webview: vscode.Webview): void {
           const data = await vscode.workspace.fs.readFile(vscode.Uri.file(s.filePath));
           const pwEntries = await fetchFileList(s.filePath, msg.pw, new Uint8Array(data));
           if (pwEntries.length === 0) {
-            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+            webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
             return;
           }
           const js7z = await JS7z({ print: () => {}, printErr: () => {} });
@@ -254,7 +265,7 @@ function registerHandler(webview: vscode.Webview): void {
             });
           } catch {
             logger.warn({ event: "webview.password.testFailed" }, "Password verification failed");
-            webview.postMessage({ c: "pwerr", t: "Wrong password" });
+            webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
             return;
           } finally {
             tryCleanupJS7z(js7z);
@@ -284,10 +295,11 @@ function registerHandler(webview: vscode.Webview): void {
               size: formatCompactSize(pwTotalSize),
             },
             getNoisyPatterns(),
+            undefined,
           );
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
-          webview.postMessage({ c: "pwerr", t: "Wrong password" });
+          webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
         }
         return;
       }
@@ -336,11 +348,7 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
         try {
           await deleteFromArchive(s.filePath, msg.paths, s.password);
-          webview.postMessage({
-            c: "del-ok",
-            t: "Deleted " + msg.paths.length + " item(s). Reloading...",
-          });
-          await setupWebview(webview, s.archiveUri);
+          await setupWebview(webview, s.archiveUri, "Deleted " + msg.paths.length + " item(s)");
         } catch (err) {
           logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
@@ -374,8 +382,7 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.rename", oldPath, newPath });
         try {
           await renameInArchive(s.filePath, oldPath, newPath, s.password);
-          webview.postMessage({ c: "del-ok", t: "done" });
-          if (s.archiveUri) await setupWebview(webview, s.archiveUri);
+          if (s.archiveUri) await setupWebview(webview, s.archiveUri, "Renamed");
         } catch (err) {
           logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
           showErrorWithCopy(t("decompress.failed") + (err as Error).message);
@@ -412,8 +419,7 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.newFolder", dir: targetDir, name });
         try {
           await createFolderInArchive(s.filePath, targetDir, name, s.password);
-          webview.postMessage({ c: "del-ok", t: "done" });
-          if (s.archiveUri) await setupWebview(webview, s.archiveUri);
+          if (s.archiveUri) await setupWebview(webview, s.archiveUri, "Created folder");
         } catch (err) {
           logger.error({ event: "webview.newFolder.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
