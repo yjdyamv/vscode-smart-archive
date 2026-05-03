@@ -92,6 +92,81 @@
           },
           {
             "filenamePattern": "*.zst"
+          },
+          {
+            "filenamePattern": "*.cab"
+          },
+          {
+            "filenamePattern": "*.arj"
+          },
+          {
+            "filenamePattern": "*.lzh"
+          },
+          {
+            "filenamePattern": "*.chm"
+          },
+          {
+            "filenamePattern": "*.msi"
+          },
+          {
+            "filenamePattern": "*.z"
+          },
+          {
+            "filenamePattern": "*.cpio"
+          },
+          {
+            "filenamePattern": "*.rpm"
+          },
+          {
+            "filenamePattern": "*.deb"
+          },
+          {
+            "filenamePattern": "*.uha"
+          },
+          {
+            "filenamePattern": "*.xar"
+          },
+          {
+            "filenamePattern": "*.iso"
+          },
+          {
+            "filenamePattern": "*.vhd"
+          },
+          {
+            "filenamePattern": "*.vmdk"
+          },
+          {
+            "filenamePattern": "*.fat"
+          },
+          {
+            "filenamePattern": "*.ntfs"
+          },
+          {
+            "filenamePattern": "*.squashfs"
+          },
+          {
+            "filenamePattern": "*.dmg"
+          },
+          {
+            "filenamePattern": "*.hfs"
+          },
+          {
+            "filenamePattern": "*.apm"
+          },
+          {
+            "filenamePattern": "*.mbr"
+          },
+          {
+            "filenamePattern": "*.elf"
+          },
+          {
+            "filenamePattern": "*.macho"
+          },
+          {
+            "filenamePattern": "*.swf"
+          },
+          {
+            "filenamePattern": "*.flv"
           }
         ]
       }
