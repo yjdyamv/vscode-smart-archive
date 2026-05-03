@@ -107,42 +107,24 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
   });
 
   webview.html = loadingHtml();
-
-  let entries: { path: string; size: number; type: string }[];
-  try {
-    entries = await fetchFileList(filePath);
-  } catch (err) {
-    logger.error({ event: "setupWebview.fetchFileList.failed", err }, (err as Error).message);
-    webview.html = emptyHtml(t("decompress.failed") + (err as Error).message, cssUri, jsUri);
-    return;
-  }
-
-  const entryIndex = buildEntryIndex(entries);
-
   const prev = handlerStates.get(webview);
+  let password = prev?.password;
 
+  // For encryptable formats, detect encryption before listing files
+  // to avoid leaking file structure from unencrypted ZIP headers.
   if (isEncryptableExt(getFullExt(filePath))) {
     let encrypted = false;
-    if (entries.length === 0) {
-      try {
-        encrypted = await isEncrypted(filePath);
-      } catch {
-        logger.warn(
-          { event: "setupWebview.encryptDetect.failed" },
-          "Failed to detect encryption state",
-        );
-        encrypted = true;
-      }
+    try {
+      encrypted = await isEncrypted(filePath);
+    } catch {
+      encrypted = true;
     }
 
-    logger.info({ event: "setupWebview.encrypted", encrypted });
-
-    if (encrypted && prev?.password) {
+    if (encrypted && password) {
       logger.info({ event: "setupWebview.password.retry" });
       try {
-        const pwEntries = await fetchFileList(filePath, prev.password);
+        const pwEntries = await fetchFileList(filePath, password);
         if (pwEntries.length > 0) {
-          entries = pwEntries;
           encrypted = false;
           logger.info({ event: "setupWebview.password.retrySuccess", count: pwEntries.length });
         }
@@ -157,9 +139,9 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
         archiveUri,
         archiveName,
         filePath,
-        password: prev?.password,
-        entries,
-        entryIndex,
+        password,
+        entries: [],
+        entryIndex: new Map(),
       });
       webview.html = passwordHtml(archiveName, cssUri);
       if (!handlerRegistered.has(webview)) {
@@ -170,13 +152,22 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri): Pr
     }
   }
 
-  logger.info({ event: "setupWebview.entries", count: entries.length });
+  let entries: { path: string; size: number; type: string }[];
+  try {
+    entries = await fetchFileList(filePath, password);
+  } catch (err) {
+    logger.error({ event: "setupWebview.fetchFileList.failed", err }, (err as Error).message);
+    webview.html = emptyHtml(t("decompress.failed") + (err as Error).message, cssUri, jsUri);
+    return;
+  }
+
+  const entryIndex = buildEntryIndex(entries);
 
   handlerStates.set(webview, {
     archiveUri,
     archiveName,
     filePath,
-    password: prev?.password,
+    password,
     entries,
     entryIndex,
   });
@@ -298,13 +289,6 @@ function registerHandler(webview: vscode.Webview): void {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: "Wrong password" });
         }
-        return;
-      }
-
-      // ── Skip password (open without unlocking) ──
-      if (msg.c === "skipPw") {
-        logger.info({ event: "webview.skipPw", archiveName: s.archiveName });
-        webview.html = contentHtml([], 0, 0, cssUri, jsUri);
         return;
       }
 

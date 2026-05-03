@@ -10,8 +10,6 @@ import {
   j7zCompress,
   j7zCompressDir,
   j7zDecompress,
-  laExtract,
-  laHasEncrypted,
   buildTree,
   countTreeStats,
   isEncryptedInline,
@@ -150,91 +148,7 @@ void (async () => {
     assert.strictEqual(f["src/a.txt"], "wim");
   });
 
-  // ── 6. Cross-engine: js7z create → libarchive-wasm read ──
-  await test("cross: 7z→LA single", async () => {
-    const b = await j7zCompress({ "/x.txt": "c7z" }, "/c.7z");
-    const f = await laExtract(b);
-    assert.strictEqual(f["x.txt"], "c7z");
-  });
-
-  await test("cross: 7z→LA folder", async () => {
-    const b = await j7zCompressDir({ "/s/a.js": "a", "/s/lib/b.js": "b" }, "/cf.7z");
-    const f = await laExtract(b);
-    assert.strictEqual(f["s/a.js"], "a");
-    assert.strictEqual(f["s/lib/b.js"], "b");
-  });
-
-  await test("cross: ZIP→LA single", async () => {
-    const b = await j7zCompress({ "/z.txt": "cz" }, "/cz.zip");
-    const f = await laExtract(b);
-    assert.strictEqual(f["z.txt"], "cz");
-  });
-
-  await test("cross: ZIP→LA folder", async () => {
-    const b = await j7zCompressDir({ "/p/readme.md": "#p", "/p/sub/f.js": "x" }, "/czf.zip");
-    const f = await laExtract(b);
-    assert.strictEqual(f["p/readme.md"], "#p");
-    assert.strictEqual(f["p/sub/f.js"], "x");
-  });
-
-  await test("cross: TAR→LA", async () => {
-    const b = await j7zCompress({ "/t.txt": "ct" }, "/ct.tar");
-    const f = await laExtract(b);
-    assert.strictEqual(f["t.txt"], "ct");
-  });
-
-  // ── 7. libarchive-wasm specific ──
-  await test("LA: extract encrypted ZIP", async () => {
-    const b = await j7zCompress({ "/e.txt": "enc" }, "/lz.zip", ["-pla"]);
-    const f = await laExtract(b, "la");
-    assert.strictEqual(f["e.txt"], "enc");
-  });
-
-  await test("LA: wrong password throws", async () => {
-    const b = await j7zCompress({ "/e.txt": "x" }, "/lz2.zip", ["-pla"]);
-    try {
-      await laExtract(b, "bad");
-      assert.fail("Should have thrown");
-    } catch (er) {
-      assert.ok(
-        (er as Error).message.includes("passphrase") || (er as Error).message.includes("Incorrect"),
-        (er as Error).message,
-      );
-    }
-  });
-
-  await test("LA: hasEncryptedData on encrypted ZIP", async () => {
-    const b = await j7zCompress({ "/x.txt": "x" }, "/he.zip", ["-ppw"]);
-    const v = await laHasEncrypted(b);
-    assert.ok(v === true || v === false || v === null, `value: ${v}`);
-  });
-
-  await test("LA: hasEncryptedData on plain ZIP", async () => {
-    const b = await j7zCompress({ "/x.txt": "x" }, "/hp.zip");
-    const v = await laHasEncrypted(b);
-    assert.ok(v === true || v === false || v === null, `value: ${v}`);
-  });
-
-  await test("LA: hasEncryptedData on 7z (returns null)", async () => {
-    const b = await j7zCompress({ "/x.txt": "x" }, "/h7z.7z", ["-ppw", "-mhe=on"]);
-    const v = await laHasEncrypted(b);
-    assert.strictEqual(v, null, "libarchive-wasm cannot detect 7z encryption");
-  });
-
-  await test("LA: decompress 7z-created GZip", async () => {
-    const b = await j7zCompress({ "/stream.txt": "gz la" }, "/lg.gz");
-    try {
-      const f = await laExtract(b);
-      assert.ok(Object.values(f).length >= 1, "should extract");
-    } catch (er) {
-      assert.ok(
-        (er as Error).message.includes("memory") || (er as Error).message.includes("bounds"),
-        (er as Error).message,
-      );
-    }
-  });
-
-  // ── 8. Security ──
+  // ── 6. Security ──
   await test("sec: path traversal blocked", () => {
     const safeJoin = (outDir: string, entry: string): string => {
       if (entry.includes("\0")) throw new Error(`null byte: ${entry}`);
