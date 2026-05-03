@@ -23,7 +23,7 @@ let _pendingAdd: {
   password: string | undefined;
   webview: vscode.Webview | null;
   archiveUri: vscode.Uri | null;
-  onComplete?: (webview: vscode.Webview, archiveUri: vscode.Uri) => Promise<void>;
+  onComplete?: (webview: vscode.Webview, archiveUri: vscode.Uri, toast?: string) => Promise<void>;
 } | null = null;
 
 export function initAddToArchive(
@@ -32,7 +32,7 @@ export function initAddToArchive(
   password: string | undefined,
   webview: vscode.Webview | null,
   archiveUri: vscode.Uri | null,
-  onComplete?: (webview: vscode.Webview, archiveUri: vscode.Uri) => Promise<void>,
+  onComplete?: (webview: vscode.Webview, archiveUri: vscode.Uri, toast?: string) => Promise<void>,
 ): void {
   _pendingAdd = { archivePath, targetDir, password, webview, archiveUri, onComplete };
 }
@@ -112,9 +112,8 @@ export async function runAddToArchive(): Promise<void> {
       archivePath: ctx.archivePath,
     });
 
-    if (ctx.webview) ctx.webview.postMessage({ c: "del-ok", t: "done" });
     if (ctx.webview && ctx.archiveUri && ctx.onComplete) {
-      await ctx.onComplete(ctx.webview, ctx.archiveUri);
+      await ctx.onComplete(ctx.webview, ctx.archiveUri, "Added files");
     }
   } catch (err) {
     logger.error({ event: "addToArchive.run.failed", err }, "Add to archive failed");
