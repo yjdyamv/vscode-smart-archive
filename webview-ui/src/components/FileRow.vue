@@ -142,9 +142,14 @@ function onExpandClick(e: MouseEvent) {
   user-select: none;
   -webkit-user-select: none;
   padding-right: 8px;
+  transition: background 0.1s ease;
 }
 .row:hover {
   background: var(--vscode-list-hoverBackground);
+}
+.row:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
 .row.sel {
   background: var(--vscode-list-activeSelectionBackground);

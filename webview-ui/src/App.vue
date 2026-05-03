@@ -530,8 +530,10 @@ provide("showToast", showToast);
         @test="testArchive"
       />
     </template>
-    <div v-else class="text-center text-[var(--vscode-descriptionForeground)] py-16 px-6">
-      {{ archiveProps?.name ?? "Archive" }} (empty)
+    <div v-else class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]">
+      <div class="text-4xl opacity-40">📭</div>
+      <div class="text-sm">{{ archiveProps?.name ?? "Archive" }}</div>
+      <div class="text-xs opacity-60">No files to display</div>
     </div>
 
     <Toast :msg="toast.msg" :ok="toast.ok" :visible="toast.show" />
