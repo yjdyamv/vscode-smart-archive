@@ -43,6 +43,7 @@ async function decompressSingleFile(
   uri: vscode.Uri,
   batchIdx: number,
   batchTotal: number,
+  knownPassword?: string,
 ): Promise<void> {
   const inputPath = uri.fsPath;
   const ext = getFullExt(inputPath);
@@ -77,9 +78,9 @@ async function decompressSingleFile(
   }
 
   // Password: always prompt for encryptable formats, skip for others
-  let password = "";
+  let password = knownPassword ?? "";
 
-  if (isEncryptableExt(ext)) {
+  if (!password && isEncryptableExt(ext)) {
     const pwd = await promptPassword(t("password.decryptHint"));
     if (pwd === null) return;
     password = pwd;
@@ -129,6 +130,10 @@ async function decompressSingleFile(
       }
     },
   );
+}
+
+export async function decompressWithKnownPassword(uri: vscode.Uri, password: string): Promise<void> {
+  await decompressSingleFile(uri, 0, 0, password);
 }
 
 export async function browseCommand(uri: vscode.Uri | undefined): Promise<void> {
