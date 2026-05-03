@@ -141,17 +141,15 @@ export async function previewFileFromArchive(
     sizeBytes: stat.size,
   });
 
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-  const archiveName = path.basename(archivePath);
   const normalizedFile = filePath.replace(/\\/g, "/");
 
   let fileData: ArrayBuffer;
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    const archiveFsPath = mountArchive(js7z, archivePath);
     js7z.FS.mkdir("/_pv");
 
-    const xArgs = ["x", `/${archiveName}`, "-o/_pv", "-y"];
+    const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
     if (password) xArgs.splice(1, 0, `-p${password}`);
     if (!isWrappedFormat(archiveExt)) xArgs.push(normalizedFile);
     await new Promise<void>((resolve, reject) => {
