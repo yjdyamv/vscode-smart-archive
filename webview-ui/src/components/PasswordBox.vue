@@ -1,12 +1,24 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, onMounted, onUnmounted } from "vue";
 
-defineProps<{ archiveName: string }>();
+const props = defineProps<{ archiveName: string; wrong?: boolean }>();
 const emit = defineEmits<{ (e: "submit", pw: string): void }>();
 const password = ref("");
 const showPassword = ref(false);
 const hasError = ref(false);
-function submit() { if (password.value.trim()) emit("submit", password.value); }
+watch(() => props.wrong, (v) => { hasError.value = !!v; if (v) password.value = ""; });
+
+function onMsg(e: MessageEvent) {
+  if (e.data?.c === "pwerr") {
+    hasError.value = true;
+    password.value = "";
+    setTimeout(() => { hasError.value = false; }, 4000);
+  }
+}
+onMounted(() => window.addEventListener("message", onMsg));
+onUnmounted(() => window.removeEventListener("message", onMsg));
+
+function submit() { if (password.value.trim()) { hasError.value = false; emit("submit", password.value); } }
 function onKeydown(e: KeyboardEvent) { if (e.key === "Enter") submit(); }
 </script>
 
@@ -16,15 +28,16 @@ function onKeydown(e: KeyboardEvent) { if (e.key === "Enter") submit(); }
     <div class="text-[var(--vscode-foreground)] text-[1.1em]">{{ archiveName }}</div>
     <div class="text-[var(--vscode-descriptionForeground)] text-[0.92em] mb-1">Encrypted — enter password</div>
     <div class="relative flex items-center">
-      <input v-model="password" :type="showPassword ? 'text' : 'password'"
-        :class="{ '!border-[var(--vscode-inputValidation-errorBorder)] shadow-[0_0_0_1px_var(--vscode-inputValidation-errorBorder)]': hasError }"
-        class="bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] rounded px-3 py-1.5 pr-9 w-[248px] focus:outline-1 focus:outline-[var(--vscode-focusBorder)] transition-colors"
-        placeholder="Password" autofocus @keydown="onKeydown" />
+      <div :class="{ '!border-[#e51400] !shadow-[0_0_0_1px_#e5140033]': hasError }" class="border border-[var(--vscode-input-border)] rounded">
+        <input v-model="password" :type="showPassword ? 'text' : 'password'"
+          class="bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-none rounded px-3 py-1.5 pr-9 w-[248px] focus:outline-none"
+          placeholder="Password" autofocus @keydown="onKeydown" />
+      </div>
       <button class="absolute right-1.5 top-1/2 -translate-y-1/2 bg-none border-none cursor-pointer text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] text-sm p-1 leading-none"
         @mousedown="showPassword = true" @mouseup="showPassword = false" @mouseleave="showPassword = false">👁</button>
     </div>
     <button class="btn mt-1" @click="submit">Unlock</button>
-    <div class="text-[var(--vscode-inputValidation-errorForeground)] text-[0.92em] min-h-[1.4em] opacity-0 transition-opacity" :class="{ 'opacity-100': hasError }">Wrong password</div>
+    <div :style="hasError ? 'color:#f14c4c;opacity:1' : 'opacity:0'" class="text-[0.92em] min-h-[1.4em] transition-opacity">Wrong password</div>
   </div>
 </template>
 
