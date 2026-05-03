@@ -192,6 +192,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri, toa
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
+  const roToast = getFullExt(filePath) === ".iso" ? t("archive.readOnly") : toast;
   webview.html = contentHtml(
     tree,
     fileCount,
@@ -205,7 +206,7 @@ async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri, toa
       size: formatCompactSize(totalSize),
     },
     patterns,
-    toast,
+    roToast,
   );
 
   if (!handlerRegistered.has(webview)) {
@@ -281,6 +282,7 @@ function registerHandler(webview: vscode.Webview): void {
           const dc = pwStats.dirs;
           const itemCount = pwStats.total;
           const ext = getFullExt(s.filePath);
+          const pwToast = ext === ".iso" ? t("archive.readOnly") : undefined;
           webview.html = contentHtml(
             pwTree,
             fc,
@@ -294,7 +296,7 @@ function registerHandler(webview: vscode.Webview): void {
               size: formatCompactSize(pwTotalSize),
             },
             getNoisyPatterns(),
-            undefined,
+            pwToast,
           );
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
