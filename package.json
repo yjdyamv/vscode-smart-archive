@@ -2,7 +2,7 @@
   "name": "smart-archive",
   "displayName": "Smart Archive",
   "description": "Compress and decompress files using JS7z + libarchive.js. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ with AES-256 encryption.",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "publisher": "yjdyamv",
   "license": "MIT",
   "repository": {
@@ -293,13 +293,17 @@
         },
         "smart-archive.collapsedDirPatterns": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Directory name patterns to keep collapsed by default in the archive preview. Merged with built-in defaults (node_modules, .venv, .git, dist, etc.)."
         },
         "smart-archive.compressExcludePatterns": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Glob patterns (gitignore syntax) for files/directories to exclude when compressing. Example: ['node_modules', '.venv', '*.log', '**/dist']"
         }
