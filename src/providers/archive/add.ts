@@ -9,7 +9,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { mountArchive, MAX_BUFFER } from "../../engines/js7z-helpers";
+import { MAX_BUFFER } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { getBaseName } from "../../utils/path";
@@ -145,7 +145,7 @@ export async function addToArchive(
   checkFileSize(stat.size);
 
   if (stat.size > MAX_BUFFER) {
-    return addToArchiveLarge(archivePath, localPaths, targetDir, password);
+    throw new Error("Archive exceeds 2 GiB — in-place editing not yet supported for large files.");
   }
 
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
@@ -271,39 +271,5 @@ function copyDirToFSRecursive(js7z: JS7zInstance, localDir: string, vfsDir: stri
       const data = fs.readFileSync(localEntry);
       js7z.FS.writeFile(vfsEntry, data);
     }
-  }
-}
-
-async function addToArchiveLarge(
-  archivePath: string,
-  localPaths: string[],
-  targetDir: string,
-  password?: string,
-): Promise<void> {
-  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-  try {
-    const archiveFsPath = mountArchive(js7z, archivePath);
-    const usesMount = archiveFsPath.startsWith("/mnt_");
-    const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z, localPaths, targetDir);
-
-    const args = vfsDir
-      ? ["a", archiveFsPath, "-aot", vfsDir]
-      : ["a", archiveFsPath, "-aot", ...vfsPaths];
-    if (password) {
-      validatePassword(password);
-      args.splice(1, 0, `-p${password}`);
-    }
-    logger.debug({ event: "addToArchiveLarge.7zArgs", args: args.join(" ") });
-    await new Promise<void>((resolve, reject) => {
-      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
-      js7z.callMain(args);
-    });
-    if (!usesMount) {
-      const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
-    }
-    logger.info({ event: "addToArchiveLarge.ok", archivePath, files: localPaths.length });
-  } finally {
-    tryCleanupJS7z(js7z);
   }
 }
