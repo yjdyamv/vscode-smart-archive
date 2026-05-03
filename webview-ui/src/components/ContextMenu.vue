@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, onMounted, onUnmounted, ref } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref } from "vue";
 
-defineProps<{ x: number; y: number; paths: string[]; dirPath: string }>();
+const props = defineProps<{ x: number; y: number; paths: string[]; dirPath: string }>();
 const emit = defineEmits<{
   (e: "close"): void; (e: "extract"): void; (e: "delete"): void;
   (e: "copy"): void; (e: "add-here"): void; (e: "new-folder"): void; (e: "rename"): void;
@@ -14,10 +14,18 @@ function onMouseDown(e: MouseEvent) {
 }
 onMounted(() => document.addEventListener("mousedown", onMouseDown, true));
 onUnmounted(() => document.removeEventListener("mousedown", onMouseDown, true));
+
+const style = computed(() => {
+  const menuW = 180; // estimated menu width
+  const menuH = 250; // estimated menu height
+  const x = Math.min(props.x, window.innerWidth - menuW);
+  const y = Math.min(props.y, window.innerHeight - menuH);
+  return { left: Math.max(x, 0) + "px", top: Math.max(y, 0) + "px" };
+});
 </script>
 
 <template>
-  <div ref="menuRef" class="ctxmenu" :style="{ left: x + 'px', top: y + 'px' }">
+  <div ref="menuRef" class="ctxmenu" :style="style">
     <div class="cmi" @click="emit('copy')">Copy</div>
     <div class="cmi" @click="emit('extract')">Extract Selected</div>
     <div class="cmi" @click="emit('delete')">Delete</div>
