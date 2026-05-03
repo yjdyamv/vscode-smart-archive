@@ -301,13 +301,6 @@ function registerHandler(webview: vscode.Webview): void {
         return;
       }
 
-      // ── Skip password (open without unlocking) ──
-      if (msg.c === "skipPw") {
-        logger.info({ event: "webview.skipPw", archiveName: s.archiveName });
-        webview.html = contentHtml([], 0, 0, cssUri, jsUri);
-        return;
-      }
-
       // ── Extract All ──
       if (msg.c === "extAll") {
         logger.info({ event: "webview.extAll", archiveName: s.archiveName });
