@@ -7,15 +7,14 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 - **Compress** to 7z, ZIP, TAR, WIM, GZip, BZip2, XZ, tar.gz, tar.bz2, tar.xz, tar.zst
 - **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
-- **Archive browser** — opens as default editor for archives, tree view with search, sort, partial extract, delete, test
+- **Archive browser** — opens as default editor for archives; virtual-scrolled tree (Vue 3 + TanStack Virtual), search, sort, partial extract, add/delete/rename, integrity test
 - **File preview** — double-click any file in the archive to open it in VSCode
-- **In-place editing** — delete files from within archives (`7z d`)
 - **Copy/paste** — select files in archive browser, paste to any local folder
-- **Integrity test** — verify archives with `7z t`
 - **Multi-volume RAR** — auto-resolves `.r00`–`.r99` to the base `.rar`
 - **RAR support** — `libarchive-wasm` handles RAR extraction (RAR4 + RAR5)
 - **Bilingual UI** — English / Chinese (auto-detected from VS Code locale)
 - **Security** — Zip Slip protection, zip bomb size limits, path traversal blocking
+- **Smart exclude** — automatically skips `node_modules`, `.git`, `dist`, `.venv`, and 30+ other noisy directories when compressing; customizable via settings
 - **CJK filenames** — recovers GBK / Shift-JIS / EUC-KR encoded filenames in old archives
 - **Context menu** — right-click files/folders to compress, right-click archives to decompress or browse
 
@@ -23,7 +22,9 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 
 ```bash
 npm install
-npm run compile   # build TypeScript
+npm run install:webview   # install webview dependencies
+npm run build:webview     # build Vue frontend
+npm run compile           # compile TypeScript
 ```
 
 Then press `F5` in VSCode to launch the Extension Development Host.
@@ -68,27 +69,22 @@ RAR files are auto-detected and processed by `libarchive-wasm`. All other format
 | `smart-archive.defaultFormat` | `7z` | Default archive format |
 | `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
 | `smart-archive.defaultOutputDir` | `source` | Output location: next to source file or prompt |
+| `smart-archive.collapsedDirPatterns` | `[]` | Extra patterns to exclude when compressing (gitignore syntax) |
 
 ## Development
 
 ```bash
-npm install          # install dependencies
-npm run compile      # compile TypeScript → out/
-npm run watch        # watch mode
-npm test             # compile + run 82 tests
-npm run lint         # oxlint static analysis
-npm run typecheck    # TypeScript type checking
-npm run format       # oxfmt code formatting
-npm run check        # format + lint + typecheck (CI)
-npm run package      # compile + create VSIX package
+npm install             # install dependencies
+npm run install:webview # install webview dependencies
+npm run build:webview   # build Vue frontend → media/vue/
+npm run compile         # compile TypeScript → out/
+npm run watch           # watch mode (TS only)
+npm run lint            # oxlint static analysis
+npm run typecheck       # TypeScript type checking
+npm run format          # oxfmt code formatting
+npm run check           # format + lint + typecheck (CI)
+npm run package         # build webview + compile + create .vsix
 ```
-
-## Testing
-
-`npm test` runs 82 automated tests across two test suites:
-
-- **core.test.ts** — 7z/ZIP/TAR/WIM/GZip/BZip2/XZ round-trips, encryption, cross-engine extraction, path traversal protection, zip bomb limits, CJK filename preservation
-- **preview.test.ts** — Selective extraction (7z & libarchive) for all format variants, encrypted archives, two-step wrapped extraction, zstd round-trip
 
 ## Dependencies
 
@@ -98,7 +94,8 @@ npm run package      # compile + create VSIX package
 | [libarchive-wasm](https://github.com/ofk/libarchive-wasm) | libarchive WebAssembly port (RAR support) |
 | [@bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm) | Zstandard compression |
 | [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding fix |
-| [pino](https://github.com/pinojs/pino) | Structured logging |
+| [Vue 3](https://vuejs.org/) | Archive browser UI |
+| [TanStack Virtual](https://tanstack.com/virtual) | Virtual scrolling for large archives |
 
 ## License
 
