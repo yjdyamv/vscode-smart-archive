@@ -283,6 +283,26 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "添加到压缩包",
     "zh-tw": "新增到壓縮檔",
   },
+  "archive.toastDeleted": {
+    en: "Deleted {0} item(s)",
+    "zh-cn": "已删除 {0} 项",
+    "zh-tw": "已刪除 {0} 項",
+  },
+  "archive.toastRenamed": {
+    en: "Renamed",
+    "zh-cn": "已重命名",
+    "zh-tw": "已重新命名",
+  },
+  "archive.toastCreatedFolder": {
+    en: "Folder created",
+    "zh-cn": "文件夹已创建",
+    "zh-tw": "資料夾已建立",
+  },
+  "archive.toastAddedFiles": {
+    en: "Files added",
+    "zh-cn": "文件已添加",
+    "zh-tw": "檔案已新增",
+  },
   "archive.addedFiles": {
     en: "Added {0} file(s) to archive: ",
     "zh-cn": "已向压缩包添加 {0} 个文件: ",

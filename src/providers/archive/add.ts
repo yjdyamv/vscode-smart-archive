@@ -13,6 +13,7 @@ import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { getBaseName } from "../../utils/path";
 import { logger } from "../../utils/logger";
+import { t } from "../../i18n";
 import { withWrappedArchive } from "./wrappedHelper";
 
 // ── Module-level state for add-to-archive ──
@@ -113,7 +114,7 @@ export async function runAddToArchive(): Promise<void> {
     });
 
     if (ctx.webview && ctx.archiveUri && ctx.onComplete) {
-      await ctx.onComplete(ctx.webview, ctx.archiveUri, "Added files");
+      await ctx.onComplete(ctx.webview, ctx.archiveUri, t("archive.toastAddedFiles"));
     }
   } catch (err) {
     logger.error({ event: "addToArchive.run.failed", err }, "Add to archive failed");
