@@ -46,6 +46,7 @@ import {
   testArchive,
 } from "./archive";
 import { setCopiedPaths } from "./copyPaste";
+import { decompressWithKnownPassword } from "../commands/decompress";
 
 const EXT_ID = "yjdyamv.smart-archive";
 
@@ -308,7 +309,11 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "extAll") {
         logger.info({ event: "webview.extAll", archiveName: s.archiveName });
         try {
-          await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", s.archiveUri);
+          if (s.password) {
+            await decompressWithKnownPassword(s.archiveUri, s.password);
+          } else {
+            await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", s.archiveUri);
+          }
           webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
         } catch (err) {
           logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
