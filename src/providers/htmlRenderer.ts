@@ -52,8 +52,7 @@ ${cssUri ? cssLink(cssUri) : ""}
   .pw-eye:hover,.pw-clr:hover{color:var(--vscode-foreground)}
   .btn{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;padding:2px 8px;border-radius:2px;cursor:pointer;font-size:calc(var(--vscode-font-size)*.92);margin-top:4px}
   .btn:hover{background:var(--vscode-button-hoverBackground)}
-  .btn-skip{background:transparent;color:var(--vscode-descriptionForeground)}
-  .pw-err{color:var(--vscode-inputValidation-errorForeground,#f14c4c);font-size:calc(var(--vscode-font-size)*.92);min-height:1.4em;opacity:0;transition:opacity .2s}
+   .pw-err{color:var(--vscode-inputValidation-errorForeground,#f14c4c);font-size:calc(var(--vscode-font-size)*.92);min-height:1.4em;opacity:0;transition:opacity .2s}
   .pw-err.on{opacity:1}
 </style></head>
 <body>
@@ -67,13 +66,11 @@ ${cssUri ? cssLink(cssUri) : ""}
     <button class="pw-eye" title="Show password" onmousedown="document.getElementById('pw').type='text'" onmouseup="document.getElementById('pw').type='password'" onmouseleave="document.getElementById('pw').type='password'">&#x1F441;</button>
   </div>
   <button class="btn" onclick="submitPw()">Unlock</button>
-  <button class="btn btn-skip" onclick="skipPw()">Open without password</button>
   <div id="pwe" class="pw-err">Wrong password</div>
 </div>
 <script>
 var v=acquireVsCodeApi();
 function submitPw(){var i=document.getElementById('pw'),pw=i.value;if(!pw)return;i.classList.remove('err');document.getElementById('pwe').classList.remove('on');v.postMessage({c:'pw',pw:pw})}
-function skipPw(){v.postMessage({c:'skipPw'})}
 window.addEventListener('message',function(e){if(e.data.c==='pwerr'){document.getElementById('pw').classList.add('err');document.getElementById('pwe').classList.add('on');document.getElementById('pwe').textContent=e.data.t||'Wrong password'}});
 </script>
 </body></html>`;

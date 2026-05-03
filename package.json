@@ -334,7 +334,6 @@
     "@bokuweb/zstd-wasm": "^0.0.27",
     "iconv-lite": "^0.7.2",
     "js7z-tools": "^2.5.0",
-    "libarchive-wasm": "^1.2.0",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1"
   },

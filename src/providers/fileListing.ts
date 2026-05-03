@@ -1,9 +1,8 @@
 /**
  * File listing — Smart Archive VSCode Extension
  *
- * Engine-agnostic file listing for archives. Orchestrates between
- * js7z-tools and libarchive-wasm, handling wrapped formats (tar.gz etc.)
- * that require full extraction to list.
+ * Engine-agnostic file listing for archives. Uses js7z-tools.
+ * Wrapped formats (tar.gz etc.) require full extraction to list.
  *
  * @module providers/fileListing
  */
@@ -12,7 +11,6 @@ import * as vscode from "vscode";
 import * as path from "path";
 import type { JS7zFactory, JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
-import { getFileList } from "../engines/libarchive-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { logger } from "../utils/logger";
 import { tryCleanup } from "../engines/js7z-helpers";
@@ -23,15 +21,12 @@ import { validatePassword } from "../utils/security";
 const JS7z: JS7zFactory = require("js7z-tools");
 
 /**
- * Fetch the file list for an archive, choosing the best engine.
+ * Fetch the file list for an archive.
  *
  * Strategy (ordered by priority):
  *   1. Wrapped formats (tar.gz etc.) — must extract to list (7z l doesn't traverse)
  *   2. js7z l -slt — preferred: reliable UTF-8 output, fast, detects encryption
- *   3. Encryptable format without password — return [ ] to trigger password prompt;
- *      intentionally skip libarchive fallback because it may leak file metadata
- *      without requiring the password
- *   4. libarchive getFileList — fallback for unsupported formats
+ *   3. Encryptable format without password — return [ ] to trigger password prompt
  */
 async function fetchFileList(
   filePath: string,
@@ -46,11 +41,11 @@ async function fetchFileList(
   } catch (err) {
     logger.warn(
       { event: "fetchFileList.listFiles.failed", err, filePath },
-      "js7z listing failed, will try fallback",
+      "js7z listing failed",
     );
   }
   if (!password && isEncryptableExt(ext)) return [];
-  return getFileList(filePath);
+  return [];
 }
 
 async function listViaExtract(

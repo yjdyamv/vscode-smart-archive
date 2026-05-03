@@ -2,7 +2,7 @@
 import { ref } from "vue";
 
 defineProps<{ archiveName: string }>();
-const emit = defineEmits<{ (e: "submit", pw: string): void; (e: "skip"): void }>();
+const emit = defineEmits<{ (e: "submit", pw: string): void }>();
 const password = ref("");
 const showPassword = ref(false);
 const hasError = ref(false);
@@ -24,7 +24,6 @@ function onKeydown(e: KeyboardEvent) { if (e.key === "Enter") submit(); }
         @mousedown="showPassword = true" @mouseup="showPassword = false" @mouseleave="showPassword = false">👁</button>
     </div>
     <button class="btn mt-1" @click="submit">Unlock</button>
-    <button class="bg-transparent text-[var(--vscode-descriptionForeground)] border-none px-2 py-0.5 rounded-sm cursor-pointer text-[0.92em] mt-1 hover:bg-[var(--vscode-toolbar-hoverBackground)]" @click="emit('skip')">Open without password</button>
     <div class="text-[var(--vscode-inputValidation-errorForeground)] text-[0.92em] min-h-[1.4em] opacity-0 transition-opacity" :class="{ 'opacity-100': hasError }">Wrong password</div>
   </div>
 </template>

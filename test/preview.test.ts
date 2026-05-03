@@ -10,7 +10,6 @@ import {
   j7zCompress,
   j7zCompressDir,
   j7zSelective,
-  laSelective,
   createWrapped,
   walkFS,
   passed,
@@ -74,20 +73,6 @@ void (async () => {
               0,
             );
           });
-        if (f.la)
-          await test(`LA selective: .${ext}`, async () => {
-            try {
-              const b = await createWrapped(stdFiles, ext);
-              const r = await laSelective(b, ["d/a.txt"]);
-              assert.strictEqual(r["d/a.txt"], "a");
-              assert.strictEqual(
-                Object.keys(r).filter((k) => !(k in { "d/a.txt": 1 })).length,
-                0,
-              );
-            } catch {
-              /* may not support this variant */
-            }
-          });
       }
     } else if (f.ext === "gz" || f.ext === "bz2" || f.ext === "xz") {
       if (f.j7z)
@@ -124,27 +109,6 @@ void (async () => {
           assert.strictEqual(Object.keys(r).length, 2);
         });
       }
-      if (f.la) {
-        await test(`LA selective: .${f.ext} single`, async () => {
-          const b = await j7zCompressDir(stdFiles, "/t." + f.ext);
-          const r = await laSelective(b, ["d/a.txt"]);
-          assert.strictEqual(r["d/a.txt"], "a");
-          assert.strictEqual(
-            Object.keys(r).filter((k) => !(k in { "d/a.txt": 1 })).length,
-            0,
-          );
-        });
-        await test(`LA selective: .${f.ext} multi`, async () => {
-          const b = await j7zCompressDir(stdFiles, "/t." + f.ext);
-          const r = await laSelective(b, ["d/a.txt", "d/b.txt"]);
-          assert.strictEqual(r["d/a.txt"], "a");
-          assert.strictEqual(r["d/b.txt"], "b");
-          assert.strictEqual(
-            Object.keys(r).filter((k) => !(k in { "d/a.txt": 1, "d/b.txt": 1 })).length,
-            0,
-          );
-        });
-      }
     }
   }
 
@@ -160,28 +124,9 @@ void (async () => {
     assert.strictEqual(r["src/a.txt"], "wim");
     assert.strictEqual(Object.keys(r).length, 1);
   });
-  await test("LA selective: WIM", async () => {
-    const j = await JS7z();
-    mkdirP(j, "/src");
-    j.FS.writeFile("/src/a.txt", new Uint8Array(Buffer.from("wim")));
-    j.FS.writeFile("/src/b.txt", new Uint8Array(Buffer.from("no")));
-    await run7z(j, ["a", "-twim", "/t.wim", "/src"]);
-    const buf = Buffer.from(j.FS.readFile("/t.wim", { encoding: "binary" }));
-    try {
-      const r = await laSelective(buf, ["src/a.txt"]);
-      assert.strictEqual(r["src/a.txt"], "wim");
-    } catch {
-      /* LA may not support WIM */
-    }
-  });
   await test("7z selective: nonexistent path", async () => {
     const b = await j7zCompressDir({ "/f.txt": "x" }, "/t.7z");
     const r = await j7zSelective(b, ["no.txt"]);
-    assert.strictEqual(Object.keys(r).length, 0);
-  });
-  await test("LA selective: nonexistent path", async () => {
-    const b = await j7zCompressDir({ "/f.txt": "x" }, "/t.7z");
-    const r = await laSelective(b, ["no.txt"]);
     assert.strictEqual(Object.keys(r).length, 0);
   });
   await test("7z selective: 1-of-10", async () => {
@@ -190,13 +135,6 @@ void (async () => {
     assert.strictEqual(r["many/5.txt"], "file-5");
     assert.strictEqual(Object.keys(r).length, 1);
   });
-  await test("LA selective: 1-of-10", async () => {
-    const b = await j7zCompressDir(files10, "/t.7z");
-    const r = await laSelective(b, ["many/5.txt"]);
-    assert.strictEqual(r["many/5.txt"], "file-5");
-    assert.strictEqual(Object.keys(r).length, 1);
-  });
-
   // ── 3. Encrypted ──
   const encFiles = { "/f.txt": "enc" };
   await test("7z selective: enc 7z correct pw", async () => {
@@ -229,34 +167,6 @@ void (async () => {
       assert.ok((er as Error).message.includes("7z exit"));
     }
   });
-  await test("LA selective: enc ZIP correct pw", async () => {
-    const b = await j7zCompressDir(encFiles, "/t.zip", ["-pla"]);
-    const r = await laSelective(b, ["f.txt"], "la");
-    assert.strictEqual(r["f.txt"], "enc");
-    assert.strictEqual(Object.keys(r).length, 1);
-  });
-  await test("LA selective: enc ZIP wrong pw", async () => {
-    const b = await j7zCompressDir(encFiles, "/t.zip", ["-pla"]);
-    try {
-      await laSelective(b, ["f.txt"], "bad");
-      assert.fail();
-    } catch (er) {
-      assert.ok(
-        (er as Error).message.includes("passphrase") ||
-          (er as Error).message.includes("Incorrect"),
-      );
-    }
-  });
-  await test("LA selective: enc 7z fails", async () => {
-    const b = await j7zCompressDir({ "/f.txt": "enc" }, "/t.7z", ["-pp4ss", "-mhe=on"]);
-    try {
-      const r = await laSelective(b, ["f.txt"], "p4ss");
-      assert.strictEqual(Object.keys(r).length, 0);
-    } catch {
-      /* LA throws on encrypted 7z — expected */
-    }
-  });
-
   // ── 4. Two-step 7z x for wrapped formats (7z l can't recurse into inner tar) ──
   for (const ext of ["tar.xz", "tar.gz", "tar.bz2", "tgz", "txz"]) {
     await test(`7z x-x-ls: .${ext}`, async () => {
