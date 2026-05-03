@@ -38,11 +38,21 @@ export async function decompressWith7z(
 
   try {
     checkFileSize(fs.statSync(options.inputPath).size);
-    const archiveName = getBaseName(options.inputPath);
     const archiveFsPath = mountArchive(js7z, options.inputPath);
-    js7z.FS.mkdir(OUTPUT_DIR);
+    const usesMount = archiveFsPath.startsWith("/mnt_");
 
-    const extractArgs: string[] = ["x", archiveFsPath, `-o${OUTPUT_DIR}`];
+    let outPath: string;
+    if (usesMount) {
+      const outMnt = "/out_mnt";
+      js7z.FS.mkdir(outMnt);
+      js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outMnt);
+      outPath = outMnt;
+    } else {
+      js7z.FS.mkdir(OUTPUT_DIR);
+      outPath = OUTPUT_DIR;
+    }
+
+    const extractArgs: string[] = ["x", archiveFsPath, `-o${outPath}`];
     if (options.password) {
       extractArgs.splice(1, 0, `-p${options.password}`);
     }
@@ -51,7 +61,9 @@ export async function decompressWith7z(
 
     await run7z(js7z, extractArgs, progress);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+    if (!usesMount) {
+      copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+    }
 
     await unwrapInnerTar(options.outputDir, progress);
 
@@ -81,10 +93,21 @@ async function unwrapInnerTar(
 
   try {
     const innerFsPath = mountArchive(js7z, tarPath);
-    js7z.FS.mkdir("/_inner_out");
+    const usesMount = innerFsPath.startsWith("/mnt_");
+    let outPath: string;
+    if (usesMount) {
+      outPath = "/out_mnt_tar";
+      js7z.FS.mkdir(outPath);
+      js7z.FS.mount(js7z.NODEFS, { root: outputDir }, outPath);
+    } else {
+      outPath = "/_inner_out";
+      js7z.FS.mkdir(outPath);
+    }
 
-    await run7z(js7z, ["x", innerFsPath, "-o/_inner_out"], progress);
-    copyDirFromFS(js7z, "/_inner_out", outputDir);
+    await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
+    if (!usesMount) {
+      copyDirFromFS(js7z, "/_inner_out", outputDir);
+    }
 
     // Clean up intermediate .tar (best-effort, may already be removed)
     try {
