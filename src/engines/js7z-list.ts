@@ -39,11 +39,13 @@ export async function listFiles(
 
   try {
     const archiveName = getBaseName(filePath);
+    let archiveFsPath: string;
     if (useData) {
       js7z.FS.writeFile(`/${archiveName}`, data);
+      archiveFsPath = `/${archiveName}`;
     } else {
       checkFileSize(fs.statSync(filePath).size);
-      mountArchive(js7z, filePath);
+      archiveFsPath = mountArchive(js7z, filePath);
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -56,7 +58,7 @@ export async function listFiles(
         validatePassword(password);
         args.splice(1, 0, `-p${password}`);
       }
-      args.push(`/${archiveName}`);
+      args.push(archiveFsPath);
       js7z.callMain(args);
     });
 
@@ -118,11 +120,10 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
   });
 
   try {
-    const archiveName = getBaseName(filePath);
-    mountArchive(js7z, filePath);
+    const archiveFsPath = mountArchive(js7z, filePath);
 
     try {
-      await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
+      await run7z(js7z, ["l", "-slt", "-p", archiveFsPath]);
       return stdout.includes("Encrypted = +");
     } catch {
       logger.warn(
