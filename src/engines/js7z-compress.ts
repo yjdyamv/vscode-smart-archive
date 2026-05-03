@@ -17,6 +17,7 @@ import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
 import { zstdCompress } from "./zstd-codec";
 import { logger } from "../utils/logger";
+import { validatePassword } from "../utils/security";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const JS7z: JS7zFactory = require("js7z-tools");
@@ -31,6 +32,7 @@ function buildCompressArgs(
   const args: string[] = ["a", outputFile];
 
   if (password) {
+    validatePassword(password);
     args.push(`-p${password}`);
     if (format.label === "7z") {
       args.push("-mhe=on");

@@ -413,10 +413,6 @@ export const NOISY_DIR_PATTERNS = [
   ".terraform",
 ];
 
-export function isNoisyDir(name: string): boolean {
-  return NOISY_DIR_PATTERNS.includes(name);
-}
-
 // ── Default compression exclude patterns ────────────────────────────
 
 export const COMPRESS_EXCLUDE_DEFAULTS = NOISY_DIR_PATTERNS;
