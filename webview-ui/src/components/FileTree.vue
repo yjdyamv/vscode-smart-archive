@@ -54,9 +54,8 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
 </script>
 
 <template>
-  <div ref="containerRef" class="flex-1 overflow-y-auto overflow-x-hidden relative">
+  <div ref="containerRef" class="flex-1 overflow-y-auto overflow-x-hidden relative pb-[50vh]">
     <div class="relative w-full" :style="{ height: virtualizer.getTotalSize() + 'px' }">
-    >
       <div
         v-for="item in virtualItems"
         :key="flatNodes[item.index].path"
