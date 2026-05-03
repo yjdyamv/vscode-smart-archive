@@ -7,7 +7,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { mountArchive, MAX_BUFFER } from "../../engines/js7z-helpers";
+import { MAX_BUFFER } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { logger } from "../../utils/logger";
@@ -28,12 +28,16 @@ export async function deleteFromArchive(
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
 
+  if (stat.size > MAX_BUFFER) {
+    throw new Error("Archive exceeds 2 GiB — in-place editing not yet supported for large files.");
+  }
+
+  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+  const archiveName = path.basename(archivePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const archiveFsPath = mountArchive(js7z, archivePath);
-    const usesMount = archiveFsPath.startsWith("/mnt_");
-
-    const dArgs = ["d", archiveFsPath, "-y"];
+    js7z.FS.writeFile(`/${archiveName}`, data);
+    const dArgs = ["d", `/${archiveName}`, "-y"];
     if (password) {
       validatePassword(password);
       dArgs.splice(1, 0, `-p${password}`);
@@ -46,16 +50,14 @@ export async function deleteFromArchive(
       js7z.callMain(dArgs);
     });
 
-    if (!usesMount) {
-      const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-      logger.info({
-        event: "deleteFromArchive.ok",
-        archivePath,
-        items: selectedPaths.length,
-        newSizeBytes: updated.byteLength,
-      });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
-    }
+    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
+    logger.info({
+      event: "deleteFromArchive.ok",
+      archivePath,
+      items: selectedPaths.length,
+      newSizeBytes: updated.byteLength,
+    });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
   } finally {
     tryCleanupJS7z(js7z);
   }
