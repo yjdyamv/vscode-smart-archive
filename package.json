@@ -128,11 +128,13 @@
         },
         {
           "command": "yjdyamv.smart-archive.decompress",
-          "group": "7_modification"
+          "group": "7_modification",
+          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst)$/"
         },
         {
           "command": "yjdyamv.smart-archive.browse",
-          "group": "7_modification"
+          "group": "7_modification",
+          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst)$/"
         }
       ]
     },
