@@ -10,6 +10,5 @@ export {
   createFolderInArchive,
   previewFileFromArchive,
   renameInArchive,
-  unwrapAndExtract,
   testArchive,
 } from "./modify";

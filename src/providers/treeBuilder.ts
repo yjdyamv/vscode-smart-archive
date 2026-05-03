@@ -382,23 +382,6 @@ function countAllStats(entries: FlatEntry[]): {
   return { files, dirs: dirSet.size, total: files + dirSet.size, totalSize };
 }
 
-function countFlatStats(entries: FlatEntry[]): {
-  files: number;
-  dirs: number;
-  total: number;
-  totalSize: number;
-} {
-  let files = 0;
-  let dirs = 0;
-  let totalSize = 0;
-  for (const e of entries) {
-    totalSize += e.size || 0;
-    if (e.type !== "REGULAR_FILE") dirs++;
-    else files++;
-  }
-  return { files, dirs, total: files + dirs, totalSize };
-}
-
 function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total: number } {
   let files = 0;
   let dirs = 0;
@@ -423,7 +406,6 @@ export {
   buildTreeRootOnly,
   getDirChildren,
   countTreeStats,
-  countFlatStats,
   buildEntryIndex,
   markNoisyDirs,
   countAllStats,
