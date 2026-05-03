@@ -11,6 +11,7 @@
 
 import * as path from "path";
 import * as vscode from "vscode";
+import { t } from "../i18n";
 
 function getLimit(key: string, defaultMiB: number): number {
   return (
@@ -105,7 +106,7 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
 export function checkFileSize(size: number): void {
   const max = getMaxFileSize();
   if (size > max) {
-    throw new Error(`File size ${fmtSize(size)} exceeds maximum ${fmtSize(max)}`);
+    throw new Error(t("security.fileSizeExceeded", fmtSize(size), fmtSize(max)));
   }
 }
 
@@ -121,7 +122,7 @@ export function checkTotalSize(current: number, added: number): number {
   const total = current + added;
   const max = getMaxTotalSize();
   if (total > max) {
-    throw new Error(`Total decompressed size ${fmtSize(total)} exceeds maximum ${fmtSize(max)}`);
+    throw new Error(t("security.totalSizeExceeded", fmtSize(total), fmtSize(max)));
   }
   return total;
 }
@@ -132,7 +133,7 @@ export function checkTotalSize(current: number, added: number): number {
  * containing null bytes, newlines, or invalid characters.
  */
 export function validatePassword(pw: string): void {
-  if (pw.startsWith("-")) throw new Error("Password must not start with '-'");
-  if (pw.includes("\0")) throw new Error("Password contains null byte");
-  if (pw.includes("\n") || pw.includes("\r")) throw new Error("Password contains newline");
+  if (pw.startsWith("-")) throw new Error(t("security.passwordStartDash"));
+  if (pw.includes("\0")) throw new Error(t("security.passwordNullByte"));
+  if (pw.includes("\n") || pw.includes("\r")) throw new Error(t("security.passwordNewline"));
 }

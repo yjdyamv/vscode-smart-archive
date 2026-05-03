@@ -92,6 +92,81 @@
           },
           {
             "filenamePattern": "*.zst"
+          },
+          {
+            "filenamePattern": "*.cab"
+          },
+          {
+            "filenamePattern": "*.arj"
+          },
+          {
+            "filenamePattern": "*.lzh"
+          },
+          {
+            "filenamePattern": "*.chm"
+          },
+          {
+            "filenamePattern": "*.msi"
+          },
+          {
+            "filenamePattern": "*.z"
+          },
+          {
+            "filenamePattern": "*.cpio"
+          },
+          {
+            "filenamePattern": "*.rpm"
+          },
+          {
+            "filenamePattern": "*.deb"
+          },
+          {
+            "filenamePattern": "*.uha"
+          },
+          {
+            "filenamePattern": "*.xar"
+          },
+          {
+            "filenamePattern": "*.iso"
+          },
+          {
+            "filenamePattern": "*.vhd"
+          },
+          {
+            "filenamePattern": "*.vmdk"
+          },
+          {
+            "filenamePattern": "*.fat"
+          },
+          {
+            "filenamePattern": "*.ntfs"
+          },
+          {
+            "filenamePattern": "*.squashfs"
+          },
+          {
+            "filenamePattern": "*.dmg"
+          },
+          {
+            "filenamePattern": "*.hfs"
+          },
+          {
+            "filenamePattern": "*.apm"
+          },
+          {
+            "filenamePattern": "*.mbr"
+          },
+          {
+            "filenamePattern": "*.elf"
+          },
+          {
+            "filenamePattern": "*.macho"
+          },
+          {
+            "filenamePattern": "*.swf"
+          },
+          {
+            "filenamePattern": "*.flv"
           }
         ]
       }
@@ -128,11 +203,13 @@
         },
         {
           "command": "yjdyamv.smart-archive.decompress",
-          "group": "7_modification"
+          "group": "7_modification",
+          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
         },
         {
           "command": "yjdyamv.smart-archive.browse",
-          "group": "7_modification"
+          "group": "7_modification",
+          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
         }
       ]
     },
