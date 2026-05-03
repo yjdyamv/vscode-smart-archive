@@ -86,7 +86,7 @@ function run7z(
       if (exitCode === 0) {
         resolve();
       } else {
-        reject(new Error(t("compress.exitError", String(exitCode)) + "\n" + stderr));
+        reject(new Error(t("decompress.exitError", String(exitCode)) + "\n" + stderr));
       }
     };
     js7z.callMain(args);

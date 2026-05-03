@@ -38,11 +38,7 @@ export function registerArchiveEditor(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { prewarmLibarchive } = require("../engines/libarchive-engine") as {
-    prewarmLibarchive: () => Promise<void>;
-  };
-  prewarmLibarchive();
+  void import("../engines/libarchive-engine.js").then(({ prewarmLibarchive }) => prewarmLibarchive());
 }
 
 export async function openArchivePreview(archiveUri: vscode.Uri): Promise<void> {
