@@ -30,11 +30,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "選取壓縮格式",
   },
   "compress.rarUnsupported": {
-    en: "RAR creation is not supported by free/open-source tools.\nConsider using 7z or ZIP format for compression.\nRAR extraction (decompression) is fully supported via libarchive.",
+    en: "RAR creation is not supported by free/open-source tools.\nConsider using 7z or ZIP format.\nRAR extraction is fully supported.",
     "zh-cn":
-      "RAR 格式创建不受免费/开源工具支持。\n建议使用 7z 或 ZIP 格式进行压缩。\nRAR 解压功能已完整支持（通过 libarchive）。",
+      "RAR 格式创建不受免费/开源工具支持。\n建议使用 7z 或 ZIP 格式。\nRAR 解压功能已完整支持。",
     "zh-tw":
-      "RAR 格式建立不受免費/開源工具支援。\n建議使用 7z 或 ZIP 格式進行壓縮。\nRAR 解壓功能已完整支援（透過 libarchive）。",
+      "RAR 格式建立不受免費/開源工具支援。\n建議使用 7z 或 ZIP 格式。\nRAR 解壓功能已完整支援。",
   },
   "compress.progressTitle": {
     en: "Compressing...",
@@ -135,26 +135,6 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "正在解压...",
     "zh-tw": "正在解壓...",
   },
-  "decompress.rarProgressTitle": {
-    en: "Decompressing RAR with libarchive...",
-    "zh-cn": "正在用 libarchive 解压 RAR...",
-    "zh-tw": "正在用 libarchive 解壓 RAR...",
-  },
-  "decompress.rarExtracting": {
-    en: "Extracting RAR archive...",
-    "zh-cn": "正在提取 RAR 归档...",
-    "zh-tw": "正在擷取 RAR 封存...",
-  },
-  "decompress.rarDone": {
-    en: "Decompressed {0} file(s) to: ",
-    "zh-cn": "解压完成: {0} 个文件 → ",
-    "zh-tw": "解壓完成: {0} 個檔案 → ",
-  },
-  "decompress.rarFailed": {
-    en: "RAR extraction failed: ",
-    "zh-cn": "RAR 解压失败: ",
-    "zh-tw": "RAR 解壓失敗: ",
-  },
   "decompress.done": {
     en: "Decompressed to: ",
     "zh-cn": "解压完成: ",
@@ -185,16 +165,6 @@ const messages: Record<string, Record<Locale, string>> = {
     en: "Unwrapping inner TAR...",
     "zh-cn": "正在解包内层 TAR...",
     "zh-tw": "正在解包內層 TAR...",
-  },
-  "decompress.fallbackTo7z": {
-    en: "libarchive failed, trying 7z...",
-    "zh-cn": "libarchive 失败，尝试 7z...",
-    "zh-tw": "libarchive 失敗，嘗試 7z...",
-  },
-  "decompress.fallbackToLA": {
-    en: "7z failed, trying libarchive...",
-    "zh-cn": "7z 失败，尝试 libarchive...",
-    "zh-tw": "7z 失敗，嘗試 libarchive...",
   },
   "decompress.previewTitle": {
     en: "Archive contents",

@@ -1,8 +1,8 @@
 /**
  * Extraction — Smart Archive VSCode Extension
  *
- * Core selective-extraction function with three code paths:
- * RAR → libarchive, wrapped formats → two-step 7z, normal → 7z + fallback.
+ * Core selective-extraction function with two code paths:
+ * wrapped formats → two-step 7z, normal → 7z.
  * Also contains the VFS-to-local copy helper with prefix stripping.
  *
  * @module providers/extraction
@@ -13,9 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { JS7z, tryCleanupJS7z } from "./fileListing";
-import { extractSelectedFiles } from "../engines/libarchive-engine";
 import { getFullExt, isWrappedFormat } from "../constants";
-import { isRarExt } from "../utils/rar";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
 import { checkFileSize, validatePassword } from "../utils/security";
@@ -153,11 +151,10 @@ function copyFromFSWithStrip(
 /**
  * Extract selected files from an archive (webview "Extract Selected").
  *
- * Three code paths based on archive type:
- *   1. RAR → libarchive only (7z cannot read RAR at all)
- *   2. Wrapped (tar.gz etc.) → two-step: extract outer layer with 7z,
+ * Two code paths based on archive type:
+ *   1. Wrapped (tar.gz etc.) → two-step: extract outer layer with 7z,
  *      then extract selected paths from inner .tar with a second 7z instance
- *   3. Normal → 7z first, fall back to libarchive on failure
+ *   2. Normal → 7z
  */
 async function extractSelected(
   archivePath: string,
@@ -169,7 +166,6 @@ async function extractSelected(
 ): Promise<void> {
   const start = Date.now();
   const ext = getFullExt(archivePath);
-  const rarExt = isRarExt(ext);
   const isWrapped = isWrappedFormat(ext);
   const outputDir = outputOverride || getOutputPath(archivePath, "extracted");
 
@@ -179,29 +175,8 @@ async function extractSelected(
     pathCount: selectedPaths.length,
     flat,
     outputDir,
-    isRar: rarExt,
     isWrapped,
   });
-
-  if (rarExt) {
-    fs.mkdirSync(outputDir, { recursive: true });
-    const count = await extractSelectedFiles(
-      archivePath,
-      outputDir,
-      selectedPaths,
-      password || undefined,
-    );
-    vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-    if (fs.existsSync(outputDir)) {
-      await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
-    }
-    logger.info({
-      event: "extractSelected.exit",
-      duration: Date.now() - start,
-      engine: "libarchive",
-    });
-    return;
-  }
 
   if (isWrapped) {
     const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
@@ -270,7 +245,7 @@ async function extractSelected(
     return;
   }
 
-  // Non-RAR archives: try 7z first, fall back to libarchive
+  // Normal archives: 7z only
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
   const archiveName = path.basename(archivePath);
   let stderr = "";
@@ -286,63 +261,36 @@ async function extractSelected(
     js7z.FS.writeFile(`/${archiveName}`, data);
     js7z.FS.mkdir("/out");
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        js7z.onExit = (code: number) => {
-          if (code === 0) resolve();
-          else reject(new Error(`7z ${flat ? "e" : "x"}: ${code}\n${stderr}`));
-        };
-        const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
-        const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
-        if (password) {
-          validatePassword(password);
-          eArgs.splice(1, 0, `-p${password}`);
-        }
-        eArgs.push(...normalizedPaths);
-        // Add exclusion flags for deselected children
-        if (excludes && excludes.length > 0) {
-          for (const ex of excludes) {
-            eArgs.push("-xr!" + ex.replace(/\\/g, "/"));
-          }
-        }
-        js7z.callMain(eArgs);
-      });
-      fs.mkdirSync(outputDir, { recursive: true });
-      if (flat) {
-        copyDirFromFS(js7z, "/out", outputDir);
-      } else {
-        copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths);
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (code: number) => {
+        if (code === 0) resolve();
+        else reject(new Error(`7z ${flat ? "e" : "x"}: ${code}\n${stderr}`));
+      };
+      const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
+      const eArgs = [flat ? "e" : "x", `/${archiveName}`, "-o/out", flat ? "-aou" : "-y"];
+      if (password) {
+        validatePassword(password);
+        eArgs.splice(1, 0, `-p${password}`);
       }
-      if (fs.existsSync(outputDir)) {
-        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
-      }
-      vscode.window.showInformationMessage(t("decompress.done") + outputDir);
-      logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z" });
-    } catch (err) {
-      logger.warn({ event: "extractSelected.fallback", err }, (err as Error).message);
-      try {
-        const count = await extractSelectedFiles(archivePath, outputDir, selectedPaths);
-        vscode.window.showInformationMessage(t("decompress.rarDone", String(count)) + outputDir);
-        if (fs.existsSync(outputDir)) {
-          await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+      eArgs.push(...normalizedPaths);
+      if (excludes && excludes.length > 0) {
+        for (const ex of excludes) {
+          eArgs.push("-xr!" + ex.replace(/\\/g, "/"));
         }
-        logger.info({
-          event: "extractSelected.exit",
-          duration: Date.now() - start,
-          engine: "libarchive",
-        });
-      } catch (fallbackErr) {
-        logger.error(
-          { event: "extractSelected.fallback.failed", err: fallbackErr },
-          "Fallback extraction failed",
-        );
-        // eslint-disable-next-line preserve-caught-error
-        throw new Error(
-          t("decompress.failed") +
-            `\n7z: ${(err as Error).message}\nlibarchive: ${(fallbackErr as Error).message}`,
-        );
       }
+      js7z.callMain(eArgs);
+    });
+    fs.mkdirSync(outputDir, { recursive: true });
+    if (flat) {
+      copyDirFromFS(js7z, "/out", outputDir);
+    } else {
+      copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths);
     }
+    if (fs.existsSync(outputDir)) {
+      await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));
+    }
+    vscode.window.showInformationMessage(t("decompress.done") + outputDir);
+    logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z" });
   } finally {
     tryCleanupJS7z(js7z);
   }

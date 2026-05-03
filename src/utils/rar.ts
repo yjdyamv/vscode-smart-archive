@@ -1,7 +1,7 @@
 /**
  * RAR archive utilities — Smart Archive VSCode Extension
  *
- * RAR is handled exclusively by libarchive-wasm (js7z-tools cannot read RAR).
+ * RAR detection and multi-volume resolution.
  * This module centralizes all RAR-specific detection, validation, and
  * multi-volume resolution logic that was previously scattered across
  * constants.ts, decompress.ts, and archiveProvider.ts.

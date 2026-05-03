@@ -34,7 +34,7 @@ export interface FormatMeta {
   primaryEngine: "7z" | "la";
   /** 7z callMain supports selective extraction with file paths */
   j7zSelective: boolean;
-  /** libarchive-wasm supports selective extraction */
+  /** Whether selective extraction is supported (legacy) */
   laSelective: boolean;
   /** Whether the format wraps a tar (tar.gz, .tgz etc.); requires two-step creation */
   wrapsTar: boolean;
@@ -319,11 +319,6 @@ export const COMPOUND_EXTS: readonly string[] = FORMAT_TABLE.filter((f) => f.wra
 /** Set of extensions where 7z supports selective extraction */
 export const J7Z_SELECTIVE_EXTS: ReadonlySet<string> = new Set(
   FORMAT_TABLE.filter((f) => f.j7zSelective).flatMap((f) => f.exts),
-);
-
-/** Set of extensions where libarchive supports selective extraction */
-export const LA_SELECTIVE_EXTS: ReadonlySet<string> = new Set(
-  FORMAT_TABLE.filter((f) => f.laSelective).flatMap((f) => f.exts),
 );
 
 /** Map short-form extension to canonical long-form (e.g. .tgz → .tar.gz) */

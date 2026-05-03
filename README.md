@@ -1,6 +1,6 @@
 # Smart Archive
 
-VSCode extension for compressing and decompressing files using **7-Zip WebAssembly** and **libarchive WebAssembly** — no native binaries required.
+VSCode extension for compressing and decompressing files using **7-Zip WebAssembly** — no native binaries required.
 
 ## Features
 
@@ -11,7 +11,7 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 - **File preview** — double-click any file in the archive to open it in VSCode
 - **Copy/paste** — select files in archive browser, paste to any local folder
 - **Multi-volume RAR** — auto-resolves `.r00`–`.r99` to the base `.rar`
-- **RAR support** — `libarchive-wasm` handles RAR extraction (RAR4 + RAR5)
+- **RAR support** — RAR4 + RAR5 extraction via 7-Zip
 - **Bilingual UI** — English / Chinese (auto-detected from VS Code locale)
 - **Security** — Zip Slip protection, zip bomb size limits, path traversal blocking
 - **Smart exclude** — automatically skips `node_modules`, `.git`, `dist`, `.venv`, and 30+ other noisy directories when compressing; customizable via settings
@@ -37,7 +37,7 @@ Then press `F5` in VSCode to launch the Extension Development Host.
 | Decompress | Right-click archive → `Smart Archive: Decompress` → optional password → extracts to `*.extracted/` |
 | Browse | Right-click archive → `Smart Archive: Browse Contents` → interactive file tree with partial extract |
 
-RAR files are auto-detected and processed by `libarchive-wasm`. All other formats go through `js7z-tools` (7-Zip WASM) with automatic libarchive fallback.
+RAR files are auto-detected and processed by 7-Zip WASM.
 
 ## Supported Formats
 
@@ -90,8 +90,7 @@ npm run package         # build webview + compile + create .vsix
 
 | Package | Purpose |
 |---------|---------|
-| [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly port |
-| [libarchive-wasm](https://github.com/ofk/libarchive-wasm) | libarchive WebAssembly port (RAR support) |
+| [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly port (all compression & extraction) |
 | [@bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm) | Zstandard compression |
 | [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding fix |
 | [Vue 3](https://vuejs.org/) | Archive browser UI |
