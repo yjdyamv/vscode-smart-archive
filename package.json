@@ -9,6 +9,7 @@
     "type": "git",
     "url": "https://github.com/yjdyamv/vscode-smart-archive"
   },
+  "icon": "icon_128x128.png",
   "engines": {
     "vscode": "^1.85.0"
   },
