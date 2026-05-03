@@ -37,10 +37,6 @@ export function registerArchiveEditor(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true },
     }),
   );
-
-  void import("../engines/libarchive-engine.js").then(({ prewarmLibarchive }) =>
-    prewarmLibarchive(),
-  );
 }
 
 export async function openArchivePreview(archiveUri: vscode.Uri): Promise<void> {

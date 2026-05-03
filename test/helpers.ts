@@ -158,69 +158,6 @@ async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string, strin
   return res;
 }
 
-// ── libarchive-wasm helpers ──
-
-async function laExtract(buf: Buffer, pw = ""): Promise<Record<string, string>> {
-  const { ArchiveReader, libarchiveWasm } = await import("libarchive-wasm");
-  const m = await libarchiveWasm();
-  const r = new ArchiveReader(
-    m,
-    new Int8Array(buf.buffer, buf.byteOffset, buf.byteLength),
-    pw || undefined,
-  );
-  const res: Record<string, string> = {};
-  try {
-    for (const e of r.entries()) {
-      const pn = e.getPathname();
-      if (!pn || e.getFiletype() === "DIRECTORY") continue;
-      const d = e.readData();
-      if (d) res[pn] = Buffer.from(d).toString();
-    }
-  } finally {
-    r.free();
-  }
-  return res;
-}
-
-async function laHasEncrypted(buf: Buffer): Promise<boolean | null> {
-  const { ArchiveReader, libarchiveWasm } = await import("libarchive-wasm");
-  const m = await libarchiveWasm();
-  const r = new ArchiveReader(m, new Int8Array(buf.buffer, buf.byteOffset, buf.byteLength));
-  try {
-    return r.hasEncryptedData();
-  } finally {
-    r.free();
-  }
-}
-
-async function laSelective(
-  buf: Buffer,
-  paths: string[],
-  pw = "",
-): Promise<Record<string, string>> {
-  const { ArchiveReader, libarchiveWasm } = await import("libarchive-wasm");
-  const m = await libarchiveWasm();
-  const r = new ArchiveReader(
-    m,
-    new Int8Array(buf.buffer, buf.byteOffset, buf.byteLength),
-    pw || undefined,
-  );
-  const sel = new Set(paths);
-  const res: Record<string, string> = {};
-  try {
-    for (const e of r.entries()) {
-      const pn = e.getPathname();
-      if (!pn || !sel.has(pn)) continue;
-      if (e.getFiletype() === "DIRECTORY" || pn.endsWith("/")) continue;
-      const d = e.readData();
-      if (d) res[pn] = Buffer.from(d).toString();
-    }
-  } finally {
-    r.free();
-  }
-  return res;
-}
-
 // ── Wrapped archive helpers ──
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -433,9 +370,6 @@ export {
   copyFS,
   j7zSelective,
   j7zDecompress,
-  laExtract,
-  laHasEncrypted,
-  laSelective,
   createWrapped,
   walkFS,
   buildTree,

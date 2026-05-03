@@ -5,7 +5,7 @@
  *   - .7z / .zip / .rar → always prompt (these can be encrypted)
  *   - All other formats → skip prompt (no encryption support)
  *
- * Cleanup: if extraction fails (both engines), the empty output directory
+ * Cleanup: if extraction fails, the empty output directory
  * is removed to avoid littering the workspace.
  *
  * @module commands/decompress
@@ -15,7 +15,6 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { decompressWith7z } from "../engines/js7z-engine";
-import { extractArchive as extractWithLibarchive } from "../engines/libarchive-engine";
 import { promptPassword } from "../ui/prompts";
 import { getOutputPath } from "../utils/fs";
 import { DECOMPRESS_EXTENSIONS, getFullExt, isEncryptableExt } from "../constants";
@@ -94,44 +93,19 @@ async function decompressSingleFile(
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title:
-        (isRar ? t("decompress.rarProgressTitle") : t("decompress.progressTitle")) + batchLabel,
+      title: t("decompress.progressTitle") + batchLabel,
       cancellable: true,
     },
     async (progress, token) => {
       const startTime = Date.now();
-      // Only create output dir when extraction starts; clean up on failure
       try {
         fs.mkdirSync(outputDir, { recursive: true });
-
-        if (isRar) {
-          progress.report({ message: t("archive.extracting") });
-          const count = await extractWithLibarchive(
-            { inputPath, outputDir, password },
-            token,
-            progress,
-          );
-          const elapsed = formatDuration(Date.now() - startTime);
-          vscode.window.showInformationMessage(
-            t("decompress.rarDone", String(count)) + outputDir + t("time.elapsed", elapsed),
-          );
-        } else {
-          await tryExtract(
-            () => decompressWith7z({ inputPath, outputDir, password }, progress, token),
-            async () => {
-              progress.report({ message: t("decompress.fallbackToLA") });
-              const count = await extractWithLibarchive(
-                { inputPath, outputDir, password },
-                token,
-                progress,
-              );
-              const elapsed = formatDuration(Date.now() - startTime);
-              vscode.window.showInformationMessage(
-                t("decompress.rarDone", String(count)) + outputDir + t("time.elapsed", elapsed),
-              );
-            },
-          );
-        }
+        progress.report({ message: t("archive.extracting") });
+        await decompressWith7z({ inputPath, outputDir, password }, progress, token);
+        const elapsed = formatDuration(Date.now() - startTime);
+        vscode.window.showInformationMessage(
+          t("decompress.done") + outputDir + t("time.elapsed", elapsed),
+        );
       } catch (err) {
         logger.error({ event: "decompress.extraction.failed", err }, "Decompression failed");
         // Clean up output directory only if it's empty (partial extraction
@@ -155,33 +129,6 @@ async function decompressSingleFile(
       }
     },
   );
-}
-
-async function tryExtract(
-  primary: () => Promise<void>,
-  fallback: () => Promise<void>,
-): Promise<void> {
-  try {
-    await primary();
-  } catch (primaryErr) {
-    logger.warn(
-      { event: "decompress.primary.failed", err: primaryErr },
-      "Primary extraction failed, falling back to libarchive",
-    );
-    try {
-      await fallback();
-    } catch (fallbackErr) {
-      logger.error(
-        { event: "decompress.fallback.failed", err: fallbackErr },
-        "Fallback extraction failed",
-      );
-      // eslint-disable-next-line preserve-caught-error
-      throw new Error(
-        t("decompress.failed") +
-          `\n7z: ${(primaryErr as Error).message}\nlibarchive: ${(fallbackErr as Error).message}`,
-      );
-    }
-  }
 }
 
 export async function browseCommand(uri: vscode.Uri | undefined): Promise<void> {
