@@ -38,7 +38,9 @@ export function registerArchiveEditor(context: vscode.ExtensionContext): void {
     }),
   );
 
-  void import("../engines/libarchive-engine.js").then(({ prewarmLibarchive }) => prewarmLibarchive());
+  void import("../engines/libarchive-engine.js").then(({ prewarmLibarchive }) =>
+    prewarmLibarchive(),
+  );
 }
 
 export async function openArchivePreview(archiveUri: vscode.Uri): Promise<void> {
