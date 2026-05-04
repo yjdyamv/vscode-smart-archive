@@ -196,6 +196,10 @@ function testArchive() {
   showToast("Testing archive integrity...", true);
 }
 
+function convertFormat() {
+  post({ c: "convert" });
+}
+
 function submitPassword(pw: string) {
   post({ c: "pw", pw });
 }
@@ -512,6 +516,7 @@ provide("showToast", showToast);
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
         @search="(q: string) => search.updateSearch(q, sortedTree)"
+        @convert="convertFormat"
       />
       <FileTree
         :flat-nodes="visibleFlatNodes"

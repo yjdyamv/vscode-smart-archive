@@ -705,6 +705,35 @@ void (async () => {
     assert.strictEqual(res["a.txt"], "secret");
   });
 
+  // ── 26. Format conversion ──
+  const files27z = { "/sub/a.txt": "one", "/c.txt": "two" };
+
+  await test("convert: 7z to zip round-trip", async () => {
+    const src7z = await j7zCompressDir(files27z, "/_s.7z");
+    const orig = await j7zDecompress(src7z);
+    assert.strictEqual(orig["sub/a.txt"], "one");
+
+    const files: Record<string, string> = {};
+    for (const [k, v] of Object.entries(orig)) files["/" + k] = v;
+    const zip = await j7zCompressDir(files, "/_d.zip");
+    const conv = await j7zDecompress(zip);
+    assert.ok(Object.values(conv).includes("one"), "one");
+    assert.ok(Object.values(conv).includes("two"), "two");
+  });
+
+  await test("convert: 7z to tar round-trip", async () => {
+    const src7z = await j7zCompressDir(files27z, "/_s2.7z");
+    const orig = await j7zDecompress(src7z);
+    assert.strictEqual(orig["sub/a.txt"], "one");
+
+    const files: Record<string, string> = {};
+    for (const [k, v] of Object.entries(orig)) files["/" + k] = v;
+    const tar = await j7zCompressDir(files, "/_d.tar");
+    const conv = await j7zDecompress(tar);
+    assert.ok(Object.values(conv).includes("one"), "tar one");
+    assert.ok(Object.values(conv).includes("two"), "tar two");
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
