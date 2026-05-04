@@ -41,18 +41,11 @@ export async function createFolderInArchive(
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
-
-  if (stat.size > MAX_BUFFER) {
-    throw new Error("Archive exceeds 2 GiB — in-place editing not yet supported for large files.");
-  }
-
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-  const archiveName = path.basename(archivePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
-
+    const fsPath = mountArchive(js7z, archivePath);
+    const usesMount = fsPath.startsWith("/mnt_");
     const vfsFolder = `/${folderPath}`;
     let cur = "";
     for (const part of folderPath.split("/").filter(Boolean)) {
@@ -65,8 +58,8 @@ export async function createFolderInArchive(
     const parts = folderPath.split("/").filter(Boolean);
     const firstLevel = parts[0];
     const args = firstLevel
-      ? ["a", `/${archiveName}`, "-aot", `/${firstLevel}`]
-      : ["a", `/${archiveName}`, "-aot", dotfile];
+      ? ["a", fsPath, "-aot", `/${firstLevel}`]
+      : ["a", fsPath, "-aot", dotfile];
     if (password) {
       validatePassword(password);
       args.splice(1, 0, `-p${password}`);
@@ -79,8 +72,10 @@ export async function createFolderInArchive(
       js7z.callMain(args);
     });
 
-    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    if (!usesMount) {
+      const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    }
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
     tryCleanupJS7z(js7z);
@@ -264,20 +259,14 @@ export async function renameInArchive(
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
-
-  if (stat.size > MAX_BUFFER) {
-    throw new Error("Archive exceeds 2 GiB — in-place editing not yet supported for large files.");
-  }
-
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-  const archiveName = path.basename(archivePath);
   const oldNorm = oldPath.replace(/\\/g, "/");
   const newNorm = newPath.replace(/\\/g, "/");
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
-    const rnArgs = ["rn", `/${archiveName}`, oldNorm, newNorm];
+    const fsPath = mountArchive(js7z, archivePath);
+    const usesMount = fsPath.startsWith("/mnt_");
+    const rnArgs = ["rn", fsPath, oldNorm, newNorm];
     if (password) rnArgs.splice(1, 0, `-p${password}`);
     logger.debug({ event: "rename.7zArgs", args: rnArgs.join(" ") });
 
@@ -286,8 +275,10 @@ export async function renameInArchive(
       js7z.callMain(rnArgs);
     });
 
-    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    if (!usesMount) {
+      const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    }
     logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
   } finally {
     tryCleanupJS7z(js7z);
