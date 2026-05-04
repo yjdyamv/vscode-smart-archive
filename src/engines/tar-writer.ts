@@ -27,7 +27,10 @@ function tarHeader(name: string, size: number, isDir: boolean): Buffer {
   const sizeOctal = size.toString(8).padStart(11, "0") + " ";
   Buffer.from(sizeOctal).copy(buf, 124);
   // mtime (12) — octal
-  const mtime = Math.floor(Date.now() / 1000).toString(8).padStart(11, "0") + " ";
+  const mtime =
+    Math.floor(Date.now() / 1000)
+      .toString(8)
+      .padStart(11, "0") + " ";
   Buffer.from(mtime).copy(buf, 136);
   // chksum (8) — blanks for now, compute below
   Buffer.from("        ").copy(buf, 148);
@@ -54,10 +57,7 @@ function padSize(n: number): number {
   return n % BLOCK === 0 ? n : n + BLOCK - (n % BLOCK);
 }
 
-function collectPaths(
-  basePath: string,
-  token?: vscode.CancellationToken,
-): string[] {
+function collectPaths(basePath: string, token?: vscode.CancellationToken): string[] {
   const result: string[] = [];
   const stack = [basePath];
   while (stack.length > 0) {
