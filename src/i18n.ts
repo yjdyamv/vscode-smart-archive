@@ -91,6 +91,26 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "选择压缩级别",
     "zh-tw": "選取壓縮級別",
   },
+  "compress.selectVolume": {
+    en: "Split into volumes? (optional)",
+    "zh-cn": "分卷压缩？(可选)",
+    "zh-tw": "分卷壓縮？(可選)",
+  },
+  "compress.volume.none": {
+    en: "Don't split",
+    "zh-cn": "不分卷",
+    "zh-tw": "不分卷",
+  },
+  "compress.volume.custom": {
+    en: "Custom...",
+    "zh-cn": "自定义...",
+    "zh-tw": "自訂...",
+  },
+  "compress.volume.prompt": {
+    en: "Volume size (e.g. 100m, 1g, 650m). Use k/m/g suffix.",
+    "zh-cn": "分卷大小 (例如 100m, 1g, 650m)，后缀 k/m/g",
+    "zh-tw": "分卷大小 (例如 100m, 1g, 650m)，後綴 k/m/g",
+  },
 
   // ---- Encrypt flow ----
   "encrypt.title": {

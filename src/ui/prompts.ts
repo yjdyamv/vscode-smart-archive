@@ -130,3 +130,42 @@ export async function promptCompressLevel(): Promise<number> {
   const idx = labels.indexOf(chosen.label);
   return idx >= 0 ? LEVEL_VALUES[idx] : defaultLevel;
 }
+
+const VOLUME_SIZES = [
+  { label: "1.44M", value: "1440k" },
+  { label: "10M", value: "10m" },
+  { label: "50M", value: "50m" },
+  { label: "100M", value: "100m" },
+  { label: "200M", value: "200m" },
+  { label: "650M", value: "650m" },
+  { label: "700M", value: "700m" },
+  { label: "1G", value: "1g" },
+  { label: "2G", value: "2g" },
+  { label: "4.7G", value: "4700m" },
+];
+
+export async function promptVolumeSize(): Promise<string | undefined> {
+  const items = [
+    { label: t("compress.volume.none"), value: undefined as string | undefined },
+    ...VOLUME_SIZES.map((v) => ({ label: v.label, value: v.value })),
+    { label: t("compress.volume.custom"), value: "__custom__" },
+  ];
+
+  const chosen = await vscode.window.showQuickPick(items, {
+    placeHolder: t("compress.selectVolume"),
+    ignoreFocusOut: true,
+  });
+
+  if (!chosen) return undefined;
+  if (chosen.value === "__custom__") {
+    return (
+      vscode.window.showInputBox({
+        prompt: t("compress.volume.prompt"),
+        placeHolder: "100m",
+        validateInput: (v) =>
+          /^\d+[kmg]?$/i.test(v.trim()) ? null : "Invalid format (e.g. 100m, 1g)",
+      }) || undefined
+    );
+  }
+  return chosen.value;
+}

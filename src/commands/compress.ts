@@ -21,6 +21,7 @@ import {
   promptPassword,
   promptSavePath,
   promptCompressLevel,
+  promptVolumeSize,
 } from "../ui/prompts";
 import type { CompressOptions } from "../types";
 import { t } from "../i18n";
@@ -53,6 +54,7 @@ export async function compressCommand(
   }
 
   const level = await promptCompressLevel();
+  const volumeSize = await promptVolumeSize();
 
   if (format.supportsEncryption) {
     const encryptChoice = await promptEncryptChoice();
@@ -63,11 +65,11 @@ export async function compressCommand(
       if (!pwd) {
         vscode.window.showWarningMessage(t("encrypt.noPassword"));
       }
-      return executeCompress(targets, format, pwd, format.label, level);
+      return executeCompress(targets, format, pwd, format.label, level, volumeSize);
     }
   }
 
-  await executeCompress(targets, format, "", format.label, level);
+  await executeCompress(targets, format, "", format.label, level, volumeSize);
 }
 
 async function executeCompress(
@@ -76,6 +78,7 @@ async function executeCompress(
   password: string,
   outputExtension: string,
   level: number,
+  volumeSize?: string,
 ): Promise<void> {
   const firstTarget = targets[0];
   const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, outputExtension);
@@ -92,6 +95,7 @@ async function executeCompress(
     outputPath: saveUri.fsPath,
     password,
     level,
+    volumeSize,
   };
 
   await vscode.window.withProgress(
