@@ -12,7 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zFactory, CompressOptions, FormatInfo } from "../types";
-import { tryCleanup, INPUT_DIR, OUTPUT_DIR, mountLocalPaths, run7z } from "./js7z-helpers";
+import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z } from "./js7z-helpers";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -72,8 +72,11 @@ export async function compressWith7z(
       files: localPaths.length,
       level: options.level,
     });
-    const fsInputPaths = mountLocalPaths(js7z, localPaths);
-    const usesMount = fsInputPaths.some((p) => p.startsWith("/mnt_"));
+
+    // Copy small files/dirs to VFS, mount large files via NODEFS
+    const fsInputPaths = copyInputsToFS(js7z, localPaths, token);
+    const { paths: mountedPaths, usesMount } = mountLocalPaths(js7z, localPaths);
+    const allInputPaths = [...fsInputPaths, ...mountedPaths];
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
@@ -95,7 +98,7 @@ export async function compressWith7z(
       const tarFsPath = joinFSPath(OUTPUT_DIR, "_tmp.tar");
 
       progress.report({ message: t("compress.creatingTar") });
-      await run7z(js7z, ["a", tarFsPath, ...fsInputPaths, ...excludeArgs, "-mmt=on"], progress);
+      await run7z(js7z, ["a", tarFsPath, ...allInputPaths, ...excludeArgs, "-mmt=on"], progress);
 
       const tarData = js7z.FS.readFile(tarFsPath, { encoding: "binary" });
 
@@ -128,7 +131,7 @@ export async function compressWith7z(
 
     const args = buildCompressArgs(
       archiveFsPath,
-      fsInputPaths,
+      allInputPaths,
       options.format,
       options.password,
       options.level,

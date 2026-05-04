@@ -52,25 +52,22 @@ function copyInputsToFS(
   return fsPaths;
 }
 
-function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): string[] {
+function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { paths: string[]; usesMount: boolean } {
   const result: string[] = [];
+  let usesMount = false;
   for (const localPath of localPaths) {
-    const name = getBaseName(localPath);
     const stat = fs.statSync(localPath);
-    if (stat.isDirectory() || stat.size > MAX_BUFFER) {
+    if (!stat.isDirectory() && stat.size > MAX_BUFFER) {
+      const name = getBaseName(localPath);
       const parentDir = path.dirname(localPath);
       const mnt = `/mnt_${_mntCount++}`;
       try { js7z.FS.mkdir(mnt); } catch { /* ignore */ }
       js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
       result.push(`${mnt}/${name}`);
-    } else {
-      const data = fs.readFileSync(localPath);
-      const fsTarget = joinFSPath(INPUT_DIR, name);
-      js7z.FS.writeFile(fsTarget, data);
-      result.push(fsTarget);
+      usesMount = true;
     }
   }
-  return result;
+  return { paths: result, usesMount };
 }
 
 function run7z(
