@@ -91,30 +91,10 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "选择压缩级别",
     "zh-tw": "選取壓縮級別",
   },
-  "compress.selectVolume": {
-    en: "Split into volumes? (optional)",
-    "zh-cn": "分卷压缩？(可选)",
-    "zh-tw": "分卷壓縮？(可選)",
-  },
-  "compress.volume.none": {
-    en: "Don't split",
-    "zh-cn": "不分卷",
-    "zh-tw": "不分卷",
-  },
-  "compress.volume.custom": {
-    en: "Custom...",
-    "zh-cn": "自定义...",
-    "zh-tw": "自訂...",
-  },
-  "compress.volume.prompt": {
-    en: "Volume size (number + k/m/g suffix, e.g. 100m, 1g, 650m)",
-    "zh-cn": "分卷大小 (数字 + k/m/g 后缀，如 100m, 1g, 650m)",
-    "zh-tw": "分卷大小 (數字 + k/m/g 後綴，如 100m, 1g, 650m)",
-  },
-  "compress.volume.invalid": {
-    en: "Invalid format. Use a number followed by k, m, or g (e.g. 100m, 1g)",
-    "zh-cn": "格式无效。请使用数字加 k/m/g 后缀 (如 100m, 1g)",
-    "zh-tw": "格式無效。請使用數字加 k/m/g 後綴 (如 100m, 1g)",
+  "compress.selectTargetFormat": {
+    en: "Select target format for conversion",
+    "zh-cn": "选择转换目标格式",
+    "zh-tw": "選取轉換目標格式",
   },
 
   // ---- Encrypt flow ----

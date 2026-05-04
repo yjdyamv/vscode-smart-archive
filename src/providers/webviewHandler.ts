@@ -10,13 +10,17 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import { isEncrypted } from "../engines/js7z-engine";
+import * as fs from "fs";
+import * as os from "os";
+import { isEncrypted, decompressWith7z } from "../engines/js7z-engine";
+import { compressWith7z } from "../engines/js7z-engine";
 import {
   getFullExt,
   isWrappedFormat,
   isEncryptableExt,
   NOISY_DIR_PATTERNS,
   isSplitVolume,
+  COMPRESS_FORMATS,
 } from "../constants";
 
 function getNoisyPatterns(): string[] {
@@ -73,6 +77,41 @@ function showErrorWithCopy(msg: string): void {
   vscode.window.showErrorMessage(msg, "Copy").then((action) => {
     if (action === "Copy") vscode.env.clipboard.writeText(msg);
   });
+}
+
+async function promptConvertFormat(): Promise<string | undefined> {
+  const formats = COMPRESS_FORMATS.filter((f) => f.canCreate);
+  const chosen = await vscode.window.showQuickPick(
+    formats.map((f) => ({ label: f.label, description: f.description })),
+    { placeHolder: t("compress.selectTargetFormat"), ignoreFocusOut: true },
+  );
+  return chosen?.label;
+}
+
+async function convertArchive(
+  srcPath: string,
+  dstFormat: string,
+  dstPath: string,
+  password: string,
+): Promise<void> {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_cvt_"));
+  try {
+    await decompressWith7z({ inputPath: srcPath, outputDir: tmp, password }, { report: () => {} });
+    await compressWith7z(
+      {
+        targets: [{ fsPath: tmp }],
+        format: { label: dstFormat, description: "", canCreate: true, supportsEncryption: false },
+        outputPath: dstPath,
+        password: "",
+        level: 5,
+      },
+      { report: () => {} },
+    );
+  } finally {
+    try {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    } catch {}
+  }
 }
 
 interface HandlerState {
@@ -540,6 +579,24 @@ function registerHandler(webview: vscode.Webview): void {
         } catch (err) {
           logger.error({ event: "webview.preview.failed", err }, (err as Error).message);
           showErrorWithCopy(t("decompress.failed") + (err as Error).message);
+        }
+      }
+
+      // ── Convert ──
+      if (msg.c === "convert") {
+        logger.info({ event: "webview.convert", path: s.filePath });
+        try {
+          const fmt = await promptConvertFormat();
+          if (!fmt) return;
+          const dst = s.filePath.replace(/\.[^.]+$/, `.${fmt}`);
+          webview.postMessage({ c: "loading", t: "Converting..." });
+          await convertArchive(s.filePath, fmt, dst, s.password ?? "");
+          webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
+        } catch (err) {
+          logger.error({ event: "webview.convert.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
         }
       }
 
