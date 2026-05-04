@@ -9,7 +9,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { mountArchive, cleanupTmpFiles } from "../../engines/js7z-helpers";
+import { mountArchive, cleanupTmpFiles, MAX_BUFFER } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { getBaseName } from "../../utils/path";
@@ -238,12 +238,21 @@ function copyLocalToFSWithPrefix(
 
   const vfsPaths: string[] = [];
 
-  for (const localPath of localPaths) {
-    const name = getBaseName(localPath);
-    const vfsTarget = vfsBase ? `${vfsBase}/${name}` : `/${name}`;
-    const stat = fs.statSync(localPath);
+    for (const localPath of localPaths) {
+      const name = getBaseName(localPath);
+      const vfsTarget = vfsBase ? `${vfsBase}/${name}` : `/${name}`;
+      const stat = fs.statSync(localPath);
 
-    if (stat.isDirectory()) {
+      if (stat.isFile() && stat.size > MAX_BUFFER) {
+        const parentDir = path.dirname(localPath);
+        const mnt = `/mnt_add_${Date.now()}`;
+        try { js7z.FS.mkdir(mnt); } catch { /* ignore */ }
+        js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
+        if (normDir) {
+          try { js7z.FS.mkdir("/" + normDir); } catch { /* ignore */ }
+        }
+        vfsPaths.push(`${mnt}/${name}`);
+      } else if (stat.isDirectory()) {
       js7z.FS.mkdir(vfsTarget);
       copyDirToFSRecursive(js7z, localPath, vfsTarget);
     } else {
