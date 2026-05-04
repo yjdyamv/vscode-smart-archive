@@ -39,10 +39,7 @@ async function fetchFileList(
     const f = await listFiles(filePath, password, data);
     if (f && f.length > 0) return f;
   } catch (err) {
-    logger.warn(
-      { event: "fetchFileList.listFiles.failed", err, filePath },
-      "js7z listing failed",
-    );
+    logger.warn({ event: "fetchFileList.listFiles.failed", err, filePath }, "js7z listing failed");
   }
   if (!password && isEncryptableExt(ext)) return [];
   return [];

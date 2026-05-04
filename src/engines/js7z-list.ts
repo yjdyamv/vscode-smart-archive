@@ -10,7 +10,7 @@
 
 import * as fs from "fs";
 import type { JS7zFactory } from "../types";
-import { tryCleanup, run7z } from "./js7z-helpers";
+import { tryCleanup, run7z, mountArchive } from "./js7z-helpers";
 import { getBaseName, fixArchiveEncoding } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
@@ -24,12 +24,7 @@ export async function listFiles(
   data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
   logger.debug({ event: "listFiles.start", filePath, hasPassword: !!password });
-  const buf =
-    data ??
-    (() => {
-      checkFileSize(fs.statSync(filePath).size);
-      return fs.readFileSync(filePath);
-    })();
+  const useData = !!data;
   let stdout = "";
   let stderr = "";
 
@@ -44,7 +39,14 @@ export async function listFiles(
 
   try {
     const archiveName = getBaseName(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, buf);
+    let archiveFsPath: string;
+    if (useData) {
+      js7z.FS.writeFile(`/${archiveName}`, data);
+      archiveFsPath = `/${archiveName}`;
+    } else {
+      checkFileSize(fs.statSync(filePath).size);
+      archiveFsPath = mountArchive(js7z, filePath);
+    }
 
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (code: number) => {
@@ -56,7 +58,7 @@ export async function listFiles(
         validatePassword(password);
         args.splice(1, 0, `-p${password}`);
       }
-      args.push(`/${archiveName}`);
+      args.push(archiveFsPath);
       js7z.callMain(args);
     });
 
@@ -106,7 +108,6 @@ export async function listFiles(
 
 export async function isEncrypted(filePath: string): Promise<boolean> {
   checkFileSize(fs.statSync(filePath).size);
-  const data = fs.readFileSync(filePath);
   let stdout = "",
     stderr = "";
   const js7z = await JS7z({
@@ -119,11 +120,10 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
   });
 
   try {
-    const archiveName = getBaseName(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    const archiveFsPath = mountArchive(js7z, filePath);
 
     try {
-      await run7z(js7z, ["l", "-slt", "-p", `/${archiveName}`]);
+      await run7z(js7z, ["l", "-slt", "-p", archiveFsPath]);
       return stdout.includes("Encrypted = +");
     } catch {
       logger.warn(
