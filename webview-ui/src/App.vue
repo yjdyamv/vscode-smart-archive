@@ -371,8 +371,12 @@ onMounted(() => {
         showToast(msg.t as string, false);
         break;
       case "loading":
-        loadingMsg.value = (msg.t as string) || "Working...";
-        viewState.value = (msg.t === true) ? "loading" : "content";
+        if (typeof msg.t === "string") {
+          loadingMsg.value = msg.t;
+          viewState.value = "loading";
+        } else {
+          viewState.value = msg.t ? "loading" : "content";
+        }
         break;
       case "pwerr":
         showToast(msg.t as string || "Wrong password", false);
