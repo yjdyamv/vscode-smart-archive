@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { mountArchive, cleanupTmpFiles } from "../../engines/js7z-helpers";
+import { streamToVFS } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { PREVIEW_TMP_DIR } from "../tempFiles";
@@ -44,8 +44,7 @@ export async function createFolderInArchive(
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
-    const fsPath = mountArchive(js7z, archivePath);
-    const usesMount = fsPath.startsWith("/mnt_");
+    const fsPath = streamToVFS(js7z, archivePath);
     const vfsFolder = `/${folderPath}`;
     let cur = "";
     for (const part of folderPath.split("/").filter(Boolean)) {
@@ -76,13 +75,11 @@ export async function createFolderInArchive(
       js7z.callMain(args);
     });
 
-    if (!usesMount) {
-      const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
-    }
+    const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
-    cleanupTmpFiles(archivePath);
+    ;
     tryCleanupJS7z(js7z);
   }
 }
@@ -146,7 +143,7 @@ export async function previewFileFromArchive(
   let fileData: ArrayBuffer;
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const archiveFsPath = mountArchive(js7z, archivePath);
+    const archiveFsPath = streamToVFS(js7z, archivePath);
     js7z.FS.mkdir("/_pv");
 
     const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
@@ -269,8 +266,7 @@ export async function renameInArchive(
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const fsPath = mountArchive(js7z, archivePath);
-    const usesMount = fsPath.startsWith("/mnt_");
+    const fsPath = streamToVFS(js7z, archivePath);
     const rnArgs = ["rn", fsPath, oldNorm, newNorm];
     if (password) rnArgs.splice(1, 0, `-p${password}`);
     logger.debug({ event: "rename.7zArgs", args: rnArgs.join(" ") });
@@ -280,13 +276,11 @@ export async function renameInArchive(
       js7z.callMain(rnArgs);
     });
 
-    if (!usesMount) {
-      const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
-    }
+    const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
     logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
   } finally {
-    cleanupTmpFiles(archivePath);
+    ;
     tryCleanupJS7z(js7z);
   }
 }

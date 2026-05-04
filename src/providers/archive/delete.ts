@@ -7,7 +7,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { mountArchive, cleanupTmpFiles } from "../../engines/js7z-helpers";
+import { streamToVFS } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { logger } from "../../utils/logger";
@@ -30,8 +30,7 @@ export async function deleteFromArchive(
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const archiveFsPath = mountArchive(js7z, archivePath);
-    const usesMount = archiveFsPath.startsWith("/mnt_");
+    const archiveFsPath = streamToVFS(js7z, archivePath);
 
     const dArgs = ["d", archiveFsPath, "-y"];
     if (password) {
@@ -46,18 +45,16 @@ export async function deleteFromArchive(
       js7z.callMain(dArgs);
     });
 
-    if (!usesMount) {
-      const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-      logger.info({
-        event: "deleteFromArchive.ok",
-        archivePath,
-        items: selectedPaths.length,
-        newSizeBytes: updated.byteLength,
-      });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
-    }
+    const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
+    logger.info({
+      event: "deleteFromArchive.ok",
+      archivePath,
+      items: selectedPaths.length,
+      newSizeBytes: updated.byteLength,
+    });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
   } finally {
-    cleanupTmpFiles(archivePath);
+    ;
     tryCleanupJS7z(js7z);
   }
 }

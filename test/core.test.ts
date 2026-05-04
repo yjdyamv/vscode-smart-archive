@@ -561,6 +561,57 @@ void (async () => {
     });
   }
 
+  // ── 21. Stream-to-VFS for large files ──
+  await test("streamToVFS: 7z round-trip with dirs", async () => {
+    // Create a directory structure with multiple files on disk
+    const root = path.join(td, "src");
+    fs.mkdirSync(path.join(root, "lib"), { recursive: true });
+    fs.mkdirSync(path.join(root, "bin"), { recursive: true });
+    fs.writeFileSync(path.join(root, "readme.md"), "A".repeat(50 * 1024 * 1024)); // 50MB
+    fs.writeFileSync(path.join(root, "lib", "util.js"), "B".repeat(30 * 1024 * 1024)); // 30MB
+    fs.writeFileSync(path.join(root, "bin", "app.exe"), "C".repeat(20 * 1024 * 1024)); // 20MB
+
+    const j = await JS7z();
+    // Stream the entire directory into VFS via copyInputsToFS equivalent
+    function streamDir(localDir: string, vfsDir: string, token?: unknown) {
+      const entries = fs.readdirSync(localDir, { withFileTypes: true });
+      for (const e of entries) {
+        const loc = path.join(localDir, e.name);
+        const vfs = `${vfsDir}/${e.name}`;
+        if (e.isDirectory()) {
+          j.FS.mkdir(vfs);
+          streamDir(loc, vfs);
+        } else {
+          const rfd = fs.openSync(loc, "r");
+          const st = fs.fstatSync(rfd);
+          j.FS.createDataFile("/", vfs.replace(/^\//, ""), new Uint8Array(0), true, true, 0o777);
+          const stream = j.FS.open(vfs, "w");
+          const chunk = Buffer.alloc(10 * 1024 * 1024);
+          let pos = 0;
+          while (true) {
+            const n = fs.readSync(rfd, chunk, 0, chunk.length, pos);
+            if (n === 0) break;
+            j.FS.write(stream, new Uint8Array(chunk.slice(0, n)), 0, n, pos);
+            pos += n;
+          }
+          j.FS.close(stream);
+          fs.closeSync(rfd);
+        }
+      }
+    }
+    j.FS.mkdir("/src");
+    streamDir(root, "/src");
+
+    // Compress
+    await run7z(j, ["a", "/out.7z", "/src", "-mx1"]);
+    const outBuf = Buffer.from(j.FS.readFile("/out.7z", { encoding: "binary" }));
+    const f = await j7zDecompress(outBuf);
+
+    assert.strictEqual(f["src/readme.md"].length, 50 * 1024 * 1024);
+    assert.strictEqual(f["src/lib/util.js"].length, 30 * 1024 * 1024);
+    assert.strictEqual(f["src/bin/app.exe"].length, 20 * 1024 * 1024);
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);

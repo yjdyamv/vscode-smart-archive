@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zFactory, DecompressOptions } from "../types";
-import { tryCleanup, OUTPUT_DIR, run7z, mountArchive, MAX_BUFFER } from "./js7z-helpers";
+import { tryCleanup, OUTPUT_DIR, run7z, streamToVFS, MAX_BUFFER } from "./js7z-helpers";
 import { getBaseName } from "../utils/path";
 import { copyDirFromFS } from "../utils/fs";
 import { t, formatDuration } from "../i18n";
@@ -38,7 +38,7 @@ export async function decompressWith7z(
 
   try {
     checkFileSize(fs.statSync(options.inputPath).size);
-    const archiveFsPath = mountArchive(js7z, options.inputPath);
+    const archiveFsPath = streamToVFS(js7z, options.inputPath);
     const usesMount = archiveFsPath.startsWith("/mnt_");
 
     let outPath: string;
@@ -92,7 +92,7 @@ async function unwrapInnerTar(
   const js7z = await JS7z();
 
   try {
-    const innerFsPath = mountArchive(js7z, tarPath);
+    const innerFsPath = streamToVFS(js7z, tarPath);
     const usesMount = innerFsPath.startsWith("/mnt_");
     let outPath: string;
     if (usesMount) {
