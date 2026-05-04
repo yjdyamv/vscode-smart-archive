@@ -345,10 +345,19 @@ export function getFormatByExt(ext: string): FormatMeta | undefined {
 
 export function getFullExt(filePath: string): string {
   const lower = filePath.toLowerCase();
+
+  // Split volumes: archive.7z.001 → .7z, archive.zip.002 → .zip
+  const volMatch = lower.match(/\.(7z|zip|wim)\.\d{3}$/);
+  if (volMatch) return volMatch[0].replace(/\.\d{3}$/, "");
+
   for (const ext of COMPOUND_EXTS) {
     if (lower.endsWith(ext)) return ext;
   }
   return path.extname(filePath).toLowerCase();
+}
+
+export function isSplitVolume(filePath: string): boolean {
+  return /\.(7z|zip|wim)\.\d{3}$/i.test(filePath);
 }
 
 export function isWrappedFormat(ext: string): boolean {
