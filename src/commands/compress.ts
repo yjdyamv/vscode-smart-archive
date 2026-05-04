@@ -99,10 +99,10 @@ async function executeCompress(
     // Avoid clobbering an existing folder by appending a counter
     if (fs.existsSync(folderPath)) {
       let i = 1;
-      while (fs.existsSync(path.join(dir, `${folderName} (${i})`))) {
+      while (fs.existsSync(path.join(dir, `${folderName}_${i}`))) {
         i++;
       }
-      folderPath = path.join(dir, `${folderName} (${i})`);
+      folderPath = path.join(dir, `${folderName}_${i}`);
     }
 
     outputPath = path.join(folderPath, base);
