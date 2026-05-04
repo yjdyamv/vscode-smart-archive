@@ -10,7 +10,7 @@
 
 import * as fs from "fs";
 import type { JS7zFactory } from "../types";
-import { tryCleanup, run7z, mountArchive } from "./js7z-helpers";
+import { tryCleanup, run7z, streamToVFS } from "./js7z-helpers";
 import { getBaseName, fixArchiveEncoding } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
@@ -45,7 +45,7 @@ export async function listFiles(
       archiveFsPath = `/${archiveName}`;
     } else {
       checkFileSize(fs.statSync(filePath).size);
-      archiveFsPath = mountArchive(js7z, filePath);
+      archiveFsPath = streamToVFS(js7z, filePath);
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -120,7 +120,7 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
   });
 
   try {
-    const archiveFsPath = mountArchive(js7z, filePath);
+    const archiveFsPath = streamToVFS(js7z, filePath);
 
     try {
       await run7z(js7z, ["l", "-slt", "-p", archiveFsPath]);

@@ -44,57 +44,11 @@ function copyInputsToFS(
       js7z.FS.mkdir(fsTarget);
       copyDirToFS(js7z, localPath, fsTarget, token);
     } else {
-      const data = fs.readFileSync(localPath);
-      js7z.FS.writeFile(fsTarget, data);
+      streamToVFS(js7z, localPath, fsTarget);
     }
     fsPaths.push(fsTarget);
   }
   return fsPaths;
-}
-
-function mountLocalPaths(
-  js7z: JS7zInstance,
-  localPaths: readonly string[],
-): { paths: string[]; usesMount: boolean; mountedLocalPaths: string[] } {
-  const result: string[] = [];
-  const mounted: string[] = [];
-  let usesMount = false;
-  for (const localPath of localPaths) {
-    const stat = fs.statSync(localPath);
-    const large = stat.isDirectory() ? dirHasLargeFile(localPath) : stat.size > MAX_BUFFER;
-    if (large) {
-      const name = getBaseName(localPath);
-      const parentDir = path.dirname(localPath);
-      const mnt = `/mnt_${_mntCount++}`;
-      try {
-        js7z.FS.mkdir(mnt);
-      } catch {
-        /* ignore */
-      }
-      js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
-      result.push(`${mnt}/${name}`);
-      mounted.push(localPath);
-      usesMount = true;
-    }
-  }
-  return { paths: result, usesMount, mountedLocalPaths: mounted };
-}
-
-function dirHasLargeFile(dirPath: string): boolean {
-  try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    for (const e of entries) {
-      const full = path.join(dirPath, e.name);
-      if (e.isDirectory()) {
-        if (dirHasLargeFile(full)) return true;
-      } else if (e.isFile() && fs.statSync(full).size > MAX_BUFFER) {
-        return true;
-      }
-    }
-  } catch {
-    /* skip unreadable */
-  }
-  return false;
 }
 
 function run7z(
@@ -140,65 +94,40 @@ function run7z(
 }
 
 const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
+const CHUNK = 100 * 1024 * 1024;
 
-let _mntCount = 0;
-
-function mountArchive(js7z: JS7zInstance, filePath: string): string {
+function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): string {
   const stat = fs.statSync(filePath);
   const archiveName = getBaseName(filePath);
+  const target = vfsPath ?? `/${archiveName}`;
 
   if (stat.size <= MAX_BUFFER) {
     const data = fs.readFileSync(filePath);
-    js7z.FS.writeFile(`/${archiveName}`, data);
-    return `/${archiveName}`;
+    js7z.FS.writeFile(target, data);
+    return target;
   }
 
-  const parentDir = path.dirname(filePath);
-  const mnt = `/mnt_${_mntCount++}`;
+  // Stream in chunks via VFS open/write/close
+  const rfd = fs.openSync(filePath, "r");
   try {
-    js7z.FS.mkdir(mnt);
-  } catch {
-    /* ignore */
-  }
-  // Pre-create .tmp file so NODEFS can write (7z d/rn create archiveName.tmp)
-  const tmpPath = path.join(parentDir, archiveName + ".tmp");
-  if (!fs.existsSync(tmpPath)) {
+    js7z.FS.createDataFile("/", target.replace(/^\//, ""), new Uint8Array(0), true, true, 0o777);
+    const vfsStream = js7z.FS.open(target, "w");
     try {
-      fs.writeFileSync(tmpPath, "");
-    } catch {
-      /* ignore */
-    }
-  }
-  js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
-  return `${mnt}/${archiveName}`;
-}
-
-export {
-  tryCleanup,
-  INPUT_DIR,
-  OUTPUT_DIR,
-  copyInputsToFS,
-  mountLocalPaths,
-  run7z,
-  mountArchive,
-  dirHasLargeFile,
-  MAX_BUFFER,
-};
-
-export function cleanupTmpFiles(archivePath: string): void {
-  const dir = path.dirname(archivePath);
-  const name = path.basename(archivePath);
-  try {
-    for (const entry of fs.readdirSync(dir)) {
-      if (entry.startsWith(name) && entry.endsWith(".tmp")) {
-        try {
-          fs.unlinkSync(path.join(dir, entry));
-        } catch {
-          /* ignore */
-        }
+      const buf = Buffer.alloc(CHUNK);
+      let pos = 0;
+      while (true) {
+        const n = fs.readSync(rfd, buf, 0, buf.length, pos);
+        if (n === 0) break;
+        js7z.FS.write(vfsStream, new Uint8Array(buf.slice(0, n)), 0, n, pos);
+        pos += n;
       }
+    } finally {
+      js7z.FS.close(vfsStream);
     }
-  } catch {
-    /* ignore */
+  } finally {
+    fs.closeSync(rfd);
   }
+  return target;
 }
+
+export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, streamToVFS, run7z, MAX_BUFFER };

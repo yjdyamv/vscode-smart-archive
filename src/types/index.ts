@@ -95,6 +95,18 @@ export interface EmscriptenFS {
   stat(path: string): { mode: number; size: number };
   isDir(mode: number): boolean;
   mount(type: unknown, opts: { root: string }, mountPoint: string): void;
+  symlink(target: string, path: string): void;
+  createDataFile(
+    parent: string,
+    name: string,
+    data: Uint8Array,
+    canRead: boolean,
+    canWrite: boolean,
+    canOwn?: number,
+  ): void;
+  open(path: string, flags: string): unknown;
+  write(stream: unknown, buffer: Uint8Array, offset: number, length: number, position: number): void;
+  close(stream: unknown): void;
 }
 
 /** js7z-tools factory function signature */
