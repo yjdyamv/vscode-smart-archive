@@ -139,7 +139,7 @@ export async function previewFileFromArchive(
 
   const normalizedFile = filePath.replace(/\\/g, "/");
 
-  let fileData: ArrayBuffer;
+  let fileData: ArrayBuffer = new ArrayBuffer(0);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
     const archiveFsPath = streamToVFS(js7z, archivePath);
@@ -147,20 +147,33 @@ export async function previewFileFromArchive(
 
     const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
     if (password) xArgs.splice(1, 0, `-p${password}`);
-    if (!isWrappedFormat(archiveExt)) xArgs.push(normalizedFile);
+    const doSelective = !isWrappedFormat(archiveExt);
+    if (doSelective) xArgs.push(normalizedFile);
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
       js7z.callMain(xArgs);
     });
 
-    const top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+    let top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+
+    // If selective extraction produced nothing (e.g. ar archives like .deb),
+    // retry extracting everything then locate the requested file.
+    if (top.length === 0 && doSelective) {
+      const allArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
+      if (password) allArgs.splice(1, 0, `-p${password}`);
+      await new Promise<void>((resolve, reject) => {
+        js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
+        js7z.callMain(allArgs);
+      });
+      top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+    }
 
     // Try reading the requested file directly
     const directPath = `/_pv/${normalizedFile}`;
     try {
       fileData = js7z.FS.readFile(directPath, { encoding: "binary" });
     } catch {
-      // File not found directly — unwrap any inner tar archives and retry
+      // File not found directly — try unwrapping inner tar archives
       const tarPatterns = [
         ".tar",
         ".tar.gz",
@@ -177,9 +190,17 @@ export async function previewFileFromArchive(
         ".tlz",
       ];
       const tarEntries = top.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
-      if (tarEntries.length === 1) {
-        fileData = await unwrapArchives(js7z, `/_pv/${tarEntries[0]}`, normalizedFile, password);
-      } else {
+      let found = false;
+      for (const tarEntry of tarEntries) {
+        try {
+          fileData = await unwrapArchives(js7z, `/_pv/${tarEntry}`, normalizedFile, password);
+          found = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+      if (!found) {
         logger.error(
           { event: "previewFile.notFound", path: normalizedFile },
           "Preview file not found in extracted content",
