@@ -11,7 +11,7 @@
 import * as fs from "fs";
 import * as vscode from "vscode";
 import type { JS7zFactory, CompressOptions, FormatInfo } from "../types";
-import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z } from "./js7z-helpers";
+import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z } from "./js7z-helpers";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -71,7 +71,7 @@ export async function compressWith7z(
       files: localPaths.length,
       level: options.level,
     });
-    const fsInputPaths = copyInputsToFS(js7z, localPaths, token);
+    const fsInputPaths = mountLocalPaths(js7z, localPaths);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 

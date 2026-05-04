@@ -52,6 +52,27 @@ function copyInputsToFS(
   return fsPaths;
 }
 
+function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): string[] {
+  const result: string[] = [];
+  for (const localPath of localPaths) {
+    const name = getBaseName(localPath);
+    const stat = fs.statSync(localPath);
+    if (stat.isDirectory() || stat.size > MAX_BUFFER) {
+      const parentDir = path.dirname(localPath);
+      const mnt = `/mnt_${_mntCount++}`;
+      try { js7z.FS.mkdir(mnt); } catch { /* ignore */ }
+      js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
+      result.push(`${mnt}/${name}`);
+    } else {
+      const data = fs.readFileSync(localPath);
+      const fsTarget = joinFSPath(INPUT_DIR, name);
+      js7z.FS.writeFile(fsTarget, data);
+      result.push(fsTarget);
+    }
+  }
+  return result;
+}
+
 function run7z(
   js7z: JS7zInstance,
   args: string[],
@@ -133,4 +154,4 @@ async function mutateArchive(
   }
 }
 
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z, mountArchive, mutateArchive, MAX_BUFFER };
+export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z, mountArchive, mutateArchive, MAX_BUFFER };
