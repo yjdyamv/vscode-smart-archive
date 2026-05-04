@@ -18,9 +18,13 @@ function getNoisyPatterns(): string[] {
     .getConfiguration("smart-archive")
     .get("collapsedDirPatterns");
   const userPatterns = config ?? [];
-  // Merge built-in defaults with user patterns, deduplicate
   return [...new Set([...NOISY_DIR_PATTERNS, ...userPatterns])];
 }
+
+function isReadOnlyExt(ext: string): boolean {
+  return [".rar", ".iso", ".vhd", ".vmdk", ".dmg", ".hfs", ".fat", ".ntfs"].includes(ext);
+}
+
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
 import { logger } from "../utils/logger";
 import { t, formatCompactSize } from "../i18n";
@@ -213,6 +217,15 @@ async function setupWebview(
     roToast,
   );
 
+  // Pass read-only flag
+  const readOnly = isReadOnlyExt(getFullExt(filePath));
+  if (readOnly) {
+    webview.html = webview.html.replace(
+      "</body>",
+      `<script>window._xReadOnly=true</script></body>`,
+    );
+  }
+
   if (!handlerRegistered.has(webview)) {
     handlerRegistered.add(webview);
     registerHandler(webview);
@@ -354,6 +367,10 @@ function registerHandler(webview: vscode.Webview): void {
 
       // ── Delete ──
       if (msg.c === "delSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
+        if (isReadOnlyExt(getFullExt(s.filePath))) {
+          webview.postMessage({ c: "err", t: t("archive.readOnly") });
+          return;
+        }
         logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
         try {
           webview.postMessage({ c: "loading", t: "Deleting..." });
@@ -375,6 +392,10 @@ function registerHandler(webview: vscode.Webview): void {
 
       // ── Rename ──
       if (msg.c === "renamePrompt" && typeof msg.path === "string") {
+        if (isReadOnlyExt(getFullExt(s.filePath))) {
+          webview.postMessage({ c: "err", t: t("archive.readOnly") });
+          return;
+        }
         const oldPath = msg.path;
         const oldName = path.basename(oldPath);
         const newName = await vscode.window.showInputBox({
@@ -416,6 +437,10 @@ function registerHandler(webview: vscode.Webview): void {
 
       // ── Add Files ──
       if (msg.c === "addFiles") {
+        if (isReadOnlyExt(getFullExt(s.filePath))) {
+          webview.postMessage({ c: "err", t: t("archive.readOnly") });
+          return;
+        }
         const targetDir = typeof msg.dir === "string" ? msg.dir : "";
         logger.info({ event: "webview.addFiles", dir: targetDir });
         initAddToArchive(s.filePath, targetDir, s.password, webview, s.archiveUri, setupWebview);
@@ -424,6 +449,10 @@ function registerHandler(webview: vscode.Webview): void {
 
       // ── New Folder ──
       if (msg.c === "newFolderPrompt") {
+        if (isReadOnlyExt(getFullExt(s.filePath))) {
+          webview.postMessage({ c: "err", t: t("archive.readOnly") });
+          return;
+        }
         const targetDir = typeof msg.dir === "string" ? msg.dir : "";
         const folderName = await vscode.window.showInputBox({
           prompt: "Folder name",
