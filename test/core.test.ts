@@ -10,6 +10,7 @@ import {
   j7zCompress,
   j7zCompressDir,
   j7zDecompress,
+  copyFS,
   buildTree,
   countTreeStats,
   isEncryptedInline,
@@ -513,6 +514,52 @@ void (async () => {
     assert.strictEqual(isRarVolume(".rar"), false);
     assert.strictEqual(isRarVolume(".r1"), false);
   });
+
+  // ── 18. Wrapped format round-trips ──  
+  for (const ext of ["tar.gz", "tar.bz2", "tar.xz"] as const) {
+    await test(`wrapped: ${ext} round-trip`, async () => {
+      const files = { "/d/a.txt": "hello", "/d/b.txt": "world", "/e/c.txt": "nested" };
+      const j = await JS7z();
+      for (const [fp, content] of Object.entries(files)) {
+        mkdirP(j, path.posix.dirname(fp));
+        j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
+      }
+      const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
+
+      // Create tar  
+      await run7z(j, ["a", "/_t.tar", ...tops]);
+      const tarBuf = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+
+      // Compress tar to wrapped format
+      const j2 = await JS7z();
+      j2.FS.writeFile("/_t.tar", new Uint8Array(tarBuf));
+      await run7z(j2, ["a", "/_w." + ext, "/_t.tar"]);
+
+      // Decompress outer layer
+      const compBuf = Buffer.from(j2.FS.readFile("/_w." + ext, { encoding: "binary" }));
+      const j3 = await JS7z();
+      j3.FS.writeFile("/a." + ext, new Uint8Array(compBuf));
+      j3.FS.mkdir("/o1");
+      await run7z(j3, ["x", "/a." + ext, "-o/o1", "-y"]);
+
+      // Find inner tar and extract it
+      const top = j3.FS.readdir("/o1").filter((e: string) => e !== "." && e !== "..");
+      if (top.length === 0) throw new Error(ext + ": no files after outer decompress");
+      const innerTar = top[0];
+      const innerData = j3.FS.readFile("/o1/" + innerTar, { encoding: "binary" });
+
+      const j4 = await JS7z();
+      j4.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
+      j4.FS.mkdir("/o2");
+      await run7z(j4, ["x", "/_inner.tar", "-o/o2", "-y"]);
+
+      const result: Record<string, string> = {};
+      copyFS(j4, "/o2", "", result);
+      assert.strictEqual(result["d/a.txt"], "hello", ext + ": d/a.txt mismatch");
+      assert.strictEqual(result["d/b.txt"], "world", ext + ": d/b.txt mismatch");
+      assert.strictEqual(result["e/c.txt"], "nested", ext + ": e/c.txt mismatch");
+    });
+  }
 
   fs.rmSync(td, { recursive: true, force: true });
 
