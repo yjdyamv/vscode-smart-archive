@@ -71,7 +71,11 @@ interface HandlerState {
 const handlerStates = new WeakMap<vscode.Webview, HandlerState>();
 const handlerRegistered = new WeakSet<vscode.Webview>();
 
-function getWebviewUris(webview: vscode.Webview): { cssUri: string; jsUri: string } {
+function getWebviewUris(webview: vscode.Webview): {
+  cssUri: string;
+  jsUri: string;
+  codiconCssUri: string;
+} {
   const extUri = vscode.extensions.getExtension(EXT_ID)!.extensionUri;
   return {
     cssUri: webview
@@ -79,6 +83,11 @@ function getWebviewUris(webview: vscode.Webview): { cssUri: string; jsUri: strin
       .toString(),
     jsUri: webview
       .asWebviewUri(vscode.Uri.joinPath(extUri, "media", "vue", "assets", "index.js"))
+      .toString(),
+    codiconCssUri: webview
+      .asWebviewUri(
+        vscode.Uri.joinPath(extUri, "node_modules", "@vscode", "codicons", "dist", "codicon.css"),
+      )
       .toString(),
   };
 }
@@ -90,7 +99,7 @@ async function setupWebview(
 ): Promise<void> {
   let filePath = archiveUri.fsPath;
   const ext = getFullExt(filePath);
-  const { cssUri, jsUri } = getWebviewUris(webview);
+  const { cssUri, jsUri, codiconCssUri } = getWebviewUris(webview);
 
   if (isRarVolume(ext)) {
     const rarPath = resolveRarVolume(filePath);
@@ -101,6 +110,7 @@ async function setupWebview(
         `Multi-volume RAR: "${path.basename(filePath)}" requires a .rar file in the same directory.`,
         cssUri,
         jsUri,
+        codiconCssUri,
       );
       return;
     }
@@ -114,7 +124,7 @@ async function setupWebview(
     wrapped: isWrappedFormat(getFullExt(filePath)),
   });
 
-  webview.html = loadingHtml();
+  webview.html = loadingHtml(codiconCssUri);
   const prev = handlerStates.get(webview);
   let password = prev?.password;
 
@@ -157,6 +167,7 @@ async function setupWebview(
         0,
         cssUri,
         jsUri,
+        codiconCssUri,
         { name: archiveName, format: ext, count: 0, size: "" },
         undefined,
         undefined,
@@ -175,7 +186,12 @@ async function setupWebview(
     entries = await fetchFileList(filePath, password);
   } catch (err) {
     logger.error({ event: "setupWebview.fetchFileList.failed", err }, (err as Error).message);
-    webview.html = emptyHtml(t("decompress.failed") + (err as Error).message, cssUri, jsUri);
+    webview.html = emptyHtml(
+      t("decompress.failed") + (err as Error).message,
+      cssUri,
+      jsUri,
+      codiconCssUri,
+    );
     return;
   }
 
@@ -207,6 +223,7 @@ async function setupWebview(
     dirCount,
     cssUri,
     jsUri,
+    codiconCssUri,
     {
       name: archiveName,
       format: ext,
@@ -262,7 +279,7 @@ function registerHandler(webview: vscode.Webview): void {
         return;
       }
 
-      const { cssUri, jsUri } = getWebviewUris(webview);
+      const { cssUri, jsUri, codiconCssUri } = getWebviewUris(webview);
 
       // ── Password submit (encrypted archives) ──
       if (msg.c === "pw" && msg.pw) {
@@ -306,6 +323,7 @@ function registerHandler(webview: vscode.Webview): void {
             dc,
             cssUri,
             jsUri,
+            codiconCssUri,
             {
               name: s.archiveName,
               format: ext,

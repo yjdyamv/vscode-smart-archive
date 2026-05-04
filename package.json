@@ -337,6 +337,7 @@
   },
   "dependencies": {
     "@bokuweb/zstd-wasm": "^0.0.27",
+    "@vscode/codicons": "^0.0.45",
     "iconv-lite": "^0.7.2",
     "js7z-tools": "^2.5.0",
     "minimatch": "^10.2.5",
