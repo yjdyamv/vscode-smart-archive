@@ -8,6 +8,7 @@
  */
 
 import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
@@ -96,21 +97,46 @@ const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
 const CHUNK = 100 * 1024 * 1024;
 
 function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): string {
-  const stat = fs.statSync(filePath);
   const archiveName = getBaseName(filePath);
   const target = vfsPath ?? `/${archiveName}`;
 
+  // For split volumes (archive.7z.001), stream ALL parts so 7z can
+  // find .002, .003, etc. in the same VFS directory.
+  const splitMatch = filePath.match(/^(.+\.(?:7z|zip|wim))\.(\d{3})$/i);
+  if (splitMatch) {
+    const base = splitMatch[1]; // /path/to/archive.7z
+    const dir = path.dirname(base);
+    const name = path.basename(base); // archive.7z
+    let idx = 1;
+    while (true) {
+      const part = path.join(dir, `${name}.${String(idx).padStart(3, "0")}`);
+      if (!fs.existsSync(part)) break;
+      const partTarget = vfsPath
+        ? `${vfsPath.replace(/\.\d{3}$/, "")}.${String(idx).padStart(3, "0")}`
+        : `/${name}.${String(idx).padStart(3, "0")}`;
+      copyToVFS(js7z, part, partTarget);
+      idx++;
+    }
+    return vfsPath ? vfsPath.replace(/\.\d{3}$/, ".001") : `/${name}.001`;
+  }
+
+  copyToVFS(js7z, filePath, target);
+  return target;
+}
+
+function copyToVFS(js7z: JS7zInstance, filePath: string, vfsPath: string): void {
+  const stat = fs.statSync(filePath);
   if (stat.size <= MAX_BUFFER) {
     const data = fs.readFileSync(filePath);
-    js7z.FS.writeFile(target, data);
-    return target;
+    js7z.FS.writeFile(vfsPath, data);
+    return;
   }
 
   // Stream in chunks via VFS open/write/close
   const rfd = fs.openSync(filePath, "r");
   try {
-    js7z.FS.createDataFile("/", target.replace(/^\//, ""), new Uint8Array(0), true, true, 0o777);
-    const vfsStream = js7z.FS.open(target, "w");
+    js7z.FS.createDataFile("/", vfsPath.replace(/^\//, ""), new Uint8Array(0), true, true, 0o777);
+    const vfsStream = js7z.FS.open(vfsPath, "w");
     try {
       const buf = Buffer.alloc(CHUNK);
       let pos = 0;
@@ -126,7 +152,6 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
   } finally {
     fs.closeSync(rfd);
   }
-  return target;
 }
 
 export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, streamToVFS, run7z, MAX_BUFFER };
