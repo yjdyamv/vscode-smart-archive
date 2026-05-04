@@ -22,7 +22,18 @@ function getNoisyPatterns(): string[] {
 }
 
 function isReadOnlyExt(ext: string): boolean {
-  return [".rar", ".iso", ".vhd", ".vmdk", ".dmg", ".hfs", ".fat", ".ntfs"].includes(ext);
+  return [
+    ".rar",
+    ".iso",
+    ".vhd",
+    ".vmdk",
+    ".dmg",
+    ".hfs",
+    ".fat",
+    ".ntfs",
+    ".deb",
+    ".rpm",
+  ].includes(ext);
 }
 
 import { isRarVolume, resolveRarVolume } from "../utils/rar";
@@ -216,7 +227,8 @@ async function setupWebview(
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
-  const roToast = getFullExt(filePath) === ".iso" ? t("archive.readOnly") : toast;
+  const roExt = getFullExt(filePath);
+  const roToast = [".iso", ".deb", ".rpm"].includes(roExt) ? t("archive.readOnly") : toast;
   webview.html = contentHtml(
     tree,
     fileCount,
@@ -316,7 +328,9 @@ function registerHandler(webview: vscode.Webview): void {
           const dc = pwStats.dirs;
           const itemCount = pwStats.total;
           const ext = getFullExt(s.filePath);
-          const pwToast = ext === ".iso" ? t("archive.readOnly") : undefined;
+          const pwToast = [".iso", ".deb", ".rpm"].includes(ext)
+            ? t("archive.readOnly")
+            : undefined;
           webview.html = contentHtml(
             pwTree,
             fc,
