@@ -13,6 +13,7 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 - **Multi-volume RAR** — auto-resolves `.r00`–`.r99` to the base `.rar`
 - **RAR support** — RAR4 + RAR5 extraction via 7-Zip
 - **Bilingual UI** — English / Chinese (auto-detected from VS Code locale)
+- **Large file support** — handles archives and files exceeding 2 GiB via chunked I/O
 - **Security** — Zip Slip protection, zip bomb size limits, path traversal blocking
 - **Smart exclude** — automatically skips `node_modules`, `.git`, `dist`, `.venv`, and 30+ other noisy directories when compressing; customizable via settings
 - **CJK filenames** — recovers GBK / Shift-JIS / EUC-KR encoded filenames in old archives
@@ -83,7 +84,8 @@ npm run lint            # oxlint static analysis
 npm run typecheck       # TypeScript type checking
 npm run format          # oxfmt code formatting
 npm run check           # format + lint + typecheck (CI)
-npm run package         # build webview + compile + create .vsix
+npm run package         # create .vsix
+npm run release         # install + check + package (one step)
 ```
 
 ## Dependencies
