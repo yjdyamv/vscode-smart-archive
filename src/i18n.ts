@@ -107,9 +107,14 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "自訂...",
   },
   "compress.volume.prompt": {
-    en: "Volume size (e.g. 100m, 1g, 650m). Use k/m/g suffix.",
-    "zh-cn": "分卷大小 (例如 100m, 1g, 650m)，后缀 k/m/g",
-    "zh-tw": "分卷大小 (例如 100m, 1g, 650m)，後綴 k/m/g",
+    en: "Volume size (number + k/m/g suffix, e.g. 100m, 1g, 650m)",
+    "zh-cn": "分卷大小 (数字 + k/m/g 后缀，如 100m, 1g, 650m)",
+    "zh-tw": "分卷大小 (數字 + k/m/g 後綴，如 100m, 1g, 650m)",
+  },
+  "compress.volume.invalid": {
+    en: "Invalid format. Use a number followed by k, m, or g (e.g. 100m, 1g)",
+    "zh-cn": "格式无效。请使用数字加 k/m/g 后缀 (如 100m, 1g)",
+    "zh-tw": "格式無效。請使用數字加 k/m/g 後綴 (如 100m, 1g)",
   },
 
   // ---- Encrypt flow ----
