@@ -175,6 +175,8 @@ export async function compressWith7z(
     );
     await run7z(js7z, [...args, ...excludeArgs], progress);
 
+    fs.mkdirSync(path.dirname(options.outputPath), { recursive: true });
+
     if (options.volumeSize) {
       writeVolumeFiles(js7z, OUTPUT_DIR, options.outputPath);
     } else {
