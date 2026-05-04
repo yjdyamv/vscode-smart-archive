@@ -767,9 +767,10 @@ function registerHandler(webview: vscode.Webview): void {
           if (isSplitVolume(s.filePath)) {
             volSize = await promptVolumeSize();
             if (!volSize) return;
-            dst = s.filePath.replace(/\.\d{3}$/, "");
+            const base = s.filePath.replace(/\.\d{3}$/, "");
+            dst = base.slice(0, -ext.length) + "_encrypted" + ext;
           } else {
-            dst = s.filePath;
+            dst = s.filePath.slice(0, -ext.length) + "_encrypted" + ext;
           }
           webview.postMessage({ c: "loading", t: "Encrypting..." });
           await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
@@ -799,9 +800,10 @@ function registerHandler(webview: vscode.Webview): void {
           if (isSplitVolume(s.filePath)) {
             volSize = await promptVolumeSize();
             if (!volSize) return;
-            dst = s.filePath.replace(/\.\d{3}$/, "");
+            const base = s.filePath.replace(/\.\d{3}$/, "");
+            dst = base.slice(0, -ext.length) + "_decrypted" + ext;
           } else {
-            dst = s.filePath;
+            dst = s.filePath.slice(0, -ext.length) + "_decrypted" + ext;
           }
           webview.postMessage({ c: "loading", t: "Decrypting..." });
           await convertArchive(s.filePath, fmt, dst, pw, volSize, "");

@@ -510,6 +510,7 @@ provide("search", search);
 provide("sort", sort);
 provide("postMessage", post);
 provide("showToast", showToast);
+provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
 </script>
 
 <template>
