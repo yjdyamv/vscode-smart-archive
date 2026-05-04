@@ -89,6 +89,16 @@ async function promptConvertFormat(): Promise<string | undefined> {
   return chosen?.label;
 }
 
+function uniquePath(filePath: string): string {
+  if (!fs.existsSync(filePath)) return filePath;
+  const dir = path.dirname(filePath);
+  const ext = path.extname(filePath);
+  const base = path.basename(filePath, ext);
+  let i = 1;
+  while (fs.existsSync(path.join(dir, `${base}_${i}${ext}`))) i++;
+  return path.join(dir, `${base}_${i}${ext}`);
+}
+
 function pwInputBox(prompt: string, validate?: (v: string) => string | undefined): Promise<string | undefined> {
   return new Promise((resolve) => {
     const ib = vscode.window.createInputBox();
@@ -768,9 +778,17 @@ function registerHandler(webview: vscode.Webview): void {
             volSize = await promptVolumeSize();
             if (!volSize) return;
             const base = s.filePath.replace(/\.\d{3}$/, "");
-            dst = base.slice(0, -ext.length) + "_encrypted" + ext;
+            const baseName = path.basename(base, ext);
+            const dir = path.dirname(s.filePath);
+            let folder = path.join(dir, baseName + "_encrypted");
+            if (fs.existsSync(folder)) {
+              let i = 1;
+              while (fs.existsSync(path.join(dir, `${baseName}_encrypted_${i}`))) i++;
+              folder = path.join(dir, `${baseName}_encrypted_${i}`);
+            }
+            dst = path.join(folder, path.basename(base));
           } else {
-            dst = s.filePath.slice(0, -ext.length) + "_encrypted" + ext;
+            dst = uniquePath(s.filePath.slice(0, -ext.length) + "_encrypted" + ext);
           }
           webview.postMessage({ c: "loading", t: "Encrypting..." });
           await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
@@ -801,9 +819,17 @@ function registerHandler(webview: vscode.Webview): void {
             volSize = await promptVolumeSize();
             if (!volSize) return;
             const base = s.filePath.replace(/\.\d{3}$/, "");
-            dst = base.slice(0, -ext.length) + "_decrypted" + ext;
+            const baseName = path.basename(base, ext);
+            const dir = path.dirname(s.filePath);
+            let folder = path.join(dir, baseName + "_decrypted");
+            if (fs.existsSync(folder)) {
+              let i = 1;
+              while (fs.existsSync(path.join(dir, `${baseName}_decrypted_${i}`))) i++;
+              folder = path.join(dir, `${baseName}_decrypted_${i}`);
+            }
+            dst = path.join(folder, path.basename(base));
           } else {
-            dst = s.filePath.slice(0, -ext.length) + "_decrypted" + ext;
+            dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted" + ext);
           }
           webview.postMessage({ c: "loading", t: "Decrypting..." });
           await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
