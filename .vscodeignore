@@ -1,0 +1,13 @@
+.github/**
+src/**
+test/**
+webview-ui/src/**
+webview-ui/node_modules/**
+webview-ui/env.d.ts
+webview-ui/tsconfig.json
+webview-ui/vite.config.ts
+webview-ui/vitest.config.ts
+webview-ui/index.html
+webview-ui/tsconfig.tsbuildinfo
+.oxfmtrc.json
+.oxlintrc.json
