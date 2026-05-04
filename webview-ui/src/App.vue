@@ -46,6 +46,7 @@ const visibleFlatNodes = computed(() => {
 
 const toast = reactive({ show: false, msg: "", ok: true });
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
+const readOnly = ref(!!(window as any)._xReadOnly);
 
 function showToast(msg: string, ok = true) {
   toast.msg = msg;
@@ -492,6 +493,7 @@ provide("showToast", showToast);
     />
     <template v-else-if="viewState === 'content'">
       <Toolbar
+        :read-only="readOnly"
         :selected-count="selection.state.selected.size"
         :selected-files="selectionBreakdown.files"
         :selected-dirs="selectionBreakdown.dirs"
@@ -549,6 +551,7 @@ provide("showToast", showToast);
       :y="ctxMenu.y"
       :paths="ctxMenu.paths"
       :dir-path="ctxMenu.dirPath"
+      :read-only="readOnly"
       @close="closeContextMenu"
       @extract="ctxExtract"
       @delete="ctxDelete"
