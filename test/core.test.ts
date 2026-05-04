@@ -826,6 +826,140 @@ void (async () => {
     await assert.rejects(() => j7zDecompress(out, "wrong"), /7z exit/, "wrong pw rejected");
   });
 
+  // ── 30. Decrypt: encrypted 7z → non-encrypted 7z ──
+  await test("decrypt: encrypted 7z → non-encrypted", async () => {
+    const pw = "s3cret";
+    const src = await j7zCompressDir(
+      { "/x.txt": "secret-data" },
+      "/_enc2.7z",
+      [`-p${pw}`, "-mhe=on"],
+    );
+    await assert.rejects(() => j7zDecompress(src), /7z exit/, "should be encrypted");
+
+    const decrypted = await j7zDecompress(src, pw);
+    const files: Record<string, string> = {};
+    for (const [k, v] of Object.entries(decrypted)) files["/" + k] = v;
+    const stripped = await j7zCompressDir(files, "/_dec.7z");
+    const res = await j7zDecompress(stripped);
+    assert.strictEqual(res["x.txt"], "secret-data", "decrypted content preserved");
+  });
+
+  // ── 31. Encrypt: non-encrypted 7z → encrypted 7z ──
+  await test("encrypt: non-encrypted 7z → encrypted", async () => {
+    const pw = "newpw";
+    const plain = await j7zCompressDir({ "/d.txt": "hello" }, "/_pl.7z");
+    const orig = await j7zDecompress(plain);
+    assert.strictEqual(orig["d.txt"], "hello");
+
+    const files: Record<string, string> = {};
+    for (const [k, v] of Object.entries(orig)) files["/" + k] = v;
+    const enc = await j7zCompressDir(files, "/_enc3.7z", [`-p${pw}`, "-mhe=on"]);
+    await assert.rejects(() => j7zDecompress(enc), /7z exit/, "should be encrypted");
+    const res = await j7zDecompress(enc, pw);
+    assert.strictEqual(res["d.txt"], "hello", "encrypted content preserved");
+  });
+
+  // ── 32. Decrypt split: encrypted split 7z → non-encrypted split 7z ──
+  await test("decrypt: encrypted split 7z → non-encrypted split", async () => {
+    const pw = "splitpw";
+    const j1 = await JS7z();
+    j1.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("y".repeat(16384))));
+    await run7z(j1, ["a", "/_es.7z", "/big.txt", `-p${pw}`, "-mhe=on", "-v100b"]);
+    const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_es.7z."));
+    assert.ok(parts.length >= 2, `split into ${parts.length} parts`);
+
+    const j2 = await JS7z();
+    for (const p of parts) {
+      const d = j1.FS.readFile("/" + p, { encoding: "binary" });
+      j2.FS.writeFile("/" + p, new Uint8Array(d));
+    }
+    j2.FS.mkdir("/o");
+    await run7z(j2, ["x", "/_es.7z.001", "-o/o", `-p${pw}`]);
+    const files: Record<string, string> = {};
+    copyFS(j2, "/o", "", files);
+    assert.strictEqual(files["big.txt"]?.length, 16384);
+
+    const j3 = await JS7z();
+    for (const [k, v] of Object.entries(files)) {
+      const d = path.posix.dirname(k);
+      if (d && d !== ".") mkdirP(j3, "/" + d);
+      j3.FS.writeFile("/" + k, new Uint8Array(Buffer.from(v)));
+    }
+    j3.FS.mkdir("/oo");
+    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[0]))];
+    await run7z(j3, ["a", "/oo/_ds.7z", ...tops, "-v100b"]);
+
+    const newParts = j3.FS.readdir("/oo").filter((e) => e.startsWith("_ds.7z."));
+    assert.ok(newParts.length >= 2);
+
+    const j4 = await JS7z();
+    for (const p of newParts) {
+      const d = j3.FS.readFile("/oo/" + p, { encoding: "binary" });
+      j4.FS.writeFile("/" + p, new Uint8Array(d));
+    }
+    j4.FS.mkdir("/chk2");
+    await run7z(j4, ["x", "/_ds.7z.001", "-o/chk2"]);
+    const dec: Record<string, string> = {};
+    copyFS(j4, "/chk2", "", dec);
+    assert.strictEqual(dec["big.txt"]?.length, 16384, "decrypted split content preserved");
+  });
+
+  // ── 33. Encrypt split: non-encrypted split 7z → encrypted split 7z ──
+  await test("encrypt: non-encrypted split 7z → encrypted split", async () => {
+    const pw = "encsplit";
+    const j1 = await JS7z();
+    j1.FS.writeFile("/med.txt", new Uint8Array(Buffer.from("z".repeat(16384))));
+    await run7z(j1, ["a", "/_ps.7z", "/med.txt", "-v100b"]);
+    const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_ps.7z."));
+    assert.ok(parts.length >= 2);
+
+    const j2 = await JS7z();
+    for (const p of parts) {
+      const d = j1.FS.readFile("/" + p, { encoding: "binary" });
+      j2.FS.writeFile("/" + p, new Uint8Array(d));
+    }
+    j2.FS.mkdir("/o2");
+    await run7z(j2, ["x", "/_ps.7z.001", "-o/o2"]);
+    const files: Record<string, string> = {};
+    copyFS(j2, "/o2", "", files);
+
+    const j3 = await JS7z();
+    for (const [k, v] of Object.entries(files)) {
+      const d = path.posix.dirname(k);
+      if (d && d !== ".") mkdirP(j3, "/" + d);
+      j3.FS.writeFile("/" + k, new Uint8Array(Buffer.from(v)));
+    }
+    j3.FS.mkdir("/oo2");
+    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[0]))];
+    await run7z(j3, ["a", "/oo2/_es2.7z", ...tops, `-p${pw}`, "-mhe=on", "-v100b"]);
+
+    const newParts = j3.FS.readdir("/oo2").filter((e) => e.startsWith("_es2.7z."));
+    assert.ok(newParts.length >= 2);
+
+    const j4 = await JS7z();
+    for (const p of newParts) {
+      const d = j3.FS.readFile("/oo2/" + p, { encoding: "binary" });
+      j4.FS.writeFile("/" + p, new Uint8Array(d));
+    }
+    j4.FS.mkdir("/chk3");
+    await assert.rejects(
+      () => run7z(j4, ["x", "/_es2.7z.001", "-o/chk3"]),
+      /7z exit/,
+      "encrypted split should require password",
+    );
+
+    const j5 = await JS7z();
+    for (const p of newParts) {
+      const d = j3.FS.readFile("/oo2/" + p, { encoding: "binary" });
+      j5.FS.writeFile("/" + p, new Uint8Array(d));
+    }
+    j5.FS.mkdir("/chk3b");
+    await run7z(j5, ["x", "/_es2.7z.001", "-o/chk3b", `-p${pw}`]);
+    const enc: Record<string, string> = {};
+    copyFS(j5, "/chk3b", "", enc);
+    assert.strictEqual(enc["med.txt"]?.length, 16384, "encrypted split content preserved");
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
