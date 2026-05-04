@@ -9,7 +9,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { mountArchive, dirHasLargeFile, MAX_BUFFER } from "../../engines/js7z-helpers";
+import { mountArchive, dirHasLargeFile, cleanupTmpFiles, MAX_BUFFER } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { getBaseName } from "../../utils/path";
@@ -178,6 +178,7 @@ export async function addToArchive(
       targetDir,
     });
   } finally {
+    cleanupTmpFiles(archivePath);
     tryCleanupJS7z(js7z);
   }
 }
