@@ -155,7 +155,7 @@ function mountArchive(js7z: JS7zInstance, filePath: string): string {
   return `${mnt}/${archiveName}`;
 }
 
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z, mountArchive, MAX_BUFFER };
+export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z, mountArchive, dirHasLargeFile, MAX_BUFFER };
 
 export function cleanupTmpFiles(archivePath: string): void {
   const dir = path.dirname(archivePath);
