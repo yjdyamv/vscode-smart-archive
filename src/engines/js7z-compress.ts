@@ -13,7 +13,7 @@ import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
 import type { JS7zFactory, CompressOptions, FormatInfo } from "../types";
-import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z } from "./js7z-helpers";
+import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z, MAX_BUFFER } from "./js7z-helpers";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -97,6 +97,11 @@ export async function compressWith7z(
 
       let compressedData: Uint8Array | undefined;
       if (wrapExt === "zst") {
+        const tarSize = fs.statSync(tarDiskPath).size;
+        if (tarSize > MAX_BUFFER) {
+          try { fs.unlinkSync(tarDiskPath); fs.rmdirSync(path.dirname(tarDiskPath)); } catch {}
+          throw new Error("TAR exceeds 2 GiB — zstd compression not yet supported for large inputs");
+        }
         const tarData = fs.readFileSync(tarDiskPath);
         progress.report({ message: t("compress.compressingTar", wrapExt) });
         compressedData = await zstdCompress(new Uint8Array(tarData), options.level);
