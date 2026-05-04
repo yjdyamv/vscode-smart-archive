@@ -170,3 +170,15 @@ async function mutateArchive(
 }
 
 export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z, mountArchive, mutateArchive, MAX_BUFFER };
+
+export function cleanupTmpFiles(archivePath: string): void {
+  const dir = path.dirname(archivePath);
+  const name = path.basename(archivePath);
+  try {
+    for (const entry of fs.readdirSync(dir)) {
+      if (entry.startsWith(name) && entry.endsWith(".tmp")) {
+        try { fs.unlinkSync(path.join(dir, entry)); } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+}
