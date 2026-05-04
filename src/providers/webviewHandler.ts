@@ -89,6 +89,45 @@ async function promptConvertFormat(): Promise<string | undefined> {
   return chosen?.label;
 }
 
+function pwInputBox(prompt: string, validate?: (v: string) => string | undefined): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const ib = vscode.window.createInputBox();
+    let shown = false;
+    const eyeBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("eye"), tooltip: "Show password" };
+    const eyeOffBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("eye-closed"), tooltip: "Hide password" };
+    const clearBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("close"), tooltip: "Clear" };
+    ib.prompt = prompt;
+    ib.password = true;
+    ib.ignoreFocusOut = true;
+    ib.buttons = [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+    if (validate) {
+      ib.onDidChangeValue((v) => {
+        ib.validationMessage = validate(v) ?? "";
+      });
+    }
+    ib.onDidAccept(() => {
+      if (validate && validate(ib.value)) return;
+      const val = ib.value;
+      ib.hide();
+      resolve(val);
+    });
+    ib.onDidTriggerButton((b) => {
+      if (b === clearBtn) {
+        ib.value = "";
+      } else if (b === eyeBtn || b === eyeOffBtn) {
+        shown = !shown;
+        ib.password = !shown;
+        ib.buttons = shown ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back] : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+      } else {
+        ib.hide();
+        resolve(undefined);
+      }
+    });
+    ib.onDidHide(() => resolve(undefined));
+    ib.show();
+  });
+}
+
 async function convertArchive(
   srcPath: string,
   dstFormat: string,
@@ -711,16 +750,12 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "encrypt") {
         logger.info({ event: "webview.encrypt", path: s.filePath });
         try {
-          const newPw = await vscode.window.showInputBox({
-            prompt: "Enter a password to encrypt this archive",
-            password: true,
-            validateInput: (val) => (val ? undefined : "Password is required"),
-          });
+          const newPw = await pwInputBox("Enter a password to encrypt this archive", (v) =>
+            v ? undefined : "Password is required",
+          );
           if (!newPw) return;
-          const confirmPw = await vscode.window.showInputBox({
-            prompt: "Confirm encryption password",
-            password: true,
-          });
+          const confirmPw = await pwInputBox("Confirm encryption password");
+          if (!confirmPw) return;
           if (confirmPw !== newPw) {
             vscode.window.showErrorMessage("Passwords do not match");
             return;
@@ -754,10 +789,7 @@ function registerHandler(webview: vscode.Webview): void {
         try {
           let pw = s.password;
           if (!pw) {
-            pw = await vscode.window.showInputBox({
-              prompt: "Enter the archive password to decrypt",
-              password: true,
-            });
+            pw = await pwInputBox("Enter the archive password to decrypt");
             if (!pw) return;
           }
           const ext = getFullExt(s.filePath);
