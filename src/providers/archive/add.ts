@@ -147,7 +147,6 @@ export async function addToArchive(
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
     const archiveFsPath = streamToVFS(js7z, archivePath);
-    const usesMount = archiveFsPath.startsWith("/mnt_");
 
     const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z, localPaths, targetDir);
 
@@ -166,10 +165,8 @@ export async function addToArchive(
       js7z.callMain(args);
     });
 
-    if (!usesMount) {
-      const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
-    }
+    const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
 
     logger.info({
       event: "addToArchive.ok",
