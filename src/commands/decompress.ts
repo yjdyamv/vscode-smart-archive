@@ -2,7 +2,7 @@
  * Decompress command handler — Smart Archive VSCode Extension
  *
  * Password flow:
- *   - .7z / .zip / .rar → always prompt (these can be encrypted)
+ *   - .7z / .zip / .rar → detect encryption first, skip prompt if not encrypted
  *   - All other formats → skip prompt (no encryption support)
  *
  * Cleanup: if extraction fails, the empty output directory
@@ -15,6 +15,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { decompressWith7z } from "../engines/js7z-engine";
+import { isEncrypted } from "../engines/js7z-engine";
 import { promptPassword } from "../ui/prompts";
 import { getOutputPath } from "../utils/fs";
 import { DECOMPRESS_EXTENSIONS, getFullExt, isEncryptableExt } from "../constants";
@@ -77,13 +78,23 @@ async function decompressSingleFile(
     vscode.window.showWarningMessage(t("decompress.unknownFormat", ext));
   }
 
-  // Password: always prompt for encryptable formats, skip for others
+  // Password: only prompt for encryptable formats that are actually encrypted
   let password = knownPassword ?? "";
 
   if (!password && isEncryptableExt(ext)) {
-    const pwd = await promptPassword(t("password.decryptHint"));
-    if (pwd === null) return;
-    password = pwd;
+    try {
+      const encrypted = await isEncrypted(inputPath);
+      if (encrypted) {
+        const pwd = await promptPassword(t("password.decryptHint"));
+        if (pwd === null) return;
+        password = pwd;
+      }
+    } catch {
+      // If detection fails, prompt anyway as a safe fallback
+      const pwd = await promptPassword(t("password.decryptHint"));
+      if (pwd === null) return;
+      password = pwd;
+    }
   }
 
   const outputDir = getOutputPath(inputPath, "extracted");
