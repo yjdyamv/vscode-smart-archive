@@ -588,7 +588,8 @@ function registerHandler(webview: vscode.Webview): void {
         try {
           const fmt = await promptConvertFormat();
           if (!fmt) return;
-          const dst = s.filePath.replace(/\.[^.]+$/, `.${fmt}`);
+          const oldExt = getFullExt(s.filePath);
+          const dst = s.filePath.slice(0, -oldExt.length) + `.${fmt}`;
           webview.postMessage({ c: "loading", t: "Converting..." });
           await convertArchive(s.filePath, fmt, dst, s.password ?? "");
           webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
