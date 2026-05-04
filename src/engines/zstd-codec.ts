@@ -73,15 +73,23 @@ function hasSystemZstd(): boolean {
 export function zstdCompressFile(input: string, output: string, level: number): Promise<void> {
   if (hasSystemZstd()) {
     return new Promise((resolve, reject) => {
-      const proc = spawn("zstd", [
-        "-o", output, "-f",
-        `-${mapZstdLevel(level)}`,
-        "-T0", // auto threads
-        input,
-      ], { timeout: 120_000 });
+      const proc = spawn(
+        "zstd",
+        [
+          "-o",
+          output,
+          "-f",
+          `-${mapZstdLevel(level)}`,
+          "-T0", // auto threads
+          input,
+        ],
+        { timeout: 120_000 },
+      );
 
       let stderr = "";
-      proc.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
+      proc.stderr?.on("data", (d: Buffer) => {
+        stderr += d.toString();
+      });
 
       proc.on("close", (code) => {
         if (code === 0) {
@@ -95,9 +103,11 @@ export function zstdCompressFile(input: string, output: string, level: number): 
       proc.on("error", () => {
         cleanup(output);
         // eslint-disable-next-line preserve-caught-error
-        reject(new Error(
-          "zstd not available. Install: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
-        ));
+        reject(
+          new Error(
+            "zstd not available. Install: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
+          ),
+        );
       });
     });
   }
@@ -125,5 +135,9 @@ export function zstdCompressFile(input: string, output: string, level: number): 
 }
 
 function cleanup(path: string): void {
-  try { require("fs").unlinkSync(path); } catch { /* ignore */ }
+  try {
+    require("fs").unlinkSync(path);
+  } catch {
+    /* ignore */
+  }
 }
