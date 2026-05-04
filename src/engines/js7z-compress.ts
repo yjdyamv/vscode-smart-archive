@@ -99,7 +99,7 @@ export async function compressWith7z(
       progress.report({ message: t("compress.creatingTar") });
       await createTarFile(
         tarDiskPath,
-        options.targets.map((t) => t.fsPath),
+        options.targets.map((target) => target.fsPath),
         token,
       );
       if (token?.isCancellationRequested) throw new vscode.CancellationError();

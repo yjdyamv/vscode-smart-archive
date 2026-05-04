@@ -175,7 +175,6 @@ export async function addToArchive(
       targetDir,
     });
   } finally {
-    ;
     tryCleanupJS7z(js7z);
   }
 }
