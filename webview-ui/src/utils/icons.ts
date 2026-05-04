@@ -50,78 +50,83 @@ const FILE_NAME_MAP: Record<string, string> = {
 };
 
 const FILE_ICONS: { exts: string[]; codicon: string }[] = [
+  // ── Images / Audio / Video ──
   {
     exts: [
       "png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "tiff",
       "tif", "psd", "ai", "heic", "heif", "avif", "icns", "raw", "nef",
-      "cr2", "arw",
+      "cr2", "arw", "mp3", "wav", "ogg", "flac", "aac", "wma", "m4a",
+      "opus", "mid", "midi", "mp4", "avi", "mkv", "mov", "wmv", "webm",
+      "m4v", "mpg", "mpeg", "3gp", "ogv", "swf", "fla", "smil",
     ],
     codicon: "file-media",
   },
+
+  // ── Systems languages ─ symbol-structure ──
   {
     exts: [
-      "mp3", "wav", "ogg", "flac", "aac", "wma", "m4a", "opus", "mid",
-      "midi",
+      "c", "cpp", "cc", "cxx", "c++", "h", "hpp", "hxx", "h++",
+      "rs", "rlib", "rmeta", "go", "zig", "nim", "odin", "v", "cr",
     ],
-    codicon: "file-media",
+    codicon: "symbol-structure",
   },
+
+  // ── Dynamic / scripting languages ─ symbol-method ──
   {
     exts: [
-      "mp4", "avi", "mkv", "mov", "wmv", "webm", "m4v", "mpg", "mpeg",
-      "3gp", "ogv",
-    ],
-    codicon: "file-media",
-  },
-  {
-    exts: [
-      "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs",
+      "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts",
       "py", "pyw", "pyx", "pxd", "pxi",
-      "rb", "erb", "rs", "rlib", "rmeta",
-      "go", "java", "kt", "kts", "swift",
-      "c", "cpp", "cc", "cxx", "c++",
-      "h", "hpp", "hxx", "h++",
-      "cs", "php", "phtml",
-      "dart", "scala", "sc", "lua", "pl", "pm",
-      "hs", "lhs", "ex", "exs", "clj", "cljs", "cljc", "edn",
-      "jl", "nim", "zig", "v", "groovy",
-      "r", "rmd", "rnw", "rproj",
-      "elm", "erl", "hrl", "fs", "fsx", "fsi",
-      "vlang", "vala", "cr", "odin", "wren", "res", "resi",
-      "svelte", "vue",
+      "php", "phtml", "lua", "pl", "pm", "dart",
     ],
-    codicon: "file-code",
+    codicon: "symbol-method",
   },
-  { exts: ["css", "scss", "sass", "less", "styl", "stylus", "pcss", "postcss"], codicon: "symbol-color" },
-  { exts: ["html", "htm", "xml", "xsl", "xslt", "svg", "astro"], codicon: "globe" },
+
+  // ── Class-heavy languages ─ symbol-class ──
+  {
+    exts: ["java", "kt", "kts", "cs", "scala", "sc", "groovy"],
+    codicon: "symbol-class",
+  },
+
+  // ── Functional languages ─ symbol-operator ──
   {
     exts: [
-      "json", "jsonc", "json5",
-      "yaml", "yml",
-      "toml", "ini", "cfg", "conf", "config",
-      "properties", "env", "envrc",
-      "editorconfig", "npmrc", "browserslistrc",
+      "hs", "lhs", "ex", "exs", "clj", "cljs", "cljc", "edn",
+      "erl", "hrl", "elm", "fs", "fsx", "fsi", "wren", "res", "resi",
+    ],
+    codicon: "symbol-operator",
+  },
+
+  // ── Swift ─ symbol-field ──
+  { exts: ["swift"], codicon: "symbol-field" },
+
+  // ── Ruby ─ 专属图标 ──
+  { exts: ["rb", "erb", "gemfile", "rakefile"], codicon: "ruby" },
+
+  // ── Data science ─ graph ──
+  { exts: ["r", "rmd", "rnw", "rproj", "jl", "ipynb"], codicon: "graph" },
+
+  // ── CSS / styles ─ 专属图标 ──
+  { exts: ["css", "scss", "sass", "less", "styl", "stylus", "pcss", "postcss"], codicon: "css" },
+
+  // ── Markdown ─ 专属图标 ──
+  { exts: ["md", "mdx", "markdown", "mdc", "mdwn", "mkd", "mkdn", "ronn"], codicon: "markdown" },
+
+  // ── JSON ─ 专属图标 ──
+  { exts: ["json", "jsonc", "json5"], codicon: "json" },
+
+  // ── Web markup ─ globe ──
+  { exts: ["html", "htm", "xml", "xsl", "xslt", "vue", "svelte", "astro"], codicon: "globe" },
+
+  // ── Config ─ settings-gear ──
+  {
+    exts: [
+      "yaml", "yml", "toml", "ini", "cfg", "conf", "config",
+      "properties", "env", "envrc", "editorconfig", "npmrc", "browserslistrc",
     ],
     codicon: "settings-gear",
   },
-  {
-    exts: [
-      "zip", "gz", "bz2", "xz", "7z", "rar", "tar",
-      "zst", "lz", "lzma", "tgz", "tbz2", "tbz", "txz",
-      "tzst", "tlz", "cab", "arj", "lzh", "rpm", "deb",
-      "apk", "aar", "jar", "war", "ear", "whl", "egg",
-      "z", "cpio", "xar", "uha",
-    ],
-    codicon: "file-zip",
-  },
-  { exts: ["pdf"], codicon: "file-pdf" },
-  { exts: ["md", "mdx", "markdown", "mdc", "mdwn", "mkd", "mkdn", "ronn"], codicon: "markdown" },
-  {
-    exts: [
-      "txt", "text", "log", "doc", "docx", "xls", "xlsx",
-      "ppt", "pptx", "rtf", "csv", "tsv", "odt", "ods", "odp",
-    ],
-    codicon: "file-text",
-  },
+
+  // ── Shell scripts ─ terminal ──
   {
     exts: [
       "sh", "bash", "zsh", "fish", "bat", "cmd", "ps1",
@@ -129,10 +134,33 @@ const FILE_ICONS: { exts: string[]; codicon: string }[] = [
     ],
     codicon: "terminal",
   },
+
+  // ── Archives ─ file-zip ──
   {
-    exts: ["sql", "db", "sqlite", "sqlite3", "mdb", "accdb", "prisma", "dgraph", "cypher"],
-    codicon: "database",
+    exts: [
+      "zip", "gz", "bz2", "xz", "7z", "rar", "tar",
+      "zst", "lz", "lzma", "tgz", "tbz2", "tbz", "txz",
+      "tzst", "tlz", "cab", "arj", "lzh", "rpm", "deb",
+      "apk", "aar", "jar", "war", "ear", "whl", "egg",
+      "z", "cpio", "xar", "uha", "dex",
+    ],
+    codicon: "file-zip",
   },
+
+  // ── Documents ──
+  { exts: ["pdf"], codicon: "file-pdf" },
+  {
+    exts: [
+      "txt", "text", "log", "doc", "docx", "xls", "xlsx",
+      "ppt", "pptx", "rtf", "csv", "tsv", "odt", "ods", "odp",
+    ],
+    codicon: "file-text",
+  },
+
+  // ── Database ─ database ──
+  { exts: ["sql", "db", "sqlite", "sqlite3", "mdb", "accdb", "prisma", "dgraph", "cypher"], codicon: "database" },
+
+  // ── Binary / executables ──
   {
     exts: [
       "exe", "dll", "so", "dylib", "bin", "app", "msi", "pkg",
@@ -140,6 +168,8 @@ const FILE_ICONS: { exts: string[]; codicon: string }[] = [
     ],
     codicon: "file-binary",
   },
+
+  // ── Others ──
   { exts: ["lock"], codicon: "lock" },
   { exts: ["gitignore", "gitattributes", "dockerignore", "npmignore"], codicon: "git-ignore" },
   { exts: ["gitmodules"], codicon: "file-submodule" },
@@ -147,21 +177,9 @@ const FILE_ICONS: { exts: string[]; codicon: string }[] = [
   { exts: ["ttf", "otf", "woff", "woff2", "eot", "ttc"], codicon: "symbol-string" },
   { exts: ["pem", "crt", "cer", "key", "p12", "pfx", "der", "csr", "p7b", "p7c"], codicon: "key" },
   { exts: ["vhd", "vmdk", "iso", "qcow2", "dmg", "img", "fat", "ntfs", "vdi", "vhdx"], codicon: "vm" },
-  {
-    exts: ["swf", "fla", "smil"],
-    codicon: "file-media",
-  },
-  { exts: ["cjsx"], codicon: "file-code" },
-  { exts: ["jar", "dex"], codicon: "file-zip" },
-  {
-    exts: [
-      "ipynb",
-    ],
-    codicon: "notebook",
-  },
-  { exts: ["gemfile", "rakefile", "procfile", "vagrantfile"], codicon: "settings-gear" },
   { exts: ["graphql", "gql"], codicon: "project" },
   { exts: ["proto", "protobuf"], codicon: "symbol-misc" },
+  { exts: ["cjsx"], codicon: "symbol-method" },
 ];
 
 const EXT_ICON_MAP: Record<string, string> = {};
