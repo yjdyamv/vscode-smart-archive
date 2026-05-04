@@ -50,7 +50,11 @@ export async function createFolderInArchive(
     let cur = "";
     for (const part of folderPath.split("/").filter(Boolean)) {
       cur += "/" + part;
-      try { js7z.FS.mkdir(cur); } catch { /* ignore */ }
+      try {
+        js7z.FS.mkdir(cur);
+      } catch {
+        /* ignore */
+      }
     }
     const dotfile = `${vfsFolder}/.smartarchive`;
     js7z.FS.writeFile(dotfile, new Uint8Array(1));

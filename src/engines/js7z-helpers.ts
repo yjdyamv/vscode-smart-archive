@@ -52,7 +52,10 @@ function copyInputsToFS(
   return fsPaths;
 }
 
-function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { paths: string[]; usesMount: boolean; mountedLocalPaths: string[] } {
+function mountLocalPaths(
+  js7z: JS7zInstance,
+  localPaths: readonly string[],
+): { paths: string[]; usesMount: boolean; mountedLocalPaths: string[] } {
   const result: string[] = [];
   const mounted: string[] = [];
   let usesMount = false;
@@ -63,7 +66,11 @@ function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { p
       const name = getBaseName(localPath);
       const parentDir = path.dirname(localPath);
       const mnt = `/mnt_${_mntCount++}`;
-      try { js7z.FS.mkdir(mnt); } catch { /* ignore */ }
+      try {
+        js7z.FS.mkdir(mnt);
+      } catch {
+        /* ignore */
+      }
       js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
       result.push(`${mnt}/${name}`);
       mounted.push(localPath);
@@ -84,7 +91,9 @@ function dirHasLargeFile(dirPath: string): boolean {
         return true;
       }
     }
-  } catch { /* skip unreadable */ }
+  } catch {
+    /* skip unreadable */
+  }
   return false;
 }
 
@@ -146,17 +155,35 @@ function mountArchive(js7z: JS7zInstance, filePath: string): string {
 
   const parentDir = path.dirname(filePath);
   const mnt = `/mnt_${_mntCount++}`;
-  try { js7z.FS.mkdir(mnt); } catch { /* ignore */ }
+  try {
+    js7z.FS.mkdir(mnt);
+  } catch {
+    /* ignore */
+  }
   // Pre-create .tmp file so NODEFS can write (7z d/rn create archiveName.tmp)
   const tmpPath = path.join(parentDir, archiveName + ".tmp");
   if (!fs.existsSync(tmpPath)) {
-    try { fs.writeFileSync(tmpPath, ""); } catch { /* ignore */ }
+    try {
+      fs.writeFileSync(tmpPath, "");
+    } catch {
+      /* ignore */
+    }
   }
   js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
   return `${mnt}/${archiveName}`;
 }
 
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z, mountArchive, dirHasLargeFile, MAX_BUFFER };
+export {
+  tryCleanup,
+  INPUT_DIR,
+  OUTPUT_DIR,
+  copyInputsToFS,
+  mountLocalPaths,
+  run7z,
+  mountArchive,
+  dirHasLargeFile,
+  MAX_BUFFER,
+};
 
 export function cleanupTmpFiles(archivePath: string): void {
   const dir = path.dirname(archivePath);
@@ -164,8 +191,14 @@ export function cleanupTmpFiles(archivePath: string): void {
   try {
     for (const entry of fs.readdirSync(dir)) {
       if (entry.startsWith(name) && entry.endsWith(".tmp")) {
-        try { fs.unlinkSync(path.join(dir, entry)); } catch { /* ignore */ }
+        try {
+          fs.unlinkSync(path.join(dir, entry));
+        } catch {
+          /* ignore */
+        }
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }

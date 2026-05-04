@@ -13,7 +13,15 @@ import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
 import type { JS7zFactory, CompressOptions, FormatInfo } from "../types";
-import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z, MAX_BUFFER } from "./js7z-helpers";
+import {
+  tryCleanup,
+  INPUT_DIR,
+  OUTPUT_DIR,
+  copyInputsToFS,
+  mountLocalPaths,
+  run7z,
+  MAX_BUFFER,
+} from "./js7z-helpers";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -92,15 +100,24 @@ export async function compressWith7z(
       const tarDiskPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), "_tmp.tar");
 
       progress.report({ message: t("compress.creatingTar") });
-      await createTarFile(tarDiskPath, options.targets.map(t => t.fsPath), token);
+      await createTarFile(
+        tarDiskPath,
+        options.targets.map((t) => t.fsPath),
+        token,
+      );
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
 
       let compressedData: Uint8Array | undefined;
       if (wrapExt === "zst") {
         const tarSize = fs.statSync(tarDiskPath).size;
         if (tarSize > MAX_BUFFER) {
-          try { fs.unlinkSync(tarDiskPath); fs.rmdirSync(path.dirname(tarDiskPath)); } catch {}
-          throw new Error("TAR exceeds 2 GiB — zstd compression not yet supported for large inputs");
+          try {
+            fs.unlinkSync(tarDiskPath);
+            fs.rmdirSync(path.dirname(tarDiskPath));
+          } catch {}
+          throw new Error(
+            "TAR exceeds 2 GiB — zstd compression not yet supported for large inputs",
+          );
         }
         const tarData = fs.readFileSync(tarDiskPath);
         progress.report({ message: t("compress.compressingTar", wrapExt) });
@@ -119,7 +136,10 @@ export async function compressWith7z(
       }
 
       // Clean up temp tar
-      try { fs.unlinkSync(tarDiskPath); fs.rmdirSync(path.dirname(tarDiskPath)); } catch {}
+      try {
+        fs.unlinkSync(tarDiskPath);
+        fs.rmdirSync(path.dirname(tarDiskPath));
+      } catch {}
 
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
       if (compressedData) {

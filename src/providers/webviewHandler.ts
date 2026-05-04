@@ -79,7 +79,11 @@ function getWebviewUris(webview: vscode.Webview): { cssUri: string; jsUri: strin
   };
 }
 
-async function setupWebview(webview: vscode.Webview, archiveUri: vscode.Uri, toast?: string): Promise<void> {
+async function setupWebview(
+  webview: vscode.Webview,
+  archiveUri: vscode.Uri,
+  toast?: string,
+): Promise<void> {
   let filePath = archiveUri.fsPath;
   const ext = getFullExt(filePath);
   const { cssUri, jsUri } = getWebviewUris(webview);
@@ -353,7 +357,13 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
         try {
           await deleteFromArchive(s.filePath, msg.paths, s.password);
-          try { await setupWebview(webview, s.archiveUri, t("archive.toastDeleted", String(msg.paths.length))); } catch {}
+          try {
+            await setupWebview(
+              webview,
+              s.archiveUri,
+              t("archive.toastDeleted", String(msg.paths.length)),
+            );
+          } catch {}
         } catch (err) {
           logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
@@ -388,7 +398,9 @@ function registerHandler(webview: vscode.Webview): void {
         try {
           await renameInArchive(s.filePath, oldPath, newPath, s.password);
           if (s.archiveUri) {
-            try { await setupWebview(webview, s.archiveUri, t("archive.toastRenamed")); } catch {}
+            try {
+              await setupWebview(webview, s.archiveUri, t("archive.toastRenamed"));
+            } catch {}
           }
         } catch (err) {
           logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
@@ -427,7 +439,9 @@ function registerHandler(webview: vscode.Webview): void {
         try {
           await createFolderInArchive(s.filePath, targetDir, name, s.password);
           if (s.archiveUri) {
-            try { await setupWebview(webview, s.archiveUri, t("archive.toastCreatedFolder")); } catch {}
+            try {
+              await setupWebview(webview, s.archiveUri, t("archive.toastCreatedFolder"));
+            } catch {}
           }
         } catch (err) {
           logger.error({ event: "webview.newFolder.failed", err }, (err as Error).message);
