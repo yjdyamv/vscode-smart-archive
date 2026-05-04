@@ -353,7 +353,7 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
         try {
           await deleteFromArchive(s.filePath, msg.paths, s.password);
-          await setupWebview(webview, s.archiveUri, t("archive.toastDeleted", String(msg.paths.length)));
+          try { await setupWebview(webview, s.archiveUri, t("archive.toastDeleted", String(msg.paths.length))); } catch {}
         } catch (err) {
           logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
@@ -387,7 +387,9 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.rename", oldPath, newPath });
         try {
           await renameInArchive(s.filePath, oldPath, newPath, s.password);
-          if (s.archiveUri) await setupWebview(webview, s.archiveUri, t("archive.toastRenamed"));
+          if (s.archiveUri) {
+            try { await setupWebview(webview, s.archiveUri, t("archive.toastRenamed")); } catch {}
+          }
         } catch (err) {
           logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
           showErrorWithCopy(t("decompress.failed") + (err as Error).message);
@@ -424,7 +426,9 @@ function registerHandler(webview: vscode.Webview): void {
         logger.info({ event: "webview.newFolder", dir: targetDir, name });
         try {
           await createFolderInArchive(s.filePath, targetDir, name, s.password);
-          if (s.archiveUri) await setupWebview(webview, s.archiveUri, t("archive.toastCreatedFolder"));
+          if (s.archiveUri) {
+            try { await setupWebview(webview, s.archiveUri, t("archive.toastCreatedFolder")); } catch {}
+          }
         } catch (err) {
           logger.error({ event: "webview.newFolder.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
