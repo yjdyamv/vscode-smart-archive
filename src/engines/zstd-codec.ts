@@ -102,29 +102,26 @@ export function zstdCompressFile(input: string, output: string, level: number): 
     });
   }
 
-  try {
-    const data = fs.readFileSync(input);
-    return ensureInit().then(() => {
-      try {
-        const compressed = zstd.compress(data, mapZstdLevel(level));
-        fs.writeFileSync(output, Buffer.from(compressed));
-      } catch (err) {
-        cleanup(output);
-        throw err;
+  // WASM chunked: compress file in 50MB chunks, 7z handles multi-frame decompression
+  const CHUNK = 50 * 1024 * 1024;
+  return ensureInit().then(() => {
+    const rfd = fs.openSync(input, "r");
+    const out = fs.openSync(output, "w");
+    try {
+      const buf = Buffer.alloc(CHUNK);
+      let pos = 0;
+      while (true) {
+        const n = fs.readSync(rfd, buf, 0, buf.length, pos);
+        if (n === 0) break;
+        const frame = zstd.compress(new Uint8Array(buf.slice(0, n)), mapZstdLevel(level));
+        fs.writeSync(out, Buffer.from(frame));
+        pos += n;
       }
-    }).catch((err) => {
-      cleanup(output);
-      throw err;
-    });
-  } catch (err: any) {
-    if (err?.code === "ERR_FS_FILE_TOO_LARGE") {
-      // eslint-disable-next-line preserve-caught-error
-      throw new Error(
-        "File too large for WASM zstd. Install system zstd: winget (Win), brew (Mac), apt/dnf (Linux)",
-      );
+    } finally {
+      fs.closeSync(rfd);
+      fs.closeSync(out);
     }
-    throw err;
-  }
+  });
 }
 
 function cleanup(path: string): void {
