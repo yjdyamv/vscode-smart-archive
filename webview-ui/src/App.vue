@@ -539,7 +539,7 @@ provide("showToast", showToast);
       />
     </template>
     <div v-else class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]">
-      <div class="text-4xl opacity-40">📭</div>
+      <div class="text-4xl opacity-40"><span class="codicon codicon-folder-opened"></span></div>
       <div class="text-sm">{{ archiveProps?.name ?? "Archive" }}</div>
       <div class="text-xs opacity-60">No files to display</div>
     </div>

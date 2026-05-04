@@ -125,7 +125,7 @@ function onExpandClick(e: MouseEvent) {
       <span v-if="isLoading" class="ar-loading"></span>
       <template v-else>{{ flatNode.hasChildren ? (flatNode.expanded ? '▼' : '▶') : isDir ? '▶' : '' }}</template>
     </span>
-    <span class="ic" :style="{ color: icon.color }">{{ icon.emoji }}</span>
+    <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
     <span class="nm" :title="node.path" v-html="getNameHtml()"></span>
     <span v-if="!isDir && node.size > 0" class="sz">{{ formatSize(node.size) }}</span>
   </div>
@@ -238,10 +238,9 @@ function onExpandClick(e: MouseEvent) {
   to { transform: rotate(360deg); }
 }
 .ic {
-  width: calc(var(--vscode-font-size) * 1.2);
+  width: calc(var(--vscode-font-size) * 1.4);
   text-align: center;
   flex-shrink: 0;
-  font-size: calc(var(--vscode-font-size) * 1.1);
   line-height: calc(var(--vscode-font-size) * 1.8);
 }
 .nm {
