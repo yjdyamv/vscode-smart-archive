@@ -20,12 +20,11 @@ import {
   copyInputsToFS,
   streamToVFS,
   run7z,
-  MAX_BUFFER,
 } from "./js7z-helpers";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
-import { zstdCompress } from "./zstd-codec";
+import { zstdCompressFile } from "./zstd-codec";
 import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger";
 import { validatePassword } from "../utils/security";
@@ -106,19 +105,10 @@ export async function compressWith7z(
 
       let compressedData: Uint8Array | undefined;
       if (wrapExt === "zst") {
-        const tarSize = fs.statSync(tarDiskPath).size;
-        if (tarSize > MAX_BUFFER) {
-          try {
-            fs.unlinkSync(tarDiskPath);
-            fs.rmdirSync(path.dirname(tarDiskPath));
-          } catch {}
-          throw new Error(
-            "TAR exceeds 2 GiB — zstd compression not yet supported for large inputs",
-          );
-        }
-        const tarData = fs.readFileSync(tarDiskPath);
         progress.report({ message: t("compress.compressingTar", wrapExt) });
-        compressedData = await zstdCompress(new Uint8Array(tarData), options.level);
+        const zstOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.zst");
+        await zstdCompressFile(tarDiskPath, zstOut, options.level);
+        compressedData = new Uint8Array(fs.readFileSync(zstOut));
       } else {
         progress.report({ message: t("compress.compressingTar", wrapExt) });
         const js7z2 = await JS7z();

@@ -9,6 +9,8 @@
 
 import { logger } from "../utils/logger";
 import { checkFileSize } from "../utils/security";
+import { spawn } from "child_process";
+import * as fs from "fs";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const zstd = require("@bokuweb/zstd-wasm") as {
@@ -49,10 +51,39 @@ export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Ar
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
   await ensureInit();
-  // Guard against zstd decompression bombs: compressed data should be < 256 MiB
-  // and decompressed output must pass size checks
   checkFileSize(data.byteLength);
   const result = zstd.decompress(data);
   checkFileSize(result.byteLength);
   return result;
+}
+
+let sysZstd: boolean | null = null;
+
+function hasSystemZstd(): boolean {
+  if (sysZstd !== null) return sysZstd;
+  try {
+    const result = require("child_process").spawnSync("zstd", ["--version"], { timeout: 3000 });
+    sysZstd = result.status === 0;
+  } catch {
+    sysZstd = false;
+  }
+  return sysZstd;
+}
+
+export function zstdCompressFile(input: string, output: string, level: number): Promise<void> {
+  if (hasSystemZstd()) {
+    return new Promise((resolve, reject) => {
+      const proc = spawn("zstd", ["-o", output, "-f", `-${mapZstdLevel(level)}`, input]);
+      proc.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`zstd exited with code ${code}`));
+      });
+      proc.on("error", reject);
+    });
+  }
+  const data = fs.readFileSync(input);
+  return ensureInit().then(() => {
+    const compressed = zstd.compress(data, mapZstdLevel(level));
+    fs.writeFileSync(output, Buffer.from(compressed));
+  });
 }
