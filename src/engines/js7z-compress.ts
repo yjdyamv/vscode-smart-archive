@@ -82,13 +82,11 @@ export async function compressWith7z(
       level: options.level,
     });
 
-    // Copy all input files/folders to VFS
     const allInputPaths = copyInputsToFS(js7z, localPaths, token);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
     const archiveName = getBaseName(options.outputPath);
-    js7z.FS.mkdir(OUTPUT_DIR);
     const archiveFsPath = joinFSPath(OUTPUT_DIR, archiveName);
 
     if (isWrappedFormat("." + options.format.label)) {
