@@ -95,6 +95,7 @@ async function convertArchive(
   dstPath: string,
   password: string,
   volumeSize?: string,
+  outputPassword?: string,
 ): Promise<void> {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_cvt_"));
   try {
@@ -114,7 +115,7 @@ async function convertArchive(
           supportsEncryption: false,
         },
         outputPath: dstPath,
-        password,
+        password: outputPassword ?? password,
         level: 5,
         volumeSize,
       },
@@ -198,6 +199,7 @@ async function setupWebview(
 
   // For encryptable formats, detect encryption before listing files
   // to avoid leaking file structure from unencrypted ZIP headers.
+  let isEnc = false;
   if (isEncryptableExt(getFullExt(filePath))) {
     let encrypted = false;
     try {
@@ -206,6 +208,7 @@ async function setupWebview(
       // isEncrypted can fail for multi-volume archives that need
       // all parts to list — don't blindly assume encryption.
     }
+    if (encrypted) isEnc = true;
 
     if (encrypted && password) {
       logger.info({ event: "setupWebview.password.retry" });
@@ -248,6 +251,7 @@ async function setupWebview(
       if ([".7z", ".zip"].includes(ext) && !isSplitVolume(filePath)) {
         webview.html = webview.html.replace("</body>", `<script>window._xCanSplit=true</script></body>`);
       }
+      webview.html = webview.html.replace("</body>", `<script>window._xIsEncrypted=true</script></body>`);
       if (!handlerRegistered.has(webview)) {
         handlerRegistered.add(webview);
         registerHandler(webview);
@@ -330,6 +334,13 @@ async function setupWebview(
     webview.html = webview.html.replace(
       "</body>",
       `<script>window._xCanSplit=true</script></body>`,
+    );
+  }
+
+  if (isEnc) {
+    webview.html = webview.html.replace(
+      "</body>",
+      `<script>window._xIsEncrypted=true</script></body>`,
     );
   }
 
@@ -438,6 +449,10 @@ function registerHandler(webview: vscode.Webview): void {
               `<script>window._xCanSplit=true</script></body>`,
             );
           }
+          webview.html = webview.html.replace(
+            "</body>",
+            `<script>window._xIsEncrypted=true</script></body>`,
+          );
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
@@ -686,6 +701,80 @@ function registerHandler(webview: vscode.Webview): void {
           webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
         } catch (err) {
           logger.error({ event: "webview.convert.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
+        }
+      }
+
+      // ── Encrypt (add password to non-encrypted archive) ──
+      if (msg.c === "encrypt") {
+        logger.info({ event: "webview.encrypt", path: s.filePath });
+        try {
+          const newPw = await vscode.window.showInputBox({
+            prompt: "Enter a password to encrypt this archive",
+            password: true,
+            validateInput: (val) => (val ? undefined : "Password is required"),
+          });
+          if (!newPw) return;
+          const confirmPw = await vscode.window.showInputBox({
+            prompt: "Confirm encryption password",
+            password: true,
+          });
+          if (confirmPw !== newPw) {
+            vscode.window.showErrorMessage("Passwords do not match");
+            return;
+          }
+          const ext = getFullExt(s.filePath);
+          const fmt = ext.slice(1);
+          let volSize: string | undefined;
+          let dst: string;
+          if (isSplitVolume(s.filePath)) {
+            volSize = await promptVolumeSize();
+            if (!volSize) return;
+            dst = s.filePath.replace(/\.\d{3}$/, "");
+          } else {
+            dst = s.filePath;
+          }
+          webview.postMessage({ c: "loading", t: "Encrypting..." });
+          await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
+          webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
+        } catch (err) {
+          logger.error({ event: "webview.encrypt.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
+        }
+      }
+
+      // ── Decrypt (remove password from encrypted archive) ──
+      if (msg.c === "decrypt") {
+        logger.info({ event: "webview.decrypt", path: s.filePath });
+        try {
+          let pw = s.password;
+          if (!pw) {
+            pw = await vscode.window.showInputBox({
+              prompt: "Enter the archive password to decrypt",
+              password: true,
+            });
+            if (!pw) return;
+          }
+          const ext = getFullExt(s.filePath);
+          const fmt = ext.slice(1);
+          let volSize: string | undefined;
+          let dst: string;
+          if (isSplitVolume(s.filePath)) {
+            volSize = await promptVolumeSize();
+            if (!volSize) return;
+            dst = s.filePath.replace(/\.\d{3}$/, "");
+          } else {
+            dst = s.filePath;
+          }
+          webview.postMessage({ c: "loading", t: "Decrypting..." });
+          await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
+          webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
+        } catch (err) {
+          logger.error({ event: "webview.decrypt.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
         } finally {
           webview.postMessage({ c: "loading", t: false });

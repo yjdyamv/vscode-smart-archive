@@ -49,6 +49,7 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null;
 const readOnly = ref(!!(window as any)._xReadOnly);
 const isSplit = ref(!!(window as any)._xIsSplit);
 const canSplit = ref(!!(window as any)._xCanSplit);
+const isEncrypted = ref(!!(window as any)._xIsEncrypted);
 
 function showToast(msg: string, ok = true) {
   toast.msg = msg;
@@ -209,6 +210,16 @@ function mergeVolumes() {
 
 function splitVolumes() {
   post({ c: "split" });
+}
+
+function encryptArchive() {
+  post({ c: "encrypt" });
+  showToast("Adding encryption...", true);
+}
+
+function decryptArchive() {
+  post({ c: "decrypt" });
+  showToast("Removing encryption...", true);
 }
 
 function submitPassword(pw: string) {
@@ -553,9 +564,12 @@ provide("showToast", showToast);
         :size="archiveProps.size"
         :is-split="isSplit"
         :can-split="canSplit"
+        :is-encrypted="isEncrypted"
         @test="testArchive"
         @merge="mergeVolumes"
         @split="splitVolumes"
+        @encrypt="encryptArchive"
+        @decrypt="decryptArchive"
       />
     </template>
     <div v-else class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]">
