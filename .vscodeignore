@@ -9,5 +9,13 @@ webview-ui/vite.config.ts
 webview-ui/vitest.config.ts
 webview-ui/index.html
 webview-ui/tsconfig.tsbuildinfo
+webview-ui/package.json
+webview-ui/package-lock.json
 .oxfmtrc.json
 .oxlintrc.json
+.vscode/**
+node_modules/**/*.map
+node_modules/**/*.d.ts
+node_modules/**/README.md
+out/**/*.map
+**/.gitignore
