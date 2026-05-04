@@ -9,12 +9,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import {
-  mountArchive,
-  dirHasLargeFile,
-  cleanupTmpFiles,
-  MAX_BUFFER,
-} from "../../engines/js7z-helpers";
+import { streamToVFS } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { getBaseName } from "../../utils/path";
@@ -151,8 +146,7 @@ export async function addToArchive(
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const archiveFsPath = mountArchive(js7z, archivePath);
-    const usesMount = archiveFsPath.startsWith("/mnt_");
+    const archiveFsPath = streamToVFS(js7z, archivePath);
 
     const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z, localPaths, targetDir);
 
@@ -171,10 +165,8 @@ export async function addToArchive(
       js7z.callMain(args);
     });
 
-    if (!usesMount) {
-      const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
-    }
+    const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
 
     logger.info({
       event: "addToArchive.ok",
@@ -183,7 +175,7 @@ export async function addToArchive(
       targetDir,
     });
   } finally {
-    cleanupTmpFiles(archivePath);
+    ;
     tryCleanupJS7z(js7z);
   }
 }
@@ -249,32 +241,11 @@ function copyLocalToFSWithPrefix(
     const vfsTarget = vfsBase ? `${vfsBase}/${name}` : `/${name}`;
     const stat = fs.statSync(localPath);
 
-    if (
-      (stat.isFile() && stat.size > MAX_BUFFER) ||
-      (stat.isDirectory() && dirHasLargeFile(localPath))
-    ) {
-      const parentDir = path.dirname(localPath);
-      const mnt = `/mnt_add_${Date.now()}`;
-      try {
-        js7z.FS.mkdir(mnt);
-      } catch {
-        /* ignore */
-      }
-      js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
-      if (normDir) {
-        try {
-          js7z.FS.mkdir("/" + normDir);
-        } catch {
-          /* ignore */
-        }
-      }
-      vfsPaths.push(`${mnt}/${name}`);
-    } else if (stat.isDirectory()) {
+    if (stat.isDirectory()) {
       js7z.FS.mkdir(vfsTarget);
       copyDirToFSRecursive(js7z, localPath, vfsTarget);
     } else {
-      const fileData = fs.readFileSync(localPath);
-      js7z.FS.writeFile(vfsTarget, fileData);
+      streamToVFS(js7z, localPath, vfsTarget);
     }
     vfsPaths.push(vfsTarget);
   }
@@ -290,8 +261,7 @@ function copyDirToFSRecursive(js7z: JS7zInstance, localDir: string, vfsDir: stri
       js7z.FS.mkdir(vfsEntry);
       copyDirToFSRecursive(js7z, localEntry, vfsEntry);
     } else {
-      const data = fs.readFileSync(localEntry);
-      js7z.FS.writeFile(vfsEntry, data);
+      streamToVFS(js7z, localEntry, vfsEntry);
     }
   }
 }

@@ -18,6 +18,7 @@ import type { JS7zInstance } from "../types";
 import { safeJoinPath, checkFileSize, checkTotalSize } from "./security";
 import { getFullExt } from "../constants";
 import { logger } from "./logger";
+import { streamToVFS } from "../engines/js7z-helpers";
 
 /**
  * Generate a collision-free output path.
@@ -71,8 +72,7 @@ export function copyDirToFS(
       js7z.FS.mkdir(fsEntry);
       copyDirToFS(js7z, localEntry, fsEntry, token);
     } else {
-      const data = fs.readFileSync(localEntry);
-      js7z.FS.writeFile(fsEntry, data);
+      streamToVFS(js7z, localEntry, fsEntry);
     }
   }
 }
