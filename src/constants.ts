@@ -357,7 +357,11 @@ export function getFullExt(filePath: string): string {
 }
 
 export function isSplitVolume(filePath: string): boolean {
-  return /\.(7z|zip|wim)\.\d{3}$/i.test(filePath);
+  return (
+    /\.(7z|zip|wim)\.\d{3}$/i.test(filePath) ||
+    /\.part\d+\.rar$/i.test(filePath) ||
+    /\.r\d{2}$/i.test(filePath)
+  );
 }
 
 export function isWrappedFormat(ext: string): boolean {
