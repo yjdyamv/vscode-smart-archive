@@ -24,7 +24,7 @@ function onKeydown(e: KeyboardEvent) { if (e.key === "Enter") submit(); }
 
 <template>
   <div class="flex flex-col items-center justify-center h-screen gap-2.5">
-    <div class="text-5xl">🔒</div>
+    <div class="text-5xl"><span class="codicon codicon-lock"></span></div>
     <div class="text-[var(--vscode-foreground)] text-[1.1em]">{{ archiveName }}</div>
     <div class="text-[var(--vscode-descriptionForeground)] text-[0.92em] mb-1">Encrypted — enter password</div>
     <div class="relative flex items-center">
@@ -34,7 +34,7 @@ function onKeydown(e: KeyboardEvent) { if (e.key === "Enter") submit(); }
           placeholder="Password" autofocus @keydown="onKeydown" />
       </div>
       <button class="absolute right-1.5 top-1/2 -translate-y-1/2 bg-none border-none cursor-pointer text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] text-sm p-1 leading-none"
-        @mousedown="showPassword = true" @mouseup="showPassword = false" @mouseleave="showPassword = false">👁</button>
+        @mousedown="showPassword = true" @mouseup="showPassword = false" @mouseleave="showPassword = false"><span class="codicon codicon-eye"></span></button>
     </div>
     <button class="btn mt-1" @click="submit">Unlock</button>
     <div :style="hasError ? 'color:#f14c4c;opacity:1' : 'opacity:0'" class="text-[0.92em] min-h-[1.4em] transition-opacity">Wrong password</div>
