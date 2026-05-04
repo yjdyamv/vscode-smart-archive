@@ -30,11 +30,13 @@ function onKeydown(e: KeyboardEvent) { if (e.key === "Enter") submit(); }
     <div class="relative flex items-center">
       <div :class="{ '!border-[#e51400] !shadow-[0_0_0_1px_#e5140033]': hasError }" class="border border-[var(--vscode-input-border)] rounded">
         <input v-model="password" :type="showPassword ? 'text' : 'password'"
-          class="bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-none rounded px-3 py-1.5 pr-9 w-[248px] focus:outline-none"
+          class="bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-none rounded px-3 py-1.5 pr-14 w-[248px] focus:outline-none"
           placeholder="Password" autofocus @keydown="onKeydown" />
       </div>
+      <button v-if="password" class="absolute right-7 top-1/2 -translate-y-1/2 bg-none border-none cursor-pointer text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] text-sm p-1 leading-none"
+        @click="password = ''"><span class="codicon codicon-close"></span></button>
       <button class="absolute right-1.5 top-1/2 -translate-y-1/2 bg-none border-none cursor-pointer text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] text-sm p-1 leading-none"
-        @mousedown="showPassword = true" @mouseup="showPassword = false" @mouseleave="showPassword = false"><span class="codicon codicon-eye"></span></button>
+        @click="showPassword = !showPassword"><span class="codicon" :class="showPassword ? 'codicon-eye-closed' : 'codicon-eye'"></span></button>
     </div>
     <button class="btn mt-1" @click="submit">Unlock</button>
     <div :style="hasError ? 'color:#f14c4c;opacity:1' : 'opacity:0'" class="text-[0.92em] min-h-[1.4em] transition-opacity">Wrong password</div>
