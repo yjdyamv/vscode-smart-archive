@@ -9,9 +9,10 @@
  */
 
 import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zFactory, CompressOptions, FormatInfo } from "../types";
-import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z } from "./js7z-helpers";
+import { tryCleanup, INPUT_DIR, OUTPUT_DIR, mountLocalPaths, run7z } from "./js7z-helpers";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -72,11 +73,22 @@ export async function compressWith7z(
       level: options.level,
     });
     const fsInputPaths = mountLocalPaths(js7z, localPaths);
+    const usesMount = fsInputPaths.some((p) => p.startsWith("/mnt_"));
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
     const archiveName = getBaseName(options.outputPath);
-    const archiveFsPath = joinFSPath(OUTPUT_DIR, archiveName);
+    let archiveFsPath: string;
+    if (usesMount) {
+      const outDir = path.dirname(options.outputPath);
+      const outMnt = "/out_mnt";
+      try { js7z.FS.mkdir(outMnt); } catch { /* ignore */ }
+      js7z.FS.mount(js7z.NODEFS, { root: outDir }, outMnt);
+      archiveFsPath = `${outMnt}/${archiveName}`;
+    } else {
+      js7z.FS.mkdir(OUTPUT_DIR);
+      archiveFsPath = joinFSPath(OUTPUT_DIR, archiveName);
+    }
 
     if (isWrappedFormat("." + options.format.label)) {
       const wrapExt = getWrapExtension("." + options.format.label);
@@ -123,9 +135,11 @@ export async function compressWith7z(
     );
     await run7z(js7z, [...args, ...excludeArgs], progress);
 
-    const data = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-    if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    fs.writeFileSync(options.outputPath, Buffer.from(data));
+    if (!usesMount) {
+      const data = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
+      if (token?.isCancellationRequested) throw new vscode.CancellationError();
+      fs.writeFileSync(options.outputPath, Buffer.from(data));
+    }
     const elapsed = formatDuration(Date.now() - startTime);
     vscode.window.showInformationMessage(
       t("compress.done") + options.outputPath + t("time.elapsed", elapsed),
