@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { mountArchive, MAX_BUFFER } from "../../engines/js7z-helpers";
+import { mountArchive, cleanupTmpFiles } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { PREVIEW_TMP_DIR } from "../tempFiles";
@@ -78,6 +78,7 @@ export async function createFolderInArchive(
     }
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
+    cleanupTmpFiles(archivePath);
     tryCleanupJS7z(js7z);
   }
 }
@@ -281,6 +282,7 @@ export async function renameInArchive(
     }
     logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
   } finally {
+    cleanupTmpFiles(archivePath);
     tryCleanupJS7z(js7z);
   }
 }
