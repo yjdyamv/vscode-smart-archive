@@ -13,6 +13,7 @@
 
 import * as vscode from "vscode";
 import * as fs from "fs";
+import * as path from "path";
 import { compressWith7z } from "../engines/js7z-engine";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../constants";
 import {
@@ -54,7 +55,8 @@ export async function compressCommand(
   }
 
   const level = await promptCompressLevel();
-  const volumeSize = await promptVolumeSize();
+  const supportsSplit = ["7z", "zip"].includes(format.label);
+  const volumeSize = supportsSplit ? await promptVolumeSize() : undefined;
 
   if (format.supportsEncryption) {
     const encryptChoice = await promptEncryptChoice();
@@ -84,6 +86,28 @@ async function executeCompress(
   const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, outputExtension);
   if (!saveUri) return;
 
+  let outputPath = saveUri.fsPath;
+
+  // When splitting, nest volumes inside a subfolder so .001/.002/...
+  // parts stay together instead of scattering across the parent directory.
+  if (volumeSize) {
+    const dir = path.dirname(outputPath);
+    const base = path.basename(outputPath);
+    const folderName = base.replace(/\.[^.]+$/, "");
+    let folderPath = path.join(dir, folderName);
+
+    // Avoid clobbering an existing folder by appending a counter
+    if (fs.existsSync(folderPath)) {
+      let i = 1;
+      while (fs.existsSync(path.join(dir, `${folderName} (${i})`))) {
+        i++;
+      }
+      folderPath = path.join(dir, `${folderName} (${i})`);
+    }
+
+    outputPath = path.join(folderPath, base);
+  }
+
   const options: CompressOptions = {
     targets: targets.map((target) => ({ fsPath: target.fsPath })),
     format: {
@@ -92,7 +116,7 @@ async function executeCompress(
       canCreate: format.canCreate,
       supportsEncryption: format.supportsEncryption,
     },
-    outputPath: saveUri.fsPath,
+    outputPath: outputPath,
     password,
     level,
     volumeSize,
