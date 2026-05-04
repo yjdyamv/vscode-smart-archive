@@ -70,6 +70,7 @@ import {
 } from "./archive";
 import { setCopiedPaths } from "./copyPaste";
 import { decompressWithKnownPassword } from "../commands/decompress";
+import { promptVolumeSize } from "../ui/prompts";
 
 const EXT_ID = "yjdyamv.smart-archive";
 
@@ -93,17 +94,29 @@ async function convertArchive(
   dstFormat: string,
   dstPath: string,
   password: string,
+  volumeSize?: string,
 ): Promise<void> {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_cvt_"));
   try {
     await decompressWith7z({ inputPath: srcPath, outputDir: tmp, password }, { report: () => {} });
+    if (volumeSize) {
+      fs.mkdirSync(path.dirname(dstPath), { recursive: true });
+    }
+    const entries = fs.readdirSync(tmp).map((e) => ({ fsPath: path.join(tmp, e) }));
+    const fmtInfo = COMPRESS_FORMATS.find((f) => f.label === dstFormat);
     await compressWith7z(
       {
-        targets: [{ fsPath: tmp }],
-        format: { label: dstFormat, description: "", canCreate: true, supportsEncryption: false },
+        targets: entries.length ? entries : [{ fsPath: tmp }],
+        format: fmtInfo ?? {
+          label: dstFormat,
+          description: "",
+          canCreate: true,
+          supportsEncryption: false,
+        },
         outputPath: dstPath,
-        password: "",
+        password,
         level: 5,
+        volumeSize,
       },
       { report: () => {} },
     );
@@ -229,6 +242,12 @@ async function setupWebview(
         undefined,
         "password",
       );
+      if (isSplitVolume(filePath)) {
+        webview.html = webview.html.replace("</body>", `<script>window._xIsSplit=true</script></body>`);
+      }
+      if ([".7z", ".zip"].includes(ext) && !isSplitVolume(filePath)) {
+        webview.html = webview.html.replace("</body>", `<script>window._xCanSplit=true</script></body>`);
+      }
       if (!handlerRegistered.has(webview)) {
         handlerRegistered.add(webview);
         registerHandler(webview);
@@ -298,6 +317,19 @@ async function setupWebview(
     webview.html = webview.html.replace(
       "</body>",
       `<script>window._xReadOnly=true</script></body>`,
+    );
+  }
+
+  // Pass split-volume flag so the frontend can show a Merge button
+  if (isSplitVolume(filePath)) {
+    webview.html = webview.html.replace("</body>", `<script>window._xIsSplit=true</script></body>`);
+  }
+
+  // For non-split 7z/zip, flag that splitting is available
+  if ([".7z", ".zip"].includes(ext) && !isSplitVolume(filePath)) {
+    webview.html = webview.html.replace(
+      "</body>",
+      `<script>window._xCanSplit=true</script></body>`,
     );
   }
 
@@ -394,6 +426,18 @@ function registerHandler(webview: vscode.Webview): void {
             getNoisyPatterns(),
             pwToast,
           );
+          if (isSplitVolume(s.filePath)) {
+            webview.html = webview.html.replace(
+              "</body>",
+              `<script>window._xIsSplit=true</script></body>`,
+            );
+          }
+          if ([".7z", ".zip"].includes(ext) && !isSplitVolume(s.filePath)) {
+            webview.html = webview.html.replace(
+              "</body>",
+              `<script>window._xCanSplit=true</script></body>`,
+            );
+          }
         } catch (err) {
           logger.error({ event: "webview.password.error", err });
           webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
@@ -579,6 +623,53 @@ function registerHandler(webview: vscode.Webview): void {
         } catch (err) {
           logger.error({ event: "webview.preview.failed", err }, (err as Error).message);
           showErrorWithCopy(t("decompress.failed") + (err as Error).message);
+        }
+      }
+
+      // ── Merge split volumes ──
+      if (msg.c === "merge") {
+        logger.info({ event: "webview.merge", path: s.filePath });
+        try {
+          const ext = getFullExt(s.filePath);
+          const fmt = ext.slice(1);
+          const dst = s.filePath.replace(/\.\d{3}$/, "");
+          webview.postMessage({ c: "loading", t: "Merging volumes..." });
+          await convertArchive(s.filePath, fmt, dst, s.password ?? "");
+          webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
+        } catch (err) {
+          logger.error({ event: "webview.merge.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
+        }
+      }
+
+      // ── Split into volumes ──
+      if (msg.c === "split") {
+        logger.info({ event: "webview.split", path: s.filePath });
+        try {
+          const volSize = await promptVolumeSize();
+          if (!volSize) return;
+          const ext = getFullExt(s.filePath);
+          const fmt = ext.slice(1);
+          const dir = path.dirname(s.filePath);
+          const base = path.basename(s.filePath);
+          const folderName = base.replace(/\.[^.]+$/, "");
+          let folderPath = path.join(dir, folderName);
+          if (fs.existsSync(folderPath)) {
+            let i = 1;
+            while (fs.existsSync(path.join(dir, `${folderName}_${i}`))) i++;
+            folderPath = path.join(dir, `${folderName}_${i}`);
+          }
+          const dst = path.join(folderPath, base);
+          webview.postMessage({ c: "loading", t: "Splitting..." });
+          await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize);
+          webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
+        } catch (err) {
+          logger.error({ event: "webview.split.failed", err }, (err as Error).message);
+          webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
         }
       }
 

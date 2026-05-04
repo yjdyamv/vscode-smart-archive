@@ -734,6 +734,98 @@ void (async () => {
     assert.ok(Object.values(conv).includes("two"), "tar two");
   });
 
+  // ── 27. Merge split volumes → single archive ──
+  await test("merge: split 7z back to single", async () => {
+    // Create split 7z, then reassemble as single
+    const j1 = await JS7z();
+    j1.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
+    await run7z(j1, ["a", "/_m.7z", "/big.txt", "-v100b"]);
+    const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_m.7z."));
+    assert.ok(parts.length >= 2, `split into ${parts.length} parts`);
+
+    // Extract parts in fresh instance
+    const j2 = await JS7z();
+    for (const p of parts) {
+      const data = j1.FS.readFile("/" + p, { encoding: "binary" });
+      j2.FS.writeFile("/" + p, new Uint8Array(data));
+    }
+    j2.FS.mkdir("/o");
+    await run7z(j2, ["x", "/_m.7z.001", "-o/o"]);
+    const res: Record<string, string> = {};
+    copyFS(j2, "/o", "", res);
+    assert.ok(Object.values(res).some((v) => v.length === 16384), "split content ok");
+
+    // Merge: re-compress extracted as single file
+    const merged = await j7zCompress(res as Record<string, string>, "/_merged.7z");
+    const f = await j7zDecompress(merged);
+    assert.strictEqual(Object.keys(f).length, 1, "single file merged");
+    assert.ok(Object.values(f)[0].length === 16384, "merged size correct");
+  });
+
+  // ── 28. Split single archive → volumes ──
+  await test("split: single 7z to volumes", async () => {
+    // Step 1: create a single 7z
+    const j1 = await JS7z();
+    j1.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
+    await run7z(j1, ["a", "/_s.7z", "/big.txt"]);
+    const srcBuf = Buffer.from(j1.FS.readFile("/_s.7z", { encoding: "binary" }));
+
+    // Step 2: extract source in fresh instance
+    const j2 = await JS7z();
+    j2.FS.writeFile("/_s.7z", new Uint8Array(srcBuf));
+    j2.FS.mkdir("/_t");
+    await run7z(j2, ["x", "/_s.7z", "-o/_t"]);
+
+    // Step 3: re-compress with -v in fresh instance
+    const j3 = await JS7z();
+    const files: Record<string, string> = {};
+    copyFS(j2, "/_t", "", files);
+    for (const [k, v] of Object.entries(files)) {
+      const d = path.posix.dirname(k);
+      if (d && d !== ".") mkdirP(j3, "/" + d);
+      j3.FS.writeFile("/" + k, new Uint8Array(Buffer.from(v)));
+    }
+    j3.FS.mkdir("/_o");
+    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[0]))];
+    await run7z(j3, ["a", "/_o/_d.7z", ...tops, "-v100b"]);
+
+    const parts = j3.FS.readdir("/_o").filter((e) => e.startsWith("_d.7z."));
+    assert.ok(parts.length >= 2, `split into ${parts.length} parts`);
+
+    // Step 4: verify split volumes can be extracted
+    const j4 = await JS7z();
+    for (const p of parts) {
+      const data = j3.FS.readFile("/_o/" + p, { encoding: "binary" });
+      j4.FS.writeFile("/" + p, new Uint8Array(data));
+    }
+    j4.FS.mkdir("/chk");
+    await run7z(j4, ["x", "/_d.7z.001", "-o/chk"]);
+    const res: Record<string, string> = {};
+    copyFS(j4, "/chk", "", res);
+    assert.ok(Object.values(res).some((v) => v.length === 16384), "content preserved");
+  });
+
+  // ── 29. Encrypted convert: encrypt → convert → encryption preserved ──
+  await test("convert: encrypted 7z round-trip preserves encryption", async () => {
+    const pw = "p4ssw0rd";
+    const src = await j7zCompressDir(
+      { "/sub/a.txt": "one", "/c.txt": "two" },
+      "/_enc.7z",
+      [`-p${pw}`, "-mhe=on"],
+    );
+    const orig = await j7zDecompress(src, pw);
+    assert.strictEqual(orig["sub/a.txt"], "one");
+
+    const files: Record<string, string> = {};
+    for (const [k, v] of Object.entries(orig)) files["/" + k] = v;
+    const out = await j7zCompressDir(files, "/_conv.7z", [`-p${pw}`, "-mhe=on"]);
+    const conv = await j7zDecompress(out, pw);
+    assert.strictEqual(conv["sub/a.txt"], "one", "decrypt ok");
+    assert.strictEqual(conv["c.txt"], "two", "decrypt ok");
+
+    await assert.rejects(() => j7zDecompress(out, "wrong"), /7z exit/, "wrong pw rejected");
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
