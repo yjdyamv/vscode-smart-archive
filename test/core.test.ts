@@ -561,6 +561,39 @@ void (async () => {
     });
   }
 
+  // ── 21. Stream-to-VFS for large files ──
+  await test("streamToVFS: large file round-trip", async () => {
+    // Write a 200MB file to disk
+    const bigPath = path.join(td, "big.bin");
+    const fd = fs.openSync(bigPath, "w");
+    const chunk = Buffer.alloc(1024 * 1024, 0x41);
+    for (let i = 0; i < 200; i++) fs.writeSync(fd, chunk);
+    fs.closeSync(fd);
+
+    // Stream to VFS via open/write/close (simulates streamToVFS)
+    const j = await JS7z();
+    const rfd = fs.openSync(bigPath, "r");
+    j.FS.createDataFile("/", "big.bin", new Uint8Array(0), true, true, 0o777);
+    const vfsStream = j.FS.open("/big.bin", "w");
+    const buf = Buffer.alloc(100 * 1024 * 1024);
+    let pos = 0;
+    while (true) {
+      const n = fs.readSync(rfd, buf, 0, buf.length, pos);
+      if (n === 0) break;
+      j.FS.write(vfsStream, new Uint8Array(buf.slice(0, n)), 0, n, pos);
+      pos += n;
+    }
+    j.FS.close(vfsStream);
+    fs.closeSync(rfd);
+
+    // Compress and round-trip
+    await run7z(j, ["a", "/out.7z", "/big.bin", "-mx1"]);
+    const outBuf = Buffer.from(j.FS.readFile("/out.7z", { encoding: "binary" }));
+    const f = await j7zDecompress(outBuf);
+    assert.ok(f["big.bin"], "big.bin should exist after round-trip");
+    assert.strictEqual(f["big.bin"].length, 200 * 1024 * 1024, "size should match");
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
