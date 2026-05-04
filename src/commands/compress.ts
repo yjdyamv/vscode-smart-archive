@@ -13,6 +13,7 @@
 
 import * as vscode from "vscode";
 import * as fs from "fs";
+import * as path from "path";
 import { compressWith7z } from "../engines/js7z-engine";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../constants";
 import {
@@ -21,6 +22,7 @@ import {
   promptPassword,
   promptSavePath,
   promptCompressLevel,
+  promptVolumeSize,
 } from "../ui/prompts";
 import type { CompressOptions } from "../types";
 import { t } from "../i18n";
@@ -53,6 +55,8 @@ export async function compressCommand(
   }
 
   const level = await promptCompressLevel();
+  const supportsSplit = ["7z", "zip"].includes(format.label);
+  const volumeSize = supportsSplit ? await promptVolumeSize() : undefined;
 
   if (format.supportsEncryption) {
     const encryptChoice = await promptEncryptChoice();
@@ -63,11 +67,11 @@ export async function compressCommand(
       if (!pwd) {
         vscode.window.showWarningMessage(t("encrypt.noPassword"));
       }
-      return executeCompress(targets, format, pwd, format.label, level);
+      return executeCompress(targets, format, pwd, format.label, level, volumeSize);
     }
   }
 
-  await executeCompress(targets, format, "", format.label, level);
+  await executeCompress(targets, format, "", format.label, level, volumeSize);
 }
 
 async function executeCompress(
@@ -76,10 +80,33 @@ async function executeCompress(
   password: string,
   outputExtension: string,
   level: number,
+  volumeSize?: string,
 ): Promise<void> {
   const firstTarget = targets[0];
   const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, outputExtension);
   if (!saveUri) return;
+
+  let outputPath = saveUri.fsPath;
+
+  // When splitting, nest volumes inside a subfolder so .001/.002/...
+  // parts stay together instead of scattering across the parent directory.
+  if (volumeSize) {
+    const dir = path.dirname(outputPath);
+    const base = path.basename(outputPath);
+    const folderName = base.replace(/\.[^.]+$/, "");
+    let folderPath = path.join(dir, folderName);
+
+    // Avoid clobbering an existing folder by appending a counter
+    if (fs.existsSync(folderPath)) {
+      let i = 1;
+      while (fs.existsSync(path.join(dir, `${folderName}_${i}`))) {
+        i++;
+      }
+      folderPath = path.join(dir, `${folderName}_${i}`);
+    }
+
+    outputPath = path.join(folderPath, base);
+  }
 
   const options: CompressOptions = {
     targets: targets.map((target) => ({ fsPath: target.fsPath })),
@@ -89,9 +116,10 @@ async function executeCompress(
       canCreate: format.canCreate,
       supportsEncryption: format.supportsEncryption,
     },
-    outputPath: saveUri.fsPath,
+    outputPath: outputPath,
     password,
     level,
+    volumeSize,
   };
 
   await vscode.window.withProgress(

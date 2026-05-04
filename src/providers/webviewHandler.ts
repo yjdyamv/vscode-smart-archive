@@ -11,7 +11,13 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { isEncrypted } from "../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt, NOISY_DIR_PATTERNS } from "../constants";
+import {
+  getFullExt,
+  isWrappedFormat,
+  isEncryptableExt,
+  NOISY_DIR_PATTERNS,
+  isSplitVolume,
+} from "../constants";
 
 function getNoisyPatterns(): string[] {
   return (
@@ -145,7 +151,8 @@ async function setupWebview(
     try {
       encrypted = await isEncrypted(filePath);
     } catch {
-      encrypted = true;
+      // isEncrypted can fail for multi-volume archives that need
+      // all parts to list — don't blindly assume encryption.
     }
 
     if (encrypted && password) {
@@ -227,7 +234,8 @@ async function setupWebview(
   const dirCount = stats.dirs;
   const itemCount = stats.total;
   const roExt = getFullExt(filePath);
-  const roToast = [".deb", ".rpm"].includes(roExt) ? t("archive.readOnly") : toast;
+  const roToast =
+    [".deb", ".rpm"].includes(roExt) || isSplitVolume(filePath) ? t("archive.readOnly") : toast;
   webview.html = contentHtml(
     tree,
     fileCount,
@@ -246,7 +254,7 @@ async function setupWebview(
   );
 
   // Pass read-only flag
-  const readOnly = isReadOnlyExt(getFullExt(filePath));
+  const readOnly = isReadOnlyExt(getFullExt(filePath)) || isSplitVolume(filePath);
   if (readOnly) {
     webview.html = webview.html.replace(
       "</body>",
@@ -327,7 +335,10 @@ function registerHandler(webview: vscode.Webview): void {
           const dc = pwStats.dirs;
           const itemCount = pwStats.total;
           const ext = getFullExt(s.filePath);
-          const pwToast = [".deb", ".rpm"].includes(ext) ? t("archive.readOnly") : undefined;
+          const pwToast =
+            [".deb", ".rpm"].includes(ext) || isSplitVolume(s.filePath)
+              ? t("archive.readOnly")
+              : undefined;
           webview.html = contentHtml(
             pwTree,
             fc,

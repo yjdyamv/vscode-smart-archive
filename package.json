@@ -35,10 +35,19 @@
             "filenamePattern": "*.7z"
           },
           {
+            "filenamePattern": "*.7z.*"
+          },
+          {
             "filenamePattern": "*.zip"
           },
           {
+            "filenamePattern": "*.zip.*"
+          },
+          {
             "filenamePattern": "*.rar"
+          },
+          {
+            "filenamePattern": "*.r[0-9][0-9]"
           },
           {
             "filenamePattern": "*.tar"
@@ -205,12 +214,12 @@
         {
           "command": "yjdyamv.smart-archive.decompress",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
         },
         {
           "command": "yjdyamv.smart-archive.browse",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
         }
       ]
     },
@@ -377,6 +386,11 @@
             ".terraform"
           ],
           "description": "Glob patterns (gitignore syntax) for files/directories to exclude when compressing. Example: ['node_modules', '.venv', '*.log', '**/dist']"
+        },
+        "smart-archive.defaultVolumeSize": {
+          "type": "string",
+          "default": "",
+          "description": "Default split volume size (number + k/m/g suffix, e.g. 100m, 1g). Leave empty to skip splitting by default."
         }
       }
     }
