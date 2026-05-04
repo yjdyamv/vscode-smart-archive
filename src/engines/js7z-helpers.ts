@@ -104,9 +104,9 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
   // find .002, .003, etc. in the same VFS directory.
   const splitMatch = filePath.match(/^(.+\.(?:7z|zip|wim))\.(\d{3})$/i);
   if (splitMatch) {
-    const base = splitMatch[1]; // /path/to/archive.7z
+    const base = splitMatch[1];
     const dir = path.dirname(base);
-    const name = path.basename(base); // archive.7z
+    const name = path.basename(base);
     let idx = 1;
     while (true) {
       const part = path.join(dir, `${name}.${String(idx).padStart(3, "0")}`);
@@ -118,6 +118,54 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
       idx++;
     }
     return vfsPath ? vfsPath.replace(/\.\d{3}$/, ".001") : `/${name}.001`;
+  }
+
+  // RAR split volumes: basename.part1.rar, basename.part2.rar, ...
+  const rarPartMatch = filePath.match(/^(.+)\.part(\d+)\.rar$/i);
+  if (rarPartMatch) {
+    const base = rarPartMatch[1]; // /path/to/遥感与图像处理
+    const dir = path.dirname(base);
+    const fn = path.basename(base); // 遥感与图像处理
+    let idx = 1;
+    while (true) {
+      const part = path.join(dir, `${fn}.part${idx}.rar`);
+      if (!fs.existsSync(part)) break;
+      const partTarget = vfsPath
+        ? `${vfsPath.replace(/\.part\d+/, `.part${idx}`)}`
+        : `/${fn}.part${idx}.rar`;
+      copyToVFS(js7z, part, partTarget);
+      idx++;
+    }
+    // Also copy the .rar base file if it exists (legacy volume set)
+    const rarBase = path.join(dir, `${fn}.rar`);
+    if (fs.existsSync(rarBase)) {
+      const baseTarget = vfsPath ? vfsPath.replace(/\.part\d+\.rar$/, ".rar") : `/${fn}.rar`;
+      copyToVFS(js7z, rarBase, baseTarget);
+    }
+    return vfsPath ? vfsPath.replace(/\.part\d+/, ".part1") : `/${fn}.part1.rar`;
+  }
+
+  // RAR split volumes: basename.r00, basename.r01, ... + basename.rar
+  const rarVolMatch = filePath.match(/^(.+)\.(r(?:ar|\d{2}))$/i);
+  if (rarVolMatch && /^r\d{2}$/i.test(rarVolMatch[2])) {
+    const baseName = rarVolMatch[1]; // /path/to/basename
+    const dir = path.dirname(baseName);
+    const fn = path.basename(baseName);
+    // Copy the main .rar first
+    const rarFile = path.join(dir, `${fn}.rar`);
+    if (fs.existsSync(rarFile)) {
+      const rarTarget = vfsPath ? vfsPath.replace(/\.r\d{2}$/, ".rar") : `/${fn}.rar`;
+      copyToVFS(js7z, rarFile, rarTarget);
+    }
+    // Copy all .rNN parts
+    for (let i = 0; i <= 99; i++) {
+      const nn = String(i).padStart(2, "0");
+      const vol = path.join(dir, `${fn}.r${nn}`);
+      if (!fs.existsSync(vol)) break;
+      const volTarget = vfsPath ? vfsPath.replace(/\.r\d{2}$/, `.r${nn}`) : `/${fn}.r${nn}`;
+      copyToVFS(js7z, vol, volTarget);
+    }
+    return vfsPath ? vfsPath.replace(/\.r\d{2}$/, ".rar") : `/${fn}.rar`;
   }
 
   copyToVFS(js7z, filePath, target);
