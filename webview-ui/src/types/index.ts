@@ -18,6 +18,5 @@ export interface ArchiveProps {
 }
 
 export interface FileIcon {
-  color: string;
-  emoji: string;
+  codicon: string;
 }
