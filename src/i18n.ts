@@ -91,6 +91,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "选择压缩级别",
     "zh-tw": "選取壓縮級別",
   },
+  "compress.selectTargetFormat": {
+    en: "Select target format for conversion",
+    "zh-cn": "选择转换目标格式",
+    "zh-tw": "選取轉換目標格式",
+  },
   "compress.selectVolume": {
     en: "Split into volumes? (optional)",
     "zh-cn": "分卷压缩？(可选)",
