@@ -228,7 +228,7 @@ async function setupWebview(
   const dirCount = stats.dirs;
   const itemCount = stats.total;
   const roExt = getFullExt(filePath);
-  const roToast = [".iso", ".deb", ".rpm"].includes(roExt) ? t("archive.readOnly") : toast;
+  const roToast = [".deb", ".rpm"].includes(roExt) ? t("archive.readOnly") : toast;
   webview.html = contentHtml(
     tree,
     fileCount,
@@ -328,9 +328,7 @@ function registerHandler(webview: vscode.Webview): void {
           const dc = pwStats.dirs;
           const itemCount = pwStats.total;
           const ext = getFullExt(s.filePath);
-          const pwToast = [".iso", ".deb", ".rpm"].includes(ext)
-            ? t("archive.readOnly")
-            : undefined;
+          const pwToast = [".deb", ".rpm"].includes(ext) ? t("archive.readOnly") : undefined;
           webview.html = contentHtml(
             pwTree,
             fc,
@@ -373,6 +371,11 @@ function registerHandler(webview: vscode.Webview): void {
       // ── Extract Selected ──
       if (msg.c === "extSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
         logger.info({ event: "webview.extSel", count: msg.paths.length, first: msg.paths[0] });
+        const selExt = getFullExt(s.filePath);
+        if ([".deb", ".rpm"].includes(selExt)) {
+          webview.postMessage({ c: "err", t: t("archive.readOnly") });
+          return;
+        }
         try {
           await extractSelected(
             s.filePath,
