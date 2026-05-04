@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref } from "vue";
 
-const props = defineProps<{ x: number; y: number; paths: string[]; dirPath: string }>();
+const props = defineProps<{ x: number; y: number; paths: string[]; dirPath: string; readOnly?: boolean }>();
 const emit = defineEmits<{
   (e: "close"): void; (e: "extract"): void; (e: "delete"): void;
   (e: "copy"): void; (e: "add-here"): void; (e: "new-folder"): void; (e: "rename"): void;
@@ -28,10 +28,10 @@ const style = computed(() => {
   <div ref="menuRef" class="ctxmenu" :style="style">
     <div class="cmi" @click="emit('copy')">Copy</div>
     <div class="cmi" @click="emit('extract')">Extract Selected</div>
-    <div class="cmi" @click="emit('delete')">Delete</div>
-    <div class="cmi" @click="emit('add-here')">Add Files Here{{ dirLabel }}</div>
-    <div class="cmi" @click="emit('new-folder')">New Folder{{ dirLabel }}</div>
-    <div v-if="paths.length === 1" class="cmi" @click="emit('rename')">Rename</div>
+    <div class="cmi" :class="{ 'opacity-40 cursor-default pointer-events-none': readOnly }" @click="emit('delete')">Delete</div>
+    <div class="cmi" :class="{ 'opacity-40 cursor-default pointer-events-none': readOnly }" @click="emit('add-here')">Add Files Here{{ dirLabel }}</div>
+    <div class="cmi" :class="{ 'opacity-40 cursor-default pointer-events-none': readOnly }" @click="emit('new-folder')">New Folder{{ dirLabel }}</div>
+    <div v-if="paths.length === 1" class="cmi" :class="{ 'opacity-40 cursor-default pointer-events-none': readOnly }" @click="emit('rename')">Rename</div>
     <div class="text-[0.85em] text-[var(--vscode-descriptionForeground)] px-4 py-0.5 cursor-default">{{ paths.length }} item(s)</div>
   </div>
 </template>

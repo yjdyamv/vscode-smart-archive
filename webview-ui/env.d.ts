@@ -22,4 +22,5 @@ interface Window {
   _xNoisy?: string[];
   _xToast?: string;
   _xViewState?: string;
+  _xReadOnly?: boolean;
 }

@@ -2,8 +2,8 @@
   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1 border-b border-[var(--vscode-sideBarSectionHeader-border)] bg-[var(--vscode-sideBarSectionHeader-background)] sticky top-0 z-10 flex-shrink-0">
     <div class="flex flex-wrap items-center gap-1">
       <button class="btn" :disabled="selectedCount === 0" @click="$emit('extract-selected')">📦 Extract</button>
-      <button class="btn" :disabled="selectedCount === 0" @click="$emit('delete-selected')">🗑 Delete</button>
-      <button class="btn" @click="$emit('add-files')" :title="'Add to ' + (lastAddDir || 'archive root')">➕ Add Files</button>
+      <button class="btn" :disabled="readOnly || selectedCount === 0" @click="$emit('delete-selected')">🗑 Delete</button>
+      <button class="btn" :disabled="readOnly" @click="$emit('add-files')" :title="'Add to ' + (lastAddDir || 'archive root')">➕ Add Files</button>
       <span v-if="selectedCount > 0" class="text-[0.92em] text-[var(--vscode-descriptionForeground)]">
         <b class="text-[var(--vscode-foreground)]">{{ selectedFiles }}/{{ totalFiles }}</b> files
         <b class="text-[var(--vscode-foreground)] ml-2">{{ selectedDirs }}/{{ totalDirs }}</b> dirs
@@ -26,6 +26,7 @@ defineProps<{
   selectedCount: number; selectedFiles: number; selectedDirs: number;
   totalFiles: number; totalDirs: number;
   sortKey: string; sortAsc: boolean; searchQuery: string; lastAddDir: string;
+  readOnly?: boolean;
 }>();
 defineEmits<{
   (e: "extract-all"): void; (e: "extract-selected"): void; (e: "delete-selected"): void;
