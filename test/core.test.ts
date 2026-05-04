@@ -612,6 +612,99 @@ void (async () => {
     assert.strictEqual(f["src/bin/app.exe"].length, 20 * 1024 * 1024);
   });
 
+  // ── 22. Split volume round-trip (7z) ──
+  await test("split: 7z round-trip", async () => {
+    const j = await JS7z();
+    j.FS.writeFile("/a.txt", new Uint8Array(Buffer.from("hello")));
+    j.FS.writeFile("/b.txt", new Uint8Array(Buffer.from("world")));
+    await run7z(j, ["a", "/x.7z", "/a.txt", "/b.txt", "-v10m"]);
+
+    // Collect all volume parts
+    const parts = j.FS.readdir("/").filter((e) => e.startsWith("x.7z."));
+    assert.ok(parts.length >= 1, "expected at least 1 split part");
+
+    // Re-assemble: write all parts into a new VFS instance and list
+    const j2 = await JS7z();
+    for (const p of parts) {
+      const data = j.FS.readFile("/" + p, { encoding: "binary" });
+      j2.FS.writeFile("/" + p, new Uint8Array(data));
+    }
+    j2.FS.mkdir("/o");
+    await run7z(j2, ["x", "/x.7z.001", "-o/o"]);
+    const res: Record<string, string> = {};
+    copyFS(j2, "/o", "", res);
+    assert.strictEqual(res["a.txt"], "hello");
+    assert.strictEqual(res["b.txt"], "world");
+  });
+
+  // ── 23. Split volume round-trip (zip) ──
+  await test("split: zip round-trip", async () => {
+    const j = await JS7z();
+    j.FS.writeFile("/a.txt", new Uint8Array(Buffer.from("hello")));
+    j.FS.writeFile("/b.txt", new Uint8Array(Buffer.from("world")));
+    await run7z(j, ["a", "/x.zip", "/a.txt", "/b.txt", "-v10m"]);
+
+    const parts = j.FS.readdir("/").filter((e) => e.startsWith("x.zip."));
+    assert.ok(parts.length >= 1, "expected at least 1 split part");
+
+    const j2 = await JS7z();
+    for (const p of parts) {
+      const data = j.FS.readFile("/" + p, { encoding: "binary" });
+      j2.FS.writeFile("/" + p, new Uint8Array(data));
+    }
+    j2.FS.mkdir("/o");
+    await run7z(j2, ["x", "/x.zip.001", "-o/o"]);
+    const res: Record<string, string> = {};
+    copyFS(j2, "/o", "", res);
+    assert.strictEqual(res["a.txt"], "hello");
+    assert.strictEqual(res["b.txt"], "world");
+  });
+
+  // ── 24. Split volume with small chunk size (forces multiple parts) ──
+  await test("split: multi-part 7z", async () => {
+    const j = await JS7z();
+    // Write a file big enough to split into multiple 1k parts
+    j.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
+    await run7z(j, ["a", "/y.7z", "/big.txt", "-v100b"]);
+
+    const parts = j.FS.readdir("/").filter((e) => e.startsWith("y.7z."));
+    const count = parts.length;
+    assert.ok(count >= 2, `expected >= 2 split parts, got ${count}`);
+
+    const j2 = await JS7z();
+    for (const p of parts) {
+      const data = j.FS.readFile("/" + p, { encoding: "binary" });
+      j2.FS.writeFile("/" + p, new Uint8Array(data));
+    }
+    j2.FS.mkdir("/o");
+    await run7z(j2, ["x", "/y.7z.001", "-o/o"]);
+    const res: Record<string, string> = {};
+    copyFS(j2, "/o", "", res);
+    assert.strictEqual(res["big.txt"].length, 16384);
+    assert.strictEqual(res["big.txt"], "x".repeat(16384));
+  });
+
+  // ── 25. Split volume with encryption ──
+  await test("split: encrypted 7z round-trip", async () => {
+    const j = await JS7z();
+    j.FS.writeFile("/a.txt", new Uint8Array(Buffer.from("secret")));
+    await run7z(j, ["a", "/s.7z", "/a.txt", "-pp4ss", "-mhe=on", "-v10m"]);
+
+    const parts = j.FS.readdir("/").filter((e) => e.startsWith("s.7z."));
+    assert.ok(parts.length >= 1, "expected at least 1 split part");
+
+    const j2 = await JS7z();
+    for (const p of parts) {
+      const data = j.FS.readFile("/" + p, { encoding: "binary" });
+      j2.FS.writeFile("/" + p, new Uint8Array(data));
+    }
+    j2.FS.mkdir("/o");
+    await run7z(j2, ["x", "/s.7z.001", "-o/o", "-pp4ss"]);
+    const res: Record<string, string> = {};
+    copyFS(j2, "/o", "", res);
+    assert.strictEqual(res["a.txt"], "secret");
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);

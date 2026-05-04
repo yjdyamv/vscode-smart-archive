@@ -12,7 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
-import type { JS7zFactory, CompressOptions, FormatInfo } from "../types";
+import type { JS7zFactory, CompressOptions, FormatInfo, JS7zInstance } from "../types";
 import {
   tryCleanup,
   INPUT_DIR,
@@ -38,6 +38,7 @@ function buildCompressArgs(
   format: FormatInfo,
   password: string,
   level: number,
+  volumeSize?: string,
 ): string[] {
   const args: string[] = ["a", outputFile];
 
@@ -51,8 +52,36 @@ function buildCompressArgs(
 
   args.push(`-mx${level}`);
   args.push("-mmt=on");
+  if (volumeSize) {
+    args.push(`-v${volumeSize}`);
+  }
   args.push(...inputPaths);
   return args;
+}
+
+function writeVolumeFiles(js7z: JS7zInstance, vfsDir: string, outputPath: string): void {
+  const outDir = path.dirname(outputPath);
+  const baseName = path.basename(outputPath);
+  const prefix = baseName + ".";
+
+  const entries = js7z.FS.readdir(vfsDir).filter((e) => e !== "." && e !== "..");
+  let count = 0;
+  for (const entry of entries) {
+    if (!entry.startsWith(prefix)) continue;
+    const data = js7z.FS.readFile(`${vfsDir}/${entry}`, { encoding: "binary" });
+    const diskPath = path.join(outDir, entry);
+    fs.writeFileSync(diskPath, Buffer.from(data));
+    count++;
+  }
+
+  // If no volume files were created, fall back to a single file
+  if (count === 0) {
+    const mainEntry = entries.find((e) => e === baseName);
+    if (mainEntry) {
+      const data = js7z.FS.readFile(`${vfsDir}/${mainEntry}`, { encoding: "binary" });
+      fs.writeFileSync(outputPath, Buffer.from(data));
+    }
+  }
 }
 
 export async function compressWith7z(
@@ -142,12 +171,19 @@ export async function compressWith7z(
       options.format,
       options.password,
       options.level,
+      options.volumeSize,
     );
     await run7z(js7z, [...args, ...excludeArgs], progress);
 
-    const data = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-    if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    fs.writeFileSync(options.outputPath, Buffer.from(data));
+    fs.mkdirSync(path.dirname(options.outputPath), { recursive: true });
+
+    if (options.volumeSize) {
+      writeVolumeFiles(js7z, OUTPUT_DIR, options.outputPath);
+    } else {
+      const data = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
+      if (token?.isCancellationRequested) throw new vscode.CancellationError();
+      fs.writeFileSync(options.outputPath, Buffer.from(data));
+    }
     const elapsed = formatDuration(Date.now() - startTime);
     vscode.window.showInformationMessage(
       t("compress.done") + options.outputPath + t("time.elapsed", elapsed),

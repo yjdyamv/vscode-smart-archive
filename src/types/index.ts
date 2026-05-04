@@ -46,6 +46,8 @@ export interface CompressOptions {
   password: string;
   /** 7-Zip compression level (0=store, 1=fastest, 3=fast, 5=normal, 7=max, 9=ultra) */
   level: number;
+  /** Split archive into volumes of this size (e.g. "100m", "650m", "1g"). Unset = no split. */
+  volumeSize?: string;
 }
 
 /** Input parameters for a decompression operation */
