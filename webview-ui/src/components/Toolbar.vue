@@ -17,6 +17,7 @@
       <span class="text-[0.78em] text-[var(--vscode-descriptionForeground)] whitespace-nowrap">{{ sortKey }} <span class="codicon" :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"></span></span>
       <input class="search-input" type="text" :value="searchQuery" placeholder="Filter…" @input="$emit('search', ($event.target as HTMLInputElement).value)" />
       <button class="btn" @click="$emit('extract-all')"><span class="codicon codicon-archive"></span> Extract All</button>
+      <button class="btn" @click="$emit('convert')"><span class="codicon codicon-sync"></span> Convert</button>
     </div>
   </div>
 </template>
@@ -32,6 +33,7 @@ defineEmits<{
   (e: "extract-all"): void; (e: "extract-selected"): void; (e: "delete-selected"): void;
   (e: "add-files"): void; (e: "copy"): void; (e: "expand-all"): void; (e: "collapse-all"): void;
   (e: "sort", key: "name" | "size"): void; (e: "search", query: string): void;
+  (e: "convert"): void;
 }>();
 </script>
 
