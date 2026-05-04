@@ -154,13 +154,32 @@ export async function previewFileFromArchive(
     });
 
     const top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
-    if (top.length === 1 && top[0].endsWith(".tar")) {
-      fileData = await unwrapAndExtract(js7z, `/_pv/${top[0]}`, normalizedFile, password);
-    } else {
-      const vfsPath = `/_pv/${normalizedFile}`;
-      try {
-        fileData = js7z.FS.readFile(vfsPath, { encoding: "binary" });
-      } catch {
+
+    // Try reading the requested file directly
+    const directPath = `/_pv/${normalizedFile}`;
+    try {
+      fileData = js7z.FS.readFile(directPath, { encoding: "binary" });
+    } catch {
+      // File not found directly — unwrap any inner tar archives and retry
+      const tarPatterns = [
+        ".tar",
+        ".tar.gz",
+        ".tar.bz2",
+        ".tar.xz",
+        ".tar.zst",
+        ".tar.lz",
+        ".tar.lzma",
+        ".tgz",
+        ".tbz2",
+        ".tbz",
+        ".txz",
+        ".tzst",
+        ".tlz",
+      ];
+      const tarEntries = top.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
+      if (tarEntries.length === 1) {
+        fileData = await unwrapArchives(js7z, `/_pv/${tarEntries[0]}`, normalizedFile, password);
+      } else {
         logger.error(
           { event: "previewFile.notFound", path: normalizedFile },
           "Preview file not found in extracted content",
@@ -188,18 +207,19 @@ export async function previewFileFromArchive(
   }
 }
 
-async function unwrapAndExtract(
+async function unwrapArchives(
   js7z: JS7zInstance,
-  tarPath: string,
+  archiveVfsPath: string,
   target: string,
   password?: string,
 ): Promise<ArrayBuffer> {
-  const tarData = js7z.FS.readFile(tarPath, { encoding: "binary" });
+  const archiveName = archiveVfsPath.replace(/^\/_pv\//, "");
+  const rawData = js7z.FS.readFile(archiveVfsPath, { encoding: "binary" });
   const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    js7z2.FS.writeFile("/_inner.tar", new Uint8Array(tarData));
+    js7z2.FS.writeFile(`/${archiveName}`, new Uint8Array(rawData));
     js7z2.FS.mkdir("/_pv2");
-    const args = ["x", "/_inner.tar", "-o/_pv2", "-y", target];
+    const args = ["x", `/${archiveName}`, "-o/_pv2", "-y", target];
     if (password) {
       validatePassword(password);
       args.splice(1, 0, `-p${password}`);
@@ -208,8 +228,27 @@ async function unwrapAndExtract(
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x inner: ${c}`)));
       js7z2.callMain(args);
     });
+
+    // Try direct path first, then fall back to reading the first non-dir entry
     const vfsPath = `/_pv2/${target}`;
-    return js7z2.FS.readFile(vfsPath, { encoding: "binary" });
+    try {
+      return js7z2.FS.readFile(vfsPath, { encoding: "binary" });
+    } catch {
+      // 7z may have flattened the path — look for the base name
+      const top2 = js7z2.FS.readdir("/_pv2").filter((e: string) => e !== "." && e !== "..");
+      for (const entry of top2) {
+        const ep = `/_pv2/${entry}`;
+        try {
+          const st = js7z2.FS.stat(ep);
+          if (!js7z2.FS.isDir(st.mode)) {
+            return js7z2.FS.readFile(ep, { encoding: "binary" });
+          }
+        } catch {
+          continue;
+        }
+      }
+      throw new Error(`Preview file not found in inner archive: ${target}`);
+    }
   } finally {
     tryCleanupJS7z(js7z2);
   }
