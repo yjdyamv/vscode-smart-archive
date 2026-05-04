@@ -356,6 +356,7 @@ function registerHandler(webview: vscode.Webview): void {
       if (msg.c === "delSel" && Array.isArray(msg.paths) && msg.paths.length > 0) {
         logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
         try {
+          webview.postMessage({ c: "loading", t: true });
           await deleteFromArchive(s.filePath, msg.paths, s.password);
           try {
             await setupWebview(
@@ -367,6 +368,8 @@ function registerHandler(webview: vscode.Webview): void {
         } catch (err) {
           logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
         }
       }
 
@@ -396,6 +399,7 @@ function registerHandler(webview: vscode.Webview): void {
         const newPath = parentDir + newName.trim();
         logger.info({ event: "webview.rename", oldPath, newPath });
         try {
+          webview.postMessage({ c: "loading", t: true });
           await renameInArchive(s.filePath, oldPath, newPath, s.password);
           if (s.archiveUri) {
             try {
@@ -405,6 +409,8 @@ function registerHandler(webview: vscode.Webview): void {
         } catch (err) {
           logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
           showErrorWithCopy(t("decompress.failed") + (err as Error).message);
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
         }
       }
 
@@ -437,6 +443,7 @@ function registerHandler(webview: vscode.Webview): void {
         const name = folderName.trim();
         logger.info({ event: "webview.newFolder", dir: targetDir, name });
         try {
+          webview.postMessage({ c: "loading", t: true });
           await createFolderInArchive(s.filePath, targetDir, name, s.password);
           if (s.archiveUri) {
             try {
@@ -446,6 +453,8 @@ function registerHandler(webview: vscode.Webview): void {
         } catch (err) {
           logger.error({ event: "webview.newFolder.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
+        } finally {
+          webview.postMessage({ c: "loading", t: false });
         }
       }
 
