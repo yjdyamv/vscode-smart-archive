@@ -9,6 +9,12 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
+import {
+  mountArchive,
+  dirHasLargeFile,
+  cleanupTmpFiles,
+  MAX_BUFFER,
+} from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { getBaseName } from "../../utils/path";
@@ -142,25 +148,17 @@ export async function addToArchive(
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
-  logger.info({
-    event: "addToArchive.readArchive",
-    archivePath,
-    sizeBytes: stat.size,
-    files: localPaths.length,
-    targetDir,
-  });
 
-  const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-  const archiveName = path.basename(archivePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    js7z.FS.writeFile(`/${archiveName}`, data);
+    const archiveFsPath = mountArchive(js7z, archivePath);
+    const usesMount = archiveFsPath.startsWith("/mnt_");
 
     const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z, localPaths, targetDir);
 
     const args = vfsDir
-      ? ["a", `/${archiveName}`, "-aot", vfsDir]
-      : ["a", `/${archiveName}`, "-aot", ...vfsPaths];
+      ? ["a", archiveFsPath, "-aot", vfsDir]
+      : ["a", archiveFsPath, "-aot", ...vfsPaths];
     if (password) {
       validatePassword(password);
       args.splice(1, 0, `-p${password}`);
@@ -173,9 +171,10 @@ export async function addToArchive(
       js7z.callMain(args);
     });
 
-    const updated = js7z.FS.readFile(`/${archiveName}`, { encoding: "binary" });
-    logger.debug({ event: "addToArchive.writeResult", newSizeBytes: updated.byteLength });
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    if (!usesMount) {
+      const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
+    }
 
     logger.info({
       event: "addToArchive.ok",
@@ -184,6 +183,7 @@ export async function addToArchive(
       targetDir,
     });
   } finally {
+    cleanupTmpFiles(archivePath);
     tryCleanupJS7z(js7z);
   }
 }
@@ -249,7 +249,27 @@ function copyLocalToFSWithPrefix(
     const vfsTarget = vfsBase ? `${vfsBase}/${name}` : `/${name}`;
     const stat = fs.statSync(localPath);
 
-    if (stat.isDirectory()) {
+    if (
+      (stat.isFile() && stat.size > MAX_BUFFER) ||
+      (stat.isDirectory() && dirHasLargeFile(localPath))
+    ) {
+      const parentDir = path.dirname(localPath);
+      const mnt = `/mnt_add_${Date.now()}`;
+      try {
+        js7z.FS.mkdir(mnt);
+      } catch {
+        /* ignore */
+      }
+      js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
+      if (normDir) {
+        try {
+          js7z.FS.mkdir("/" + normDir);
+        } catch {
+          /* ignore */
+        }
+      }
+      vfsPaths.push(`${mnt}/${name}`);
+    } else if (stat.isDirectory()) {
       js7z.FS.mkdir(vfsTarget);
       copyDirToFSRecursive(js7z, localPath, vfsTarget);
     } else {

@@ -14,11 +14,13 @@ interface JS7zInstance {
     readdir(p: string): string[];
     stat(p: string): { mode: number; size: number };
     isDir(mode: number): boolean;
+    mount(type: unknown, opts: { root: string }, mountPoint: string): void;
   };
   callMain(args: string[]): void;
   onExit: ((ec: number) => void) | null;
   printErr?: (t: string) => void;
   print?: (t: string) => void;
+  NODEFS: unknown;
 }
 
 interface TreeNode {

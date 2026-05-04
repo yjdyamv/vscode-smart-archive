@@ -303,6 +303,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "文件已添加",
     "zh-tw": "檔案已新增",
   },
+  "archive.readOnly": {
+    en: "Read-only archive — browse and extract only",
+    "zh-cn": "只读归档 — 仅可浏览和解压",
+    "zh-tw": "唯讀封存 — 僅可瀏覽和解壓",
+  },
   "archive.addedFiles": {
     en: "Added {0} file(s) to archive: ",
     "zh-cn": "已向压缩包添加 {0} 个文件: ",

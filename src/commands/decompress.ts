@@ -132,7 +132,10 @@ async function decompressSingleFile(
   );
 }
 
-export async function decompressWithKnownPassword(uri: vscode.Uri, password: string): Promise<void> {
+export async function decompressWithKnownPassword(
+  uri: vscode.Uri,
+  password: string,
+): Promise<void> {
   await decompressSingleFile(uri, 0, 0, password);
 }
 

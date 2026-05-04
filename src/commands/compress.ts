@@ -15,6 +15,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import { compressWith7z } from "../engines/js7z-engine";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../constants";
+import { cleanupTmpFiles } from "../engines/js7z-helpers";
 import {
   promptCompressFormat,
   promptEncryptChoice,
@@ -111,7 +112,7 @@ async function executeCompress(
         await compressWith7z(options, progress, token, excludePatterns);
       } catch (err) {
         logger.error({ event: "compress.command.failed", err }, "Compression failed");
-        // Clean up partial output file on cancellation or failure
+        cleanupTmpFiles(options.outputPath);
         try {
           if (fs.existsSync(options.outputPath)) {
             fs.unlinkSync(options.outputPath);

@@ -8,6 +8,7 @@
  */
 
 import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
@@ -49,6 +50,51 @@ function copyInputsToFS(
     fsPaths.push(fsTarget);
   }
   return fsPaths;
+}
+
+function mountLocalPaths(
+  js7z: JS7zInstance,
+  localPaths: readonly string[],
+): { paths: string[]; usesMount: boolean; mountedLocalPaths: string[] } {
+  const result: string[] = [];
+  const mounted: string[] = [];
+  let usesMount = false;
+  for (const localPath of localPaths) {
+    const stat = fs.statSync(localPath);
+    const large = stat.isDirectory() ? dirHasLargeFile(localPath) : stat.size > MAX_BUFFER;
+    if (large) {
+      const name = getBaseName(localPath);
+      const parentDir = path.dirname(localPath);
+      const mnt = `/mnt_${_mntCount++}`;
+      try {
+        js7z.FS.mkdir(mnt);
+      } catch {
+        /* ignore */
+      }
+      js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
+      result.push(`${mnt}/${name}`);
+      mounted.push(localPath);
+      usesMount = true;
+    }
+  }
+  return { paths: result, usesMount, mountedLocalPaths: mounted };
+}
+
+function dirHasLargeFile(dirPath: string): boolean {
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const e of entries) {
+      const full = path.join(dirPath, e.name);
+      if (e.isDirectory()) {
+        if (dirHasLargeFile(full)) return true;
+      } else if (e.isFile() && fs.statSync(full).size > MAX_BUFFER) {
+        return true;
+      }
+    }
+  } catch {
+    /* skip unreadable */
+  }
+  return false;
 }
 
 function run7z(
@@ -93,4 +139,66 @@ function run7z(
   });
 }
 
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z };
+const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
+
+let _mntCount = 0;
+
+function mountArchive(js7z: JS7zInstance, filePath: string): string {
+  const stat = fs.statSync(filePath);
+  const archiveName = getBaseName(filePath);
+
+  if (stat.size <= MAX_BUFFER) {
+    const data = fs.readFileSync(filePath);
+    js7z.FS.writeFile(`/${archiveName}`, data);
+    return `/${archiveName}`;
+  }
+
+  const parentDir = path.dirname(filePath);
+  const mnt = `/mnt_${_mntCount++}`;
+  try {
+    js7z.FS.mkdir(mnt);
+  } catch {
+    /* ignore */
+  }
+  // Pre-create .tmp file so NODEFS can write (7z d/rn create archiveName.tmp)
+  const tmpPath = path.join(parentDir, archiveName + ".tmp");
+  if (!fs.existsSync(tmpPath)) {
+    try {
+      fs.writeFileSync(tmpPath, "");
+    } catch {
+      /* ignore */
+    }
+  }
+  js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
+  return `${mnt}/${archiveName}`;
+}
+
+export {
+  tryCleanup,
+  INPUT_DIR,
+  OUTPUT_DIR,
+  copyInputsToFS,
+  mountLocalPaths,
+  run7z,
+  mountArchive,
+  dirHasLargeFile,
+  MAX_BUFFER,
+};
+
+export function cleanupTmpFiles(archivePath: string): void {
+  const dir = path.dirname(archivePath);
+  const name = path.basename(archivePath);
+  try {
+    for (const entry of fs.readdirSync(dir)) {
+      if (entry.startsWith(name) && entry.endsWith(".tmp")) {
+        try {
+          fs.unlinkSync(path.join(dir, entry));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}

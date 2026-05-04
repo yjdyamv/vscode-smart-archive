@@ -80,6 +80,8 @@ export interface JS7zInstance {
   _cleanup?: () => void;
   /** Emscripten virtual file system */
   FS: EmscriptenFS;
+  /** NODEFS backend for mounting local directories */
+  NODEFS: unknown;
 }
 
 /**
@@ -92,6 +94,7 @@ export interface EmscriptenFS {
   readdir(path: string): string[];
   stat(path: string): { mode: number; size: number };
   isDir(mode: number): boolean;
+  mount(type: unknown, opts: { root: string }, mountPoint: string): void;
 }
 
 /** js7z-tools factory function signature */

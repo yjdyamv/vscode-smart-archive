@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zFactory, DecompressOptions } from "../types";
-import { tryCleanup, OUTPUT_DIR, run7z } from "./js7z-helpers";
+import { tryCleanup, OUTPUT_DIR, run7z, mountArchive, MAX_BUFFER } from "./js7z-helpers";
 import { getBaseName } from "../utils/path";
 import { copyDirFromFS } from "../utils/fs";
 import { t, formatDuration } from "../i18n";
@@ -38,12 +38,21 @@ export async function decompressWith7z(
 
   try {
     checkFileSize(fs.statSync(options.inputPath).size);
-    const data = fs.readFileSync(options.inputPath);
-    const archiveName = getBaseName(options.inputPath);
-    js7z.FS.writeFile(`/${archiveName}`, data);
-    js7z.FS.mkdir(OUTPUT_DIR);
+    const archiveFsPath = mountArchive(js7z, options.inputPath);
+    const usesMount = archiveFsPath.startsWith("/mnt_");
 
-    const extractArgs: string[] = ["x", `/${archiveName}`, `-o${OUTPUT_DIR}`];
+    let outPath: string;
+    if (usesMount) {
+      const outMnt = "/out_mnt";
+      js7z.FS.mkdir(outMnt);
+      js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outMnt);
+      outPath = outMnt;
+    } else {
+      js7z.FS.mkdir(OUTPUT_DIR);
+      outPath = OUTPUT_DIR;
+    }
+
+    const extractArgs: string[] = ["x", archiveFsPath, `-o${outPath}`];
     if (options.password) {
       extractArgs.splice(1, 0, `-p${options.password}`);
     }
@@ -52,7 +61,9 @@ export async function decompressWith7z(
 
     await run7z(js7z, extractArgs, progress);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+    if (!usesMount) {
+      copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+    }
 
     await unwrapInnerTar(options.outputDir, progress);
 
@@ -78,15 +89,25 @@ async function unwrapInnerTar(
   progress.report({ message: t("decompress.unwrapTar") });
 
   checkFileSize(fs.statSync(tarPath).size);
-  const tarData = fs.readFileSync(tarPath);
   const js7z = await JS7z();
 
   try {
-    js7z.FS.writeFile("/_inner.tar", tarData);
-    js7z.FS.mkdir("/_inner_out");
+    const innerFsPath = mountArchive(js7z, tarPath);
+    const usesMount = innerFsPath.startsWith("/mnt_");
+    let outPath: string;
+    if (usesMount) {
+      outPath = "/out_mnt_tar";
+      js7z.FS.mkdir(outPath);
+      js7z.FS.mount(js7z.NODEFS, { root: outputDir }, outPath);
+    } else {
+      outPath = "/_inner_out";
+      js7z.FS.mkdir(outPath);
+    }
 
-    await run7z(js7z, ["x", "/_inner.tar", "-o/_inner_out"], progress);
-    copyDirFromFS(js7z, "/_inner_out", outputDir);
+    await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
+    if (!usesMount) {
+      copyDirFromFS(js7z, "/_inner_out", outputDir);
+    }
 
     // Clean up intermediate .tar (best-effort, may already be removed)
     try {
