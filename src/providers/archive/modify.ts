@@ -79,7 +79,6 @@ export async function createFolderInArchive(
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
-    ;
     tryCleanupJS7z(js7z);
   }
 }
@@ -280,7 +279,6 @@ export async function renameInArchive(
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
     logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
   } finally {
-    ;
     tryCleanupJS7z(js7z);
   }
 }

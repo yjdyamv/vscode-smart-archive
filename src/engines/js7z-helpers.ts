@@ -8,7 +8,6 @@
  */
 
 import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";

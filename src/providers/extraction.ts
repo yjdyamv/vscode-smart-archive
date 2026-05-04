@@ -245,7 +245,6 @@ async function extractSelected(
   }
 
   // Normal archives: 7z only
-  const archiveName = path.basename(archivePath);
   let stderr = "";
 
   const js7z = await JS7z({

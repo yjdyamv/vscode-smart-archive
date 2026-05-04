@@ -105,7 +105,13 @@ export interface EmscriptenFS {
     canOwn?: number,
   ): void;
   open(path: string, flags: string): unknown;
-  write(stream: unknown, buffer: Uint8Array, offset: number, length: number, position: number): void;
+  write(
+    stream: unknown,
+    buffer: Uint8Array,
+    offset: number,
+    length: number,
+    position: number,
+  ): void;
   close(stream: unknown): void;
 }
 
