@@ -9,6 +9,8 @@
  */
 
 import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 import * as vscode from "vscode";
 import type { JS7zFactory, CompressOptions, FormatInfo } from "../types";
 import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, mountLocalPaths, run7z } from "./js7z-helpers";
@@ -16,6 +18,7 @@ import { joinFSPath, getBaseName } from "../utils/path";
 import { t, formatDuration } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
 import { zstdCompress } from "./zstd-codec";
+import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger";
 import { validatePassword } from "../utils/security";
 
@@ -86,33 +89,37 @@ export async function compressWith7z(
 
     if (isWrappedFormat("." + options.format.label)) {
       const wrapExt = getWrapExtension("." + options.format.label);
-      const tarFsPath = joinFSPath(OUTPUT_DIR, "_tmp.tar");
+      const tarDiskPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), "_tmp.tar");
 
       progress.report({ message: t("compress.creatingTar") });
-      await run7z(js7z, ["a", tarFsPath, ...allInputPaths, ...excludeArgs, "-mmt=on"], progress);
-
-      const tarData = js7z.FS.readFile(tarFsPath, { encoding: "binary" });
-
+      await createTarFile(tarDiskPath, options.targets.map(t => t.fsPath), token);
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
 
-      let compressedData: Uint8Array;
+      let compressedData: Uint8Array | undefined;
       if (wrapExt === "zst") {
+        const tarData = fs.readFileSync(tarDiskPath);
         progress.report({ message: t("compress.compressingTar", wrapExt) });
         compressedData = await zstdCompress(new Uint8Array(tarData), options.level);
       } else {
         progress.report({ message: t("compress.compressingTar", wrapExt) });
         const js7z2 = await JS7z();
         try {
-          js7z2.FS.writeFile("/_tmp.tar", new Uint8Array(tarData));
-          await run7z(js7z2, ["a", archiveFsPath, "/_tmp.tar", "-mmt=on"], progress);
+          js7z2.FS.mkdir("/_comp");
+          js7z2.FS.mount(js7z2.NODEFS, { root: path.dirname(tarDiskPath) }, "/_comp");
+          await run7z(js7z2, ["a", archiveFsPath, "/_comp/_tmp.tar", "-mmt=on"], progress);
           compressedData = new Uint8Array(js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }));
         } finally {
           tryCleanup(js7z2);
         }
       }
 
+      // Clean up temp tar
+      try { fs.unlinkSync(tarDiskPath); fs.rmdirSync(path.dirname(tarDiskPath)); } catch {}
+
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
-      fs.writeFileSync(options.outputPath, Buffer.from(compressedData));
+      if (compressedData) {
+        fs.writeFileSync(options.outputPath, Buffer.from(compressedData));
+      }
       const elapsed = formatDuration(Date.now() - startTime);
       vscode.window.showInformationMessage(
         t("compress.done") + options.outputPath + t("time.elapsed", elapsed),
