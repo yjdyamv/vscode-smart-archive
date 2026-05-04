@@ -90,10 +90,7 @@ async function decompressSingleFile(
         password = pwd;
       }
     } catch {
-      // If detection fails, prompt anyway as a safe fallback
-      const pwd = await promptPassword(t("password.decryptHint"));
-      if (pwd === null) return;
-      password = pwd;
+      // isEncrypted can fail for multi-volume archives — skip prompt
     }
   }
 

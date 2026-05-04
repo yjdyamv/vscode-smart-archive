@@ -145,7 +145,8 @@ async function setupWebview(
     try {
       encrypted = await isEncrypted(filePath);
     } catch {
-      encrypted = true;
+      // isEncrypted can fail for multi-volume archives that need
+      // all parts to list — don't blindly assume encryption.
     }
 
     if (encrypted && password) {
