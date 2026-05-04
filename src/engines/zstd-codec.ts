@@ -73,17 +73,60 @@ function hasSystemZstd(): boolean {
 export function zstdCompressFile(input: string, output: string, level: number): Promise<void> {
   if (hasSystemZstd()) {
     return new Promise((resolve, reject) => {
-      const proc = spawn("zstd", ["-o", output, "-f", `-${mapZstdLevel(level)}`, input]);
+      const proc = spawn("zstd", [
+        "-o", output, "-f",
+        `-${mapZstdLevel(level)}`,
+        "-T0", // auto threads
+        input,
+      ], { timeout: 120_000 });
+
+      let stderr = "";
+      proc.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
+
       proc.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`zstd exited with code ${code}`));
+        if (code === 0) {
+          resolve();
+        } else {
+          cleanup(output);
+          reject(new Error(`zstd exited with code ${code}: ${stderr.slice(0, 200)}`));
+        }
       });
-      proc.on("error", reject);
+
+      proc.on("error", () => {
+        cleanup(output);
+        // eslint-disable-next-line preserve-caught-error
+        reject(new Error(
+          "zstd not available. Install: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
+        ));
+      });
     });
   }
-  const data = fs.readFileSync(input);
-  return ensureInit().then(() => {
-    const compressed = zstd.compress(data, mapZstdLevel(level));
-    fs.writeFileSync(output, Buffer.from(compressed));
-  });
+
+  try {
+    const data = fs.readFileSync(input);
+    return ensureInit().then(() => {
+      try {
+        const compressed = zstd.compress(data, mapZstdLevel(level));
+        fs.writeFileSync(output, Buffer.from(compressed));
+      } catch (err) {
+        cleanup(output);
+        throw err;
+      }
+    }).catch((err) => {
+      cleanup(output);
+      throw err;
+    });
+  } catch (err: any) {
+    if (err?.code === "ERR_FS_FILE_TOO_LARGE") {
+      // eslint-disable-next-line preserve-caught-error
+      throw new Error(
+        "File too large for WASM zstd. Install system zstd: winget (Win), brew (Mac), apt/dnf (Linux)",
+      );
+    }
+    throw err;
+  }
+}
+
+function cleanup(path: string): void {
+  try { require("fs").unlinkSync(path); } catch { /* ignore */ }
 }
