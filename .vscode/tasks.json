@@ -4,14 +4,28 @@
     {
       "type": "npm",
       "script": "compile",
-      "group": "build",
       "problemMatcher": [],
       "label": "npm: compile"
     },
     {
       "type": "npm",
+      "script": "build:webview",
+      "problemMatcher": [],
+      "label": "npm: build webview"
+    },
+    {
+      "type": "npm",
       "script": "test",
       "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "dependsOn": ["npm: build webview", "npm: compile"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "problemMatcher": []
     }
   ]
