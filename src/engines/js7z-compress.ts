@@ -74,8 +74,9 @@ export async function compressWith7z(
     });
 
     // Copy small files/dirs to VFS, mount large files via NODEFS
-    const fsInputPaths = copyInputsToFS(js7z, localPaths, token);
-    const { paths: mountedPaths, usesMount } = mountLocalPaths(js7z, localPaths);
+    const { paths: mountedPaths, usesMount, mountedLocalPaths } = mountLocalPaths(js7z, localPaths);
+    const smallPaths = localPaths.filter((lp) => !mountedLocalPaths.includes(lp));
+    const fsInputPaths = copyInputsToFS(js7z, smallPaths, token);
     const allInputPaths = [...fsInputPaths, ...mountedPaths];
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     progress.report({ message: t("compress.addedItems", String(localPaths.length)) });

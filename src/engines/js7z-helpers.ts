@@ -52,8 +52,9 @@ function copyInputsToFS(
   return fsPaths;
 }
 
-function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { paths: string[]; usesMount: boolean } {
+function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { paths: string[]; usesMount: boolean; mountedLocalPaths: string[] } {
   const result: string[] = [];
+  const mounted: string[] = [];
   let usesMount = false;
   for (const localPath of localPaths) {
     const stat = fs.statSync(localPath);
@@ -64,10 +65,11 @@ function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { p
       try { js7z.FS.mkdir(mnt); } catch { /* ignore */ }
       js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
       result.push(`${mnt}/${name}`);
+      mounted.push(localPath);
       usesMount = true;
     }
   }
-  return { paths: result, usesMount };
+  return { paths: result, usesMount, mountedLocalPaths: mounted };
 }
 
 function run7z(
