@@ -99,7 +99,11 @@ async function unwrapInnerTar(
 
   if (entries.length === 0) return;
 
-  while (true) {
+  let depth = 0;
+  const maxDepth = 3;
+
+  while (depth < maxDepth) {
+    depth++;
     const tarFiles = entries.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
     if (tarFiles.length === 0) break;
 
