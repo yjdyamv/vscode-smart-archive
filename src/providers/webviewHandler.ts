@@ -739,6 +739,7 @@ function registerHandler(webview: vscode.Webview): void {
           webview.postMessage({ c: "loading", t: "Encrypting..." });
           await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
           webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
+          webview.postMessage({ c: "encState", v: true });
         } catch (err) {
           logger.error({ event: "webview.encrypt.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
@@ -773,6 +774,7 @@ function registerHandler(webview: vscode.Webview): void {
           webview.postMessage({ c: "loading", t: "Decrypting..." });
           await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
           webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
+          webview.postMessage({ c: "encState", v: false });
         } catch (err) {
           logger.error({ event: "webview.decrypt.failed", err }, (err as Error).message);
           webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });

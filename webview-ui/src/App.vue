@@ -408,6 +408,9 @@ onMounted(() => {
       case "pwerr":
         showToast(msg.t as string || "Wrong password", false);
         break;
+      case "encState":
+        isEncrypted.value = !!(msg.v as boolean);
+        break;
       case "dirChildren": {
         const parentPath = msg.path as string;
         const children = msg.children as TreeNodeData[];
