@@ -14,11 +14,10 @@ import { isEncrypted } from "../engines/js7z-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt, NOISY_DIR_PATTERNS } from "../constants";
 
 function getNoisyPatterns(): string[] {
-  const config: string[] | undefined = vscode.workspace
-    .getConfiguration("smart-archive")
-    .get("collapsedDirPatterns");
-  const userPatterns = config ?? [];
-  return [...new Set([...NOISY_DIR_PATTERNS, ...userPatterns])];
+  return (
+    vscode.workspace.getConfiguration("smart-archive").get<string[]>("collapsedDirPatterns") ??
+    NOISY_DIR_PATTERNS
+  );
 }
 
 function isReadOnlyExt(ext: string): boolean {
