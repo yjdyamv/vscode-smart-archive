@@ -58,7 +58,8 @@ function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { p
   let usesMount = false;
   for (const localPath of localPaths) {
     const stat = fs.statSync(localPath);
-    if (!stat.isDirectory() && stat.size > MAX_BUFFER) {
+    const large = stat.isDirectory() ? dirHasLargeFile(localPath) : stat.size > MAX_BUFFER;
+    if (large) {
       const name = getBaseName(localPath);
       const parentDir = path.dirname(localPath);
       const mnt = `/mnt_${_mntCount++}`;
@@ -70,6 +71,21 @@ function mountLocalPaths(js7z: JS7zInstance, localPaths: readonly string[]): { p
     }
   }
   return { paths: result, usesMount, mountedLocalPaths: mounted };
+}
+
+function dirHasLargeFile(dirPath: string): boolean {
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const e of entries) {
+      const full = path.join(dirPath, e.name);
+      if (e.isDirectory()) {
+        if (dirHasLargeFile(full)) return true;
+      } else if (e.isFile() && fs.statSync(full).size > MAX_BUFFER) {
+        return true;
+      }
+    }
+  } catch { /* skip unreadable */ }
+  return false;
 }
 
 function run7z(
