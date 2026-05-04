@@ -18,7 +18,6 @@ import {
   INPUT_DIR,
   OUTPUT_DIR,
   copyInputsToFS,
-  mountLocalPaths,
   run7z,
   MAX_BUFFER,
 } from "./js7z-helpers";
@@ -83,11 +82,8 @@ export async function compressWith7z(
       level: options.level,
     });
 
-    // Copy small files/dirs to VFS, mount large files via NODEFS
-    const { paths: mountedPaths, usesMount, mountedLocalPaths } = mountLocalPaths(js7z, localPaths);
-    const smallPaths = localPaths.filter((lp) => !mountedLocalPaths.includes(lp));
-    const fsInputPaths = copyInputsToFS(js7z, smallPaths, token);
-    const allInputPaths = [...fsInputPaths, ...mountedPaths];
+    // Copy all input files/folders to VFS
+    const allInputPaths = copyInputsToFS(js7z, localPaths, token);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 

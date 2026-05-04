@@ -13,7 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { JS7z, tryCleanupJS7z } from "./fileListing";
-import { mountArchive } from "../engines/js7z-helpers";
+import { streamToVFS } from "../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../constants";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
@@ -182,7 +182,7 @@ async function extractSelected(
   if (isWrapped) {
     const js7z = await JS7z({ print: () => {}, printErr: () => {} });
     try {
-      const outerFsPath = mountArchive(js7z, archivePath);
+      const outerFsPath = streamToVFS(js7z, archivePath);
       js7z.FS.mkdir("/_x1");
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (c: number) => {
@@ -256,7 +256,7 @@ async function extractSelected(
   });
 
   try {
-    const archiveFsPath = mountArchive(js7z, archivePath);
+    const archiveFsPath = streamToVFS(js7z, archivePath);
     js7z.FS.mkdir("/out");
 
     await new Promise<void>((resolve, reject) => {

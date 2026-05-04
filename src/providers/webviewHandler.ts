@@ -34,7 +34,7 @@ import {
 import type { FlatEntry, EntryIndex } from "./treeBuilder";
 import { loadingHtml, emptyHtml, contentHtml } from "./htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "./fileListing";
-import { mountArchive } from "../engines/js7z-helpers";
+import { streamToVFS } from "../engines/js7z-helpers";
 import { extractSelected } from "./extraction";
 import {
   createFolderInArchive,
@@ -262,7 +262,7 @@ function registerHandler(webview: vscode.Webview): void {
           }
           const js7z = await JS7z({ print: () => {}, printErr: () => {} });
           try {
-            const testPath = mountArchive(js7z, s.filePath);
+            const testPath = streamToVFS(js7z, s.filePath);
             await new Promise<void>((resolve, reject) => {
               js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
               js7z.callMain(["t", `-p${msg.pw}`, testPath]);
