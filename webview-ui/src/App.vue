@@ -47,6 +47,8 @@ const visibleFlatNodes = computed(() => {
 const toast = reactive({ show: false, msg: "", ok: true });
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 const readOnly = ref(!!(window as any)._xReadOnly);
+const isSplit = ref(!!(window as any)._xIsSplit);
+const canSplit = ref(!!(window as any)._xCanSplit);
 
 function showToast(msg: string, ok = true) {
   toast.msg = msg;
@@ -198,6 +200,15 @@ function testArchive() {
 
 function convertFormat() {
   post({ c: "convert" });
+}
+
+function mergeVolumes() {
+  post({ c: "merge" });
+  showToast("Merging split volumes...", true);
+}
+
+function splitVolumes() {
+  post({ c: "split" });
 }
 
 function submitPassword(pw: string) {
@@ -540,7 +551,11 @@ provide("showToast", showToast);
         :files="totalFiles"
         :dirs="totalDirs"
         :size="archiveProps.size"
+        :is-split="isSplit"
+        :can-split="canSplit"
         @test="testArchive"
+        @merge="mergeVolumes"
+        @split="splitVolumes"
       />
     </template>
     <div v-else class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]">
