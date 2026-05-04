@@ -79,45 +79,68 @@ async function unwrapInnerTar(
   outputDir: string,
   progress: vscode.Progress<{ message?: string }>,
 ): Promise<void> {
-  const entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
-  const tarFiles = entries.filter((e) => e.endsWith(".tar"));
+  const tarPatterns = [
+    ".tar",
+    ".tar.gz",
+    ".tar.bz2",
+    ".tar.xz",
+    ".tar.zst",
+    ".tar.lz",
+    ".tar.lzma",
+    ".tgz",
+    ".tbz2",
+    ".tbz",
+    ".txz",
+    ".tzst",
+    ".tlz",
+  ];
 
-  if (tarFiles.length !== 1 || entries.length !== 1) return;
+  let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
 
-  const tarPath = path.join(outputDir, tarFiles[0]);
-  progress.report({ message: t("decompress.unwrapTar") });
+  if (entries.length === 0) return;
 
-  checkFileSize(fs.statSync(tarPath).size);
-  const js7z = await JS7z();
+  while (true) {
+    const tarFiles = entries.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
+    if (tarFiles.length === 0) break;
 
-  try {
-    const innerFsPath = streamToVFS(js7z, tarPath);
-    const usesMount = innerFsPath.startsWith("/mnt_");
-    let outPath: string;
-    if (usesMount) {
-      outPath = "/out_mnt_tar";
-      js7z.FS.mkdir(outPath);
-      js7z.FS.mount(js7z.NODEFS, { root: outputDir }, outPath);
-    } else {
-      outPath = "/_inner_out";
-      js7z.FS.mkdir(outPath);
+    for (const tarFile of tarFiles) {
+      const tarPath = path.join(outputDir, tarFile);
+      progress.report({ message: t("decompress.unwrapTar") });
+
+      checkFileSize(fs.statSync(tarPath).size);
+      const js7z = await JS7z();
+
+      try {
+        const innerFsPath = streamToVFS(js7z, tarPath);
+        const usesMount = innerFsPath.startsWith("/mnt_");
+        let outPath: string;
+        if (usesMount) {
+          outPath = "/out_mnt_tar";
+          js7z.FS.mkdir(outPath);
+          js7z.FS.mount(js7z.NODEFS, { root: outputDir }, outPath);
+        } else {
+          outPath = "/_inner_out";
+          js7z.FS.mkdir(outPath);
+        }
+
+        await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
+        if (!usesMount) {
+          copyDirFromFS(js7z, "/_inner_out", outputDir);
+        }
+
+        try {
+          fs.unlinkSync(tarPath);
+        } catch (err) {
+          logger.warn(
+            { event: "decompress.unlinkFailed", path: tarPath, err },
+            "Failed to remove intermediate tar archive",
+          );
+        }
+      } finally {
+        tryCleanup(js7z);
+      }
     }
 
-    await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
-    if (!usesMount) {
-      copyDirFromFS(js7z, "/_inner_out", outputDir);
-    }
-
-    // Clean up intermediate .tar (best-effort, may already be removed)
-    try {
-      fs.unlinkSync(tarPath);
-    } catch (err) {
-      logger.warn(
-        { event: "decompress.unlinkFailed", path: tarPath, err },
-        "Failed to remove intermediate .tar",
-      );
-    }
-  } finally {
-    tryCleanup(js7z);
+    entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
   }
 }
