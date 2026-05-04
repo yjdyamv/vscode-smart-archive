@@ -162,8 +162,7 @@ export async function promptVolumeSize(): Promise<string | undefined> {
       vscode.window.showInputBox({
         prompt: t("compress.volume.prompt"),
         placeHolder: "100m",
-        validateInput: (v) =>
-          /^\d+[kmg]?$/i.test(v.trim()) ? null : "Invalid format (e.g. 100m, 1g)",
+        validateInput: (v) => (/^\d+[kmg]?$/i.test(v.trim()) ? null : t("compress.volume.invalid")),
       }) || undefined
     );
   }
