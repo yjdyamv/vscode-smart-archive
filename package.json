@@ -35,7 +35,13 @@
             "filenamePattern": "*.7z"
           },
           {
+            "filenamePattern": "*.7z.001"
+          },
+          {
             "filenamePattern": "*.zip"
+          },
+          {
+            "filenamePattern": "*.zip.001"
           },
           {
             "filenamePattern": "*.rar"
@@ -205,12 +211,12 @@
         {
           "command": "yjdyamv.smart-archive.decompress",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.001|zip|zip\\.001|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
         },
         {
           "command": "yjdyamv.smart-archive.browse",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.001|zip|zip\\.001|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv)$/"
         }
       ]
     },
