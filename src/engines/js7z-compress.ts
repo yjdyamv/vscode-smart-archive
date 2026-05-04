@@ -87,6 +87,8 @@ export async function compressWith7z(
     let archiveFsPath: string;
     if (usesMount) {
       try { js7z.FS.mkdir(outMnt); } catch { /* ignore */ }
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(options.outputPath, "");
       js7z.FS.mount(js7z.NODEFS, { root: outDir }, outMnt);
       archiveFsPath = `${outMnt}/${archiveName}`;
     } else {
@@ -97,7 +99,11 @@ export async function compressWith7z(
     if (isWrappedFormat("." + options.format.label)) {
       const wrapExt = getWrapExtension("." + options.format.label);
       const tarFsPath = usesMount
-        ? `${outMnt}/_tmp.tar`
+        ? (() => {
+            const tp = path.join(outDir, "_tmp.tar");
+            if (!fs.existsSync(tp)) fs.writeFileSync(tp, "");
+            return `${outMnt}/_tmp.tar`;
+          })()
         : joinFSPath(OUTPUT_DIR, "_tmp.tar");
 
       progress.report({ message: t("compress.creatingTar") });

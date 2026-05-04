@@ -146,10 +146,11 @@ function mountArchive(js7z: JS7zInstance, filePath: string): string {
 
   const parentDir = path.dirname(filePath);
   const mnt = `/mnt_${_mntCount++}`;
-  try {
-    js7z.FS.mkdir(mnt);
-  } catch {
-    /* already exists */
+  try { js7z.FS.mkdir(mnt); } catch { /* ignore */ }
+  // Pre-create .tmp file so NODEFS can write to it (7z d/rn create archiveName.tmp)
+  const tmpPath = path.join(parentDir, archiveName + ".tmp");
+  if (!fs.existsSync(tmpPath)) {
+    try { fs.writeFileSync(tmpPath, ""); } catch { /* ignore */ }
   }
   js7z.FS.mount(js7z.NODEFS, { root: parentDir }, mnt);
   return `${mnt}/${archiveName}`;
