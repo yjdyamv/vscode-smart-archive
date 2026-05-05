@@ -10,15 +10,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import type { JS7zFactory, DecompressOptions } from "../types";
+import type { DecompressOptions } from "../types";
 import { tryCleanup, OUTPUT_DIR, run7z, streamToVFS } from "./js7z-helpers";
 import { copyDirFromFS } from "../utils/fs";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 import { checkFileSize } from "../utils/security";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const JS7z: JS7zFactory = require("js7z-tools");
+import { JS7z } from "./js7z-factory";
 
 export async function decompressWith7z(
   options: DecompressOptions,

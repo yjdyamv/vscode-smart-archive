@@ -12,7 +12,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
-import type { JS7zFactory, CompressOptions, FormatInfo, JS7zInstance } from "../types";
+import type { CompressOptions, FormatInfo, JS7zInstance } from "../types";
+import { JS7z } from "./js7z-factory";
 import {
   tryCleanup,
   INPUT_DIR,
@@ -28,9 +29,6 @@ import { zstdCompressFile } from "./zstd-codec";
 import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger";
 import { validatePassword } from "../utils/security";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const JS7z: JS7zFactory = require("js7z-tools");
 
 function buildCompressArgs(
   outputFile: string,
