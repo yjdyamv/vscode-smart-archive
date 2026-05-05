@@ -1,11 +1,25 @@
-import { reactive } from "vue";
+import { reactive, watch } from "vue";
+import { saveState, loadState } from "./useMessage";
 
 export function useSelection() {
+  const saved = loadState<{ sel?: string[]; anchor?: string | null; lastAdd?: string }>();
   const state = reactive({
-    selected: new Set<string>(),
-    anchorPath: null as string | null,
-    lastAddDir: "",
+    selected: new Set<string>(saved?.sel ?? []),
+    anchorPath: (saved?.anchor ?? null) as string | null,
+    lastAddDir: saved?.lastAdd ?? "",
   });
+
+  // Persist selection on change
+  watch(
+    () => state.selected.size,
+    () => {
+      saveState({
+        sel: [...state.selected],
+        anchor: state.anchorPath,
+        lastAdd: state.lastAddDir,
+      });
+    },
+  );
 
   function toggle(path: string): void {
     if (state.selected.has(path)) {
