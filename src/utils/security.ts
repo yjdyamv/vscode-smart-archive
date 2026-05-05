@@ -68,6 +68,11 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
     throw new Error(`Archive entry contains null byte: ${entryName}`);
   }
 
+  // Reject excessively long paths (DOS / filesystem limits)
+  if (entryName.length > 4096) {
+    throw new Error(`Archive entry path too long (${entryName.length} chars)`);
+  }
+
   // Reject Windows Alternate Data Streams (e.g., file.txt:evil)
   if (process.platform === "win32" && entryName.includes(":")) {
     throw new Error(`Archive entry contains invalid character ':' (ADS): ${entryName}`);
@@ -131,9 +136,20 @@ export function checkTotalSize(current: number, added: number): number {
  * Validate password for safe use in 7z CLI arguments.
  * Rejects passwords starting with '-' (could be parsed as flags),
  * containing null bytes, newlines, or invalid characters.
+ * Also limits password to a reasonable maximum length.
  */
 export function validatePassword(pw: string): void {
   if (pw.startsWith("-")) throw new Error(t("security.passwordStartDash"));
   if (pw.includes("\0")) throw new Error(t("security.passwordNullByte"));
   if (pw.includes("\n") || pw.includes("\r")) throw new Error(t("security.passwordNewline"));
+  if (pw.length > 1024) throw new Error("Password too long (max 1024 characters)");
+}
+
+/**
+ * Sanitize an archive entry name that might be passed as a 7z CLI argument.
+ * Prefixes with ./ if the name starts with '-' to prevent flag injection.
+ */
+export function sanitizeCliPath(entryName: string): string {
+  if (entryName.startsWith("-")) return "./" + entryName;
+  return entryName;
 }

@@ -8,7 +8,7 @@ import * as vscode from "vscode";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { streamToVFS } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
-import { checkFileSize, validatePassword } from "../../utils/security";
+import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
 
@@ -36,7 +36,7 @@ export async function deleteFromArchive(
       validatePassword(password);
       dArgs.splice(1, 0, `-p${password}`);
     }
-    dArgs.push(...selectedPaths.map((p) => p.replace(/\\/g, "/")));
+    dArgs.push(...selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/"))));
     logger.debug({ event: "deleteFromArchive.7zArgs", args: dArgs.join(" ") });
 
     await new Promise<void>((resolve, reject) => {
@@ -68,7 +68,7 @@ async function deleteFromWrappedArchive(
       validatePassword(password);
       dArgs.splice(1, 0, `-p${password}`);
     }
-    dArgs.push(...selectedPaths.map((p) => p.replace(/\\/g, "/")));
+    dArgs.push(...selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/"))));
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z d: ${c}`)));
       js7z2.callMain(dArgs);

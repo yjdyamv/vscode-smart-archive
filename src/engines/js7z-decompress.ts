@@ -15,7 +15,7 @@ import { tryCleanup, OUTPUT_DIR, run7z, streamToVFS } from "./js7z-helpers";
 import { copyDirFromFS } from "../utils/fs";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
-import { checkFileSize } from "../utils/security";
+import { checkFileSize, validatePassword } from "../utils/security";
 import { JS7z } from "./js7z-factory";
 
 export async function decompressWith7z(
@@ -51,6 +51,7 @@ export async function decompressWith7z(
 
     const extractArgs: string[] = ["x", archiveFsPath, `-o${outPath}`];
     if (options.password) {
+      validatePassword(options.password);
       extractArgs.splice(1, 0, `-p${options.password}`);
     }
 
