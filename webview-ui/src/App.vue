@@ -35,6 +35,15 @@ watch([sort.sortKey, sort.sortAsc], () => {
   treeData.value = sort.sortNodes([...treeData.value]);
 });
 
+// Persist expanded state to extension for cross-session recall
+watch(
+  () => tree.expandedPaths.value.size,
+  () => {
+    const arr = [...tree.expandedPaths.value];
+    if (arr.length > 0) post({ c: "saveExpanded", paths: arr });
+  },
+);
+
 const visibleFlatNodes = computed(() => {
   return tree.flatNodes.value.filter((fn) => {
     if (search.query.value.trim()) {
