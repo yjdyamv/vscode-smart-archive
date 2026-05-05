@@ -119,9 +119,9 @@ function onExpandClick(e: MouseEvent) {
     <span class="cb" @click="onCheckClick">
       <span class="ck" :class="{ on: selected }"></span>
     </span>
-    <span class="ar" @click="onExpandClick">
+    <span class="ar" :class="{ rot: flatNode.expanded, empty: isDir && !flatNode.hasChildren }" @click="isDir ? onExpandClick($event) : undefined">
       <span v-if="isLoading" class="ar-loading"></span>
-      <template v-else>{{ flatNode.hasChildren ? (flatNode.expanded ? '▼' : '▶') : isDir ? '▶' : '' }}</template>
+      <span v-else-if="isDir" class="codicon codicon-chevron-right ar-icon"></span>
     </span>
     <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
     <span class="nm" :title="node.path" v-html="getNameHtml()"></span>
@@ -212,13 +212,18 @@ function onExpandClick(e: MouseEvent) {
   width: calc(var(--vscode-font-size) * 1.3);
   flex-shrink: 0;
   text-align: center;
-  font-size: 10px;
-  color: var(--vscode-descriptionForeground);
   cursor: pointer;
   opacity: 0.7;
   transition: opacity 0.1s;
 }
 .ar:hover { opacity: 1; }
+.ar-icon {
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+.ar.rot .ar-icon { transform: rotate(90deg); }
+.ar.empty { opacity: 0.25; cursor: default; }
+.ar.empty:hover { opacity: 0.25; }
 .ar-loading {
   display: inline-block;
   width: 8px;

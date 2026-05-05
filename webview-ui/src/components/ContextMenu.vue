@@ -28,11 +28,11 @@ const isReadOnly = computed(() => props.readOnly);
 
 <template>
   <div ref="menuRef" class="ctxmenu" :style="style">
-    <div class="cmi" @click="emit('copy')"><span class="codicon codicon-copy cmi-icon"></span>Copy</div>
-    <div class="cmi" @click="emit('extract')"><span class="codicon codicon-archive cmi-icon"></span>Extract Selected</div>
+    <div class="cmi" @click="emit('copy')"><span class="codicon codicon-copy cmi-icon"></span>Copy<span class="cmi-shortcut">Ctrl+C</span></div>
+    <div class="cmi" @click="emit('extract')"><span class="codicon codicon-archive cmi-icon"></span>Extract Selected<span class="cmi-shortcut">Enter</span></div>
     <div class="cmi-sep"></div>
-    <div class="cmi" :class="{ disabled: isReadOnly }" @click="emit('rename')"><span class="codicon codicon-edit cmi-icon"></span>Rename</div>
-    <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('delete')"><span class="codicon codicon-trash cmi-icon"></span>Delete</div>
+    <div class="cmi" :class="{ disabled: isReadOnly }" @click="emit('rename')"><span class="codicon codicon-edit cmi-icon"></span>Rename<span class="cmi-shortcut">F2</span></div>
+    <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('delete')"><span class="codicon codicon-trash cmi-icon"></span>Delete<span class="cmi-shortcut">Del</span></div>
     <div class="cmi-sep"></div>
     <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('add-here')"><span class="codicon codicon-add cmi-icon"></span>Add Files Here{{ dirLabel }}</div>
     <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('new-folder')"><span class="codicon codicon-new-folder cmi-icon"></span>New Folder{{ dirLabel }}</div>
@@ -59,5 +59,6 @@ const isReadOnly = computed(() => props.readOnly);
 .cmi.sep { height: 0; }
 .cmi-icon { font-size: calc(var(--vscode-font-size) * 1.05); width: 18px; text-align: center; flex-shrink: 0; }
 .cmi-sep { height: 1px; margin: 4px 12px; background: var(--vscode-menu-border, var(--vscode-sideBarSectionHeader-border)); }
+.cmi-shortcut { margin-left: auto; font-size: calc(var(--vscode-font-size) * 0.8); opacity: 0.6; }
 .cmi-foot { padding: 3px 16px; font-size: calc(var(--vscode-font-size) * 0.82); color: var(--vscode-descriptionForeground); cursor: default; }
 </style>

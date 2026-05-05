@@ -44,8 +44,14 @@ const visibleFlatNodes = computed(() => {
   });
 });
 
+const searchMatchCount = computed(() => {
+  if (!search.query.value.trim()) return 0;
+  return visibleFlatNodes.value.length;
+});
+
 const toast = reactive({ show: false, msg: "", ok: true });
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 const readOnly = ref(!!(window as any)._xReadOnly);
 const isSplit = ref(!!(window as any)._xIsSplit);
 const canSplit = ref(!!(window as any)._xCanSplit);
@@ -57,6 +63,12 @@ function showToast(msg: string, ok = true) {
   toast.show = true;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toast.show = false; }, ok ? 1800 : 4000);
+}
+
+function onSearch(q: string) {
+  search.query.value = q;
+  if (searchDebounce) clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => search.updateSearch(q, sortedTree.value), 150);
 }
 
 const loadingMsg = ref("Reading archive...");
@@ -532,6 +544,7 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         :sort-key="sort.sortKey.value"
         :sort-asc="sort.sortAsc.value"
         :search-query="search.query.value"
+        :search-match-count="searchMatchCount"
         :last-add-dir="selection.state.lastAddDir"
         @extract-all="extAll"
         @extract-selected="extSel"
@@ -541,7 +554,7 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         @expand-all="tree.expandAll"
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
-        @search="(q: string) => search.updateSearch(q, sortedTree)"
+        @search="onSearch"
         @convert="convertFormat"
       />
       <FileTree
