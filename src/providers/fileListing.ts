@@ -16,6 +16,7 @@ import { logger } from "../utils/logger";
 import { tryCleanup } from "../engines/js7z-helpers";
 import { fixArchiveEncoding } from "../utils/path";
 import { validatePassword } from "../utils/security";
+import { t } from "../i18n";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const JS7z: JS7zFactory = require("js7z-tools");
@@ -39,6 +40,10 @@ async function fetchFileList(
     const f = await listFiles(filePath, password, data);
     if (f && f.length > 0) return f;
   } catch (err) {
+    const msg = (err as Error).message || "";
+    if (/can\s*not\s*open|unexpected\s+end|missing\s+volume/i.test(msg)) {
+      throw new Error(t("decompress.missingVolumes"), { cause: err });
+    }
     logger.warn({ event: "fetchFileList.listFiles.failed", err, filePath }, "js7z listing failed");
   }
   if (!password && isEncryptableExt(ext)) return [];
