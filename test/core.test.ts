@@ -960,6 +960,116 @@ void (async () => {
     assert.strictEqual(enc["med.txt"]?.length, 16384, "encrypted split content preserved");
   });
 
+  // ── 35. Missing split volume parts ──
+  await test("split: missing middle part throws error", async () => {
+    const j = await JS7z();
+    j.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
+    await run7z(j, ["a", "/x.7z", "/big.txt", "-v100b"]);
+
+    const parts = j.FS.readdir("/")
+      .filter((e: string) => e.startsWith("x.7z."))
+      .sort();
+    assert.ok(parts.length >= 2, `need at least 2 split parts, got ${parts.length}`);
+
+    // Copy first + last part only (skip middle) into a new VFS
+    const j2 = await JS7z();
+    const first = parts[0];
+    j2.FS.writeFile("/" + first, new Uint8Array(j.FS.readFile("/" + first, { encoding: "binary" })));
+
+    if (parts.length > 2) {
+      const last = parts[parts.length - 1];
+      j2.FS.writeFile("/" + last, new Uint8Array(j.FS.readFile("/" + last, { encoding: "binary" })));
+    }
+
+    // 7z l should fail when a volume is missing
+    let stderr = "";
+    let exitCode = 0;
+    j2.printErr = (text: string) => {
+      stderr += text + "\n";
+    };
+    await new Promise<void>((resolve) => {
+      j2.onExit = (c: number) => {
+        exitCode = c;
+        resolve();
+      };
+      j2.callMain(["l", "-slt", "/" + first]);
+    });
+
+    assert.ok(
+      exitCode !== 0 || /error|missing|can.*open|unexpected/i.test(stderr),
+      `should fail for missing volumes (code=${exitCode}, stderr=${stderr.trim()})`,
+    );
+  });
+
+  await test("split: readdir skips gaps when parts deleted", async () => {
+    const j = await JS7z();
+    j.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
+    await run7z(j, ["a", "/x.7z", "/big.txt", "-v100b"]);
+
+    const parts = j.FS.readdir("/")
+      .filter((e: string) => e.startsWith("x.7z."))
+      .sort();
+    assert.ok(parts.length >= 2, `need at least 2 split parts`);
+
+    // Write all parts to disk, but delete the middle one
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa_test_"));
+    try {
+      for (const p of parts) {
+        const data = j.FS.readFile("/" + p, { encoding: "binary" });
+        fs.writeFileSync(path.join(tmpDir, p), Buffer.from(data));
+      }
+
+      // Delete a non-first part to simulate missing volume
+      const toDelete = parts.length >= 3 ? parts[1] : parts[parts.length - 1];
+      fs.unlinkSync(path.join(tmpDir, toDelete));
+
+      // Copy existing parts into a new VFS
+      const j2 = await JS7z();
+      const name = "x.7z";
+
+      const diskParts = fs
+        .readdirSync(tmpDir)
+        .filter((f: string) =>
+          new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.(\\d+)$`).test(f),
+        )
+        .sort();
+
+      for (const dp of diskParts) {
+        const diskPath = path.join(tmpDir, dp);
+        const data = fs.readFileSync(diskPath);
+        j2.FS.writeFile("/" + dp, new Uint8Array(data));
+      }
+
+      // Verify the deleted part is NOT in the VFS
+      assert.ok(!diskParts.includes(toDelete), `deleted part ${toDelete} should be absent`);
+      assert.ok(diskParts.includes(parts[0]), "first part should exist");
+      if (parts.length > 2) {
+        assert.ok(diskParts.includes(parts[parts.length - 1]), "last part should exist");
+      }
+
+      // List should fail because middle part is missing
+      let stderr = "";
+      let exitCode = 0;
+      j2.printErr = (text: string) => {
+        stderr += text + "\n";
+      };
+      await new Promise<void>((resolve) => {
+        j2.onExit = (c: number) => {
+          exitCode = c;
+          resolve();
+        };
+        j2.callMain(["l", "-slt", "/" + parts[0]]);
+      });
+
+      assert.ok(
+        exitCode !== 0 || /error|missing|can.*open|unexpected/i.test(stderr),
+        `missing middle part should cause error (code=${exitCode}, stderr=${stderr.trim()})`,
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
