@@ -47,6 +47,7 @@ import {
   getWebviewUris,
 } from "./helpers";
 import { setupWebview } from "./setup";
+import { saveExpandedPaths } from "./expandedState";
 
 // ── Message type ──
 
@@ -654,6 +655,11 @@ export function registerHandler(webview: vscode.Webview): void {
       const children = getDirChildren(msg.path, s.entries, s.entryIndex);
       markNoisyDirs(children, getNoisyPatterns());
       webview.postMessage({ c: "dirChildren", path: msg.path, children });
+      return;
+    }
+
+    if (msg.c === "saveExpanded" && Array.isArray(msg.paths)) {
+      saveExpandedPaths(s.archiveUri, msg.paths);
       return;
     }
 

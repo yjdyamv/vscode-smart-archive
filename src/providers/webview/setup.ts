@@ -20,6 +20,7 @@ import { fetchFileList } from "../fileListing";
 import { handlerStates, handlerRegistered } from "./state";
 import { getNoisyPatterns, isReadOnlyExt, getWebviewUris } from "./helpers";
 import { registerHandler } from "./router";
+import { loadExpandedPaths as loadPersistedExpanded } from "./expandedState";
 
 export async function setupWebview(
   webview: vscode.Webview,
@@ -210,6 +211,15 @@ export async function setupWebview(
     webview.html = webview.html.replace(
       "</body>",
       `<script>window._xIsEncrypted=true</script></body>`,
+    );
+  }
+
+  // Restore previously expanded directories
+  const persisted = loadPersistedExpanded(archiveUri);
+  if (persisted.length > 0) {
+    webview.html = webview.html.replace(
+      "</body>",
+      `<script>window._xExpanded=${JSON.stringify(persisted)}</script></body>`,
     );
   }
 

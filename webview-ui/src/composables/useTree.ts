@@ -29,22 +29,28 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     const saved = loadState<{ expanded?: string[] }>();
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);
-    } else {
-      // Auto-expand non-collapsed directories up to maxDepth levels deep
-      const paths: string[] = [];
-      function collect(nodes: TreeNodeData[], depth: number) {
-        if (depth > maxDepth) return;
-        for (const node of nodes) {
-          const hasKids = (node.children?.length ?? 0) > 0 || node.hasMore;
-          if (node.kind === "DIRECTORY" && !node.collapsed && hasKids) {
-            paths.push(node.path);
-            if (node.children) collect(node.children, depth + 1);
-          }
+      return;
+    }
+    // Restore from extension's persistent state (survives tab close)
+    const persistent = (window as any)._xExpanded as string[] | undefined;
+    if (persistent?.length) {
+      expandedPaths.value = new Set(persistent);
+      return;
+    }
+    // Auto-expand non-collapsed directories up to maxDepth levels deep
+    const paths: string[] = [];
+    function collect(nodes: TreeNodeData[], depth: number) {
+      if (depth > maxDepth) return;
+      for (const node of nodes) {
+        const hasKids = (node.children?.length ?? 0) > 0 || node.hasMore;
+        if (node.kind === "DIRECTORY" && !node.collapsed && hasKids) {
+          paths.push(node.path);
+          if (node.children) collect(node.children, depth + 1);
         }
       }
-      collect(treeData.value, 0);
-      expandedPaths.value = new Set(paths);
     }
+    collect(treeData.value, 0);
+    expandedPaths.value = new Set(paths);
   }
 
   const flatNodes = computed<FlatNode[]>(() => {
