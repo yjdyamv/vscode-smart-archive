@@ -13,7 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { decompressWith7z, compressWith7z } from "../../engines/js7z-engine";
-import { getFullExt, isSplitVolume, COMPRESS_FORMATS } from "../../constants";
+import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix } from "../../constants";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
 import {
@@ -446,7 +446,7 @@ export function registerHandler(webview: vscode.Webview): void {
         try {
           const ext = getFullExt(s.filePath);
           const fmt = ext.slice(1);
-          const dst = s.filePath.replace(/\.\d{3}$/, "");
+          const dst = removeVolumeSuffix(s.filePath);
           webview.postMessage({ c: "loading", t: "Merging volumes..." });
           await convertArchive(s.filePath, fmt, dst, s.password ?? "");
           webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
@@ -527,7 +527,7 @@ export function registerHandler(webview: vscode.Webview): void {
           if (isSplitVolume(s.filePath)) {
             volSize = await promptVolumeSize();
             if (!volSize) return;
-            const base = s.filePath.replace(/\.\d{3}$/, "");
+            const base = removeVolumeSuffix(s.filePath);
             const baseName = path.basename(base, ext);
             const dir = path.dirname(s.filePath);
             let folder = path.join(dir, baseName + "_encrypted");
@@ -568,7 +568,7 @@ export function registerHandler(webview: vscode.Webview): void {
           if (isSplitVolume(s.filePath)) {
             volSize = await promptVolumeSize();
             if (!volSize) return;
-            const base = s.filePath.replace(/\.\d{3}$/, "");
+            const base = removeVolumeSuffix(s.filePath);
             const baseName = path.basename(base, ext);
             const dir = path.dirname(s.filePath);
             let folder = path.join(dir, baseName + "_decrypted");

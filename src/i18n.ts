@@ -175,6 +175,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "解压失败: ",
     "zh-tw": "解壓失敗: ",
   },
+  "decompress.missingVolumes": {
+    en: "One or more split volume parts are missing. All parts must be in the same directory.",
+    "zh-cn": "缺少一个或多个分卷文件。所有分卷必须位于同一目录。",
+    "zh-tw": "缺少一個或多個分割檔案。所有分割檔必須位於同一目錄。",
+  },
   "decompress.initEngine": {
     en: "Initializing 7-Zip engine...",
     "zh-cn": "正在初始化 7-Zip 引擎...",
