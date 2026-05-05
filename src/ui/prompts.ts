@@ -67,9 +67,18 @@ export async function promptPassword(hint: string): Promise<PasswordResult> {
   return new Promise<PasswordResult>((resolve) => {
     const ib = vscode.window.createInputBox();
     let shown = false;
-    const eyeBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("eye"), tooltip: "Show password" };
-    const eyeOffBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("eye-closed"), tooltip: "Hide password" };
-    const clearBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("close"), tooltip: "Clear" };
+    const eyeBtn: vscode.QuickInputButton = {
+      iconPath: new vscode.ThemeIcon("eye"),
+      tooltip: "Show password",
+    };
+    const eyeOffBtn: vscode.QuickInputButton = {
+      iconPath: new vscode.ThemeIcon("eye-closed"),
+      tooltip: "Hide password",
+    };
+    const clearBtn: vscode.QuickInputButton = {
+      iconPath: new vscode.ThemeIcon("close"),
+      tooltip: "Clear",
+    };
     ib.prompt = t("password.prompt");
     ib.placeholder = hint;
     ib.password = true;
@@ -86,7 +95,9 @@ export async function promptPassword(hint: string): Promise<PasswordResult> {
       } else if (b === eyeBtn || b === eyeOffBtn) {
         shown = !shown;
         ib.password = !shown;
-        ib.buttons = shown ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back] : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+        ib.buttons = shown
+          ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
+          : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
       } else {
         ib.hide();
         resolve(null);
