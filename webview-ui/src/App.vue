@@ -436,17 +436,12 @@ onMounted(() => {
         const parentPath = msg.path as string;
         const children = msg.children as TreeNodeData[];
         if (parentPath && Array.isArray(children)) {
-          const result = tree.insertChildren(parentPath, children);
+          const childPaths = tree.insertChildren(parentPath, children);
           // If parent is selected, auto-select loaded children
           if (selection.state.selected.has(parentPath)) {
-            for (const childPath of result.childPaths) {
+            for (const childPath of childPaths) {
               selection.state.selected.add(childPath);
             }
-          }
-          // Chain-load descendants that are in expanded set
-          for (const childPath of result.needsLoad) {
-            tree.setLoading(childPath);
-            post({ c: "expandDir", path: childPath });
           }
         }
         break;

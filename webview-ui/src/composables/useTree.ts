@@ -119,30 +119,26 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     return null;
   }
 
-  function insertChildren(parentPath: string, children: TreeNodeData[]): { needsLoad: string[]; childPaths: string[] } {
+  function insertChildren(parentPath: string, children: TreeNodeData[]): string[] {
     const node = findNode(treeData.value, parentPath);
-    if (!node) return { needsLoad: [], childPaths: [] };
+    if (!node) return [];
     node.children = children;
     node.hasMore = false;
     loadingPaths.value.delete(parentPath);
     // re-trigger reactivity
     treeData.value = [...treeData.value];
 
-    // Auto-expand non-collapsed children and chain-load them
-    const needsLoad: string[] = [];
+    // Expand non-collapsed child directories (auto-expansion policy)
     const childPaths: string[] = [];
     for (const child of children) {
       childPaths.push(child.path);
       const hasKids = (child.children?.length ?? 0) > 0 || child.hasMore;
       if (child.kind === "DIRECTORY" && !child.collapsed && hasKids) {
         expandedPaths.value.add(child.path);
-        if (child.hasMore && (!child.children || child.children.length === 0)) {
-          needsLoad.push(child.path);
-        }
       }
     }
     persistExpanded(expandedPaths.value);
-    return { needsLoad, childPaths };
+    return childPaths;
   }
 
   function getPathsNeedingLoad(): string[] {
