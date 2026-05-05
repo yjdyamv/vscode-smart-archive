@@ -125,6 +125,7 @@ export async function compressWith7z(
         tarDiskPath,
         options.targets.map((target) => target.fsPath),
         token,
+        excludePatterns,
       );
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
 

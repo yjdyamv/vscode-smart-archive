@@ -10,6 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
+import { minimatch } from "minimatch";
 
 const BLOCK = 512;
 
@@ -57,7 +58,11 @@ function padSize(n: number): number {
   return n % BLOCK === 0 ? n : n + BLOCK - (n % BLOCK);
 }
 
-function collectPaths(basePath: string, token?: vscode.CancellationToken): string[] {
+function collectPaths(
+  basePath: string,
+  excludePatterns: string[],
+  token?: vscode.CancellationToken,
+): string[] {
   const result: string[] = [];
   const stack = [basePath];
   while (stack.length > 0) {
@@ -66,8 +71,10 @@ function collectPaths(basePath: string, token?: vscode.CancellationToken): strin
     const entries = fs.readdirSync(current, { withFileTypes: true });
     for (const e of entries) {
       const full = path.join(current, e.name);
+      const rel = path.relative(basePath, full).replace(/\\/g, "/");
+      if (isExcluded(rel, excludePatterns)) continue;
       if (e.isDirectory()) {
-        result.push(full); // directory entry
+        result.push(full);
         stack.push(full);
       } else if (e.isFile()) {
         result.push(full);
@@ -77,10 +84,21 @@ function collectPaths(basePath: string, token?: vscode.CancellationToken): strin
   return result;
 }
 
+function isExcluded(relPath: string, patterns: string[]): boolean {
+  if (patterns.length === 0) return false;
+  for (const p of patterns) {
+    if (minimatch(relPath, p, { dot: true }) || minimatch(path.basename(relPath), p, { dot: true })) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function createTarFile(
   outputPath: string,
   localPaths: readonly string[],
   token?: vscode.CancellationToken,
+  excludePatterns: string[] = [],
 ): Promise<void> {
   const outDir = path.dirname(outputPath);
   fs.mkdirSync(outDir, { recursive: true });
@@ -97,7 +115,7 @@ export async function createTarFile(
       if (stat.isDirectory()) {
         // Write directory entry
         fs.writeSync(fd, tarHeader(rel + "/", 0, true));
-        const all = collectPaths(loc, token);
+        const all = collectPaths(loc, excludePatterns, token);
         for (const full of all) {
           if (token?.isCancellationRequested) throw new vscode.CancellationError();
           const fstat = fs.statSync(full);
