@@ -346,6 +346,7 @@ function expandOrLoad(path: string) {
 
   // If directory has more children but not loaded, request them
   if (node.hasMore && (!node.children || node.children.length === 0)) {
+    if (tree.loadingPaths.value.has(path)) return; // already loading
     tree.toggleExpand(path); // expand to show loading state
     tree.setLoading(path);
     post({ c: "expandDir", path });
@@ -360,11 +361,19 @@ function expandOrLoad(path: string) {
 const selectionBreakdown = computed(() => {
   let dirs = 0;
   let files = 0;
+  // Build a one-time path→kind map for O(1) lookups
+  const map = new Map<string, string>();
+  function walk(nodes: TreeNodeData[]) {
+    for (const n of nodes) {
+      map.set(n.path, n.kind);
+      if (n.children) walk(n.children);
+    }
+  }
+  walk(treeData.value);
   for (const p of selection.state.selected) {
-    const node = findNode(treeData.value, p);
-    if (!node) continue;
-    if (node.kind === "DIRECTORY") dirs++;
-    else files++;
+    const kind = map.get(p);
+    if (kind === "DIRECTORY") dirs++;
+    else if (kind === "REGULAR_FILE") files++;
   }
   return { dirs, files };
 });
@@ -553,7 +562,7 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         @delete-selected="delSel"
         @add-files="addFiles"
         @copy="copySel"
-        @expand-all="tree.expandAll"
+        @expand-all="tree.expandAll(); loadExpandedPaths()"
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
         @search="onSearch"

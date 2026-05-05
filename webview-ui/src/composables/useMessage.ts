@@ -15,7 +15,8 @@ export function useMessage() {
 }
 
 export function saveState(state: unknown): void {
-  vscode.setState(state);
+  const prev = vscode.getState() as Record<string, unknown> | undefined;
+  vscode.setState({ ...prev, ...(state as Record<string, unknown>) });
 }
 
 export function loadState<T>(): T | undefined {
