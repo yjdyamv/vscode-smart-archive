@@ -171,7 +171,7 @@ const FILE_ICONS: { exts: string[]; codicon: string }[] = [
 
   // ── Others ──
   { exts: ["lock"], codicon: "lock" },
-  { exts: ["gitignore", "gitattributes", "dockerignore", "npmignore"], codicon: "git-ignore" },
+  { exts: ["gitignore", "gitattributes", "dockerignore", "npmignore"], codicon: "settings" },
   { exts: ["gitmodules"], codicon: "file-submodule" },
   { exts: ["wasm", "wat"], codicon: "package" },
   { exts: ["ttf", "otf", "woff", "woff2", "eot", "ttc"], codicon: "symbol-string" },

@@ -23,6 +23,7 @@ const emit = defineEmits<{
 const node = computed(() => props.flatNode.node);
 const isDir = computed(() => node.value.kind === "DIRECTORY");
 const isCollapsedDir = computed(() => isDir.value && node.value.collapsed === true);
+const inheritCollapsed = computed(() => props.flatNode.inheritCollapsed);
 const icon = computed(() => getFileIcon(node.value.name, isDir.value));
 const indentPx = 16;
 
@@ -103,7 +104,7 @@ function onExpandClick(e: MouseEvent) {
 <template>
   <div
     class="row"
-    :class="{ dir: isDir, sel: selected, noisy: isCollapsedDir }"
+    :class="{ dir: isDir, sel: selected, noisy: inheritCollapsed }"
     :style="{ paddingLeft: depth * indentPx + 'px' }"
     :data-path="node.path"
     @click="onRowClick"
