@@ -10,11 +10,11 @@
 
 import * as fs from "fs";
 import { tryCleanup, run7z, streamToVFS } from "./js7z-helpers";
-import { getBaseName, fixArchiveEncoding } from "../utils/path";
+import { getBaseName } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
-import { getSplitVolumeBase } from "../constants";
 import { logger } from "../utils/logger";
 import { JS7z } from "./js7z-factory";
+import { parse7zListing } from "../utils/parse7z";
 
 export async function listFiles(
   filePath: string,
@@ -60,52 +60,9 @@ export async function listFiles(
       js7z.callMain(args);
     });
 
-    const results: { path: string; size: number; type: string }[] = [];
-    let curPath = "";
-    let curSize = 0;
-    let curAttr = "";
-
-    const flush = () => {
-      if (curPath) {
-        results.push({
-          path: fixArchiveEncoding(curPath),
-          size: curSize,
-          type: curAttr.includes("D") ? "DIRECTORY" : "REGULAR_FILE",
-        });
-      }
-      curPath = "";
-      curSize = 0;
-      curAttr = "";
-    };
-
-    for (const line of stdout.split("\n")) {
-      const m = line.match(/^(\w[\w ]*?)\s*=\s*(.*)/);
-      if (!m) continue;
-      const key = m[1].trim();
-      const val = m[2].trim();
-      if (key === "Path") {
-        flush();
-        curPath = val;
-      } else if (key === "Size" && !curSize) {
-        curSize = parseInt(val, 10) || 0;
-      } else if (key === "Attributes") {
-        curAttr = val;
-      }
-    }
-    flush();
-
-    // 7z l -slt lists the archive file itself as the first entry; filter it out.
-    // For split volumes, also filter the logical base name (e.g. "archive.7z"
-    // embedded in the header of "archive.7z.001").
-    const volBase = getSplitVolumeBase(archiveName);
-    const filtered = results.filter((r) => {
-      if (r.path === `/${archiveName}` || r.path === archiveName) return false;
-      if (volBase && (r.path === `/${volBase}` || r.path === volBase)) return false;
-      return true;
-    });
-
-    logger.debug({ event: "listFiles.done", count: filtered.length });
-    return filtered;
+    const results = parse7zListing(stdout, archiveName);
+    logger.debug({ event: "listFiles.done", count: results.length });
+    return results;
   } finally {
     tryCleanup(js7z);
   }

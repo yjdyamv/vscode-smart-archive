@@ -29,6 +29,7 @@ import { zstdCompressFile } from "./zstd-codec";
 import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger";
 import { validatePassword } from "../utils/security";
+import { prepareExclusions, isTargetExcluded } from "../utils/exclude";
 
 function buildCompressArgs(
   outputFile: string,
@@ -158,17 +159,13 @@ export async function compressWith7z(
     // Non-wrapped formats: copy inputs to VFS for 7z
     progress.report({ message: t("compress.readingFiles") });
 
-    // Filter out targets that match exclude patterns (same logic as tar-writer)
+    const exclusions = prepareExclusions(excludePatterns ?? []);
     const filteredPaths = localPaths.filter((lp) => {
-      const name = path.basename(lp);
-      const excluded = (excludePatterns ?? []).some((p) => {
-        const stripped = p.replace(/^(\*\*\/)+/, "");
-        return stripped && name === stripped;
-      });
-      if (excluded) {
-        logger.info({ event: "compress.skipTarget", path: lp, name });
+      if (isTargetExcluded(lp, exclusions)) {
+        logger.info({ event: "compress.skipTarget", path: lp, name: path.basename(lp) });
+        return false;
       }
-      return !excluded;
+      return true;
     });
 
     js7z.FS.mkdir(INPUT_DIR);
