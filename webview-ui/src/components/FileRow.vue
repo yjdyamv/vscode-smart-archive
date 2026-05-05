@@ -200,13 +200,13 @@ function onExpandClick(e: MouseEvent) {
 .ck.on::after {
   content: "";
   position: absolute;
-  left: 26%;
-  top: 12%;
-  width: 30%;
-  height: 55%;
+  left: 50%;
+  top: 42%;
+  width: 28%;
+  height: 52%;
   border: solid var(--vscode-checkbox-selectForeground, #2ea043);
   border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 .ar {
   width: calc(var(--vscode-font-size) * 1.3);
