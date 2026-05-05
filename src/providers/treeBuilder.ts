@@ -8,6 +8,7 @@
  */
 
 import { minimatch } from "minimatch";
+import { getSplitVolumeBase } from "../constants";
 
 interface TreeNode {
   name: string;
@@ -30,6 +31,7 @@ interface EntryWithParts {
 
 function normalizeEntries(entries: FlatEntry[], archiveName: string): EntryWithParts[] {
   const normed: EntryWithParts[] = [];
+  const volBase = getSplitVolumeBase(archiveName);
   for (const e of entries) {
     let p = e.path.replace(/\\/g, "/");
     // Strip leading "./" (libarchive convention)
@@ -41,7 +43,10 @@ function normalizeEntries(entries: FlatEntry[], archiveName: string): EntryWithP
     // Only skip non-directory self-references (e.g. libarchive lists the archive
     // itself as a file entry). Keep directory entries — they provide the root
     // structure for lazy-loaded trees.
-    if (parts.length === 1 && parts[0] === archiveName && e.type === "REGULAR_FILE") continue;
+    if (e.type === "REGULAR_FILE") {
+      if (parts.length === 1 && parts[0] === archiveName) continue;
+      if (volBase && parts.length === 1 && parts[0] === volBase) continue;
+    }
     normed.push({ entry: e, parts });
   }
   return normed;

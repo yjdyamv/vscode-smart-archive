@@ -11,11 +11,12 @@ import * as vscode from "vscode";
 import * as path from "path";
 import type { JS7zFactory, JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { getFullExt, isWrappedFormat, isEncryptableExt, getSplitVolumeBase } from "../constants";
 import { logger } from "../utils/logger";
 import { tryCleanup } from "../engines/js7z-helpers";
 import { fixArchiveEncoding } from "../utils/path";
 import { validatePassword } from "../utils/security";
+import { t } from "../i18n";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const JS7z: JS7zFactory = require("js7z-tools");
@@ -39,6 +40,10 @@ async function fetchFileList(
     const f = await listFiles(filePath, password, data);
     if (f && f.length > 0) return f;
   } catch (err) {
+    const msg = (err as Error).message || "";
+    if (/can\s*not\s*open|unexpected\s+end|missing\s+volume/i.test(msg)) {
+      throw new Error(t("decompress.missingVolumes"));
+    }
     logger.warn({ event: "fetchFileList.listFiles.failed", err, filePath }, "js7z listing failed");
   }
   if (!password && isEncryptableExt(ext)) return [];
@@ -174,7 +179,12 @@ function parse7zListing(
   flush();
 
   // Filter out the archive's own self-reference entry
-  return results.filter((r) => r.path !== `/${archiveName}` && r.path !== archiveName);
+  const volBase = getSplitVolumeBase(archiveName);
+  return results.filter((r) => {
+    if (r.path === `/${archiveName}` || r.path === archiveName) return false;
+    if (volBase && (r.path === `/${volBase}` || r.path === volBase)) return false;
+    return true;
+  });
 }
 
 export {

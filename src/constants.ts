@@ -347,8 +347,8 @@ export function getFullExt(filePath: string): string {
   const lower = filePath.toLowerCase();
 
   // Split volumes: archive.7z.001 → .7z, archive.zip.002 → .zip
-  const volMatch = lower.match(/\.(7z|zip|wim)\.\d{3}$/);
-  if (volMatch) return volMatch[0].replace(/\.\d{3}$/, "");
+  const volMatch = lower.match(/\.(7z|zip|wim)\.\d+$/);
+  if (volMatch) return volMatch[0].replace(/\.\d+$/, "");
 
   for (const ext of COMPOUND_EXTS) {
     if (lower.endsWith(ext)) return ext;
@@ -358,10 +358,28 @@ export function getFullExt(filePath: string): string {
 
 export function isSplitVolume(filePath: string): boolean {
   return (
-    /\.(7z|zip|wim)\.\d{3}$/i.test(filePath) ||
+    /\.(7z|zip|wim)\.\d+$/i.test(filePath) ||
     /\.part\d+\.rar$/i.test(filePath) ||
     /\.r\d{2}$/i.test(filePath)
   );
+}
+
+/**
+ * For a split volume file like "archive.7z.001", returns the base archive
+ * name "archive.7z". Returns null if not a recognised split-volume pattern.
+ */
+export function getSplitVolumeBase(fileName: string): string | null {
+  const m = fileName.match(/(.+\.(?:7z|zip|wim))\.\d+$/i);
+  if (m) return m[1];
+  return null;
+}
+
+/**
+ * Strip the split-volume number suffix (e.g. "archive.7z.001" → "archive.7z").
+ * Returns the original path unchanged if no volume suffix is detected.
+ */
+export function removeVolumeSuffix(filePath: string): string {
+  return filePath.replace(/\.\d+$/, "");
 }
 
 export function isWrappedFormat(ext: string): boolean {
