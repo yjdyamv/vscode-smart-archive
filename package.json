@@ -13,6 +13,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "workspaces": ["webview-ui"],
   "categories": [
     "Other"
   ],
@@ -398,9 +399,9 @@
   "scripts": {
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
-    "build:webview": "cd webview-ui && npm run build",
-    "dev:webview": "cd webview-ui && npm run dev",
-    "install:webview": "cd webview-ui && npm install",
+    "build:webview": "npm run build -w webview-ui",
+    "dev:webview": "npm run dev -w webview-ui",
+    "install:webview": "npm install -w webview-ui",
     "test": "npm run compile && tsc -p test && node test/out/core.test.js && node test/out/preview.test.js",
     "test:extension": "node test/runTest.js",
     "format": "oxfmt --write src/",
