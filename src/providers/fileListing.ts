@@ -9,7 +9,7 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import type { JS7zFactory, JS7zInstance } from "../types";
+import type { JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt, getSplitVolumeBase } from "../constants";
 import { logger } from "../utils/logger";
@@ -17,9 +17,7 @@ import { tryCleanup } from "../engines/js7z-helpers";
 import { fixArchiveEncoding } from "../utils/path";
 import { validatePassword } from "../utils/security";
 import { t } from "../i18n";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const JS7z: JS7zFactory = require("js7z-tools");
+import { JS7z } from "../engines/js7z-factory";
 
 /**
  * Fetch the file list for an archive.

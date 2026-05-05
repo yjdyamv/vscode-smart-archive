@@ -9,15 +9,12 @@
  */
 
 import * as fs from "fs";
-import type { JS7zFactory } from "../types";
 import { tryCleanup, run7z, streamToVFS } from "./js7z-helpers";
 import { getBaseName, fixArchiveEncoding } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
 import { getSplitVolumeBase } from "../constants";
 import { logger } from "../utils/logger";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const JS7z: JS7zFactory = require("js7z-tools");
+import { JS7z } from "./js7z-factory";
 
 export async function listFiles(
   filePath: string,
