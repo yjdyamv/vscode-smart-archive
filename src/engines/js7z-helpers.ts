@@ -102,22 +102,24 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
 
   // For split volumes (archive.7z.001), stream ALL parts so 7z can
   // find .002, .003, etc. in the same VFS directory.
-  const splitMatch = filePath.match(/^(.+\.(?:7z|zip|wim))\.(\d{3})$/i);
+  const splitMatch = filePath.match(/^(.+\.(?:7z|zip|wim))\.(\d+)$/i);
   if (splitMatch) {
     const base = splitMatch[1];
     const dir = path.dirname(base);
     const name = path.basename(base);
+    const digitWidth = splitMatch[2].length;
     let idx = 1;
     while (true) {
-      const part = path.join(dir, `${name}.${String(idx).padStart(3, "0")}`);
+      const part = path.join(dir, `${name}.${String(idx).padStart(digitWidth, "0")}`);
       if (!fs.existsSync(part)) break;
       const partTarget = vfsPath
-        ? `${vfsPath.replace(/\.\d{3}$/, "")}.${String(idx).padStart(3, "0")}`
-        : `/${name}.${String(idx).padStart(3, "0")}`;
+        ? `${vfsPath.replace(/\.\d+$/, "")}.${String(idx).padStart(digitWidth, "0")}`
+        : `/${name}.${String(idx).padStart(digitWidth, "0")}`;
       copyToVFS(js7z, part, partTarget);
       idx++;
     }
-    return vfsPath ? vfsPath.replace(/\.\d{3}$/, ".001") : `/${name}.001`;
+    const firstPart = String(1).padStart(digitWidth, "0");
+    return vfsPath ? `${vfsPath.replace(/\.\d+$/, "")}.${firstPart}` : `/${name}.${firstPart}`;
   }
 
   // RAR split volumes: basename.part1.rar, basename.part2.rar, ...
