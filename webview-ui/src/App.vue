@@ -44,8 +44,14 @@ const visibleFlatNodes = computed(() => {
   });
 });
 
+const searchMatchCount = computed(() => {
+  if (!search.query.value.trim()) return 0;
+  return search.directMatchSet.value.size;
+});
+
 const toast = reactive({ show: false, msg: "", ok: true });
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
+let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 const readOnly = ref(!!(window as any)._xReadOnly);
 const isSplit = ref(!!(window as any)._xIsSplit);
 const canSplit = ref(!!(window as any)._xCanSplit);
@@ -57,6 +63,12 @@ function showToast(msg: string, ok = true) {
   toast.show = true;
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toast.show = false; }, ok ? 1800 : 4000);
+}
+
+function onSearch(q: string) {
+  search.query.value = q;
+  if (searchDebounce) clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => search.updateSearch(q, sortedTree.value), 150);
 }
 
 const loadingMsg = ref("Reading archive...");
@@ -532,6 +544,9 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         :sort-key="sort.sortKey.value"
         :sort-asc="sort.sortAsc.value"
         :search-query="search.query.value"
+        :is-regex="search.isRegex.value"
+        :regex-error="search.regexError.value"
+        :search-match-count="searchMatchCount"
         :last-add-dir="selection.state.lastAddDir"
         @extract-all="extAll"
         @extract-selected="extSel"
@@ -541,7 +556,8 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         @expand-all="tree.expandAll"
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
-        @search="(q: string) => search.updateSearch(q, sortedTree)"
+        @search="onSearch"
+        @toggle-regex="search.toggleRegex"
         @convert="convertFormat"
       />
       <FileTree
@@ -577,9 +593,10 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
       />
     </template>
     <div v-else class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]">
-      <div class="text-4xl opacity-40"><span class="codicon codicon-folder-opened"></span></div>
-      <div class="text-sm">{{ archiveProps?.name ?? "Archive" }}</div>
-      <div class="text-xs opacity-60">No files to display</div>
+      <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
+      <div class="text-[1.1em] text-[var(--vscode-foreground)]">{{ archiveProps?.name ?? "Archive" }}</div>
+      <div class="text-sm opacity-70">No files to display</div>
+      <div v-if="!readOnly" class="text-xs opacity-50 mt-1">Add files with the + button or extract existing content</div>
     </div>
 
     <Toast :msg="toast.msg" :ok="toast.ok" :visible="toast.show" />
@@ -600,3 +617,10 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
     />
   </div>
 </template>
+
+<style scoped>
+.empty-icon {
+  font-size: 56px; line-height: 1;
+  opacity: 0.35;
+}
+</style>
