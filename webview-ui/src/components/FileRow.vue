@@ -157,10 +157,10 @@ function onExpandClick(e: MouseEvent) {
   opacity: 0.4;
 }
 .row.noisy {
-  opacity: 0.5;
+  color: var(--vscode-descriptionForeground);
 }
 .row.noisy:hover {
-  opacity: 0.75;
+  color: var(--vscode-foreground);
 }
 .guide {
   position: absolute;

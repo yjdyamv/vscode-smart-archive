@@ -246,21 +246,21 @@ function getDirChildren(parentPath: string, entries: FlatEntry[], index?: EntryI
 
   if (index) {
     const bucket = index.get(parentPath);
-    if (!bucket) return [];
     candidates = bucket
-      .filter((e) => {
-        let p = e.path.replace(/\\/g, "/");
-        if (p.startsWith("./")) p = p.slice(2);
-        // Skip the directory's own entry (e.g. "subdir/" when expanding "subdir")
-        if (p === parentPath || p === parentPath + "/") return false;
-        return true;
-      })
-      .map((e) => {
-        let p = e.path.replace(/\\/g, "/");
-        if (p.startsWith("./")) p = p.slice(2);
-        const relative = p.slice(parentPath ? parentPath.length + 1 : 0);
-        return { entry: e, parts: relative.split("/").filter(Boolean) };
-      });
+      ? bucket
+          .filter((e) => {
+            let p = e.path.replace(/\\/g, "/");
+            if (p.startsWith("./")) p = p.slice(2);
+            if (p === parentPath || p === parentPath + "/") return false;
+            return true;
+          })
+          .map((e) => {
+            let p = e.path.replace(/\\/g, "/");
+            if (p.startsWith("./")) p = p.slice(2);
+            const relative = p.slice(parentPath ? parentPath.length + 1 : 0);
+            return { entry: e, parts: relative.split("/").filter(Boolean) };
+          })
+      : [];
   } else {
     const prefix = parentPath ? parentPath + "/" : "";
     candidates = [];
@@ -322,12 +322,36 @@ function getDirChildren(parentPath: string, entries: FlatEntry[], index?: EntryI
     }
 
     const isDir = entry.type !== "REGULAR_FILE" || implicitDir || hasKids;
-    const node: TreeNode = isDir
+    const node = isDir
       ? mkdirNode(seg, fullChildPath, hasKids)
-      : { name: seg, path: fullChildPath, size: entry.size, kind: "REGULAR_FILE" };
+      : mknondirNode(seg, fullChildPath, entry.size);
 
     children.push(node);
     seen.set(seg, node);
+  }
+
+  // When using the index, implicit directories (e.g. "out" when only
+  // "out/file.js" exists) are not represented in the candidate list because
+  // their entries live in deeper index buckets. Scan all index keys to
+  // discover and create these missing directory nodes.
+  if (index) {
+    const prefix = parentPath ? parentPath + "/" : "";
+    const implicitSegs = new Set<string>();
+    for (const key of index.keys()) {
+      if (!key.startsWith(prefix)) continue;
+      const afterPrefix = key.slice(prefix.length);
+      const slashIdx = afterPrefix.indexOf("/");
+      const seg = slashIdx > 0 ? afterPrefix.slice(0, slashIdx) : afterPrefix;
+      if (seg && !seen.has(seg)) {
+        implicitSegs.add(seg);
+      }
+    }
+    for (const seg of implicitSegs) {
+      const fullChildPath = parentPath ? parentPath + "/" + seg : seg;
+      const node: TreeNode = mkdirNode(seg, fullChildPath, true);
+      children.push(node);
+      seen.set(seg, node);
+    }
   }
 
   return children;
