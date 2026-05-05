@@ -101,3 +101,9 @@ npm run release         # install + check + package (one step)
 ## License
 
 MIT
+
+## Acknowledge
+
+Thanks for those helped me and friendly community!
+
+Friend link: [linux.do](https://linux.do)
