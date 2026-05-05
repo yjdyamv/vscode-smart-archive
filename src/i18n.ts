@@ -233,6 +233,16 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "归档文件",
     "zh-tw": "封存檔案",
   },
+  "save.namePrompt": {
+    en: 'Output name (".{0}" will be appended)',
+    "zh-cn": "压缩包名称（将自动附加 .{0}）",
+    "zh-tw": "封存檔名稱（將自動附加 .{0}）",
+  },
+  "save.nameInvalid": {
+    en: 'Invalid characters: < > : " / \\ | ? *',
+    "zh-cn": '非法字符：< > : " / \\ | ? *',
+    "zh-tw": '無效字元：< > : " / \\ | ? *',
+  },
 
   // ---- Generic ----
   "fs.copyFailed": {
