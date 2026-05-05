@@ -17,10 +17,7 @@ export interface ArchiveEntry {
   type: string;
 }
 
-export function parse7zListing(
-  stdout: string,
-  archiveName: string,
-): ArchiveEntry[] {
+export function parse7zListing(stdout: string, archiveName: string): ArchiveEntry[] {
   const results: ArchiveEntry[] = [];
   let curPath = "";
   let curSize = 0;

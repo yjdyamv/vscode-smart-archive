@@ -36,10 +36,7 @@ export function prepareExclusions(patterns: string[]): ExclusionSet {
   return { exactNames, globPatterns };
 }
 
-export function isPathExcluded(
-  relPath: string,
-  exclusions: ExclusionSet,
-): boolean {
+export function isPathExcluded(relPath: string, exclusions: ExclusionSet): boolean {
   const { exactNames, globPatterns } = exclusions;
   if (exactNames.size === 0 && globPatterns.length === 0) return false;
 
@@ -53,9 +50,6 @@ export function isPathExcluded(
   return false;
 }
 
-export function isTargetExcluded(
-  fullPath: string,
-  exclusions: ExclusionSet,
-): boolean {
+export function isTargetExcluded(fullPath: string, exclusions: ExclusionSet): boolean {
   return isPathExcluded(path.basename(fullPath), exclusions);
 }
