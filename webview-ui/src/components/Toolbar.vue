@@ -19,7 +19,8 @@
       <span class="sep"></span>
       <span class="sort-lbl" :class="{ on: sortKey === 'name' }" @click="$emit('sort', 'name')">Name<span v-if="sortKey === 'name'" class="codicon ml-1" :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"></span></span>
       <span class="sort-lbl" :class="{ on: sortKey === 'size' }" @click="$emit('sort', 'size')">Size<span v-if="sortKey === 'size'" class="codicon ml-1" :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"></span></span>
-      <input class="search-input" type="text" :value="searchQuery" placeholder="Filter…" @input="$emit('search', ($event.target as HTMLInputElement).value)" />
+      <input class="search-input" :class="{ 'search-error': regexError }" :title="regexError || ''" type="text" :value="searchQuery" :placeholder="isRegex ? 'Regex…' : 'Filter…'" @input="$emit('search', ($event.target as HTMLInputElement).value)" />
+      <button class="btn-ico search-regex-btn" :class="{ on: isRegex }" :title="isRegex ? 'Switch to fuzzy search' : 'Use regular expression'" @click="$emit('toggle-regex')"><span class="codicon codicon-regex"></span></button>
       <span v-if="searchQuery && (searchMatchCount ?? 0) > 0" class="search-match">{{ searchMatchCount }} match{{ (searchMatchCount ?? 0) > 1 ? 'es' : '' }}</span>
     </div>
   </div>
@@ -30,6 +31,7 @@ defineProps<{
   selectedCount: number; selectedFiles: number; selectedDirs: number;
   totalFiles: number; totalDirs: number;
   sortKey: string; sortAsc: boolean; searchQuery: string; lastAddDir: string;
+  isRegex?: boolean; regexError?: string;
   searchMatchCount?: number;
   readOnly?: boolean;
 }>();
@@ -37,7 +39,7 @@ defineEmits<{
   (e: "extract-all"): void; (e: "extract-selected"): void; (e: "delete-selected"): void;
   (e: "add-files"): void; (e: "copy"): void; (e: "expand-all"): void; (e: "collapse-all"): void;
   (e: "sort", key: "name" | "size"): void; (e: "search", query: string): void;
-  (e: "convert"): void;
+  (e: "convert"): void; (e: "toggle-regex"): void;
 }>();
 </script>
 
@@ -74,7 +76,9 @@ defineEmits<{
   width: 120px; min-width: 80px; max-width: 200px; outline: none;
   transition: border-color 0.15s;
 }
-.search-input:focus { border-color: var(--vscode-focusBorder); width: 180px; }
+.search-input:focus { border-color: var(--vscode-focusBorder); }
+.search-input.search-error { border-color: #e51400; box-shadow: 0 0 0 1px #e5140033; }
+.search-regex-btn.on { color: var(--vscode-focusBorder, #007acc); background: var(--vscode-toolbar-hoverBackground); }
 .search-match {
   font-size: calc(var(--vscode-font-size) * 0.78);
   color: var(--vscode-descriptionForeground); white-space: nowrap;

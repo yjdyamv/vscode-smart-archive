@@ -1,10 +1,28 @@
 import { ref } from "vue";
 import type { TreeNodeData } from "../types";
 
+// Patterns with nested quantifiers or excessive repetition are potential ReDoS vectors
+const REDOS_PATTERNS = [
+  /\((?!\?[:!=]).*\)(\+|\*|\{\d+,\})\s*(\+|\*|\{\d+,\})/, // nested quantifiers
+  /(\+|\*)\s*(\+|\*)/, // consecutive quantifiers
+  /\(\.\*\)\s*(\+|\*)/, // (.+)+ or (.\*)\* patterns
+  /\\[bBdwWsSD]?\+\s*\+/, // a++ patterns
+];
+
+function isRedosSafe(pattern: string): boolean {
+  for (const re of REDOS_PATTERNS) {
+    if (re.test(pattern)) return false;
+  }
+  if (pattern.length > 200) return false;
+  return true;
+}
+
 export function useSearch() {
   const query = ref("");
   const isRegex = ref(false);
   const matchSet = ref(new Set<string>());
+  const directMatchSet = ref(new Set<string>());
+  const regexError = ref("");
 
   function fuzzyMatch(s: string, q: string): boolean {
     let qi = 0;
@@ -16,25 +34,35 @@ export function useSearch() {
 
   function updateSearch(q: string, nodes: TreeNodeData[]): void {
     query.value = q;
+    regexError.value = "";
     const raw = q.trim();
     const matched = new Set<string>();
+    const directMatched = new Set<string>();
 
-    if (raw.length > 2 && raw[0] === "/" && raw.lastIndexOf("/") === raw.length - 1) {
-      isRegex.value = true;
-      const pattern = raw.slice(1, -1);
+    if (!raw) {
+      matchSet.value = matched;
+      directMatchSet.value = directMatched;
+      return;
+    }
+
+    if (isRegex.value) {
       try {
-        const re = new RegExp(pattern, "i");
-        collectMatches(nodes, re, null, matched);
-      } catch {
-        isRegex.value = false;
+        if (!isRedosSafe(raw)) {
+          regexError.value = "Pattern may be unsafe (avoid nested quantifiers like (a+)+)";
+          return;
+        }
+        const re = new RegExp(raw, "i");
+        collectMatches(nodes, re, null, matched, directMatched);
+      } catch (e) {
+        regexError.value = (e as Error).message;
       }
-    } else if (raw) {
-      isRegex.value = false;
+    } else {
       const lower = raw.toLowerCase();
-      collectMatches(nodes, null, lower, matched);
+      collectMatches(nodes, null, lower, matched, directMatched);
     }
 
     matchSet.value = matched;
+    directMatchSet.value = directMatched;
   }
 
   function collectMatches(
@@ -42,6 +70,7 @@ export function useSearch() {
     re: RegExp | null,
     fuzzy: string | null,
     out: Set<string>,
+    directOut: Set<string>,
   ): boolean {
     let any = false;
     for (const node of nodes) {
@@ -52,11 +81,12 @@ export function useSearch() {
         hit = fuzzyMatch(node.name.toLowerCase(), fuzzy) || fuzzyMatch(node.path.toLowerCase(), fuzzy);
       }
       if (hit) {
+        directOut.add(node.path);
         out.add(node.path);
         any = true;
       }
       if (node.children && node.children.length > 0) {
-        const childHit = collectMatches(node.children, re, fuzzy, out);
+        const childHit = collectMatches(node.children, re, fuzzy, out, directOut);
         if (childHit) {
           out.add(node.path);
           any = true;
@@ -71,11 +101,21 @@ export function useSearch() {
     return matchSet.value.has(path);
   }
 
+  function toggleRegex(): void {
+    isRegex.value = !isRegex.value;
+    regexError.value = "";
+    query.value = "";
+    matchSet.value.clear();
+    directMatchSet.value.clear();
+  }
+
   function clearSearch(): void {
     query.value = "";
     isRegex.value = false;
+    regexError.value = "";
     matchSet.value.clear();
+    directMatchSet.value.clear();
   }
 
-  return { query, isRegex, updateSearch, isVisible, clearSearch, matchSet };
+  return { query, isRegex, regexError, matchSet, directMatchSet, updateSearch, isVisible, toggleRegex, clearSearch };
 }
