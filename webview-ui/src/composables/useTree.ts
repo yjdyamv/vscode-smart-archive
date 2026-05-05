@@ -29,18 +29,19 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);
     } else {
-      // Auto-expand all non-collapsed directories
+      // Auto-expand non-collapsed directories up to 2 levels deep
       const paths: string[] = [];
-      function collect(nodes: TreeNodeData[]) {
+      function collect(nodes: TreeNodeData[], depth: number) {
+        if (depth > 2) return;
         for (const node of nodes) {
           const hasKids = (node.children?.length ?? 0) > 0 || node.hasMore;
           if (node.kind === "DIRECTORY" && !node.collapsed && hasKids) {
             paths.push(node.path);
-            if (node.children) collect(node.children);
+            if (node.children) collect(node.children, depth + 1);
           }
         }
       }
-      collect(treeData.value);
+      collect(treeData.value, 0);
       expandedPaths.value = new Set(paths);
     }
   }
