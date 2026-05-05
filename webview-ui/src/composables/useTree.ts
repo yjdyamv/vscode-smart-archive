@@ -9,6 +9,7 @@ export interface FlatNode {
   expanded: boolean;
   hasChildren: boolean;
   visible: boolean;
+  inheritCollapsed: boolean;
 }
 
 function persistExpanded(paths: Set<string>): void {
@@ -48,11 +49,12 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
 
   const flatNodes = computed<FlatNode[]>(() => {
     const result: FlatNode[] = [];
-    function walk(nodes: TreeNodeData[], depth: number) {
+    function walk(nodes: TreeNodeData[], depth: number, inheritCollapsed: boolean) {
       for (const node of nodes) {
         const hasKids = !!(node.kind === "DIRECTORY"
           && ((node.children && node.children.length > 0) || node.hasMore));
         const exp = expandedPaths.value.has(node.path);
+        const isCollapsed = !!node.collapsed || inheritCollapsed;
         result.push({
           node,
           depth,
@@ -60,13 +62,14 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
           expanded: exp,
           hasChildren: hasKids,
           visible: true,
+          inheritCollapsed: isCollapsed,
         });
         if (hasKids && exp && node.children) {
-          walk(node.children, depth + 1);
+          walk(node.children, depth + 1, isCollapsed);
         }
       }
     }
-    walk(treeData.value, 0);
+    walk(treeData.value, 0, false);
     return result;
   });
 
