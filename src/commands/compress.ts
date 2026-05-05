@@ -26,10 +26,7 @@ import { logger } from "../utils/logger";
 
 // ── Shared helpers for back-navigable QuickPick / InputBox ──
 
-type StepResult<T> =
-  | { kind: "ok"; value: T }
-  | { kind: "back" }
-  | { kind: "cancel" };
+type StepResult<T> = { kind: "ok"; value: T } | { kind: "back" } | { kind: "cancel" };
 
 function promptQuickPick<T extends vscode.QuickPickItem>(
   items: readonly T[],
@@ -88,15 +85,26 @@ function promptInputBox(opts: {
     const ib = vscode.window.createInputBox();
     let result: "accept" | "back" | "cancel" | null = null;
     let shown = false;
-    const eyeBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("eye"), tooltip: "Show password" };
-    const eyeOffBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("eye-closed"), tooltip: "Hide password" };
-    const clearBtn: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon("close"), tooltip: "Clear" };
+    const eyeBtn: vscode.QuickInputButton = {
+      iconPath: new vscode.ThemeIcon("eye"),
+      tooltip: "Show password",
+    };
+    const eyeOffBtn: vscode.QuickInputButton = {
+      iconPath: new vscode.ThemeIcon("eye-closed"),
+      tooltip: "Hide password",
+    };
+    const clearBtn: vscode.QuickInputButton = {
+      iconPath: new vscode.ThemeIcon("close"),
+      tooltip: "Clear",
+    };
     const isPw = !!opts.password;
     ib.prompt = opts.prompt;
     ib.placeholder = opts.placeholder;
     ib.password = isPw;
     ib.ignoreFocusOut = true;
-    ib.buttons = isPw ? [eyeBtn, clearBtn, vscode.QuickInputButtons.Back] : [clearBtn, vscode.QuickInputButtons.Back];
+    ib.buttons = isPw
+      ? [eyeBtn, clearBtn, vscode.QuickInputButtons.Back]
+      : [clearBtn, vscode.QuickInputButtons.Back];
     if (opts.validate) {
       ib.onDidChangeValue((v) => {
         ib.validationMessage = opts.validate!(v) ?? "";
@@ -113,7 +121,9 @@ function promptInputBox(opts: {
       } else if (isPw && (b === eyeBtn || b === eyeOffBtn)) {
         shown = !shown;
         ib.password = !shown;
-        ib.buttons = shown ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back] : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+        ib.buttons = shown
+          ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
+          : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
       } else if (b === vscode.QuickInputButtons.Back) {
         result = "back";
         ib.hide();
@@ -282,7 +292,10 @@ export async function compressCommand(
       case 2: {
         const r = await promptLevelWizard();
         if (r.kind !== "ok") {
-          if (r.kind === "back") { step = 1; continue; }
+          if (r.kind === "back") {
+            step = 1;
+            continue;
+          }
           return;
         }
         level = r.value;
@@ -295,7 +308,10 @@ export async function compressCommand(
       case 3: {
         const r = await promptVolumeWizard();
         if (r.kind !== "ok") {
-          if (r.kind === "back") { step = 2; continue; }
+          if (r.kind === "back") {
+            step = 2;
+            continue;
+          }
           return;
         }
         volumeSize = r.value;
@@ -326,7 +342,10 @@ export async function compressCommand(
       case 5: {
         const r = await promptPasswordWizard();
         if (r.kind !== "ok") {
-          if (r.kind === "back") { step = 4; continue; }
+          if (r.kind === "back") {
+            step = 4;
+            continue;
+          }
           return;
         }
         password = r.value;
@@ -393,7 +412,10 @@ export async function compressCommand(
               try {
                 if (fs.existsSync(options.outputPath)) fs.unlinkSync(options.outputPath);
               } catch {
-                logger.warn({ event: "compress.cleanup.failed" }, "Failed to clean up partial output file");
+                logger.warn(
+                  { event: "compress.cleanup.failed" },
+                  "Failed to clean up partial output file",
+                );
               }
               if (!(err instanceof vscode.CancellationError)) {
                 vscode.window.showErrorMessage(t("compress.failed") + (err as Error).message);
