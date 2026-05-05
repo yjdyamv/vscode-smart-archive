@@ -146,7 +146,10 @@ export async function previewFileFromArchive(
     js7z.FS.mkdir("/_pv");
 
     const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
-    if (password) xArgs.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      xArgs.splice(1, 0, `-p${password}`);
+    }
     const doSelective = !isWrappedFormat(archiveExt);
     if (doSelective) xArgs.push(normalizedFile);
     await new Promise<void>((resolve, reject) => {
@@ -290,7 +293,10 @@ export async function testArchive(archivePath: string, password?: string): Promi
   try {
     js7z.FS.writeFile(`/${archiveName}`, data);
     const tArgs = ["t", `/${archiveName}`];
-    if (password) tArgs.splice(1, 0, `-p${password}`);
+    if (password) {
+      validatePassword(password);
+      tArgs.splice(1, 0, `-p${password}`);
+    }
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (c: number) =>
         c === 0 ? resolve() : reject(new Error(`7z t: ${c}\n${stdout}`));

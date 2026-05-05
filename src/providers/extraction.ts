@@ -17,7 +17,7 @@ import { streamToVFS } from "../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../constants";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
-import { checkFileSize, validatePassword } from "../utils/security";
+import { checkFileSize, validatePassword, sanitizeCliPath } from "../utils/security";
 import { logger } from "../utils/logger";
 
 /**
@@ -204,7 +204,7 @@ async function extractSelected(
       try {
         js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
         js7z2.FS.mkdir("/_x2");
-        const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
+        const normalizedPaths = selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/")));
         const excludeFlags = (excludes ?? []).map((ex) => "-xr!" + ex.replace(/\\/g, "/"));
         await new Promise<void>((resolve, reject) => {
           js7z2.onExit = (c: number) => {
@@ -263,7 +263,7 @@ async function extractSelected(
         if (code === 0) resolve();
         else reject(new Error(`7z ${flat ? "e" : "x"}: ${code}\n${stderr}`));
       };
-      const normalizedPaths = selectedPaths.map((p) => p.replace(/\\/g, "/"));
+      const normalizedPaths = selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/")));
       const eArgs = [flat ? "e" : "x", archiveFsPath, "-o/out", flat ? "-aou" : "-y"];
       if (password) {
         validatePassword(password);

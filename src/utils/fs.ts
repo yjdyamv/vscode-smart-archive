@@ -77,6 +77,8 @@ export function copyDirToFS(
   }
 }
 
+export const MAX_DIR_DEPTH = 100;
+
 /**
  * Recursively copy a directory from the JS7z virtual FS to the local file system.
  *
@@ -89,8 +91,8 @@ export function copyDirFromFS(
   fsDir: string,
   localDir: string,
   token?: vscode.CancellationToken,
-): void {
-  _copyDirFromFS(js7z, fsDir, localDir, 0, token);
+): number {
+  return _copyDirFromFS(js7z, fsDir, localDir, 0, 0, token);
 }
 
 function _copyDirFromFS(
@@ -98,8 +100,16 @@ function _copyDirFromFS(
   fsDir: string,
   localDir: string,
   totalSize: number,
+  depth: number,
   token?: vscode.CancellationToken,
 ): number {
+  if (depth > MAX_DIR_DEPTH) {
+    logger.warn(
+      { event: "fs.maxDepth.reached", depth },
+      "Max directory depth reached, skipping deeper entries",
+    );
+    return totalSize;
+  }
   const entries = js7z.FS.readdir(fsDir);
   for (const entry of entries) {
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
@@ -123,7 +133,7 @@ function _copyDirFromFS(
       const stat = js7z.FS.stat(fsEntry);
       if (js7z.FS.isDir(stat.mode)) {
         fs.mkdirSync(localEntry, { recursive: true });
-        totalSize = _copyDirFromFS(js7z, fsEntry, localEntry, totalSize, token);
+        totalSize = _copyDirFromFS(js7z, fsEntry, localEntry, totalSize, depth + 1, token);
       } else {
         checkFileSize(stat.size);
         const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });

@@ -337,11 +337,15 @@ async function handleRename(
     validateInput: (v) =>
       !v.trim()
         ? "Name cannot be empty"
-        : /[<>:"/\\|?*]/.test(v)
-          ? 'Invalid characters: < > : " / \\ | ? *'
-          : v.trim() === oldName
-            ? "New name is the same as current"
-            : null,
+        : v.includes("\0")
+          ? "Invalid character"
+          : /[<>:"/\\|?*]/.test(v)
+            ? 'Invalid characters: < > : " / \\ | ? *'
+            : v.trim() === oldName
+              ? "New name is the same as current"
+              : v.length > 255
+                ? "Name too long"
+                : null,
   });
   if (!newName || !newName.trim() || newName.trim() === oldName) {
     logger.info({ event: "webview.rename.cancelled", oldPath });
@@ -428,9 +432,13 @@ async function handleNewFolder(
     validateInput: (v) =>
       !v.trim()
         ? "Folder name cannot be empty"
-        : /[<>:"/\\|?*]/.test(v)
-          ? 'Invalid characters: < > : " / \\ | ? *'
-          : null,
+        : v.includes("\0")
+          ? "Invalid character"
+          : /[<>:"/\\|?*]/.test(v)
+            ? 'Invalid characters: < > : " / \\ | ? *'
+            : v.length > 255
+              ? "Name too long"
+              : null,
   });
   if (!folderName || !folderName.trim()) {
     logger.info({ event: "webview.newFolder.cancelled" });
