@@ -97,10 +97,6 @@ export async function compressWith7z(
   const excludeArgs = (excludePatterns ?? []).map((p) => "-xr!" + p.replace(/^(\*\*\/)+/, ""));
 
   try {
-    js7z.FS.mkdir(INPUT_DIR);
-    js7z.FS.mkdir(OUTPUT_DIR);
-
-    progress.report({ message: t("compress.readingFiles") });
     const localPaths = options.targets.map((target) => target.fsPath);
     logger.info({
       event: "compress.start",
@@ -108,10 +104,6 @@ export async function compressWith7z(
       files: localPaths.length,
       level: options.level,
     });
-
-    const allInputPaths = copyInputsToFS(js7z, localPaths, token);
-    if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
     const archiveName = getBaseName(options.outputPath);
     const archiveFsPath = joinFSPath(OUTPUT_DIR, archiveName);
@@ -147,7 +139,6 @@ export async function compressWith7z(
         }
       }
 
-      // Clean up temp tar
       try {
         fs.unlinkSync(tarDiskPath);
         fs.rmdirSync(path.dirname(tarDiskPath));
@@ -163,6 +154,29 @@ export async function compressWith7z(
       );
       return;
     }
+
+    // Non-wrapped formats: copy inputs to VFS for 7z
+    progress.report({ message: t("compress.readingFiles") });
+
+    // Filter out targets that match exclude patterns (same logic as tar-writer)
+    const filteredPaths = localPaths.filter((lp) => {
+      const name = path.basename(lp);
+      const excluded = (excludePatterns ?? []).some((p) => {
+        const stripped = p.replace(/^(\*\*\/)+/, "");
+        return stripped && name === stripped;
+      });
+      if (excluded) {
+        logger.info({ event: "compress.skipTarget", path: lp, name });
+      }
+      return !excluded;
+    });
+
+    js7z.FS.mkdir(INPUT_DIR);
+    js7z.FS.mkdir(OUTPUT_DIR);
+
+    const allInputPaths = copyInputsToFS(js7z, filteredPaths, token);
+    if (token?.isCancellationRequested) throw new vscode.CancellationError();
+    progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
     const args = buildCompressArgs(
       archiveFsPath,
