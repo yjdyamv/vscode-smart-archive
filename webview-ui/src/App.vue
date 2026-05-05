@@ -46,7 +46,7 @@ const visibleFlatNodes = computed(() => {
 
 const searchMatchCount = computed(() => {
   if (!search.query.value.trim()) return 0;
-  return visibleFlatNodes.value.length;
+  return search.directMatchSet.value.size;
 });
 
 const toast = reactive({ show: false, msg: "", ok: true });
@@ -544,6 +544,8 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         :sort-key="sort.sortKey.value"
         :sort-asc="sort.sortAsc.value"
         :search-query="search.query.value"
+        :is-regex="search.isRegex.value"
+        :regex-error="search.regexError.value"
         :search-match-count="searchMatchCount"
         :last-add-dir="selection.state.lastAddDir"
         @extract-all="extAll"
@@ -555,6 +557,7 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
         @search="onSearch"
+        @toggle-regex="search.toggleRegex"
         @convert="convertFormat"
       />
       <FileTree
