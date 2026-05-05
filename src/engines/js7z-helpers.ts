@@ -51,13 +51,17 @@ function copyInputsToFS(
   return fsPaths;
 }
 
+function sanitizeArgs(args: string[]): string[] {
+  return args.map((a) => (/^-p.+/.test(a) ? "-p***" : a));
+}
+
 function run7z(
   js7z: JS7zInstance,
   args: string[],
   progress?: vscode.Progress<{ message?: string; increment?: number }>,
   onStdout?: (text: string) => void,
 ): Promise<void> {
-  logger.info({ event: "run7z.enter", args });
+  logger.info({ event: "run7z.enter", args: sanitizeArgs(args) });
   const prevPrint = js7z.print;
   const prevPrintErr = js7z.printErr;
   let stderr = "";

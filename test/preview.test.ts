@@ -234,6 +234,350 @@ void (async () => {
 
   fs.rmSync(td, { recursive: true, force: true });
 
+  // ════════════════════════════════════════════════════════════════════
+  // parse7zListing tests
+  // ════════════════════════════════════════════════════════════════════
+
+  function parse7zListing(
+    stdout: string,
+    archiveName: string,
+  ): { path: string; size: number; type: string }[] {
+    const results: { path: string; size: number; type: string }[] = [];
+    let curPath = "";
+    let curSize = 0;
+    let curAttr = "";
+
+    const flush = () => {
+      if (curPath) {
+        results.push({
+          path: curPath,
+          size: curSize,
+          type: curAttr.includes("D") ? "DIRECTORY" : "REGULAR_FILE",
+        });
+      }
+      curPath = "";
+      curSize = 0;
+      curAttr = "";
+    };
+
+    for (const line of stdout.split("\n")) {
+      const m = line.match(/^(\w[\w ]*?)\s*=\s*(.*)/);
+      if (!m) continue;
+      const key = m[1].trim();
+      const val = m[2].trim();
+      if (key === "Path") { flush(); curPath = val; }
+      else if (key === "Size" && !curSize) { curSize = parseInt(val, 10) || 0; }
+      else if (key === "Attributes") { curAttr = val; }
+    }
+    flush();
+
+    // Filter out archive self-reference
+    const volBase = archiveName.match(/^(.+\.(?:7z|zip|wim))\.\d+$/i)?.[1] ?? null;
+    return results.filter((r) => {
+      if (r.path === `/${archiveName}` || r.path === archiveName) return false;
+      if (volBase && (r.path === `/${volBase}` || r.path === volBase)) return false;
+      return true;
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // markNoisyDirs tests
+  // ════════════════════════════════════════════════════════════════════
+
+  const { minimatch } = require("minimatch") as { minimatch: (p: string, pattern: string, opts?: Record<string, unknown>) => boolean };
+
+  function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
+    if (noisyPatterns.length === 0) return;
+    for (const node of nodes) {
+      if (node.kind === "DIRECTORY") {
+        for (const pattern of noisyPatterns) {
+          if (
+            minimatch(node.path, pattern, { dot: true }) ||
+            minimatch(node.name, pattern, { dot: true })
+          ) {
+            node.collapsed = true;
+            break;
+          }
+          for (const seg of node.path.split("/")) {
+            if (minimatch(seg, pattern, { dot: true })) {
+              node.collapsed = true;
+              break;
+            }
+          }
+          if (node.collapsed) break;
+        }
+      }
+      if (node.children) markNoisyDirs(node.children, noisyPatterns);
+    }
+  }
+
+  interface FlatEntry { path: string; size: number; type: string; }
+  interface TreeNode {
+    name: string;
+    path: string;
+    size: number;
+    kind: string;
+    children?: TreeNode[];
+    collapsed?: boolean;
+  }
+
+  function buildTree(entries: FlatEntry[], _archiveName: string): TreeNode[] {
+    const normed: { entry: FlatEntry; parts: string[] }[] = [];
+    for (const e of entries) {
+      let p = e.path.replace(/\\/g, "/");
+      if (p.startsWith("./")) p = p.slice(2);
+      if (!p || p === ".") continue;
+      const parts = p.split("/").filter(Boolean);
+      if (parts.length === 0) continue;
+      normed.push({ entry: e, parts });
+    }
+    normed.sort((a, b) => {
+      const aD = a.entry.type !== "DIRECTORY" ? 1 : 0;
+      const bD = b.entry.type !== "DIRECTORY" ? 1 : 0;
+      if (aD !== bD) return aD - bD;
+      return a.entry.path < b.entry.path ? -1 : a.entry.path > b.entry.path ? 1 : 0;
+    });
+    const root: TreeNode[] = [];
+    const dirMap = new Map<string, TreeNode>();
+    const siblingMap = new Map<string, number>();
+    for (const { entry, parts } of normed) {
+      let siblings = root;
+      let prefix = "";
+      for (let i = 0; i < parts.length; i++) {
+        const seg = parts[i];
+        const last = i === parts.length - 1;
+        const full = prefix ? prefix + "/" + seg : seg;
+        if (last) {
+          const isDir = entry.type === "DIRECTORY";
+          const existing = dirMap.get(full);
+          if (existing && existing.kind === "DIRECTORY") {
+            existing.size = entry.size || existing.size;
+          } else {
+            const node: TreeNode = {
+              name: seg, path: entry.path, size: entry.size,
+              kind: isDir ? "DIRECTORY" : "REGULAR_FILE",
+              children: isDir ? [] : undefined,
+            };
+            if (!isDir) siblingMap.set(seg, siblings.length);
+            siblings.push(node);
+            if (isDir) dirMap.set(full, node);
+          }
+        } else {
+          let dir = dirMap.get(full);
+          if (!dir) {
+            const dup = siblingMap.get(seg);
+            if (dup !== undefined && siblings[dup]?.kind !== "DIRECTORY") {
+              siblings.splice(dup, 1);
+              siblingMap.delete(seg);
+            }
+            dir = { name: seg, path: full, size: 0, kind: "DIRECTORY", children: [] };
+            siblingMap.set(seg, siblings.length);
+            siblings.push(dir);
+            dirMap.set(full, dir);
+          }
+          siblings = dir.children!;
+          prefix = full;
+        }
+      }
+    }
+    return root;
+  }
+
+  function mock7zListing(entries: { path: string; size: number; attr: string }[]): string {
+    const lines: string[] = [];
+    for (const e of entries) {
+      lines.push(`Path = ${e.path}`);
+      if (e.size > 0) lines.push(`Size = ${e.size}`);
+      if (e.attr) lines.push(`Attributes = ${e.attr}`);
+      lines.push("");
+    }
+    return lines.join("\n");
+  }
+
+  await test("parse7zListing: basic files and dirs", () => {
+    const stdout = mock7zListing([
+      { path: "/test.7z", size: 100, attr: "A" },
+      { path: "src", size: 0, attr: "D" },
+      { path: "src/index.js", size: 42, attr: "A" },
+      { path: "src/lib", size: 0, attr: "D" },
+      { path: "src/lib/util.js", size: 10, attr: "A" },
+      { path: "package.json", size: 5, attr: "A" },
+    ]);
+    const r = parse7zListing(stdout, "test.7z");
+    assert.strictEqual(r.length, 5, "should filter self-entry");
+    assert.strictEqual(r[0].path, "src");
+    assert.strictEqual(r[0].type, "DIRECTORY");
+    assert.strictEqual(r[1].path, "src/index.js");
+    assert.strictEqual(r[1].type, "REGULAR_FILE");
+    assert.strictEqual(r[1].size, 42);
+    assert.strictEqual(r[4].path, "package.json");
+    assert.strictEqual(r[4].size, 5);
+  });
+
+  await test("parse7zListing: skips archive self-reference", () => {
+    const stdout = mock7zListing([
+      { path: "/archive.7z", size: 200, attr: "A" },
+      { path: "/archive.7z", size: 200, attr: "A" }, // without leading slash
+      { path: "readme.md", size: 30, attr: "A" },
+    ]);
+    // Without leading slash
+    const stdout2 = `Path = archive.7z\nSize = 200\nAttributes = A\n\nPath = readme.md\nSize = 30\nAttributes = A\n\n`;
+    const r = parse7zListing(stdout2, "archive.7z");
+    assert.strictEqual(r.length, 1);
+    assert.strictEqual(r[0].path, "readme.md");
+  });
+
+  await test("parse7zListing: empty output returns empty", () => {
+    assert.strictEqual(parse7zListing("", "x.7z").length, 0);
+    assert.strictEqual(parse7zListing("7-Zip ...\n---\n", "x.7z").length, 0);
+  });
+
+  await test("parse7zListing: handles 7z header lines gracefully", () => {
+    const stdout =
+      "7-Zip (z) 25.01 ...\n\n" +
+      "Scanning the drive:\n" +
+      "  0M Scan /\n" +
+      "Path = dir/file.txt\nSize = 100\nAttributes = A\n\n" +
+      "Path = dir\nSize = 0\nAttributes = D\n\n";
+    const r = parse7zListing(stdout, "x.7z");
+    assert.strictEqual(r.length, 2);
+    assert.strictEqual(r[0].path, "dir/file.txt");
+    assert.strictEqual(r[0].size, 100);
+    assert.strictEqual(r[1].type, "DIRECTORY");
+  });
+
+  await test("parse7zListing: split volume self-reference filtered", () => {
+    const stdout = mock7zListing([
+      { path: "/x.7z.001", size: 100, attr: "A" },
+      { path: "/x.7z", size: 80, attr: "A" }, // logical base
+      { path: "data.txt", size: 20, attr: "A" },
+    ]);
+    const r = parse7zListing(stdout, "x.7z.001");
+    assert.strictEqual(r.length, 1);
+    assert.strictEqual(r[0].path, "data.txt");
+  });
+
+  await test("parse7zListing: size only set on first occurrence", () => {
+    const stdout =
+      "Path = app.js\nSize = 42\n\n" +
+      "Modified = 2024-01-01 00:00:00\n\n" +
+      "Path = readme.md\nSize = 100\nAttributes = A\n\n";
+    const r = parse7zListing(stdout, "a.7z");
+    assert.strictEqual(r[0].path, "app.js");
+    assert.strictEqual(r[0].size, 42);
+    assert.strictEqual(r[1].size, 100);
+  });
+
+  await test("parse7zListing: CJK filenames preserved", () => {
+    const stdout = mock7zListing([
+      { path: "中文文件.txt", size: 10, attr: "A" },
+      { path: "日本語フォルダ", size: 0, attr: "D" },
+    ]);
+    const r = parse7zListing(stdout, "a.7z");
+    assert.strictEqual(r.length, 2);
+    assert.ok(r.some((e) => e.path.includes("中文文件")));
+    assert.ok(r.some((e) => e.type === "DIRECTORY"));
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // markNoisyDirs tests
+  // ════════════════════════════════════════════════════════════════════
+
+  await test("markNoisyDirs: collapses node_modules at root", () => {
+    const entries: { path: string; size: number; type: string }[] = [
+      { path: "node_modules", size: 0, type: "DIRECTORY" },
+      { path: "node_modules/express", size: 0, type: "DIRECTORY" },
+      { path: "node_modules/express/index.js", size: 100, type: "REGULAR_FILE" },
+      { path: "src/index.js", size: 42, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "test.7z");
+    markNoisyDirs(tree, ["node_modules", ".git"]);
+    const nm = tree.find((n) => n.name === "node_modules");
+    assert.ok(nm, "node_modules should exist in tree");
+    assert.strictEqual(nm!.collapsed, true, "node_modules should be collapsed");
+    const src = tree.find((n) => n.name === "src");
+    assert.ok(src);
+    assert.strictEqual(src!.collapsed, undefined, "src should not be collapsed");
+  });
+
+  await test("markNoisyDirs: collapses nested noisy dirs", () => {
+    const entries: FlatEntry[] = [
+      { path: "project", size: 0, type: "DIRECTORY" },
+      { path: "project/src", size: 0, type: "DIRECTORY" },
+      { path: "project/src/node_modules", size: 0, type: "DIRECTORY" },
+      { path: "project/src/node_modules/lib.js", size: 10, type: "REGULAR_FILE" },
+      { path: "project/.git", size: 0, type: "DIRECTORY" },
+      { path: "project/.git/HEAD", size: 5, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "test.zip");
+    markNoisyDirs(tree, ["node_modules", ".git"]);
+    const project = tree.find((n) => n.name === "project");
+    assert.strictEqual(project!.collapsed, undefined);
+    // .git is direct child of project
+    const git = project!.children!.find((c) => c.name === ".git");
+    assert.strictEqual(git!.collapsed, true);
+    // node_modules is inside src
+    const src = project!.children!.find((c) => c.name === "src");
+    assert.ok(src);
+    const nm = src!.children!.find((c) => c.name === "node_modules");
+    assert.strictEqual(nm!.collapsed, true);
+  });
+
+  await test("markNoisyDirs: children of noisy dir also collapsed", () => {
+    const entries: { path: string; size: number; type: string }[] = [
+      { path: "node_modules", size: 0, type: "DIRECTORY" },
+      { path: "node_modules/express", size: 0, type: "DIRECTORY" },
+      { path: "node_modules/express/lib", size: 0, type: "DIRECTORY" },
+      { path: "node_modules/express/lib/app.js", size: 50, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "t.7z");
+    markNoisyDirs(tree, ["node_modules"]);
+    const nm = tree[0];
+    assert.strictEqual(nm.collapsed, true);
+    const express = nm.children![0];
+    assert.strictEqual(express.collapsed, true, "express inside node_modules also collapsed");
+    const lib = express.children![0];
+    assert.strictEqual(lib.collapsed, true, "lib inside express also collapsed");
+  });
+
+  await test("markNoisyDirs: empty patterns does nothing", () => {
+    const entries: { path: string; size: number; type: string }[] = [
+      { path: "node_modules/lib.js", size: 10, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "t.7z");
+    markNoisyDirs(tree, []);
+    assert.strictEqual(tree[0].collapsed, undefined);
+  });
+
+  await test("markNoisyDirs: glob patterns work", () => {
+    const entries: { path: string; size: number; type: string }[] = [
+      { path: "logs", size: 0, type: "DIRECTORY" },
+      { path: "logs/error.log", size: 20, type: "REGULAR_FILE" },
+      { path: "logs/info.log", size: 15, type: "REGULAR_FILE" },
+      { path: "src/main.ts", size: 30, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "t.7z");
+    markNoisyDirs(tree, ["*.log"]);
+    const logs = tree.find((n) => n.name === "logs");
+    // logs dir with children that match *.log
+    assert.strictEqual(logs!.collapsed, undefined, "*.log matches files, not dirs");
+  });
+
+  await test("markNoisyDirs: dotfile dirs collapsed", () => {
+    const entries: { path: string; size: number; type: string }[] = [
+      { path: ".npm", size: 0, type: "DIRECTORY" },
+      { path: ".npm/_cacache", size: 0, type: "DIRECTORY" },
+      { path: ".vscode", size: 0, type: "DIRECTORY" },
+      { path: ".vscode/settings.json", size: 8, type: "REGULAR_FILE" },
+      { path: "src/app.ts", size: 12, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTree(entries, "t.7z");
+    markNoisyDirs(tree, [".npm", ".vscode"]);
+    assert.strictEqual(tree.find((n) => n.name === ".npm")!.collapsed, true);
+    assert.strictEqual(tree.find((n) => n.name === ".vscode")!.collapsed, true);
+    assert.strictEqual(tree.find((n) => n.name === "src")!.collapsed, undefined);
+  });
+
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
   if (failed > 0) process.exit(1);
 })();

@@ -1070,6 +1070,174 @@ void (async () => {
     }
   });
 
+  // ════════════════════════════════════════════════════════════════════
+  // Exclusion logic tests
+  // ════════════════════════════════════════════════════════════════════
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { prepareExclusions, isPathExcluded, isTargetExcluded }: {
+    prepareExclusions: (p: string[]) => { exactNames: ReadonlySet<string>; globPatterns: readonly string[] };
+    isPathExcluded: (rel: string, ex: { exactNames: ReadonlySet<string>; globPatterns: readonly string[] }) => boolean;
+    isTargetExcluded: (p: string, ex: { exactNames: ReadonlySet<string>; globPatterns: readonly string[] }) => boolean;
+  } = require("../../out/utils/exclude");
+
+  const td2 = fs.mkdtempSync(path.join(os.tmpdir(), "sat_excl_"));
+
+  await test("prepareExclusions splits exact names from globs", () => {
+    const r = prepareExclusions(["node_modules", "*.log", ".git", "**/dist/**"]);
+    assert.strictEqual(r.exactNames.has("node_modules"), true);
+    assert.strictEqual(r.exactNames.has(".git"), true);
+    assert.strictEqual(r.exactNames.has("*.log"), false, "glob should not be in exactNames");
+    assert.strictEqual(r.globPatterns.includes("*.log"), true);
+    assert.strictEqual(r.globPatterns.includes("**/dist/**"), true, "glob keeps original **/ prefix");
+  });
+
+  await test("prepareExclusions handles empty/edge patterns", () => {
+    const r = prepareExclusions(["", "**/", "foo"]);
+    assert.strictEqual(r.exactNames.size, 1);
+    assert.strictEqual(r.globPatterns.length, 0);
+    assert.strictEqual(r.exactNames.has("foo"), true);
+  });
+
+  await test("isPathExcluded matches root-level dir by name", () => {
+    const ex = prepareExclusions(["node_modules", ".git"]);
+    assert.strictEqual(isPathExcluded("node_modules", ex), true);
+    assert.strictEqual(isPathExcluded(".git", ex), true);
+    assert.strictEqual(isPathExcluded("src", ex), false);
+  });
+
+  await test("isPathExcluded matches nested dir by segment", () => {
+    const ex = prepareExclusions(["node_modules"]);
+    assert.strictEqual(isPathExcluded("project/node_modules", ex), true);
+    assert.strictEqual(isPathExcluded("a/b/c/node_modules/d/e", ex), true);
+    assert.strictEqual(isPathExcluded("project/src", ex), false);
+  });
+
+  await test("isPathExcluded handles Windows-style paths", () => {
+    const ex = prepareExclusions(["out"]);
+    assert.strictEqual(isPathExcluded("project\\out\\file.js", ex), true);
+    assert.strictEqual(isPathExcluded("project\\src\\file.js", ex), false);
+  });
+
+  await test("isPathExcluded with glob patterns", () => {
+    const ex = prepareExclusions(["*.log", "**/dist/**"]);
+    assert.strictEqual(isPathExcluded("error.log", ex), true);
+    assert.strictEqual(isPathExcluded("deep/nested/error.log", ex), true);
+    assert.strictEqual(isPathExcluded("src/dist/bundle.js", ex), true);
+    assert.strictEqual(isPathExcluded("dist/main.js", ex), true);
+    assert.strictEqual(isPathExcluded("src/app.js", ex), false);
+  });
+
+  await test("isPathExcluded with dotfiles", () => {
+    const ex = prepareExclusions([".npm", ".git"]);
+    assert.strictEqual(isPathExcluded(".npm", ex), true);
+    assert.strictEqual(isPathExcluded("project/.npm/_cacache", ex), true);
+    assert.strictEqual(isPathExcluded(".git/config", ex), true);
+    assert.strictEqual(isPathExcluded("normal_dir", ex), false);
+  });
+
+  await test("isPathExcluded empty exclusions returns false", () => {
+    assert.strictEqual(isPathExcluded("node_modules", prepareExclusions([])), false);
+  });
+
+  await test("isTargetExcluded filters targets by basename", () => {
+    const ex = prepareExclusions(["node_modules", "out"]);
+    assert.strictEqual(isTargetExcluded("/home/user/project/node_modules", ex), true);
+    assert.strictEqual(isTargetExcluded("C:\\project\\out", ex), true);
+    assert.strictEqual(isTargetExcluded("/home/user/project/src", ex), false);
+  });
+
+  await test("isTargetExcluded with glob patterns", () => {
+    const ex = prepareExclusions(["*.tmp"]);
+    assert.strictEqual(isTargetExcluded("/home/temp.tmp", ex), true);
+    assert.strictEqual(isTargetExcluded("/home/temp.txt", ex), false);
+  });
+
+  await test("collectPaths-like walk excludes dirs at any depth", () => {
+    const base = path.join(td2, "project");
+    fs.mkdirSync(path.join(base, "node_modules", "express"), { recursive: true });
+    fs.mkdirSync(path.join(base, "src", "lib"), { recursive: true });
+    fs.mkdirSync(path.join(base, ".git", "objects"), { recursive: true });
+    fs.mkdirSync(path.join(base, "dist"), { recursive: true });
+    fs.writeFileSync(path.join(base, "src", "index.js"), "hello");
+    fs.writeFileSync(path.join(base, "src", "lib", "util.js"), "util");
+    fs.writeFileSync(path.join(base, "package.json"), "{}");
+    fs.writeFileSync(path.join(base, "node_modules", "express", "index.js"), "nm");
+    fs.writeFileSync(path.join(base, ".git", "HEAD"), "ref");
+    fs.writeFileSync(path.join(base, "dist", "bundle.js"), "bundle");
+
+    const ex = prepareExclusions(["node_modules", ".git", "dist"]);
+    const result: string[] = [];
+    const stack = [base];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      for (const e of fs.readdirSync(current, { withFileTypes: true })) {
+        const full = path.join(current, e.name);
+        const rel = path.relative(base, full).replace(/\\/g, "/");
+        if (isPathExcluded(rel, ex)) continue;
+        if (e.isDirectory()) { result.push(full); stack.push(full); }
+        else result.push(full);
+      }
+    }
+
+    const relPaths = result.map((f) => path.relative(base, f).replace(/\\/g, "/"));
+    const excludedNames = ["node_modules", ".git", "dist"];
+    const leaked = relPaths.filter((r) => excludedNames.some((ex) => r.split("/").includes(ex)));
+    assert.strictEqual(leaked.length, 0, `leaked: ${leaked.join(", ")}`);
+    assert.ok(relPaths.includes("src/index.js"), "should include src/index.js");
+    assert.ok(relPaths.includes("package.json"));
+  });
+
+  await test("collectPaths-like walk excludes targets directly", () => {
+    // Simulate multi-select where an excluded dir is a direct target
+    const base = path.join(td2, "multi");
+    fs.mkdirSync(path.join(base, "included"), { recursive: true });
+    fs.mkdirSync(path.join(base, "excluded"), { recursive: true });
+    fs.writeFileSync(path.join(base, "included", "a.js"), "a");
+    fs.writeFileSync(path.join(base, "excluded", "b.js"), "b");
+
+    const ex = prepareExclusions(["excluded"]);
+    const targets = [path.join(base, "included"), path.join(base, "excluded")];
+    const filtered = targets.filter((t) => !isTargetExcluded(t, ex));
+
+    assert.strictEqual(filtered.length, 1);
+    assert.ok(filtered[0].endsWith("included"));
+  });
+
+  await test("default patterns exclude all NOISY_DIR_PATTERNS entries", () => {
+    const patterns = [
+      "node_modules", ".npm", ".yarn", ".venv", "venv", "__pycache__",
+      ".pytest_cache", ".mypy_cache", ".tox", ".eggs", "site-packages",
+      ".git", ".svn", ".hg",
+      "dist", "build", "target", "out", "output",
+      ".next", ".nuxt", ".output", ".svelte-kit",
+      ".idea", ".vscode", ".vs",
+      "coverage", ".nyc_output", ".cache", ".turbo", ".parcel-cache",
+      "vendor", "bower_components", ".terraform",
+    ];
+    const ex = prepareExclusions(patterns);
+    // Each default pattern should be a direct name match
+    for (const p of patterns) {
+      assert.strictEqual(isPathExcluded(p, ex), true, `should exclude "${p}"`);
+    }
+    // And at any depth
+    assert.strictEqual(isPathExcluded("a/b/c/node_modules/x/y", ex), true);
+    assert.strictEqual(isPathExcluded("deep/.git/hooks", ex), true);
+    assert.strictEqual(isPathExcluded("x/out/y/z", ex), true);
+    assert.strictEqual(isPathExcluded("normal/file.js", ex), false);
+  });
+
+  await test("**/ prefixed patterns work correctly", () => {
+    const ex = prepareExclusions(["**/node_modules", "**/.git"]);
+    assert.strictEqual(isPathExcluded("node_modules", ex), true);
+    assert.strictEqual(isPathExcluded("deep/node_modules", ex), true);
+    assert.strictEqual(isPathExcluded(".git", ex), true);
+    assert.strictEqual(isPathExcluded("src/.git", ex), true);
+    assert.strictEqual(isPathExcluded("src/app.js", ex), false);
+  });
+
+  fs.rmSync(td2, { recursive: true, force: true });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);

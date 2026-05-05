@@ -10,7 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { minimatch } from "minimatch";
+import { prepareExclusions, isPathExcluded, isTargetExcluded } from "../utils/exclude";
 
 const BLOCK = 512;
 
@@ -58,25 +58,9 @@ function padSize(n: number): number {
   return n % BLOCK === 0 ? n : n + BLOCK - (n % BLOCK);
 }
 
-function isExcluded(
-  relPath: string,
-  exactNames: ReadonlySet<string>,
-  globPatterns: readonly string[],
-): boolean {
-  const segments = relPath.split("/");
-  for (const seg of segments) {
-    if (seg && exactNames.has(seg)) return true;
-  }
-  for (const p of globPatterns) {
-    if (minimatch(relPath, p, { dot: true, matchBase: true })) return true;
-  }
-  return false;
-}
-
 function collectPaths(
   basePath: string,
-  exactNames: ReadonlySet<string>,
-  globPatterns: readonly string[],
+  exclusions: ReturnType<typeof prepareExclusions>,
   token?: vscode.CancellationToken,
 ): string[] {
   const result: string[] = [];
@@ -88,9 +72,7 @@ function collectPaths(
     for (const e of entries) {
       const full = path.join(current, e.name);
       const rel = path.relative(basePath, full).replace(/\\/g, "/");
-      if (exactNames.size > 0 || globPatterns.length > 0) {
-        if (isExcluded(rel, exactNames, globPatterns)) continue;
-      }
+      if (isPathExcluded(rel, exclusions)) continue;
       if (e.isDirectory()) {
         result.push(full);
         stack.push(full);
@@ -100,24 +82,6 @@ function collectPaths(
     }
   }
   return result;
-}
-
-function prepareExcludePatterns(excludePatterns: string[]): {
-  exactNames: ReadonlySet<string>;
-  globPatterns: string[];
-} {
-  const exactNames = new Set<string>();
-  const globPatterns: string[] = [];
-  for (const raw of excludePatterns) {
-    const p = raw.replace(/^(\*\*\/)+/, "");
-    if (!p) continue;
-    if (/[*?[\]{}]/.test(p)) {
-      globPatterns.push(p);
-    } else {
-      exactNames.add(p);
-    }
-  }
-  return { exactNames, globPatterns };
 }
 
 export async function createTarFile(
@@ -130,7 +94,7 @@ export async function createTarFile(
   fs.mkdirSync(outDir, { recursive: true });
   const fd = fs.openSync(outputPath, "w");
 
-  const { exactNames, globPatterns } = prepareExcludePatterns(excludePatterns);
+  const exclusions = prepareExclusions(excludePatterns);
 
   try {
     const rootDir = path.dirname(localPaths[0]);
@@ -138,10 +102,7 @@ export async function createTarFile(
     for (const loc of localPaths) {
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
 
-      const locName = path.basename(loc);
-      if (isExcluded(locName, exactNames, globPatterns)) {
-        continue;
-      }
+      if (isTargetExcluded(loc, exclusions)) continue;
 
       const stat = fs.statSync(loc);
       const rel = path.relative(rootDir, loc).replace(/\\/g, "/");
@@ -149,7 +110,7 @@ export async function createTarFile(
       if (stat.isDirectory()) {
         // Write directory entry
         fs.writeSync(fd, tarHeader(rel + "/", 0, true));
-        const all = collectPaths(loc, exactNames, globPatterns, token);
+        const all = collectPaths(loc, exclusions, token);
         for (const full of all) {
           if (token?.isCancellationRequested) throw new vscode.CancellationError();
           const fstat = fs.statSync(full);
