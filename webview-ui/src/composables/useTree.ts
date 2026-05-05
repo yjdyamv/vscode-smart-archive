@@ -128,19 +128,12 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     node.children = children;
     node.hasMore = false;
     loadingPaths.value.delete(parentPath);
-    // re-trigger reactivity
     treeData.value = [...treeData.value];
 
-    // Expand non-collapsed child directories (auto-expansion policy)
     const childPaths: string[] = [];
     for (const child of children) {
       childPaths.push(child.path);
-      const hasKids = (child.children?.length ?? 0) > 0 || child.hasMore;
-      if (child.kind === "DIRECTORY" && !child.collapsed && hasKids) {
-        expandedPaths.value.add(child.path);
-      }
     }
-    persistExpanded(expandedPaths.value);
     return childPaths;
   }
 
