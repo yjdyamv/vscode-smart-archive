@@ -79,6 +79,7 @@ function promptInputBox(opts: {
   prompt: string;
   placeholder: string;
   password?: boolean;
+  value?: string;
   validate?: (v: string) => string | undefined;
 }): Promise<StepResult<string>> {
   return new Promise((resolve) => {
@@ -100,6 +101,7 @@ function promptInputBox(opts: {
     const isPw = !!opts.password;
     ib.prompt = opts.prompt;
     ib.placeholder = opts.placeholder;
+    ib.value = opts.value ?? "";
     ib.password = isPw;
     ib.ignoreFocusOut = true;
     ib.buttons = isPw
@@ -249,6 +251,23 @@ async function promptPasswordWizard(): Promise<StepResult<string>> {
   return { kind: "ok", value: res.value };
 }
 
+async function promptSaveNameWizard(defaultName: string, ext: string): Promise<StepResult<string>> {
+  const res = await promptInputBox({
+    prompt: t("save.namePrompt", ext),
+    placeholder: defaultName,
+    value: defaultName,
+    validate: (v) => {
+      if (!v.trim()) return "Name cannot be empty";
+      if (/[<>:"/\\|?*]/.test(v)) return t("save.nameInvalid");
+      return undefined;
+    },
+  });
+  if (res.kind !== "ok") return res;
+  // Strip any trailing extensions the user may have typed, then re-append the format ext.
+  const clean = res.value.replace(/\..+$/, "");
+  return { kind: "ok", value: `${clean}.${ext}` };
+}
+
 // ── Main command ──
 
 export async function compressCommand(
@@ -360,24 +379,39 @@ export async function compressCommand(
       case 6: {
         const firstTarget = targets[0];
         const ext = format!.label;
-        const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, ext);
-        if (!saveUri) {
-          step = 2; // cancelled → back to level
-          continue;
-        }
 
-        let outputPath = saveUri.fsPath;
+        let outputPath: string;
+
         if (volumeSize) {
-          const dir = path.dirname(outputPath);
-          const base = path.basename(outputPath);
-          const folderName = base.replace(/\.[^.]+$/, "");
+          const defaultName = targets.length === 1 ? path.basename(firstTarget.fsPath) : "archive";
+          const r = await promptSaveNameWizard(defaultName, ext);
+          if (r.kind !== "ok") {
+            if (r.kind === "back") {
+              step = doEncrypt ? 5 : format!.supportsEncryption ? 4 : 3;
+              continue;
+            }
+            return;
+          }
+          const baseName = r.value;
+          const dir = path.dirname(firstTarget.fsPath);
+          const folderName =
+            targets.length === 1
+              ? path.basename(firstTarget.fsPath)
+              : baseName.replace(/\.[^.]+$/, "");
           let folderPath = path.join(dir, folderName);
           if (fs.existsSync(folderPath)) {
             let i = 1;
             while (fs.existsSync(path.join(dir, `${folderName}_${i}`))) i++;
             folderPath = path.join(dir, `${folderName}_${i}`);
           }
-          outputPath = path.join(folderPath, base);
+          outputPath = path.join(folderPath, baseName);
+        } else {
+          const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, ext);
+          if (!saveUri) {
+            step = 2; // cancelled → back to level
+            continue;
+          }
+          outputPath = saveUri.fsPath;
         }
 
         const options: CompressOptions = {
