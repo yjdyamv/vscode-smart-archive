@@ -402,20 +402,21 @@
     "build:webview": "npm run build -w webview-ui",
     "dev:webview": "npm run dev -w webview-ui",
     "install:webview": "npm install -w webview-ui",
+    "build": "npm run build:webview && npm run compile",
     "test": "npm run compile && tsc -p test && node test/out/core.test.js && node test/out/preview.test.js",
-    "test:extension": "node test/runTest.js",
+    "test:extension": "npm run compile && tsc -p test && node test/runTest.js",
     "format": "oxfmt --write src/",
     "format:check": "oxfmt --check src/",
     "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort src/",
     "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort --fix src/",
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
-    "release": "npm install && npm run install:webview && npm run check && npm run package",
+    "release": "npm run check && npm run package",
     "package": "vsce package",
-    "package:ovsx": "npx ovsx package",
-    "publish": "npx vsce publish",
-    "publish:ovsx": "npm run compile && npx ovsx publish",
-    "vscode:prepublish": "npm run build:webview && npm run compile"
+    "package:ovsx": "npm run build && npx ovsx package",
+    "publish": "npm run build && npx vsce publish",
+    "publish:ovsx": "npm run build && npx ovsx publish",
+    "vscode:prepublish": "npm run build"
   },
   "overrides": {
     "encoding-sniffer": "1.0.2"
