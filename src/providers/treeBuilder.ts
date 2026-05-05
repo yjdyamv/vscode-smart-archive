@@ -246,21 +246,21 @@ function getDirChildren(parentPath: string, entries: FlatEntry[], index?: EntryI
 
   if (index) {
     const bucket = index.get(parentPath);
-    if (!bucket) return [];
     candidates = bucket
-      .filter((e) => {
-        let p = e.path.replace(/\\/g, "/");
-        if (p.startsWith("./")) p = p.slice(2);
-        // Skip the directory's own entry (e.g. "subdir/" when expanding "subdir")
-        if (p === parentPath || p === parentPath + "/") return false;
-        return true;
-      })
-      .map((e) => {
-        let p = e.path.replace(/\\/g, "/");
-        if (p.startsWith("./")) p = p.slice(2);
-        const relative = p.slice(parentPath ? parentPath.length + 1 : 0);
-        return { entry: e, parts: relative.split("/").filter(Boolean) };
-      });
+      ? bucket
+          .filter((e) => {
+            let p = e.path.replace(/\\/g, "/");
+            if (p.startsWith("./")) p = p.slice(2);
+            if (p === parentPath || p === parentPath + "/") return false;
+            return true;
+          })
+          .map((e) => {
+            let p = e.path.replace(/\\/g, "/");
+            if (p.startsWith("./")) p = p.slice(2);
+            const relative = p.slice(parentPath ? parentPath.length + 1 : 0);
+            return { entry: e, parts: relative.split("/").filter(Boolean) };
+          })
+      : [];
   } else {
     const prefix = parentPath ? parentPath + "/" : "";
     candidates = [];
