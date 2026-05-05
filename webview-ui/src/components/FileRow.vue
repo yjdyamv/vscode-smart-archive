@@ -34,7 +34,6 @@ function getNameHtml(): string {
   const name = node.value.name;
   if (!props.searchQuery.trim()) return escapeHtml(name);
 
-  // Highlight matches
   const raw = props.searchQuery.trim();
   if (raw.length > 2 && raw[0] === "/" && raw.lastIndexOf("/") === raw.length - 1) {
     try {
@@ -45,7 +44,6 @@ function getNameHtml(): string {
     }
   }
 
-  // Fuzzy highlight
   const q = raw.toLowerCase();
   const lower = name.toLowerCase();
   const pos: number[] = [];
@@ -134,15 +132,15 @@ function onExpandClick(e: MouseEvent) {
 <style scoped>
 .row {
   position: relative;
-  height: calc(var(--vscode-font-size) * 1.8);
-  line-height: calc(var(--vscode-font-size) * 1.8);
+  height: calc(var(--vscode-font-size) * 1.85);
+  line-height: calc(var(--vscode-font-size) * 1.85);
   display: flex;
   align-items: center;
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
   padding-right: 8px;
-  transition: background 0.1s ease;
+  transition: background 0.08s ease;
 }
 .row:hover {
   background: var(--vscode-list-hoverBackground);
@@ -155,8 +153,14 @@ function onExpandClick(e: MouseEvent) {
   background: var(--vscode-list-activeSelectionBackground);
   color: var(--vscode-list-activeSelectionForeground);
 }
+.row.sel .guide {
+  opacity: 0.4;
+}
 .row.noisy {
-  opacity: 0.55;
+  opacity: 0.5;
+}
+.row.noisy:hover {
+  opacity: 0.75;
 }
 .guide {
   position: absolute;
@@ -164,10 +168,11 @@ function onExpandClick(e: MouseEvent) {
   bottom: 0;
   width: 1px;
   background: var(--vscode-tree-indentGuidesStroke);
+  opacity: 0.5;
   pointer-events: none;
 }
 .cb {
-  width: 20px;
+  width: 22px;
   flex-shrink: 0;
   text-align: center;
   cursor: pointer;
@@ -179,8 +184,8 @@ function onExpandClick(e: MouseEvent) {
 }
 .ck {
   display: inline-block;
-  width: calc(var(--vscode-font-size) * 1.3);
-  height: calc(var(--vscode-font-size) * 1.3);
+  width: calc(var(--vscode-font-size) * 1.25);
+  height: calc(var(--vscode-font-size) * 1.25);
   border: 1.5px solid var(--vscode-checkbox-border, #6e7681);
   border-radius: 3px;
   background: var(--vscode-checkbox-background, transparent);
@@ -203,27 +208,17 @@ function onExpandClick(e: MouseEvent) {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
-.ck.part {
-  background: var(--vscode-checkbox-selectBackground, #0e639c);
-  border-color: var(--vscode-checkbox-selectBorder, #007acc);
-}
-.ck.part::after {
-  content: "";
-  position: absolute;
-  left: 22%;
-  top: 42%;
-  width: 40%;
-  height: 0;
-  border-top: 2px solid var(--vscode-checkbox-selectForeground, #2ea043);
-}
 .ar {
-  width: calc(var(--vscode-font-size) * 1.2);
+  width: calc(var(--vscode-font-size) * 1.3);
   flex-shrink: 0;
   text-align: center;
   font-size: 10px;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.1s;
 }
+.ar:hover { opacity: 1; }
 .ar-loading {
   display: inline-block;
   width: 8px;
@@ -238,10 +233,11 @@ function onExpandClick(e: MouseEvent) {
   to { transform: rotate(360deg); }
 }
 .ic {
-  width: calc(var(--vscode-font-size) * 1.4);
+  width: calc(var(--vscode-font-size) * 1.5);
   text-align: center;
   flex-shrink: 0;
-  line-height: calc(var(--vscode-font-size) * 1.8);
+  line-height: calc(var(--vscode-font-size) * 1.85);
+  font-size: calc(var(--vscode-font-size) * 1.05);
 }
 .nm {
   overflow: hidden;
@@ -250,14 +246,16 @@ function onExpandClick(e: MouseEvent) {
   flex: 1;
 }
 .sz {
-  font-size: calc(var(--vscode-font-size) * 0.85);
+  font-size: calc(var(--vscode-font-size) * 0.82);
   color: var(--vscode-descriptionForeground);
-  margin-left: 1em;
+  margin-left: 10px;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 :deep(mark) {
   background: var(--vscode-editor-findMatchHighlightBackground, #d4d40066);
   color: inherit;
-  border-radius: 1px;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 </style>
