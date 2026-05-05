@@ -398,7 +398,7 @@ onMounted(() => {
   }
 
   if (rawTree.length > 0) {
-    treeData.value = rawTree;
+    treeData.value = sort.sortNodes(rawTree);
     viewState.value = "content";
     tree.initExpandedFromTree();
     // Show toast from page reload (after delete/rename/add/folder operations)
