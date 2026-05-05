@@ -24,15 +24,15 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   const expandedPaths = ref(new Set<string>());
   const loadingPaths = ref(new Set<string>());
 
-  function initExpandedFromTree() {
+  function initExpandedFromTree(maxDepth = 2) {
     const saved = loadState<{ expanded?: string[] }>();
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);
     } else {
-      // Auto-expand non-collapsed directories up to 2 levels deep
+      // Auto-expand non-collapsed directories up to maxDepth levels deep
       const paths: string[] = [];
       function collect(nodes: TreeNodeData[], depth: number) {
-        if (depth > 2) return;
+        if (depth > maxDepth) return;
         for (const node of nodes) {
           const hasKids = (node.children?.length ?? 0) > 0 || node.hasMore;
           if (node.kind === "DIRECTORY" && !node.collapsed && hasKids) {
