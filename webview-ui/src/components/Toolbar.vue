@@ -20,6 +20,7 @@
       <span class="sort-lbl" :class="{ on: sortKey === 'name' }" @click="$emit('sort', 'name')">Name<span v-if="sortKey === 'name'" class="codicon ml-1" :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"></span></span>
       <span class="sort-lbl" :class="{ on: sortKey === 'size' }" @click="$emit('sort', 'size')">Size<span v-if="sortKey === 'size'" class="codicon ml-1" :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"></span></span>
       <input class="search-input" type="text" :value="searchQuery" placeholder="Filter…" @input="$emit('search', ($event.target as HTMLInputElement).value)" />
+      <span v-if="searchQuery && (searchMatchCount ?? 0) > 0" class="search-match">{{ searchMatchCount }} match{{ (searchMatchCount ?? 0) > 1 ? 'es' : '' }}</span>
     </div>
   </div>
 </template>
@@ -29,6 +30,7 @@ defineProps<{
   selectedCount: number; selectedFiles: number; selectedDirs: number;
   totalFiles: number; totalDirs: number;
   sortKey: string; sortAsc: boolean; searchQuery: string; lastAddDir: string;
+  searchMatchCount?: number;
   readOnly?: boolean;
 }>();
 defineEmits<{
@@ -73,6 +75,10 @@ defineEmits<{
   transition: border-color 0.15s;
 }
 .search-input:focus { border-color: var(--vscode-focusBorder); width: 180px; }
+.search-match {
+  font-size: calc(var(--vscode-font-size) * 0.78);
+  color: var(--vscode-descriptionForeground); white-space: nowrap;
+}
 .sort-lbl {
   cursor: pointer; font-size: calc(var(--vscode-font-size) * 0.85);
   color: var(--vscode-descriptionForeground);
