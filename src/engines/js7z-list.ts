@@ -13,6 +13,7 @@ import type { JS7zFactory } from "../types";
 import { tryCleanup, run7z, streamToVFS } from "./js7z-helpers";
 import { getBaseName, fixArchiveEncoding } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
+import { getSplitVolumeBase } from "../constants";
 import { logger } from "../utils/logger";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -97,7 +98,14 @@ export async function listFiles(
     flush();
 
     // 7z l -slt lists the archive file itself as the first entry; filter it out.
-    const filtered = results.filter((r) => r.path !== `/${archiveName}` && r.path !== archiveName);
+    // For split volumes, also filter the logical base name (e.g. "archive.7z"
+    // embedded in the header of "archive.7z.001").
+    const volBase = getSplitVolumeBase(archiveName);
+    const filtered = results.filter((r) => {
+      if (r.path === `/${archiveName}` || r.path === archiveName) return false;
+      if (volBase && (r.path === `/${volBase}` || r.path === volBase)) return false;
+      return true;
+    });
 
     logger.debug({ event: "listFiles.done", count: filtered.length });
     return filtered;

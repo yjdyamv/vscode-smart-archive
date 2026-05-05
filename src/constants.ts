@@ -364,6 +364,16 @@ export function isSplitVolume(filePath: string): boolean {
   );
 }
 
+/**
+ * For a split volume file like "archive.7z.001", returns the base archive
+ * name "archive.7z". Returns null if not a recognised split-volume pattern.
+ */
+export function getSplitVolumeBase(fileName: string): string | null {
+  const m = fileName.match(/(.+\.(?:7z|zip|wim))\.\d{3}$/i);
+  if (m) return m[1];
+  return null;
+}
+
 export function isWrappedFormat(ext: string): boolean {
   const f = getFormatByExt(ext);
   return f?.wrapsTar ?? false;

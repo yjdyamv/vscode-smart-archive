@@ -11,7 +11,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import type { JS7zFactory, JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { getFullExt, isWrappedFormat, isEncryptableExt, getSplitVolumeBase } from "../constants";
 import { logger } from "../utils/logger";
 import { tryCleanup } from "../engines/js7z-helpers";
 import { fixArchiveEncoding } from "../utils/path";
@@ -174,7 +174,12 @@ function parse7zListing(
   flush();
 
   // Filter out the archive's own self-reference entry
-  return results.filter((r) => r.path !== `/${archiveName}` && r.path !== archiveName);
+  const volBase = getSplitVolumeBase(archiveName);
+  return results.filter((r) => {
+    if (r.path === `/${archiveName}` || r.path === archiveName) return false;
+    if (volBase && (r.path === `/${volBase}` || r.path === volBase)) return false;
+    return true;
+  });
 }
 
 export {
