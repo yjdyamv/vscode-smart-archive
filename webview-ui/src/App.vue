@@ -437,12 +437,13 @@ onMounted(() => {
         const children = msg.children as TreeNodeData[];
         if (parentPath && Array.isArray(children)) {
           const childPaths = tree.insertChildren(parentPath, children);
-          // If parent is selected, auto-select loaded children
           if (selection.state.selected.has(parentPath)) {
             for (const childPath of childPaths) {
               selection.state.selected.add(childPath);
             }
           }
+          // Chain-load any restored expanded directories that just appeared
+          loadExpandedPaths();
         }
         break;
       }
