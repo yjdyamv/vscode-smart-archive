@@ -9,6 +9,7 @@ export interface FlatNode {
   expanded: boolean;
   hasChildren: boolean;
   visible: boolean;
+  inheritCollapsed: boolean;
 }
 
 function persistExpanded(paths: Set<string>): void {
@@ -24,34 +25,42 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   const expandedPaths = ref(new Set<string>());
   const loadingPaths = ref(new Set<string>());
 
-  function initExpandedFromTree() {
+  function initExpandedFromTree(maxDepth = 2) {
     const saved = loadState<{ expanded?: string[] }>();
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);
-    } else {
-      // Auto-expand all non-collapsed directories
-      const paths: string[] = [];
-      function collect(nodes: TreeNodeData[]) {
-        for (const node of nodes) {
-          const hasKids = (node.children?.length ?? 0) > 0 || node.hasMore;
-          if (node.kind === "DIRECTORY" && !node.collapsed && hasKids) {
-            paths.push(node.path);
-            if (node.children) collect(node.children);
-          }
+      return;
+    }
+    // Restore from extension's persistent state (survives tab close)
+    const persistent = (window as any)._xExpanded as string[] | undefined;
+    if (persistent?.length) {
+      expandedPaths.value = new Set(persistent);
+      return;
+    }
+    // Auto-expand non-collapsed directories up to maxDepth levels deep
+    const paths: string[] = [];
+    function collect(nodes: TreeNodeData[], depth: number) {
+      if (depth > maxDepth) return;
+      for (const node of nodes) {
+        const hasKids = (node.children?.length ?? 0) > 0 || node.hasMore;
+        if (node.kind === "DIRECTORY" && !node.collapsed && hasKids) {
+          paths.push(node.path);
+          if (node.children) collect(node.children, depth + 1);
         }
       }
-      collect(treeData.value);
-      expandedPaths.value = new Set(paths);
     }
+    collect(treeData.value, 0);
+    expandedPaths.value = new Set(paths);
   }
 
   const flatNodes = computed<FlatNode[]>(() => {
     const result: FlatNode[] = [];
-    function walk(nodes: TreeNodeData[], depth: number) {
+    function walk(nodes: TreeNodeData[], depth: number, inheritCollapsed: boolean) {
       for (const node of nodes) {
         const hasKids = !!(node.kind === "DIRECTORY"
           && ((node.children && node.children.length > 0) || node.hasMore));
         const exp = expandedPaths.value.has(node.path);
+        const isCollapsed = !!node.collapsed || inheritCollapsed;
         result.push({
           node,
           depth,
@@ -59,13 +68,14 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
           expanded: exp,
           hasChildren: hasKids,
           visible: true,
+          inheritCollapsed: isCollapsed,
         });
         if (hasKids && exp && node.children) {
-          walk(node.children, depth + 1);
+          walk(node.children, depth + 1, isCollapsed);
         }
       }
     }
-    walk(treeData.value, 0);
+    walk(treeData.value, 0, false);
     return result;
   });
 
@@ -118,30 +128,19 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     return null;
   }
 
-  function insertChildren(parentPath: string, children: TreeNodeData[]): { needsLoad: string[]; childPaths: string[] } {
+  function insertChildren(parentPath: string, children: TreeNodeData[]): string[] {
     const node = findNode(treeData.value, parentPath);
-    if (!node) return { needsLoad: [], childPaths: [] };
+    if (!node) return [];
     node.children = children;
     node.hasMore = false;
     loadingPaths.value.delete(parentPath);
-    // re-trigger reactivity
     treeData.value = [...treeData.value];
 
-    // Auto-expand non-collapsed children and chain-load them
-    const needsLoad: string[] = [];
     const childPaths: string[] = [];
     for (const child of children) {
       childPaths.push(child.path);
-      const hasKids = (child.children?.length ?? 0) > 0 || child.hasMore;
-      if (child.kind === "DIRECTORY" && !child.collapsed && hasKids) {
-        expandedPaths.value.add(child.path);
-        if (child.hasMore && (!child.children || child.children.length === 0)) {
-          needsLoad.push(child.path);
-        }
-      }
     }
-    persistExpanded(expandedPaths.value);
-    return { needsLoad, childPaths };
+    return childPaths;
   }
 
   function getPathsNeedingLoad(): string[] {

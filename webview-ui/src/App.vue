@@ -35,6 +35,15 @@ watch([sort.sortKey, sort.sortAsc], () => {
   treeData.value = sort.sortNodes([...treeData.value]);
 });
 
+// Persist expanded state to extension for cross-session recall
+watch(
+  () => tree.expandedPaths.value.size,
+  () => {
+    const arr = [...tree.expandedPaths.value];
+    if (arr.length > 0) post({ c: "saveExpanded", paths: arr });
+  },
+);
+
 const visibleFlatNodes = computed(() => {
   return tree.flatNodes.value.filter((fn) => {
     if (search.query.value.trim()) {
@@ -398,7 +407,7 @@ onMounted(() => {
   }
 
   if (rawTree.length > 0) {
-    treeData.value = rawTree;
+    treeData.value = sort.sortNodes(rawTree);
     viewState.value = "content";
     tree.initExpandedFromTree();
     // Show toast from page reload (after delete/rename/add/folder operations)
@@ -436,18 +445,14 @@ onMounted(() => {
         const parentPath = msg.path as string;
         const children = msg.children as TreeNodeData[];
         if (parentPath && Array.isArray(children)) {
-          const result = tree.insertChildren(parentPath, children);
-          // If parent is selected, auto-select loaded children
+          const childPaths = tree.insertChildren(parentPath, children);
           if (selection.state.selected.has(parentPath)) {
-            for (const childPath of result.childPaths) {
+            for (const childPath of childPaths) {
               selection.state.selected.add(childPath);
             }
           }
-          // Chain-load descendants that are in expanded set
-          for (const childPath of result.needsLoad) {
-            tree.setLoading(childPath);
-            post({ c: "expandDir", path: childPath });
-          }
+          // Chain-load any restored expanded directories that just appeared
+          loadExpandedPaths();
         }
         break;
       }

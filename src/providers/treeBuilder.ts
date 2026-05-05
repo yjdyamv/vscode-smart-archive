@@ -371,6 +371,15 @@ function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
           node.collapsed = true;
           break;
         }
+        // Also collapse if any ancestor segment matches (e.g. node_modules/express
+        // is a child of node_modules and should not auto-expand)
+        for (const seg of node.path.split("/")) {
+          if (minimatch(seg, pattern, { dot: true })) {
+            node.collapsed = true;
+            break;
+          }
+        }
+        if (node.collapsed) break;
       }
     }
     if (node.children) markNoisyDirs(node.children, noisyPatterns);
