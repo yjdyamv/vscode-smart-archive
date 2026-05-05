@@ -352,6 +352,13 @@ function getDirChildren(parentPath: string, entries: FlatEntry[], index?: EntryI
       children.push(node);
       seen.set(seg, node);
     }
+    // Re-sort so implicit directories appear in the correct position
+    children.sort((a, b) => {
+      const aD = a.kind === "DIRECTORY" ? 0 : 1;
+      const bD = b.kind === "DIRECTORY" ? 0 : 1;
+      if (aD !== bD) return aD - bD;
+      return a.name.localeCompare(b.name);
+    });
   }
 
   return children;
