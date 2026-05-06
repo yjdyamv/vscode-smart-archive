@@ -13,6 +13,7 @@ import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { streamToVFS } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
+import { t } from "../../i18n";
 import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
@@ -208,7 +209,7 @@ export async function previewFileFromArchive(
           { event: "previewFile.notFound", path: normalizedFile },
           "Preview file not found in extracted content",
         );
-        throw new Error(`Preview file not found: ${normalizedFile}`);
+        throw new Error(t("preview.notFound", normalizedFile));
       }
     }
 
@@ -272,7 +273,7 @@ async function unwrapArchives(
           continue;
         }
       }
-      throw new Error(`Preview file not found in inner archive: ${target}`);
+      throw new Error(t("preview.notFoundInner", target));
     }
   } finally {
     tryCleanupJS7z(js7z2);
@@ -304,9 +305,7 @@ export async function testArchive(archivePath: string, password?: string): Promi
       js7z.callMain(tArgs);
     });
     const ok = stdout.includes("Everything is Ok");
-    return ok
-      ? "Archive integrity test passed"
-      : "Test completed with warnings:\n" + stdout.slice(-200);
+    return ok ? t("test.passed") : t("test.warnings") + stdout.slice(-200);
   } finally {
     tryCleanupJS7z(js7z);
   }

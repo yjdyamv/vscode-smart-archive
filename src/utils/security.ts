@@ -44,7 +44,7 @@ export async function promptOversizeFile(label: string, size: number): Promise<b
   const maxSize = getMaxFileSize();
   if (size <= maxSize) return true;
   const choice = await vscode.window.showWarningMessage(
-    `"${label}" is ${fmtSize(size)}, exceeding the limit of ${fmtSize(maxSize)}.\n\nExtracting may cause high memory usage or disk exhaustion.`,
+    t("security.oversizeWarning", label, fmtSize(size), fmtSize(maxSize)),
     { modal: true },
     t("security.extractAnyway"),
   );

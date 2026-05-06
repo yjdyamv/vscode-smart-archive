@@ -29,9 +29,9 @@ export function pasteCopiedFromArchive(): void {
   if (!fs.existsSync(copiedArchivePath)) {
     logger.warn({ event: "pasteCopied.sourceMissing", archivePath: copiedArchivePath });
     vscode.window
-      .showErrorMessage(t("archive.sourceMissing", copiedArchivePath), "Copy")
+      .showErrorMessage(t("archive.sourceMissing", copiedArchivePath), t("generic.copy"))
       .then((action) => {
-        if (action === "Copy")
+        if (action === t("generic.copy"))
           vscode.env.clipboard.writeText(t("archive.sourceMissing", copiedArchivePath));
       });
     return;
@@ -63,9 +63,9 @@ export function pasteCopiedFromArchive(): void {
         } catch (err) {
           logger.error({ event: "paste.failed", err }, (err as Error).message);
           vscode.window
-            .showErrorMessage(t("decompress.failed") + (err as Error).message, "Copy")
+            .showErrorMessage(t("decompress.failed") + (err as Error).message, t("generic.copy"))
             .then((action) => {
-              if (action === "Copy")
+              if (action === t("generic.copy"))
                 vscode.env.clipboard.writeText(t("decompress.failed") + (err as Error).message);
             });
         }
