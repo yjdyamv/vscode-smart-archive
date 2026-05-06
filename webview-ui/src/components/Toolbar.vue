@@ -37,7 +37,7 @@
       </button>
     </div>
     <div class="flex flex-wrap items-center gap-2 ml-auto">
-      <span v-if="selectedCount > 0" class="sel-count">
+      <span class="sel-count">
         <b>{{ selectedFiles }}/{{ totalFiles }}</b> files
         <b class="ml-2">{{ selectedDirs }}/{{ totalDirs }}</b> dirs
       </span>
