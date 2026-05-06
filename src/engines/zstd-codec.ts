@@ -9,6 +9,7 @@
 
 import { logger } from "../utils/logger";
 import { checkFileSize } from "../utils/security";
+import { t } from "../i18n";
 import { spawn } from "child_process";
 import * as fs from "fs";
 
@@ -114,11 +115,7 @@ export function zstdCompressFile(input: string, output: string, level: number): 
       proc.on("error", () => {
         cleanup(output);
         // eslint-disable-next-line preserve-caught-error
-        reject(
-          new Error(
-            "zstd not available. Install: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
-          ),
-        );
+        reject(new Error(t("zstd.notAvailable")));
       });
     });
   }

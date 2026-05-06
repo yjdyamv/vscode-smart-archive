@@ -128,9 +128,7 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
       );
 
     if (parts.length === 0) {
-      throw new Error(
-        `No split volume parts found for "${filePath}". Ensure all parts are in the same directory.`,
-      );
+      throw new Error(t("decompress.noSplitParts", path.basename(filePath)));
     }
 
     for (const partName of parts) {

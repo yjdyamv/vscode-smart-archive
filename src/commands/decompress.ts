@@ -58,8 +58,7 @@ async function decompressSingleFile(
       return decompressSingleFile(vscode.Uri.file(rarPath), batchIdx, batchTotal);
     }
     vscode.window.showErrorMessage(
-      t("decompress.failed") +
-        `Multi-volume RAR: "${path.basename(inputPath)}" requires a .rar file in the same directory.`,
+      t("decompress.failed") + t("decompress.rarVolume", path.basename(inputPath)),
     );
     return;
   }
@@ -72,7 +71,7 @@ async function decompressSingleFile(
         { event: "decompress.validateRar.failed", err: errRar },
         "RAR header validation failed",
       );
-      vscode.window.showErrorMessage(t("decompress.failed") + "Cannot read file");
+      vscode.window.showErrorMessage(t("decompress.failed") + t("decompress.cannotRead"));
       return;
     }
   }
