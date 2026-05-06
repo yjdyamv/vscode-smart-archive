@@ -34,18 +34,18 @@ export function getBaseName(fsPath: string): string {
 }
 
 /**
- * Fix garbled CJK filenames from libarchive-wasm.
+ * Fix garbled CJK filenames from archive listings.
  *
- * libarchive decodes archive entry pathnames using a default charset
- * (CP437 for ZIP without UTF-8 flag, Latin-1 as Emscripten fallback).
+ * Archives may encode entry pathnames using a default charset
+ * (CP437 for ZIP without UTF-8 flag, Latin-1 as fallback).
  * When an archive was created on a CJK-locale system (e.g. GBK on
  * Chinese Windows), the pathnames appear as mojibake.
  *
  * Strategy: re-encode the garbled string through the same charset
- * libarchive used (CP437 → Latin-1 order), then re-decode as GBK
+ * (CP437 → Latin-1 order), then re-decode as GBK
  * via iconv-lite. This recovers the original CJK filenames.
  *
- * @param raw - Potentially garbled pathname from libarchive
+ * @param raw - Potentially garbled pathname from archive listing
  * @returns Corrected pathname
  */
 export function fixArchiveEncoding(raw: string): string {
@@ -60,7 +60,7 @@ export function fixArchiveEncoding(raw: string): string {
     return raw;
   }
 
-  // libarchive uses CP437 for ZIP without UTF-8 flag;
+  // CP437 is commonly used for ZIP archives without a UTF-8 flag
   // fall back to Latin-1 if CP437 doesn't produce CJK.
   // Try multiple CJK code pages: GBK (Simplified Chinese), Shift-JIS
   // (Japanese), EUC-KR (Korean).
