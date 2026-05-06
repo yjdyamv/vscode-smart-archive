@@ -394,6 +394,16 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "检测到解压炸弹: 报告 {0}B 但解压后为 {1}B",
     "zh-tw": "偵測到解壓炸彈: 報告 {0}B 但解壓後為 {1}B",
   },
+  "security.pathTraversal": {
+    en: "Invalid directory: path traversal not allowed",
+    "zh-cn": "无效目录: 不允许路径遍历",
+    "zh-tw": "無效目錄: 不允許路徑遍歷",
+  },
+  "security.passwordEmpty": {
+    en: "Password cannot be empty for encryption",
+    "zh-cn": "加密密码不能为空",
+    "zh-tw": "加密密碼不能為空",
+  },
   "decompress.rarVolume": {
     en: 'Multi-volume RAR: "{0}" requires a .rar file in the same directory.',
     "zh-cn": '多卷 RAR: "{0}" 需要同目录下的 .rar 文件。',

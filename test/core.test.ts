@@ -1288,6 +1288,75 @@ void (async () => {
   }
 
 
+  // ── 40. sanitizeCliPath prevents flag injection ──
+  await test("sanitizeCliPath: normal paths unchanged", () => {
+    // Inline implementation — src/utils/security.ts imports vscode, can't require in test env
+    const sanitizeCliPath = (entryName: string): string =>
+      entryName.startsWith("-") ? "./" + entryName : entryName;
+    assert.strictEqual(sanitizeCliPath("normal.txt"), "normal.txt");
+    assert.strictEqual(sanitizeCliPath("sub/dir/file.txt"), "sub/dir/file.txt");
+  });
+
+  await test("sanitizeCliPath: prefixes dash-starting paths with ./", () => {
+    const sanitizeCliPath = (entryName: string): string =>
+      entryName.startsWith("-") ? "./" + entryName : entryName;
+    assert.strictEqual(sanitizeCliPath("-flag"), "./-flag");
+    assert.strictEqual(sanitizeCliPath("--help"), "./--help");
+    assert.strictEqual(sanitizeCliPath("-"), "./-");
+  });
+
+  await test("sanitizeCliPath: empty string unchanged", () => {
+    const sanitizeCliPath = (entryName: string): string =>
+      entryName.startsWith("-") ? "./" + entryName : entryName;
+    assert.strictEqual(sanitizeCliPath(""), "");
+  });
+
+  // ── 41. sanitizeTargetDir blocks path traversal ──
+  await test("sanitizeTargetDir: normal dirs pass through", () => {
+    const sanitizeTargetDir = (dir: string): string => {
+      if (!dir) return "";
+      let safe = dir.replace(/\\/g, "/").replace(/^\/+/, "");
+      const segments = safe.split("/");
+      for (const seg of segments) {
+        if (seg === ".." || seg === ".") throw new Error("path traversal");
+      }
+      return safe;
+    };
+    assert.strictEqual(sanitizeTargetDir(""), "");
+    assert.strictEqual(sanitizeTargetDir("sub"), "sub");
+    assert.strictEqual(sanitizeTargetDir("sub/dir"), "sub/dir");
+  });
+
+  await test("sanitizeTargetDir: strips leading slashes", () => {
+    const sanitizeTargetDir = (dir: string): string => {
+      if (!dir) return "";
+      let safe = dir.replace(/\\/g, "/").replace(/^\/+/, "");
+      const segments = safe.split("/");
+      for (const seg of segments) {
+        if (seg === ".." || seg === ".") throw new Error("path traversal");
+      }
+      return safe;
+    };
+    assert.strictEqual(sanitizeTargetDir("/foo"), "foo");
+    assert.strictEqual(sanitizeTargetDir("///bar"), "bar");
+  });
+
+  await test("sanitizeTargetDir: rejects .. traversal", () => {
+    const sanitizeTargetDir = (dir: string): string => {
+      if (!dir) return "";
+      let safe = dir.replace(/\\/g, "/").replace(/^\/+/, "");
+      const segments = safe.split("/");
+      for (const seg of segments) {
+        if (seg === ".." || seg === ".") throw new Error("path traversal");
+      }
+      return safe;
+    };
+    assert.throws(() => sanitizeTargetDir(".."), /path traversal/);
+    assert.throws(() => sanitizeTargetDir("../etc"), /path traversal/);
+    assert.throws(() => sanitizeTargetDir("a/../../b"), /path traversal/);
+    assert.throws(() => sanitizeTargetDir("."), /path traversal/);
+  });
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);

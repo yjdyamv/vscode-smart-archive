@@ -139,9 +139,8 @@ export async function addToArchive(
   const ext = getFullExt(archivePath);
 
   const patterns =
-    vscode.workspace
-      .getConfiguration("smart-archive")
-      .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
+    vscode.workspace.getConfiguration("smart-archive").get<string[]>("compressExcludePatterns") ??
+    COMPRESS_EXCLUDE_DEFAULTS;
   const exclusions = prepareExclusions(patterns);
 
   if (isWrappedFormat(ext)) {
