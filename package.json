@@ -33,14 +33,6 @@
     "AES-256",
     "multi-volume"
   ],
-  "activationEvents": [
-    "onCommand:yjdyamv.smart-archive.compress",
-    "onCommand:yjdyamv.smart-archive.decompress",
-    "onCommand:yjdyamv.smart-archive.browse",
-    "onCommand:yjdyamv.smart-archive.paste",
-    "onCommand:yjdyamv.smart-archive.addToArchive",
-    "onCustomEditor:archiveViewer"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "customEditors": [
@@ -237,7 +229,7 @@
       {
         "command": "yjdyamv.smart-archive.compress",
         "key": "ctrl+shift+c",
-        "when": "explorerResourceIsFolder || resourceFilename && resourceFilename !~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
+        "when": "explorerResourceIsFolder || (filesExplorerFocus || listViewHasSelection) && resourceScheme == file && resourceFilename !~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
       }
     ],
     "menus": {
