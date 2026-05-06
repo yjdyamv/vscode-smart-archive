@@ -446,7 +446,7 @@
     }
   },
   "scripts": {
-    "clean": "node -e \"['out','media/vue','test/out','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
+    "clean": "node -e \"['out','media/vue','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
     "build:webview": "npm --prefix webview-ui run build",
@@ -456,7 +456,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:extension": "npm run compile && tsc -p test && node test/runTest.js",
+
     "format": "oxfmt --write src/ test/ webview-ui/src/",
     "format:check": "oxfmt --check src/ test/ webview-ui/src/",
     "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort src/ test/ webview-ui/src/",
@@ -482,14 +482,10 @@
     "pino": "^10.3.1"
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^25.6.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/test-electron": "^2.4.0",
     "@vscode/vsce": "^3.9.1",
     "glob": "^10.0.0",
-    "mocha": "^11.7.5",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
     "typescript": "^6.0.3",
