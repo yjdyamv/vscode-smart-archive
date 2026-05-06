@@ -116,7 +116,10 @@ function _copyDirFromFS(
     if (entry === "." || entry === "..") continue;
 
     // Skip internal .smartarchive marker files used to preserve empty folders
-    if (entry === ".smartarchive") continue;
+    if (entry === ".smartarchive") {
+      logger.debug({ event: "fs.skipSmartarchive" }, "Skipped internal .smartarchive marker");
+      continue;
+    }
 
     // Reject entries with embedded path separators or null bytes —
     // these indicate a malicious archive attempting path traversal

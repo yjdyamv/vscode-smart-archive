@@ -69,16 +69,24 @@ function pruneOldPreviews(): void {
       }))
       .sort((a, b) => a.mtime - b.mtime);
 
+    let pruned = 0;
     while (files.length > MAX_PREVIEW_FILES) {
       const oldest = files.shift()!;
       try {
         fs.unlinkSync(path.join(PREVIEW_TMP_DIR, oldest.name));
+        pruned++;
       } catch {
         logger.warn(
           { event: "tempFiles.prune.failed", file: oldest.name },
           "Failed to remove old preview temp file",
         );
       }
+    }
+    if (pruned > 0) {
+      logger.info(
+        { event: "tempFiles.pruned", pruned, remaining: files.length },
+        `Pruned ${pruned} old preview temp file(s), ${files.length} remaining`,
+      );
     }
   } catch (err) {
     logger.warn({ event: "tempFiles.prune.failed", err }, "Failed to prune preview temp files");

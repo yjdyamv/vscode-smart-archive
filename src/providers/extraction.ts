@@ -46,7 +46,10 @@ function copyFromFSWithStrip(
       const full = currentDir === "/" ? `/${name}` : `${currentDir}/${name}`;
       const rel = relPart ? `${relPart}/${name}` : name;
 
-      if (name === ".smartarchive") continue;
+      if (name === ".smartarchive") {
+        logger.debug({ event: "extractSelected.skipSmartarchive" }, "Skipped internal .smartarchive marker");
+        continue;
+      }
 
       try {
         const st = js7z.FS.stat(full);
