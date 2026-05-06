@@ -237,12 +237,7 @@
       {
         "command": "yjdyamv.smart-archive.compress",
         "key": "ctrl+shift+c",
-        "when": "explorerResourceIsFolder || (filesExplorerFocus || listViewHasSelection) && resourceFilename !~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
-      },
-      {
-        "command": "yjdyamv.smart-archive.decompress",
-        "key": "ctrl+shift+x",
-        "when": "explorerResourceIsFolder || filesExplorerFocus || listViewHasSelection"
+        "when": "explorerResourceIsFolder || resourceFilename =~ /.+/ && resourceFilename !~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
       }
     ],
     "menus": {
