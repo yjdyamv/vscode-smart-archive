@@ -7,10 +7,6 @@
  * Each prompt step (except Save) shows a Back button so the user can
  * navigate to the previous step and correct a wrong selection.
  *
- * Stream formats (gz/bz2/xz) are single-file only. When the user selects
- * a folder or multiple files, we auto-upgrade to tar.gz/tar.bz2/tar.xz
- * to preserve directory structure.
- *
  * @module commands/compress
  */
 
