@@ -329,7 +329,7 @@ export async function isEncryptedInline(filePath: string): Promise<boolean> {
 
 export function fixArchiveEncoding(raw: string): string {
   if (!raw) return raw;
-  if (/^[\x00-\x7F]*$/.test(raw)) return raw;
+  if (/^[ -~]*$/.test(raw)) return raw;
   return raw;
 }
 
