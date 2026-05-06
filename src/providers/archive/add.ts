@@ -38,6 +38,12 @@ export function initAddToArchive(
   archiveUri: vscode.Uri | null,
   onComplete?: (webview: vscode.Webview, archiveUri: vscode.Uri, toast?: string) => Promise<void>,
 ): void {
+  if (_pendingAdd) {
+    logger.warn(
+      { event: "addToArchive.init.overwritten", prevArchive: _pendingAdd.archivePath },
+      "Pending add state overwritten — previous request was never executed",
+    );
+  }
   _pendingAdd = { archivePath, targetDir, password, webview, archiveUri, onComplete };
 }
 

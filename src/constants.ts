@@ -413,3 +413,18 @@ export const NOISY_DIR_PATTERNS = [
 // ── Default compression exclude patterns ────────────────────────────
 
 export const COMPRESS_EXCLUDE_DEFAULTS = NOISY_DIR_PATTERNS;
+
+// ── Volume size presets ──────────────────────────────────────────────
+
+export const VOLUME_SIZES = [
+  { label: "1.44M", value: "1440k" },
+  { label: "10M", value: "10m" },
+  { label: "50M", value: "50m" },
+  { label: "100M", value: "100m" },
+  { label: "200M", value: "200m" },
+  { label: "650M", value: "650m" },
+  { label: "700M", value: "700m" },
+  { label: "1G", value: "1g" },
+  { label: "2G", value: "2g" },
+  { label: "4.7G", value: "4700m" },
+];

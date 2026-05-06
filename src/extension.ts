@@ -14,7 +14,7 @@ import { decompressCommand, browseCommand } from "./commands/decompress";
 import { registerArchiveEditor, pasteCopiedFromArchive } from "./providers/archiveProvider";
 import { runAddToArchive } from "./providers/archive";
 import { logger } from "./utils/logger";
-import { setGlobalState, clearAllExpanded } from "./providers/webview/expandedState";
+import { setGlobalState } from "./providers/webview/expandedState";
 
 /**
  * Called when the extension is activated.
@@ -76,6 +76,5 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export function deactivate(): void {
   logger.info({ event: "extension.deactivate" });
-  clearAllExpanded();
   logger.dispose();
 }
