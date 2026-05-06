@@ -127,14 +127,16 @@ export async function promptSavePath(
   targetPath: string,
   targetCount: number,
   format: string,
+  saveDir?: string,
 ): Promise<vscode.Uri | undefined> {
   let defaultUri: vscode.Uri;
+  const dir = saveDir ?? path.dirname(targetPath);
 
   if (targetCount === 1) {
     const base = path.basename(targetPath, path.extname(targetPath));
-    defaultUri = vscode.Uri.file(path.join(path.dirname(targetPath), `${base}.${format}`));
+    defaultUri = vscode.Uri.file(path.join(dir, `${base}.${format}`));
   } else {
-    defaultUri = vscode.Uri.file(path.join(path.dirname(targetPath), `archive.${format}`));
+    defaultUri = vscode.Uri.file(path.join(dir, `archive.${format}`));
   }
 
   return vscode.window.showSaveDialog({

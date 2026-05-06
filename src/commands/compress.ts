@@ -270,8 +270,40 @@ export async function compressCommand(
   uri: vscode.Uri | undefined,
   selectedUris: readonly vscode.Uri[] | undefined,
 ): Promise<void> {
-  const targets = selectedUris && selectedUris.length > 0 ? selectedUris : uri ? [uri] : [];
-  if (targets.length === 0) {
+  let targets: vscode.Uri[];
+  let isWorkspaceCompress = false;
+  const wsFolders = vscode.workspace.workspaceFolders;
+
+  // Right-clicked on a workspace folder item?
+  const matchedWs = uri && wsFolders?.find((f) => f.uri.fsPath === uri.fsPath);
+
+  if (matchedWs) {
+    // Right-clicked workspace folder → compress it, save inside
+    logger.info({ event: "compress.target.wsFolder", workspacePath: matchedWs.uri.fsPath });
+    targets = [matchedWs.uri];
+    isWorkspaceCompress = true;
+  } else if (!uri && !(selectedUris && selectedUris.length > 0)) {
+    // Right-clicked empty space, no selection → compress all workspace folders
+    if (!wsFolders || wsFolders.length === 0) {
+      logger.warn({ event: "compress.target.noWorkspace" }, "No workspace folders available");
+      vscode.window.showErrorMessage(t("compress.noFiles"));
+      return;
+    }
+    logger.info({
+      event: "compress.target.emptySpace",
+      workspaceCount: wsFolders.length,
+      paths: wsFolders.map((f) => f.uri.fsPath),
+    });
+    targets = wsFolders.map((f) => f.uri);
+    isWorkspaceCompress = true;
+  } else if (selectedUris && selectedUris.length > 0) {
+    logger.info({ event: "compress.target.selection", count: selectedUris.length });
+    targets = [...selectedUris];
+  } else if (uri) {
+    logger.info({ event: "compress.target.single", path: uri.fsPath });
+    targets = [uri];
+  } else {
+    logger.warn({ event: "compress.target.none" }, "No targets available");
     vscode.window.showErrorMessage(t("compress.noFiles"));
     return;
   }
@@ -389,7 +421,9 @@ export async function compressCommand(
             return;
           }
           const baseName = r.value;
-          const dir = path.dirname(firstTarget.fsPath);
+          const dir = isWorkspaceCompress
+            ? firstTarget.fsPath
+            : path.dirname(firstTarget.fsPath);
           const folderName =
             targets.length === 1
               ? path.basename(firstTarget.fsPath)
@@ -402,11 +436,24 @@ export async function compressCommand(
           }
           outputPath = path.join(folderPath, baseName);
         } else {
-          const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, ext);
+          logger.info({
+            event: "compress.saveDialog",
+            isWorkspaceCompress,
+            firstTarget: firstTarget.fsPath,
+            targetsLen: targets.length,
+            saveDir: isWorkspaceCompress ? firstTarget.fsPath : path.dirname(firstTarget.fsPath),
+          });
+          const saveUri = await promptSavePath(
+            firstTarget.fsPath,
+            targets.length,
+            ext,
+            isWorkspaceCompress ? firstTarget.fsPath : undefined,
+          );
           if (!saveUri) {
             logger.info({ event: "compress.cancelled", step: "save" });
             return;
           }
+          logger.info({ event: "compress.chosen", outputPath: saveUri.fsPath });
           outputPath = saveUri.fsPath;
         }
 
