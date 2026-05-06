@@ -37,7 +37,7 @@ export async function setupWebview(
       filePath = rarPath;
     } else {
       webview.html = emptyHtml(
-        `Multi-volume RAR: "${path.basename(filePath)}" requires a .rar file in the same directory.`,
+        t("decompress.rarVolume", path.basename(filePath)),
         cssUri,
         jsUri,
         codiconCssUri,

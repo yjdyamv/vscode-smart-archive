@@ -14,47 +14,9 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import type { FormatInfo, PasswordResult, EncryptChoice } from "../types";
-import { COMPRESS_FORMATS } from "../constants";
-import { t, compressLevels } from "../i18n";
-
-/**
- * Show a format selection dropdown.
- * Only formats with `canCreate === true` are shown.
- *
- * @returns The chosen format, or undefined if the user cancelled
- */
-export async function promptCompressFormat(): Promise<FormatInfo | undefined> {
-  const items = COMPRESS_FORMATS.map((f) => ({
-    label: f.label,
-    description: f.description,
-  }));
-
-  const chosen = await vscode.window.showQuickPick(items, {
-    placeHolder: t("compress.selectFormat"),
-    ignoreFocusOut: true,
-  });
-
-  if (!chosen) return undefined;
-  return COMPRESS_FORMATS.find((f) => f.label === chosen.label);
-}
-
-/**
- * Ask the user whether to enable AES-256 encryption.
- *
- * @returns true=encrypt, false=no encryption, null=cancelled
- */
-export async function promptEncryptChoice(): Promise<EncryptChoice> {
-  const choice = await vscode.window.showQuickPick(
-    [
-      { label: t("encrypt.no"), description: "" },
-      { label: t("encrypt.yes"), description: "" },
-    ],
-    { placeHolder: t("encrypt.title"), ignoreFocusOut: true },
-  );
-  if (!choice) return null;
-  return choice.label === t("encrypt.yes");
-}
+import type { PasswordResult } from "../types";
+import { VOLUME_SIZES } from "../constants";
+import { t } from "../i18n";
 
 /**
  * Show a masked password input box.
@@ -144,47 +106,6 @@ export async function promptSavePath(
     filters: { [t("save.filterName")]: [format] },
   });
 }
-
-const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
-
-export async function promptCompressLevel(): Promise<number> {
-  const config = vscode.workspace.getConfiguration("smart-archive");
-  const defaultLevel = config.get<number>("defaultCompressionLevel", 5);
-  const labels = compressLevels();
-
-  // Place the configured default level first so it's highlighted and
-  // selected by default when the user presses Enter without picking.
-  const defaultIdx = LEVEL_VALUES.indexOf(defaultLevel);
-  const order = LEVEL_VALUES.map((_, i) => i);
-  if (defaultIdx >= 0) {
-    order.splice(defaultIdx, 1);
-    order.unshift(defaultIdx);
-  }
-
-  const items = order.map((i) => ({ label: labels[i] }));
-
-  const chosen = await vscode.window.showQuickPick(items, {
-    placeHolder: t("compress.selectLevel"),
-    ignoreFocusOut: true,
-  });
-
-  if (!chosen) return defaultLevel;
-  const idx = labels.indexOf(chosen.label);
-  return idx >= 0 ? LEVEL_VALUES[idx] : defaultLevel;
-}
-
-const VOLUME_SIZES = [
-  { label: "1.44M", value: "1440k" },
-  { label: "10M", value: "10m" },
-  { label: "50M", value: "50m" },
-  { label: "100M", value: "100m" },
-  { label: "200M", value: "200m" },
-  { label: "650M", value: "650m" },
-  { label: "700M", value: "700m" },
-  { label: "1G", value: "1g" },
-  { label: "2G", value: "2g" },
-  { label: "4.7G", value: "4700m" },
-];
 
 export async function promptVolumeSize(): Promise<string | undefined> {
   const config = vscode.workspace.getConfiguration("smart-archive");

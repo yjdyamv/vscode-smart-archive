@@ -5,6 +5,3 @@
  */
 
 export { setupWebview } from "./webview/setup";
-export { registerHandler } from "./webview/router";
-export { handlerStates, handlerRegistered } from "./webview/state";
-export type { HandlerState } from "./webview/state";
