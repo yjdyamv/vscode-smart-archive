@@ -1,7 +1,7 @@
 {
   "name": "smart-archive",
   "displayName": "Smart Archive",
-  "description": "Compress and decompress files using JS7z + libarchive.js. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ with AES-256 encryption.",
+  "description": "Compress and decompress files using JS7z + zstd-wasm. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
   "version": "1.12.0",
   "publisher": "yjdyamv",
   "license": "MIT",
