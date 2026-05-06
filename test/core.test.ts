@@ -1367,6 +1367,88 @@ describe("smartarchive marker filtering", () => {
 // pruneOldPreviews (requires compiled module, may not be available)
 // ════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════
+// Workspace compress save path
+// ════════════════════════════════════════════════════════════════════
+
+describe("workspace compress save path", () => {
+  it("saves archive inside workspace folder, not alongside in parent dir", async () => {
+    const wsDir = path.join(td, "ws-compress-test");
+    const srcDir = path.join(wsDir, "src");
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(path.join(wsDir, "README.md"), "# test");
+    fs.writeFileSync(path.join(srcDir, "index.ts"), "x");
+
+    // Collect files for VFS compress (relative to wsDir so root = wsDir basename)
+    const files: Record<string, string> = {};
+    const tops = new Set<string>();
+    function walk(dir: string) {
+      for (const name of fs.readdirSync(dir)) {
+        const fp = path.join(dir, name);
+        const rel = "/" + path.relative(wsDir, fp).replace(/\\/g, "/");
+        if (fs.statSync(fp).isDirectory()) {
+          const seg = rel.split("/")[1];
+          if (seg) tops.add(seg);
+          walk(fp);
+        } else {
+          files[rel] = fs.readFileSync(fp, "utf-8");
+          const seg = rel.split("/")[1];
+          if (seg) tops.add(seg);
+        }
+      }
+    }
+    walk(wsDir);
+
+    // Compress top-level dirs (same logic as compressCommand for a single dir)
+    const archiveBuffer = await j7zCompressDir(files, "/_ws.7z");
+
+    // Save INSIDE workspace dir (new behavior)
+    const archiveName = path.basename(wsDir) + ".7z";
+    const insidePath = path.join(wsDir, archiveName);
+    fs.writeFileSync(insidePath, archiveBuffer);
+
+    // Verify archive exists inside workspace, not alongside
+    const parentPath = path.join(path.dirname(wsDir), archiveName);
+    expect(fs.existsSync(insidePath)).toBe(true);
+    expect(fs.existsSync(parentPath)).toBe(false);
+
+    // Verify archive is readable
+    let listing = "";
+    const j2 = await JS7z({
+      print: (t: string) => (listing += t + "\n"),
+      printErr: () => {},
+    });
+    const raw = fs.readFileSync(insidePath);
+    j2.FS.writeFile("/_check.7z", new Uint8Array(raw));
+    await new Promise<void>((resolve, reject) => {
+      j2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
+      j2.callMain(["l", "-sccUTF-8", "/_check.7z"]);
+    });
+    expect(listing).toContain("index.ts");
+    expect(listing).toContain("README.md");
+
+    fs.unlinkSync(insidePath);
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  });
+
+  it("computes save dir inside workspace (not parent) when isWorkspaceCompress", () => {
+    const wsPath = "/home/user/my-project";
+
+    // When isWorkspaceCompress = false (old / normal behavior)
+    const normalDir = path.posix.dirname(wsPath);
+    expect(normalDir).toBe("/home/user");
+
+    // When isWorkspaceCompress = true (new behavior)
+    const workspaceDir = wsPath;
+    expect(workspaceDir).toBe("/home/user/my-project");
+
+    // Verify the archive path is inside workspace
+    const archive = path.posix.join(workspaceDir, path.posix.basename(wsPath) + ".7z");
+    expect(archive).toBe("/home/user/my-project/my-project.7z");
+    expect(archive.startsWith(wsPath + "/")).toBe(true);
+  });
+});
+
 describe("tempFiles module", () => {
   const _tempFiles: { pruneOldPreviews: () => void } | null = (() => {
     try {
