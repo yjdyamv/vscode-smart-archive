@@ -71,7 +71,12 @@ function showToast(msg: string, ok = true) {
   toast.ok = ok;
   toast.show = true;
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.show = false; }, ok ? 1800 : 4000);
+  toastTimer = setTimeout(
+    () => {
+      toast.show = false;
+    },
+    ok ? 1800 : 4000,
+  );
 }
 
 function onSearch(q: string) {
@@ -112,12 +117,30 @@ function closeContextMenu() {
   ctxMenu.show = false;
 }
 
-function ctxExtract() { extSel(); closeContextMenu(); }
-function ctxDelete() { delSel(); closeContextMenu(); }
-function ctxCopy() { copySel(); closeContextMenu(); }
-function ctxAddHere() { post({ c: "addFiles", dir: ctxMenu.dirPath }); closeContextMenu(); }
-function ctxNewFolder() { post({ c: "newFolderPrompt", dir: ctxMenu.dirPath }); closeContextMenu(); }
-function ctxRename() { if (ctxMenu.paths.length === 1) renameFile(ctxMenu.paths[0]); closeContextMenu(); }
+function ctxExtract() {
+  extSel();
+  closeContextMenu();
+}
+function ctxDelete() {
+  delSel();
+  closeContextMenu();
+}
+function ctxCopy() {
+  copySel();
+  closeContextMenu();
+}
+function ctxAddHere() {
+  post({ c: "addFiles", dir: ctxMenu.dirPath });
+  closeContextMenu();
+}
+function ctxNewFolder() {
+  post({ c: "newFolderPrompt", dir: ctxMenu.dirPath });
+  closeContextMenu();
+}
+function ctxRename() {
+  if (ctxMenu.paths.length === 1) renameFile(ctxMenu.paths[0]);
+  closeContextMenu();
+}
 
 // Message handlers
 function extAll() {
@@ -436,7 +459,7 @@ onMounted(() => {
         }
         break;
       case "pwerr":
-        showToast(msg.t as string || "Wrong password", false);
+        showToast((msg.t as string) || "Wrong password", false);
         break;
       case "encState":
         isEncrypted.value = !!(msg.v as boolean);
@@ -536,11 +559,17 @@ provide("search", search);
 provide("sort", sort);
 provide("postMessage", post);
 provide("showToast", showToast);
-provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
+provide(
+  "lastAddDir",
+  computed(() => selection.state.lastAddDir || ""),
+);
 </script>
 
 <template>
-  <div class="flex flex-col h-screen text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)] font-[var(--vscode-font-family)]" style="font-size:var(--vscode-font-size)">
+  <div
+    class="flex flex-col h-screen text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)] font-[var(--vscode-font-family)]"
+    style="font-size: var(--vscode-font-size)"
+  >
     <LoadingSpinner v-if="viewState === 'loading'" :msg="loadingMsg" />
     <PasswordBox
       v-else-if="viewState === 'password'"
@@ -567,7 +596,10 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         @delete-selected="delSel"
         @add-files="addFiles"
         @copy="copySel"
-        @expand-all="tree.expandAll(); loadExpandedPaths()"
+        @expand-all="
+          tree.expandAll();
+          loadExpandedPaths();
+        "
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
         @search="onSearch"
@@ -606,11 +638,18 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         @decrypt="decryptArchive"
       />
     </template>
-    <div v-else class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]">
+    <div
+      v-else
+      class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]"
+    >
       <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
-      <div class="text-[1.1em] text-[var(--vscode-foreground)]">{{ archiveProps?.name ?? "Archive" }}</div>
+      <div class="text-[1.1em] text-[var(--vscode-foreground)]">
+        {{ archiveProps?.name ?? "Archive" }}
+      </div>
       <div class="text-sm opacity-70">No files to display</div>
-      <div v-if="!readOnly" class="text-xs opacity-50 mt-1">Add files with the + button or extract existing content</div>
+      <div v-if="!readOnly" class="text-xs opacity-50 mt-1">
+        Add files with the + button or extract existing content
+      </div>
     </div>
 
     <Toast :msg="toast.msg" :ok="toast.ok" :visible="toast.show" />
@@ -634,7 +673,8 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
 
 <style scoped>
 .empty-icon {
-  font-size: 56px; line-height: 1;
+  font-size: 56px;
+  line-height: 1;
   opacity: 0.35;
 }
 </style>

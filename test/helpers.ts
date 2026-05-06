@@ -326,6 +326,7 @@ async function isEncryptedInline(filePath: string): Promise<boolean> {
 
 function fixArchiveEncoding(raw: string): string {
   if (!raw) return raw;
+  // oxlint-disable-next-line no-control-regex
   if (/^[\x00-\x7F]*$/.test(raw)) return raw;
   return raw;
 }

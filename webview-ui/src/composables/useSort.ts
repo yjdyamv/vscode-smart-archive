@@ -3,7 +3,7 @@ import type { TreeNodeData } from "../types";
 
 export type SortKey = "name" | "size";
 
-export function useSort(treeData: Ref<TreeNodeData[]>) {
+export function useSort(_treeData: Ref<TreeNodeData[]>) {
   const sortKey = ref<SortKey>("name");
   const sortAsc = ref(true);
 

@@ -17,20 +17,20 @@ function isRedosSafe(pattern: string): boolean {
   return true;
 }
 
+function fuzzyMatch(s: string, q: string): boolean {
+  let qi = 0;
+  for (let i = 0; i < s.length && qi < q.length; i++) {
+    if (s[i] === q[qi]) qi++;
+  }
+  return qi === q.length;
+}
+
 export function useSearch() {
   const query = ref("");
   const isRegex = ref(false);
   const matchSet = ref(new Set<string>());
   const directMatchSet = ref(new Set<string>());
   const regexError = ref("");
-
-  function fuzzyMatch(s: string, q: string): boolean {
-    let qi = 0;
-    for (let i = 0; i < s.length && qi < q.length; i++) {
-      if (s[i] === q[qi]) qi++;
-    }
-    return qi === q.length;
-  }
 
   function updateSearch(q: string, nodes: TreeNodeData[]): void {
     query.value = q;
@@ -78,7 +78,8 @@ export function useSearch() {
       if (re) {
         hit = re.test(node.name) || re.test(node.path);
       } else if (fuzzy) {
-        hit = fuzzyMatch(node.name.toLowerCase(), fuzzy) || fuzzyMatch(node.path.toLowerCase(), fuzzy);
+        hit =
+          fuzzyMatch(node.name.toLowerCase(), fuzzy) || fuzzyMatch(node.path.toLowerCase(), fuzzy);
       }
       if (hit) {
         directOut.add(node.path);
@@ -117,5 +118,15 @@ export function useSearch() {
     directMatchSet.value.clear();
   }
 
-  return { query, isRegex, regexError, matchSet, directMatchSet, updateSearch, isVisible, toggleRegex, clearSearch };
+  return {
+    query,
+    isRegex,
+    regexError,
+    matchSet,
+    directMatchSet,
+    updateSearch,
+    isVisible,
+    toggleRegex,
+    clearSearch,
+  };
 }

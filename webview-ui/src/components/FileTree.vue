@@ -26,9 +26,10 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement | null>(null);
 
 const estimateSize = () => {
-  const fontSize = typeof document !== "undefined"
-    ? parseFloat(getComputedStyle(document.documentElement).fontSize)
-    : 14;
+  const fontSize =
+    typeof document !== "undefined"
+      ? parseFloat(getComputedStyle(document.documentElement).fontSize)
+      : 14;
   return fontSize * 1.8;
 };
 
@@ -44,11 +45,12 @@ const virtualizer = useVirtualizer(
 const virtualItems = computed(() => virtualizer.value.getVirtualItems());
 
 function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
-  const dirPath = fn.node.kind === "DIRECTORY"
-    ? fn.path
-    : fn.path.includes("/")
-      ? fn.path.substring(0, fn.path.lastIndexOf("/"))
-      : "";
+  const dirPath =
+    fn.node.kind === "DIRECTORY"
+      ? fn.path
+      : fn.path.includes("/")
+        ? fn.path.substring(0, fn.path.lastIndexOf("/"))
+        : "";
   emit("context-menu", e, fn.path, dirPath);
 }
 </script>
@@ -75,8 +77,23 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
           :match-set="matchSet"
           :search-query="searchQuery"
           :is-loading="loadingPaths.has(flatNodes[item.index].path)"
-          @click="(shift, ctrl) => emit('row-click', flatNodes[item.index].path, flatNodes[item.index].node.kind === 'DIRECTORY', shift, ctrl)"
-          @dblclick="emit('row-dblclick', flatNodes[item.index].path, flatNodes[item.index].node.kind === 'DIRECTORY')"
+          @click="
+            (shift, ctrl) =>
+              emit(
+                'row-click',
+                flatNodes[item.index].path,
+                flatNodes[item.index].node.kind === 'DIRECTORY',
+                shift,
+                ctrl,
+              )
+          "
+          @dblclick="
+            emit(
+              'row-dblclick',
+              flatNodes[item.index].path,
+              flatNodes[item.index].node.kind === 'DIRECTORY',
+            )
+          "
           @check="emit('check-click', flatNodes[item.index].path)"
           @expand="emit('expand-click', flatNodes[item.index].path)"
           @contextmenu="(e: MouseEvent) => onRowContextMenu(e, flatNodes[item.index])"

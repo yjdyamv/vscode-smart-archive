@@ -60,8 +60,8 @@ function getNameHtml(): string {
   let result = "";
   let last = 0;
   for (const p of pos) {
-    result += escapeHtml(name.substring(last, p))
-      + "<mark>" + escapeHtml(name.charAt(p)) + "</mark>";
+    result +=
+      escapeHtml(name.substring(last, p)) + "<mark>" + escapeHtml(name.charAt(p)) + "</mark>";
     last = p + 1;
   }
   result += escapeHtml(name.substring(last));
@@ -69,8 +69,12 @@ function getNameHtml(): string {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function formatSize(bytes: number): string {
@@ -115,12 +119,16 @@ function onExpandClick(e: MouseEvent) {
       v-for="i in indentGuides(depth)"
       :key="'g' + i"
       class="guide"
-      :style="{ left: (i * indentPx + indentPx / 2) + 'px' }"
+      :style="{ left: i * indentPx + indentPx / 2 + 'px' }"
     ></span>
     <span class="cb" @click="onCheckClick">
       <span class="ck" :class="{ on: selected }"></span>
     </span>
-    <span class="ar" :class="{ rot: flatNode.expanded, empty: isDir && !flatNode.hasChildren }" @click="isDir ? onExpandClick($event) : undefined">
+    <span
+      class="ar"
+      :class="{ rot: flatNode.expanded, empty: isDir && !flatNode.hasChildren }"
+      @click="isDir ? onExpandClick($event) : undefined"
+    >
       <span v-if="isLoading" class="ar-loading"></span>
       <span v-else-if="isDir" class="codicon codicon-chevron-right ar-icon"></span>
     </span>
@@ -217,14 +225,23 @@ function onExpandClick(e: MouseEvent) {
   opacity: 0.7;
   transition: opacity 0.1s;
 }
-.ar:hover { opacity: 1; }
+.ar:hover {
+  opacity: 1;
+}
 .ar-icon {
   font-size: 12px;
   transition: transform 0.15s ease;
 }
-.ar.rot .ar-icon { transform: rotate(90deg); }
-.ar.empty { opacity: 0.25; cursor: default; }
-.ar.empty:hover { opacity: 0.25; }
+.ar.rot .ar-icon {
+  transform: rotate(90deg);
+}
+.ar.empty {
+  opacity: 0.25;
+  cursor: default;
+}
+.ar.empty:hover {
+  opacity: 0.25;
+}
 .ar-loading {
   display: inline-block;
   width: 8px;
@@ -236,7 +253,9 @@ function onExpandClick(e: MouseEvent) {
   vertical-align: middle;
 }
 @keyframes ar-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .ic {
   width: calc(var(--vscode-font-size) * 1.5);
