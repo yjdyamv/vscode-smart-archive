@@ -68,7 +68,10 @@ async function decompressSingleFile(
     try {
       validateRarHeader(inputPath);
     } catch (errRar) {
-      logger.warn({ event: "decompress.validateRar.failed", err: errRar }, "RAR header validation failed");
+      logger.warn(
+        { event: "decompress.validateRar.failed", err: errRar },
+        "RAR header validation failed",
+      );
       vscode.window.showErrorMessage(t("decompress.failed") + "Cannot read file");
       return;
     }

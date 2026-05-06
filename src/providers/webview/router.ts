@@ -36,6 +36,7 @@ import {
   addToArchive,
 } from "../archive";
 import { setCopiedPaths } from "../copyPaste";
+import { validatePassword, sanitizeTargetDir } from "../../utils/security";
 import { decompressWithKnownPassword } from "../../commands/decompress";
 import { promptVolumeSize } from "../../ui/prompts";
 import { handlerStates, type HandlerState } from "./state";
@@ -193,6 +194,7 @@ async function handlePassword(
     }
     const js7z = await JS7z({ print: () => {}, printErr: () => {} });
     try {
+      validatePassword(msg.pw);
       const testPath = streamToVFS(js7z, s.filePath);
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
@@ -387,9 +389,15 @@ async function handleAddFiles(
     webview.postMessage({ c: "err", t: t("archive.readOnly") });
     return;
   }
-  const targetDir = typeof msg.dir === "string" ? msg.dir : "";
-  logger.info({ event: "webview.addFiles", dir: targetDir });
-  initAddToArchive(s.filePath, targetDir, s.password, webview, s.archiveUri, setupWebview);
+  let targetAddDir: string;
+  try {
+    targetAddDir = sanitizeTargetDir(typeof msg.dir === "string" ? msg.dir : "");
+  } catch (err) {
+    webview.postMessage({ c: "err", t: (err as Error).message });
+    return;
+  }
+  logger.info({ event: "webview.addFiles", dir: targetAddDir });
+  initAddToArchive(s.filePath, targetAddDir, s.password, webview, s.archiveUri, setupWebview);
   vscode.commands.executeCommand("yjdyamv.smart-archive.addToArchive");
 }
 
@@ -403,7 +411,13 @@ async function handleDropFiles(
     webview.postMessage({ c: "err", t: t("archive.readOnly") });
     return;
   }
-  const targetDir = typeof msg.dir === "string" ? msg.dir : "";
+  let targetDir: string;
+  try {
+    targetDir = sanitizeTargetDir(typeof msg.dir === "string" ? msg.dir : "");
+  } catch (err) {
+    webview.postMessage({ c: "err", t: (err as Error).message });
+    return;
+  }
   logger.info({
     event: "webview.dropFiles",
     count: msg.paths.length,
@@ -433,7 +447,13 @@ async function handleNewFolder(
     webview.postMessage({ c: "err", t: t("archive.readOnly") });
     return;
   }
-  const targetDir = typeof msg.dir === "string" ? msg.dir : "";
+  let targetDir: string;
+  try {
+    targetDir = sanitizeTargetDir(typeof msg.dir === "string" ? msg.dir : "");
+  } catch (err) {
+    webview.postMessage({ c: "err", t: (err as Error).message });
+    return;
+  }
   const folderName = await vscode.window.showInputBox({
     prompt: "Folder name",
     placeHolder: "new-folder",
@@ -648,81 +668,85 @@ async function handleTest(webview: vscode.Webview, s: HandlerState): Promise<voi
 // ── Dispatcher ──
 
 export function registerHandler(webview: vscode.Webview): void {
-  webview.onDidReceiveMessage(async (msg: WebviewMsg) => {
-    logger.info({ event: "webview.msg", c: msg.c, dir: msg.dir });
-    const s = handlerStates.get(webview);
-    if (!s) return;
+  webview.onDidReceiveMessage((msg: WebviewMsg) => {
+    (async () => {
+      logger.info({ event: "webview.msg", c: msg.c, dir: msg.dir });
+      const s = handlerStates.get(webview);
+      if (!s) return;
 
-    if (msg.c === "log") {
-      logger.debug({ event: "webview.ui", msg: msg.msg });
-      return;
-    }
+      if (msg.c === "log") {
+        logger.debug({ event: "webview.ui", msg: msg.msg });
+        return;
+      }
 
-    if (msg.c === "expandDir" && typeof msg.path === "string") {
-      const children = getDirChildren(msg.path, s.entries, s.entryIndex);
-      markNoisyDirs(children, getNoisyPatterns());
-      webview.postMessage({ c: "dirChildren", path: msg.path, children });
-      return;
-    }
+      if (msg.c === "expandDir" && typeof msg.path === "string") {
+        const children = getDirChildren(msg.path, s.entries, s.entryIndex);
+        markNoisyDirs(children, getNoisyPatterns());
+        webview.postMessage({ c: "dirChildren", path: msg.path, children });
+        return;
+      }
 
-    if (msg.c === "saveExpanded" && Array.isArray(msg.paths)) {
-      saveExpandedPaths(s.archiveUri, msg.paths);
-      return;
-    }
+      if (msg.c === "saveExpanded" && Array.isArray(msg.paths)) {
+        saveExpandedPaths(s.archiveUri, msg.paths);
+        return;
+      }
 
-    const { cssUri, jsUri, codiconCssUri } = getWebviewUris(webview);
+      const { cssUri, jsUri, codiconCssUri } = getWebviewUris(webview);
 
-    if (msg.c === "pw") {
-      await handlePassword(webview, s, msg, cssUri, jsUri, codiconCssUri);
-      return;
-    }
+      if (msg.c === "pw") {
+        await handlePassword(webview, s, msg, cssUri, jsUri, codiconCssUri);
+        return;
+      }
 
-    switch (msg.c) {
-      case "extAll":
-        await handleExtractAll(webview, s);
-        break;
-      case "extSel":
-        await handleExtractSelected(webview, s, msg);
-        break;
-      case "copy":
-        handleCopy(webview, s, msg);
-        break;
-      case "delSel":
-        await handleDelete(webview, s, msg);
-        break;
-      case "renamePrompt":
-        await handleRename(webview, s, msg);
-        break;
-      case "addFiles":
-        await handleAddFiles(webview, s, msg);
-        break;
-      case "dropFiles":
-        await handleDropFiles(webview, s, msg);
-        break;
-      case "newFolderPrompt":
-        await handleNewFolder(webview, s, msg);
-        break;
-      case "preview":
-        await handlePreview(webview, s, msg);
-        break;
-      case "merge":
-        await handleMerge(webview, s);
-        break;
-      case "split":
-        await handleSplit(webview, s);
-        break;
-      case "convert":
-        await handleConvert(webview, s);
-        break;
-      case "encrypt":
-        await handleEncrypt(webview, s);
-        break;
-      case "decrypt":
-        await handleDecrypt(webview, s);
-        break;
-      case "test":
-        await handleTest(webview, s);
-        break;
-    }
+      switch (msg.c) {
+        case "extAll":
+          await handleExtractAll(webview, s);
+          break;
+        case "extSel":
+          await handleExtractSelected(webview, s, msg);
+          break;
+        case "copy":
+          handleCopy(webview, s, msg);
+          break;
+        case "delSel":
+          await handleDelete(webview, s, msg);
+          break;
+        case "renamePrompt":
+          await handleRename(webview, s, msg);
+          break;
+        case "addFiles":
+          await handleAddFiles(webview, s, msg);
+          break;
+        case "dropFiles":
+          await handleDropFiles(webview, s, msg);
+          break;
+        case "newFolderPrompt":
+          await handleNewFolder(webview, s, msg);
+          break;
+        case "preview":
+          await handlePreview(webview, s, msg);
+          break;
+        case "merge":
+          await handleMerge(webview, s);
+          break;
+        case "split":
+          await handleSplit(webview, s);
+          break;
+        case "convert":
+          await handleConvert(webview, s);
+          break;
+        case "encrypt":
+          await handleEncrypt(webview, s);
+          break;
+        case "decrypt":
+          await handleDecrypt(webview, s);
+          break;
+        case "test":
+          await handleTest(webview, s);
+          break;
+      }
+    })().catch((err) => {
+      logger.error({ event: "webview.msg.unhandled", err }, "Unhandled webview message error");
+    });
   });
 }

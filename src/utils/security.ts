@@ -153,3 +153,19 @@ export function sanitizeCliPath(entryName: string): string {
   if (entryName.startsWith("-")) return "./" + entryName;
   return entryName;
 }
+
+/**
+ * Sanitize a target directory path from webview input.
+ * Rejects path traversal components (..) and strips leading slashes.
+ */
+export function sanitizeTargetDir(dir: string): string {
+  if (!dir) return "";
+  let safe = dir.replace(/\\/g, "/").replace(/^\/+/, "");
+  const segments = safe.split("/");
+  for (const seg of segments) {
+    if (seg === ".." || seg === ".") {
+      throw new Error(t("security.pathTraversal"));
+    }
+  }
+  return safe;
+}

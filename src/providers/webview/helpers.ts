@@ -55,7 +55,9 @@ export function getWebviewUris(webview: vscode.Webview): {
   jsUri: string;
   codiconCssUri: string;
 } {
-  const extUri = vscode.extensions.getExtension(EXT_ID)!.extensionUri;
+  const ext = vscode.extensions.getExtension(EXT_ID);
+  if (!ext) throw new Error(`Extension ${EXT_ID} not found`);
+  const extUri = ext.extensionUri;
   return {
     cssUri: webview
       .asWebviewUri(vscode.Uri.joinPath(extUri, "media", "vue", "assets", "style.css"))

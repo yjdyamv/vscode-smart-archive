@@ -135,34 +135,28 @@ function _copyDirFromFS(
     // If stat fails (e.g. the entry is a symlink that Emscripten FS
     // reports as a regular file but can't stat), fall back to reading
     // as a raw file — this covers edge cases with certain archive formats.
+    let stat: { mode: number; size: number } | undefined;
     try {
-      const stat = js7z.FS.stat(fsEntry);
-      if (js7z.FS.isDir(stat.mode)) {
-        fs.mkdirSync(localEntry, { recursive: true });
-        totalSize = _copyDirFromFS(js7z, fsEntry, localEntry, totalSize, depth + 1, token);
-      } else {
-        checkFileSize(stat.size);
-        const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
-        checkFileSize(data.byteLength);
-        totalSize = checkTotalSize(totalSize, data.byteLength);
-        fs.writeFileSync(localEntry, Buffer.from(data));
-      }
+      stat = js7z.FS.stat(fsEntry);
     } catch {
       logger.warn(
         { event: "copyDirFromFS.stat.failed" },
         "Failed to stat virtual FS entry, falling back to raw read",
       );
-      try {
-        const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
-        checkFileSize(data.byteLength);
-        totalSize = checkTotalSize(totalSize, data.byteLength);
-        fs.writeFileSync(localEntry, Buffer.from(data));
-      } catch (err) {
-        logger.error(
-          { event: "fs.copyFailed", path: fsEntry, err },
-          "Failed to copy file from virtual FS",
-        );
-      }
+    }
+
+    if (stat && js7z.FS.isDir(stat.mode)) {
+      fs.mkdirSync(localEntry, { recursive: true });
+      totalSize = _copyDirFromFS(js7z, fsEntry, localEntry, totalSize, depth + 1, token);
+    } else {
+      // Read the file data from VFS
+      const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
+      if (stat) checkFileSize(stat.size);
+      checkFileSize(data.byteLength);
+      totalSize = checkTotalSize(totalSize, data.byteLength);
+      // Write errors propagate to caller — silent data loss is worse
+      // than a reported failure
+      fs.writeFileSync(localEntry, Buffer.from(data));
     }
   }
   return totalSize;
