@@ -28,8 +28,6 @@ const totalDirs = ref(0);
 const sort = useSort(treeData);
 const tree = useTreeFlatten(treeData);
 
-const sortedTree = computed(() => sort.sortNodes(treeData.value));
-
 // Apply sort to treeData when sort key/direction changes
 watch([sort.sortKey, sort.sortAsc], () => {
   treeData.value = sort.sortNodes([...treeData.value]);
@@ -39,8 +37,7 @@ watch([sort.sortKey, sort.sortAsc], () => {
 watch(
   () => tree.expandedPaths.value.size,
   () => {
-    const arr = [...tree.expandedPaths.value];
-    if (arr.length > 0) post({ c: "saveExpanded", paths: arr });
+    post({ c: "saveExpanded", paths: [...tree.expandedPaths.value] });
   },
 );
 
@@ -82,7 +79,7 @@ function showToast(msg: string, ok = true) {
 function onSearch(q: string) {
   search.query.value = q;
   if (searchDebounce) clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(() => search.updateSearch(q, sortedTree.value), 150);
+  searchDebounce = setTimeout(() => search.updateSearch(q, treeData.value), 150);
 }
 
 const loadingMsg = ref("Reading archive...");
@@ -150,7 +147,7 @@ function extAll() {
 
 function isAnyDirSelected(paths: string[]): boolean {
   for (const p of paths) {
-    const node = findNode(treeData.value, p);
+    const node = tree.findNode(p);
     if (node && node.kind === "DIRECTORY") return true;
   }
   return false;
@@ -168,7 +165,7 @@ function getEffectivePaths(): { paths: string[]; excludes: string[] } {
   const excludes = new Set<string>();
 
   for (const p of raw) {
-    const node = findNode(treeData.value, p);
+    const node = tree.findNode(p);
     if (node && node.kind === "DIRECTORY" && node.children && node.children.length > 0) {
       // Directory with children: keep dir, exclude only deselected children
       paths.add(p);
@@ -270,17 +267,6 @@ function submitPassword(pw: string) {
   post({ c: "pw", pw });
 }
 
-function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
-  for (const node of nodes) {
-    if (node.path === path) return node;
-    if (node.children) {
-      const found = findNode(node.children, path);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
 function collectDescendantPaths(node: TreeNodeData): string[] {
   const result: string[] = [];
   if (!node.children) return result;
@@ -298,7 +284,7 @@ function collectDescendantPaths(node: TreeNodeData): string[] {
 function toggleWithDescendants(path: string) {
   if (selection.state.selected.has(path)) {
     selection.state.selected.delete(path);
-    const node = tree.findNode(treeData.value, path);
+    const node = tree.findNode(path);
     if (node) {
       for (const childPath of collectDescendantPaths(node)) {
         selection.state.selected.delete(childPath);
@@ -306,7 +292,7 @@ function toggleWithDescendants(path: string) {
     }
   } else {
     selection.state.selected.add(path);
-    const node = tree.findNode(treeData.value, path);
+    const node = tree.findNode(path);
     if (node) {
       for (const childPath of collectDescendantPaths(node)) {
         selection.state.selected.add(childPath);
@@ -361,7 +347,7 @@ function loadExpandedPaths() {
 }
 
 function expandOrLoad(path: string) {
-  const node = tree.findNode(treeData.value, path);
+  const node = tree.findNode(path);
   if (!node || node.kind !== "DIRECTORY") return;
 
   // If already expanded, just toggle
@@ -393,17 +379,9 @@ function expandOrLoad(path: string) {
 const selectionBreakdown = computed(() => {
   let dirs = 0;
   let files = 0;
-  // Build a one-time path→kind map for O(1) lookups
-  const map = new Map<string, string>();
-  function walk(nodes: TreeNodeData[]) {
-    for (const n of nodes) {
-      map.set(n.path, n.kind);
-      if (n.children) walk(n.children);
-    }
-  }
-  walk(treeData.value);
+  const map = tree.nodeMap.value;
   for (const p of selection.state.selected) {
-    const kind = map.get(p);
+    const kind = map.get(p)?.kind;
     if (kind === "DIRECTORY") dirs++;
     else if (kind === "REGULAR_FILE") files++;
   }
@@ -442,7 +420,7 @@ onMounted(() => {
     viewState.value = "empty";
   }
 
-  onMessage((msg) => {
+  const cleanupMessage = onMessage((msg) => {
     switch (msg.c) {
       case "ok":
         showToast(msg.t as string, true);
@@ -485,6 +463,7 @@ onMounted(() => {
   document.addEventListener("keydown", handleKeyboard);
 
   onUnmounted(() => {
+    cleanupMessage();
     document.removeEventListener("keydown", handleKeyboard);
   });
 });
