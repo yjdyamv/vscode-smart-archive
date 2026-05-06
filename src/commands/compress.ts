@@ -14,7 +14,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { compressWith7z } from "../engines/js7z-engine";
-import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS } from "../constants";
+import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS, VOLUME_SIZES } from "../constants";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
 import { t, compressLevels } from "../i18n";
@@ -178,19 +178,6 @@ async function promptLevelWizard(): Promise<StepResult<number>> {
   return { kind: "ok", value: idx >= 0 ? LEVEL_VALUES[idx] : defaultLevel };
 }
 
-const VOLUME_SIZES = [
-  { label: "1.44M", value: "1440k" },
-  { label: "10M", value: "10m" },
-  { label: "50M", value: "50m" },
-  { label: "100M", value: "100m" },
-  { label: "200M", value: "200m" },
-  { label: "650M", value: "650m" },
-  { label: "700M", value: "700m" },
-  { label: "1G", value: "1g" },
-  { label: "2G", value: "2g" },
-  { label: "4.7G", value: "4700m" },
-];
-
 async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
   const config = vscode.workspace.getConfiguration("smart-archive");
   const defaultSize = config.get<string>("defaultVolumeSize") || "";
@@ -253,14 +240,14 @@ async function promptSaveNameWizard(defaultName: string, ext: string): Promise<S
     placeholder: defaultName,
     value: defaultName,
     validate: (v) => {
-      if (!v.trim()) return "Name cannot be empty";
+      if (!v.trim()) return t("validation.nameEmpty");
       if (/[<>:"/\\|?*]/.test(v)) return t("save.nameInvalid");
       return undefined;
     },
   });
   if (res.kind !== "ok") return res;
-  // Strip any trailing extensions the user may have typed, then re-append the format ext.
-  const clean = res.value.replace(/\..+$/, "");
+  // Strip trailing extension the user may have typed, then re-append the format ext.
+  const clean = path.basename(res.value, path.extname(res.value));
   return { kind: "ok", value: `${clean}.${ext}` };
 }
 
