@@ -446,14 +446,16 @@
     }
   },
   "scripts": {
-    "clean": "node -e \"['out','media/vue','test/out'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
+    "clean": "node -e \"['out','media/vue','test/out','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
     "build:webview": "npm --prefix webview-ui run build",
     "dev:webview": "npm --prefix webview-ui run dev",
     "install:webview": "npm --prefix webview-ui install",
     "build": "npm run build:webview && npm run compile",
-    "test": "npm run compile && tsc -p test && node test/out/core.test.js && node test/out/preview.test.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "test:extension": "npm run compile && tsc -p test && node test/runTest.js",
     "format": "oxfmt --write src/ test/ webview-ui/src/",
     "format:check": "oxfmt --check src/ test/ webview-ui/src/",
@@ -490,6 +492,7 @@
     "mocha": "^11.7.5",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   }
 }
