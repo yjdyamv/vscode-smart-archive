@@ -9,7 +9,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { NOISY_DIR_PATTERNS } from "../../constants";
+import { FORMAT_TABLE, NOISY_DIR_PATTERNS } from "../../constants";
 import { EXT_ID } from "./state";
 
 export function getNoisyPatterns(): string[] {
@@ -19,19 +19,12 @@ export function getNoisyPatterns(): string[] {
   );
 }
 
+const READ_ONLY_EXTS: ReadonlySet<string> = new Set(
+  FORMAT_TABLE.filter((f) => !f.canCreate).flatMap((f) => f.exts),
+);
+
 export function isReadOnlyExt(ext: string): boolean {
-  return [
-    ".rar",
-    ".iso",
-    ".vhd",
-    ".vmdk",
-    ".dmg",
-    ".hfs",
-    ".fat",
-    ".ntfs",
-    ".deb",
-    ".rpm",
-  ].includes(ext);
+  return READ_ONLY_EXTS.has(ext);
 }
 
 export function showErrorWithCopy(msg: string): void {
@@ -55,7 +48,9 @@ export function getWebviewUris(webview: vscode.Webview): {
   jsUri: string;
   codiconCssUri: string;
 } {
-  const extUri = vscode.extensions.getExtension(EXT_ID)!.extensionUri;
+  const ext = vscode.extensions.getExtension(EXT_ID);
+  if (!ext) throw new Error(`Extension ${EXT_ID} not found`);
+  const extUri = ext.extensionUri;
   return {
     cssUri: webview
       .asWebviewUri(vscode.Uri.joinPath(extUri, "media", "vue", "assets", "style.css"))

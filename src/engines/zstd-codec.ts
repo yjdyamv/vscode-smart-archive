@@ -57,24 +57,35 @@ export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
   return result;
 }
 
-let sysZstd: boolean | null = null;
+let sysZstdPath: string | null | false = null;
 
-function hasSystemZstd(): boolean {
-  if (sysZstd !== null) return sysZstd;
+function resolveSystemZstd(): string | null {
+  if (sysZstdPath !== null) return sysZstdPath || null;
   try {
-    const result = require("child_process").spawnSync("zstd", ["--version"], { timeout: 3000 });
-    sysZstd = result.status === 0;
+    const whichProc = require("child_process").spawnSync(
+      process.platform === "win32" ? "where" : "which",
+      ["zstd"],
+      { timeout: 3000 },
+    );
+    if (whichProc.status === 0) {
+      sysZstdPath = whichProc.stdout.toString().trim().split("\n")[0] || "zstd";
+    } else {
+      // Try locating via --version as fallback
+      const verProc = require("child_process").spawnSync("zstd", ["--version"], { timeout: 3000 });
+      sysZstdPath = verProc.status === 0 ? "zstd" : false;
+    }
   } catch {
-    sysZstd = false;
+    sysZstdPath = false;
   }
-  return sysZstd;
+  return sysZstdPath || null;
 }
 
 export function zstdCompressFile(input: string, output: string, level: number): Promise<void> {
-  if (hasSystemZstd()) {
+  const zstdPath = resolveSystemZstd();
+  if (zstdPath) {
     return new Promise((resolve, reject) => {
       const proc = spawn(
-        "zstd",
+        zstdPath,
         [
           "-o",
           output,
