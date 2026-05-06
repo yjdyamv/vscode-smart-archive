@@ -9,7 +9,7 @@
  */
 
 import * as fs from "fs";
-import { tryCleanup, run7z, streamToVFS } from "./js7z-helpers";
+import { tryCleanup, streamToVFS } from "./js7z-helpers";
 import { getBaseName } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
@@ -85,7 +85,13 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
     const archiveFsPath = streamToVFS(js7z, filePath);
 
     try {
-      await run7z(js7z, ["l", "-slt", "-p", archiveFsPath]);
+      await new Promise<void>((resolve, reject) => {
+        js7z.onExit = (code: number) => {
+          if (code === 0) resolve();
+          else reject(new Error(`7z l: ${code}\n${stderr}`));
+        };
+        js7z.callMain(["l", "-slt", "-p", archiveFsPath]);
+      });
       return stdout.includes("Encrypted = +");
     } catch {
       logger.warn(

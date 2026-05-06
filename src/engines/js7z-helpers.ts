@@ -100,6 +100,11 @@ function run7z(
 const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
 const CHUNK = 100 * 1024 * 1024;
 
+function matchPartNum(name: string, pattern: RegExp): string {
+  const m = name.match(pattern);
+  return m ? m[1] : "0";
+}
+
 function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): string {
   const archiveName = getBaseName(filePath);
   const target = vfsPath ?? `/${archiveName}`;
@@ -118,7 +123,8 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
       .readdirSync(dir)
       .filter((f) => partPattern.test(f))
       .sort(
-        (a, b) => parseInt(a.match(partPattern)![1], 10) - parseInt(b.match(partPattern)![1], 10),
+        (a, b) =>
+          parseInt(matchPartNum(a, partPattern), 10) - parseInt(matchPartNum(b, partPattern), 10),
       );
 
     if (parts.length === 0) {
@@ -130,14 +136,14 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
     for (const partName of parts) {
       const partPath = path.join(dir, partName);
       const partTarget = vfsPath
-        ? `${vfsPath.replace(/\.\d+$/, "")}.${partName.match(partPattern)![1]}`
+        ? `${vfsPath.replace(/\.\d+$/, "")}.${matchPartNum(partName, partPattern)}`
         : `/${partName}`;
       copyToVFS(js7z, partPath, partTarget);
     }
 
     const first = parts[0];
     return vfsPath
-      ? `${vfsPath.replace(/\.\d+$/, "")}.${first.match(partPattern)![1]}`
+      ? `${vfsPath.replace(/\.\d+$/, "")}.${matchPartNum(first, partPattern)}`
       : `/${first}`;
   }
 
@@ -154,13 +160,14 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
       .readdirSync(dir)
       .filter((f) => partPattern.test(f))
       .sort(
-        (a, b) => parseInt(a.match(partPattern)![1], 10) - parseInt(b.match(partPattern)![1], 10),
+        (a, b) =>
+          parseInt(matchPartNum(a, partPattern), 10) - parseInt(matchPartNum(b, partPattern), 10),
       );
 
     for (const partName of parts) {
       const partPath = path.join(dir, partName);
       const partTarget = vfsPath
-        ? `${vfsPath.replace(/\.part\d+/, `.part${partName.match(partPattern)![1]}`)}`
+        ? `${vfsPath.replace(/\.part\d+/, `.part${matchPartNum(partName, partPattern)}`)}`
         : `/${partName}`;
       copyToVFS(js7z, partPath, partTarget);
     }
@@ -172,7 +179,7 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
       copyToVFS(js7z, rarBase, baseTarget);
     }
 
-    const firstNum = parts.length > 0 ? parts[0].match(partPattern)![1] : "1";
+    const firstNum = parts.length > 0 ? matchPartNum(parts[0], partPattern) : "1";
     return vfsPath ? vfsPath.replace(/\.part\d+/, `.part${firstNum}`) : `/${fn}.part1.rar`;
   }
 
@@ -196,13 +203,14 @@ function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): st
       .readdirSync(dir)
       .filter((f) => rnnPattern.test(f))
       .sort(
-        (a, b) => parseInt(a.match(rnnPattern)![1], 10) - parseInt(b.match(rnnPattern)![1], 10),
+        (a, b) =>
+          parseInt(matchPartNum(a, rnnPattern), 10) - parseInt(matchPartNum(b, rnnPattern), 10),
       );
 
     for (const partName of parts) {
       const partPath = path.join(dir, partName);
       const partTarget = vfsPath
-        ? vfsPath.replace(/\.r\d{2}$/, `.r${partName.match(rnnPattern)![1]}`)
+        ? vfsPath.replace(/\.r\d{2}$/, `.r${matchPartNum(partName, rnnPattern)}`)
         : `/${partName}`;
       copyToVFS(js7z, partPath, partTarget);
     }

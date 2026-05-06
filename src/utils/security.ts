@@ -46,7 +46,7 @@ export async function promptOversizeFile(label: string, size: number): Promise<b
   const choice = await vscode.window.showWarningMessage(
     `"${label}" is ${fmtSize(size)}, exceeding the limit of ${fmtSize(maxSize)}.\n\nExtracting may cause high memory usage or disk exhaustion.`,
     { modal: true },
-    "Extract anyway",
+    t("security.extractAnyway"),
   );
   return choice === "Extract anyway";
 }
@@ -142,7 +142,7 @@ export function validatePassword(pw: string): void {
   if (pw.startsWith("-")) throw new Error(t("security.passwordStartDash"));
   if (pw.includes("\0")) throw new Error(t("security.passwordNullByte"));
   if (pw.includes("\n") || pw.includes("\r")) throw new Error(t("security.passwordNewline"));
-  if (pw.length > 1024) throw new Error("Password too long (max 1024 characters)");
+  if (pw.length > 1024) throw new Error(t("security.passwordTooLong"));
 }
 
 /**
@@ -152,4 +152,20 @@ export function validatePassword(pw: string): void {
 export function sanitizeCliPath(entryName: string): string {
   if (entryName.startsWith("-")) return "./" + entryName;
   return entryName;
+}
+
+/**
+ * Sanitize a target directory path from webview input.
+ * Rejects path traversal components (..) and strips leading slashes.
+ */
+export function sanitizeTargetDir(dir: string): string {
+  if (!dir) return "";
+  let safe = dir.replace(/\\/g, "/").replace(/^\/+/, "");
+  const segments = safe.split("/");
+  for (const seg of segments) {
+    if (seg === ".." || seg === ".") {
+      throw new Error(t("security.pathTraversal"));
+    }
+  }
+  return safe;
 }

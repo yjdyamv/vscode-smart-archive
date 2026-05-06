@@ -15,7 +15,7 @@ import { tryCleanup, OUTPUT_DIR, run7z, streamToVFS } from "./js7z-helpers";
 import { copyDirFromFS } from "../utils/fs";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
-import { checkFileSize, validatePassword } from "../utils/security";
+import { checkFileSize, checkTotalSize, validatePassword } from "../utils/security";
 import { JS7z } from "./js7z-factory";
 
 export async function decompressWith7z(
@@ -99,6 +99,7 @@ async function unwrapInnerTar(
   if (entries.length === 0) return;
 
   let depth = 0;
+  let totalSize = 0;
   const maxDepth = 3;
 
   while (depth < maxDepth) {
@@ -111,6 +112,7 @@ async function unwrapInnerTar(
       progress.report({ message: t("decompress.unwrapTar") });
 
       checkFileSize(fs.statSync(tarPath).size);
+      totalSize = checkTotalSize(totalSize, fs.statSync(tarPath).size);
       const js7z = await JS7z();
 
       try {
@@ -128,7 +130,7 @@ async function unwrapInnerTar(
 
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
         if (!usesMount) {
-          copyDirFromFS(js7z, "/_inner_out", outputDir);
+          totalSize = copyDirFromFS(js7z, "/_inner_out", outputDir);
         }
 
         try {

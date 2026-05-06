@@ -46,6 +46,14 @@ function copyFromFSWithStrip(
       const full = currentDir === "/" ? `/${name}` : `${currentDir}/${name}`;
       const rel = relPart ? `${relPart}/${name}` : name;
 
+      if (name === ".smartarchive") {
+        logger.debug(
+          { event: "extractSelected.skipSmartarchive" },
+          "Skipped internal .smartarchive marker",
+        );
+        continue;
+      }
+
       try {
         const st = js7z.FS.stat(full);
         if (js7z.FS.isDir(st.mode)) {
@@ -110,15 +118,16 @@ function copyFromFSWithStrip(
       checkFileSize(data.byteLength);
 
       // Decompression bomb check: verify reported vs actual size ratio
+      let reportedSize: number | undefined;
       try {
-        const reported = js7z.FS.stat(full).size;
-        if (data.byteLength > reported * 4 && reported > 1024) {
-          throw new Error(
-            `Decompression bomb: reported ${reported}B but decompressed to ${data.byteLength}B`,
-          );
-        }
+        reportedSize = js7z.FS.stat(full).size;
       } catch {
         /* stat may fail, skip bomb check */
+      }
+      if (reportedSize !== undefined && data.byteLength > reportedSize * 4 && reportedSize > 1024) {
+        throw new Error(
+          t("security.decompressionBomb", String(reportedSize), String(data.byteLength)),
+        );
       }
 
       let finalPath = outPath;

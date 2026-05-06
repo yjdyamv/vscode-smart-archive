@@ -12,8 +12,8 @@ import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { streamToVFS } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
-import { checkFileSize, validatePassword } from "../../utils/security";
-import { PREVIEW_TMP_DIR } from "../tempFiles";
+import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
+import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
 
@@ -151,7 +151,7 @@ export async function previewFileFromArchive(
       xArgs.splice(1, 0, `-p${password}`);
     }
     const doSelective = !isWrappedFormat(archiveExt);
-    if (doSelective) xArgs.push(normalizedFile);
+    if (doSelective) xArgs.push(sanitizeCliPath(normalizedFile));
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
       js7z.callMain(xArgs);
@@ -218,6 +218,7 @@ export async function previewFileFromArchive(
     const ext = path.extname(normalizedFile);
     const tmpPath = path.join(PREVIEW_TMP_DIR, `${hash}${ext}`);
     if (!fs.existsSync(tmpPath)) {
+      pruneOldPreviews();
       fs.writeFileSync(tmpPath, buf);
     }
     const uri = vscode.Uri.file(tmpPath);
@@ -243,7 +244,7 @@ async function unwrapArchives(
   try {
     js7z2.FS.writeFile(`/${archiveName}`, new Uint8Array(rawData));
     js7z2.FS.mkdir("/_pv2");
-    const args = ["x", `/${archiveName}`, "-o/_pv2", "-y", target];
+    const args = ["x", `/${archiveName}`, "-o/_pv2", "-y", sanitizeCliPath(target)];
     if (password) {
       validatePassword(password);
       args.splice(1, 0, `-p${password}`);
@@ -332,7 +333,7 @@ export async function renameInArchive(
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
     const fsPath = streamToVFS(js7z, archivePath);
-    const rnArgs = ["rn", fsPath, oldNorm, newNorm];
+    const rnArgs = ["rn", fsPath, sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
     if (password) rnArgs.splice(1, 0, `-p${password}`);
     logger.debug({ event: "rename.7zArgs", args: rnArgs.join(" ") });
 
@@ -358,7 +359,7 @@ async function renameInWrappedArchive(
   const oldNorm = oldPath.replace(/\\/g, "/");
   const newNorm = newPath.replace(/\\/g, "/");
   return withWrappedArchive(archivePath, password, async (js7z2) => {
-    const rnArgs = ["rn", "/inner.tar", oldNorm, newNorm];
+    const rnArgs = ["rn", "/inner.tar", sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
     if (password) rnArgs.splice(1, 0, `-p${password}`);
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z rn inner: ${c}`)));

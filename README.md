@@ -1,5 +1,9 @@
 # Smart Archive
 
+[![CI](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/ci.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/visual-studio-marketplace/v/yjdyamv.smart-archive)](https://marketplace.visualstudio.com/items?itemName=yjdyamv.smart-archive)
+[![License](https://img.shields.io/github/license/yjdyamv/vscode-smart-archive)](LICENSE)
+
 VSCode extension for compressing and decompressing files using **7-Zip WebAssembly** — no native binaries required.
 
 ## Features
@@ -67,26 +71,41 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `smart-archive.defaultFormat` | `7z` | Default archive format |
+| `smart-archive.defaultFormat` | `7z` | Default archive format (7z, zip, tar, tar.gz, tar.bz2, tar.xz, tar.zst, wim) |
 | `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
-| `smart-archive.defaultOutputDir` | `source` | Output location: next to source file or prompt |
-| `smart-archive.collapsedDirPatterns` | `[]` | Extra patterns to exclude when compressing (gitignore syntax) |
+| `smart-archive.defaultOutputDir` | `source` | Output location: `source` (next to archive) or `prompt` (always ask) |
+| `smart-archive.maxFileSizeMiB` | `1024` | Maximum single decompressed file size (MiB) |
+| `smart-archive.maxTotalSizeMiB` | `10240` | Maximum total decompressed size across all files (MiB) |
+| `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory name patterns kept collapsed by default in archive preview |
+| `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Glob patterns for files/dirs to exclude when compressing |
+| `smart-archive.defaultVolumeSize` | `""` | Default split volume size (e.g. `100m`, `1g`). Leave empty to skip. |
+
+## Requirements
+
+- VS Code 1.85.0 or later
+- Node.js 20+ (for development)
 
 ## Development
 
 ```bash
-npm install             # install dependencies
-npm run install:webview # install webview dependencies
-npm run build:webview   # build Vue frontend → media/vue/
-npm run compile         # compile TypeScript → out/
-npm run watch           # watch mode (TS only)
-npm run lint            # oxlint static analysis
-npm run typecheck       # TypeScript type checking
-npm run format          # oxfmt code formatting
-npm run check           # format + lint + typecheck (CI)
-npm run package         # create .vsix
-npm run release         # install + check + package (one step)
+npm install              # install dependencies
+npm run install:webview  # install webview dependencies
+npm run build:webview    # build Vue frontend → media/vue/
+npm run compile          # compile TypeScript → out/
+npm run build            # build webview + compile (one step)
+npm run watch            # watch mode (TS only)
+npm run dev:webview      # Vite dev server with HMR for webview
+npm run lint             # oxlint static analysis
+npm run typecheck        # TypeScript type checking
+npm run format           # oxfmt code formatting
+npm run check            # format + lint + typecheck (CI)
+npm run test             # compile and run tests
+npm run clean            # remove build output
+npm run package          # create .vsix
+npm run release          # install webview + build + check + package
 ```
+
+Press `F5` in VS Code to launch the Extension Development Host. The webview must be built first (`npm run build:webview`).
 
 ## Dependencies
 
@@ -102,8 +121,6 @@ npm run release         # install + check + package (one step)
 
 MIT
 
-## Acknowledge
+## Acknowledgments
 
-Thanks for those helped me and friendly community!
-
-Friend link: [linux.do](https://linux.do)
+Thanks to everyone who contributed and the friendly community!
