@@ -14,6 +14,7 @@ import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { getFullExt, getWrapExtension } from "../../constants";
 import { zstdCompress } from "../../engines/zstd-codec";
 import { validatePassword } from "../../utils/security";
+import { t } from "../../i18n";
 
 /**
  * Run a mutation on a wrapped archive (tar.gz, tar.xz, etc.).
@@ -49,7 +50,7 @@ export async function withWrappedArchive(
 
     const top = js7z.FS.readdir(tmpDir).filter((e: string) => e !== "." && e !== "..");
     const innerTar = top.find((e: string) => e.endsWith(".tar"));
-    if (!innerTar) throw new Error("Wrapped archive: no inner .tar found");
+    if (!innerTar) throw new Error(t("archive.noInnerTar"));
 
     const innerData = js7z.FS.readFile(`${tmpDir}/${innerTar}`, { encoding: "binary" });
     const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });

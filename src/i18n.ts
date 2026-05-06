@@ -640,6 +640,70 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "测试完成，但有警告：\n",
     "zh-tw": "測試完成，但有警告：\n",
   },
+
+  // ---- Add to archive dialog ----
+  "addToArchive.chooseWhat": {
+    en: "Choose what to add to the archive",
+    "zh-cn": "选择要添加到压缩包的内容",
+    "zh-tw": "選擇要新增到壓縮檔的內容",
+  },
+  "addToArchive.selectFiles": {
+    en: "Select Files",
+    "zh-cn": "选择文件",
+    "zh-tw": "選取檔案",
+  },
+  "addToArchive.selectFolders": {
+    en: "Select Folders",
+    "zh-cn": "选择文件夹",
+    "zh-tw": "選取資料夾",
+  },
+  "addToArchive.select": {
+    en: "Select",
+    "zh-cn": "选择",
+    "zh-tw": "選取",
+  },
+
+  // ---- Generic ----
+  "generic.copy": {
+    en: "Copy",
+    "zh-cn": "复制",
+    "zh-tw": "複製",
+  },
+
+  // ---- Decompress errors ----
+  "decompress.cannotRead": {
+    en: "Cannot read file",
+    "zh-cn": "无法读取文件",
+    "zh-tw": "無法讀取檔案",
+  },
+  "decompress.noSplitParts": {
+    en: 'No split volume parts found for "{0}". Ensure all parts are in the same directory.',
+    "zh-cn": '未找到 "{0}" 的分卷文件，请确保所有分卷位于同一目录。',
+    "zh-tw": '未找到 "{0}" 的分割檔案，請確保所有分割檔位於同一目錄。',
+  },
+
+  // ---- Zstd ----
+  "zstd.notAvailable": {
+    en: "zstd not available. Install: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
+    "zh-cn":
+      "zstd 不可用。请安装: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
+    "zh-tw":
+      "zstd 不可用。請安裝: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
+  },
+
+  // ---- Archive operations ----
+  "archive.noInnerTar": {
+    en: "Wrapped archive: no inner TAR found",
+    "zh-cn": "包裹归档: 未找到内部 TAR",
+    "zh-tw": "包裹封存: 未找到內部 TAR",
+  },
+
+  // ---- Security dialogs ----
+  "security.oversizeWarning": {
+    en: "{0} is {1}, exceeding the limit of {2}.\n\nExtracting may cause high memory usage or disk exhaustion.",
+    "zh-cn": "{0} 大小为 {1}，超过了 {2} 的限制。\n\n解压可能导致高内存占用或磁盘耗尽。",
+    "zh-tw": "{0} 大小為 {1}，超過了 {2} 的限制。\n\n解壓可能導致高記憶體佔用或磁碟耗盡。",
+  },
 };
 
 /**

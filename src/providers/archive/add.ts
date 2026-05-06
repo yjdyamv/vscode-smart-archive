@@ -79,7 +79,7 @@ export async function runAddToArchive(): Promise<void> {
           description: t("addToArchive.addBothDesc"),
         },
       ],
-      { placeHolder: "Choose what to add to the archive" },
+      { placeHolder: t("addToArchive.chooseWhat") },
     );
     if (!pick) {
       logger.info({ event: "addToArchive.cancelled", phase: "quickPick" });
@@ -93,7 +93,7 @@ export async function runAddToArchive(): Promise<void> {
         canSelectMany: true,
         canSelectFiles: true,
         canSelectFolders: false,
-        openLabel: pick.desc === "both" ? "Select Files" : "Select",
+        openLabel: pick.desc === "both" ? t("addToArchive.selectFiles") : t("addToArchive.select"),
       });
       if (furis) uris.push(...furis);
     }
@@ -103,7 +103,8 @@ export async function runAddToArchive(): Promise<void> {
         canSelectMany: true,
         canSelectFiles: false,
         canSelectFolders: true,
-        openLabel: pick.desc === "both" ? "Select Folders" : "Select",
+        openLabel:
+          pick.desc === "both" ? t("addToArchive.selectFolders") : t("addToArchive.select"),
       });
       if (duris) uris.push(...duris);
     }
