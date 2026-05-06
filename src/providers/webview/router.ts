@@ -319,7 +319,10 @@ async function handleDelete(
     { modal: true },
     t("delete.confirm"),
   );
-  if (confirm !== t("delete.confirm")) return;
+  if (confirm !== t("delete.confirm")) {
+    webview.postMessage({ c: "loading", t: false });
+    return;
+  }
 
   try {
     webview.postMessage({ c: "loading", t: t("archive.deleting") });
