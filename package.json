@@ -33,14 +33,6 @@
     "AES-256",
     "multi-volume"
   ],
-  "activationEvents": [
-    "onCommand:yjdyamv.smart-archive.compress",
-    "onCommand:yjdyamv.smart-archive.decompress",
-    "onCommand:yjdyamv.smart-archive.browse",
-    "onCommand:yjdyamv.smart-archive.paste",
-    "onCommand:yjdyamv.smart-archive.addToArchive",
-    "onCustomEditor:archiveViewer"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "customEditors": [
@@ -231,18 +223,6 @@
         "title": "Smart Archive: Add to Archive",
         "shortTitle": "Add to Archive",
         "icon": "$(add)"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "yjdyamv.smart-archive.compress",
-        "key": "ctrl+shift+c",
-        "when": "explorerResourceIsFolder || (filesExplorerFocus || listViewHasSelection) && resourceFilename !~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
-      },
-      {
-        "command": "yjdyamv.smart-archive.decompress",
-        "key": "ctrl+shift+x",
-        "when": "explorerResourceIsFolder || filesExplorerFocus || listViewHasSelection"
       }
     ],
     "menus": {
@@ -446,22 +426,23 @@
     }
   },
   "scripts": {
-    "clean": "node -e \"['out','media/vue','test/out'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
+    "clean": "node -e \"['out','media/vue','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
+    "postinstall": "npm --prefix webview-ui install",
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
     "build:webview": "npm --prefix webview-ui run build",
     "dev:webview": "npm --prefix webview-ui run dev",
-    "install:webview": "npm --prefix webview-ui install",
     "build": "npm run build:webview && npm run compile",
-    "test": "npm run compile && tsc -p test && node test/out/core.test.js && node test/out/preview.test.js",
-    "test:extension": "npm run compile && tsc -p test && node test/runTest.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "format": "oxfmt --write src/ test/ webview-ui/src/",
     "format:check": "oxfmt --check src/ test/ webview-ui/src/",
     "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort src/ test/ webview-ui/src/",
     "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort --fix src/ test/ webview-ui/src/",
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
-    "release": "npm run install:webview && npm run build && npm run check && npm run package",
+    "release": "npm run build && npm run check && npm run package",
     "package": "vsce package",
     "package:ovsx": "npm run build && npx ovsx package",
     "publish": "npm run build && npx vsce publish",
@@ -480,16 +461,12 @@
     "pino": "^10.3.1"
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^25.6.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/test-electron": "^2.4.0",
     "@vscode/vsce": "^3.9.1",
-    "glob": "^10.0.0",
-    "mocha": "^11.7.5",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   }
 }

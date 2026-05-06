@@ -1,6 +1,5 @@
 # Smart Archive
 
-[![CI](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/ci.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/visual-studio-marketplace/v/yjdyamv.smart-archive)](https://marketplace.visualstudio.com/items?itemName=yjdyamv.smart-archive)
 [![License](https://img.shields.io/github/license/yjdyamv/vscode-smart-archive)](LICENSE)
 
@@ -26,8 +25,7 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 ## Quick Start
 
 ```bash
-npm install
-npm run install:webview   # install webview dependencies
+npm install               # installs root + webview-ui deps (postinstall hook)
 npm run build:webview     # build Vue frontend
 npm run compile           # compile TypeScript
 ```
@@ -88,8 +86,7 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 ## Development
 
 ```bash
-npm install              # install dependencies
-npm run install:webview  # install webview dependencies
+npm install              # installs root + webview-ui deps (postinstall hook)
 npm run build:webview    # build Vue frontend → media/vue/
 npm run compile          # compile TypeScript → out/
 npm run build            # build webview + compile (one step)
@@ -98,11 +95,13 @@ npm run dev:webview      # Vite dev server with HMR for webview
 npm run lint             # oxlint static analysis
 npm run typecheck        # TypeScript type checking
 npm run format           # oxfmt code formatting
-npm run check            # format + lint + typecheck (CI)
-npm run test             # compile and run tests
+npm run check            # format + lint + typecheck
+npm run test             # vitest (extension + webview-ui)
+npm run test:watch       # vitest watch mode
+npm run test:ui          # vitest UI mode
 npm run clean            # remove build output
 npm run package          # create .vsix
-npm run release          # install webview + build + check + package
+npm run release          # build + check + package
 ```
 
 Press `F5` in VS Code to launch the Extension Development Host. The webview must be built first (`npm run build:webview`).

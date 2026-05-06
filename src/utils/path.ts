@@ -53,7 +53,7 @@ export function fixArchiveEncoding(raw: string): string {
 
   // Fast path: pure ASCII needs no correction
   // eslint-disable-next-line no-control-regex
-  if (/^[\x00-\x7F]*$/.test(raw)) return raw;
+  if (/^[ -~]*$/.test(raw)) return raw;
 
   // Fast path: already valid UTF-8 CJK
   if (!raw.includes("\uFFFD") && /[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/.test(raw)) {
