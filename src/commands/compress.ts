@@ -408,6 +408,7 @@ export async function compressCommand(
         } else {
           const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, ext);
           if (!saveUri) {
+            logger.info({ event: "compress.cancelled", step: "save" });
             return;
           }
           outputPath = saveUri.fsPath;

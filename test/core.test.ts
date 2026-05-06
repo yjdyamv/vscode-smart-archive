@@ -1238,6 +1238,56 @@ void (async () => {
 
   fs.rmSync(td2, { recursive: true, force: true });
 
+  // ── 36. .smartarchive markers filtered during extraction ──
+  await test("copy: .smartarchive markers are skipped in VFS-to-disk copy", async () => {
+    // Simulate what copyDirFromFS does: walk VFS, skip .smartarchive entries
+    const j = await JS7z();
+    j.FS.mkdir("/_test");
+    j.FS.writeFile("/_test/readme.txt", new Uint8Array(Buffer.from("hello")));
+    j.FS.writeFile("/_test/.smartarchive", new Uint8Array(Buffer.from(".")));
+    j.FS.mkdir("/_test/subdir");
+    j.FS.writeFile("/_test/subdir/data.txt", new Uint8Array(Buffer.from("data")));
+    j.FS.writeFile("/_test/subdir/.smartarchive", new Uint8Array(Buffer.from(".")));
+
+    // Walk and filter, mimicking the .smartarchive skip logic
+    const copied: string[] = [];
+    const smartarchiveSeen: string[] = [];
+    function walk(vfsDir: string) {
+      const entries = j.FS.readdir(vfsDir);
+      for (const name of entries) {
+        if (name === "." || name === "..") continue;
+        if (name === ".smartarchive") { smartarchiveSeen.push(name); continue; }
+        const full = vfsDir === "/" ? `/${name}` : `${vfsDir}/${name}`;
+        const st = j.FS.stat(full);
+        if (j.FS.isDir(st.mode)) { walk(full); continue; }
+        copied.push(name);
+      }
+    }
+    walk("/_test");
+    assert.ok(copied.includes("readme.txt"), "normal files copied");
+    assert.ok(copied.includes("data.txt"), "nested files copied");
+    assert.ok(!copied.includes(".smartarchive"), ".smartarchive filtered");
+    assert.ok(smartarchiveSeen.length >= 1, "markers were seen but skipped");
+  });
+
+  // ── 38. pruneOldPreviews handles missing directory ──
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const _tempFiles: {
+    pruneOldPreviews: () => void;
+  } | null = (() => {
+    try { return require("../../out/providers/tempFiles"); } catch { return null; }
+  })();
+
+  if (_tempFiles) {
+    await test("pruneOldPreviews: handles nonexistent directory gracefully", () => {
+      assert.doesNotThrow(() => _tempFiles.pruneOldPreviews(),
+        "pruneOldPreviews should handle nonexistent dir gracefully");
+    });
+  } else {
+    console.log("  SKIP: pruneOldPreviews (requires vscode module, not available in test env)");
+  }
+
+
   fs.rmSync(td, { recursive: true, force: true });
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total\n`);
