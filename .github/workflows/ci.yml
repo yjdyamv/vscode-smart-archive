@@ -8,20 +8,53 @@ on:
 
 jobs:
   lint-and-test:
-    name: Lint & Test
-    runs-on: ubuntu-latest
+    name: Lint & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20, 22]
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - run: npm ci
+
+      - run: npm run install:webview
+
+      - run: npm run build:webview
 
       - name: Check (format + lint + typecheck)
         run: npm run check
 
       - name: Test
         run: npm test
+
+  package:
+    name: Package VSIX
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run install:webview
+
+      - run: npm run build
+
+      - run: npm run package
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: smart-archive.vsix
+          path: "*.vsix"

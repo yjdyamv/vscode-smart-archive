@@ -409,6 +409,237 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": '多卷 RAR: "{0}" 需要同目录下的 .rar 文件。',
     "zh-tw": '多卷 RAR: "{0}" 需要同目錄下的 .rar 檔案。',
   },
+
+  // ---- Password UI ----
+  "password.show": {
+    en: "Show password",
+    "zh-cn": "显示密码",
+    "zh-tw": "顯示密碼",
+  },
+  "password.hide": {
+    en: "Hide password",
+    "zh-cn": "隐藏密码",
+    "zh-tw": "隱藏密碼",
+  },
+  "input.clear": {
+    en: "Clear",
+    "zh-cn": "清除",
+    "zh-tw": "清除",
+  },
+
+  // ---- Wizard steps ----
+  "wizard.step.format": {
+    en: "Format",
+    "zh-cn": "格式",
+    "zh-tw": "格式",
+  },
+  "wizard.step.level": {
+    en: "Step 2: Level",
+    "zh-cn": "第 2 步：压缩级别",
+    "zh-tw": "第 2 步：壓縮級別",
+  },
+  "wizard.step.volume": {
+    en: "Step 3: Volume size",
+    "zh-cn": "第 3 步：分卷大小",
+    "zh-tw": "第 3 步：分卷大小",
+  },
+  "wizard.step.encrypt": {
+    en: "Step 4: Encryption",
+    "zh-cn": "第 4 步：加密",
+    "zh-tw": "第 4 步：加密",
+  },
+
+  // ---- Archive operations ----
+  "delete.confirm": {
+    en: "Delete",
+    "zh-cn": "删除",
+    "zh-tw": "刪除",
+  },
+  "archive.deleting": {
+    en: "Deleting...",
+    "zh-cn": "正在删除...",
+    "zh-tw": "正在刪除...",
+  },
+  "archive.deletingProgress": {
+    en: "Delete {0} selected item(s) from archive? This cannot be undone.",
+    "zh-cn": "确定要从压缩包中永久删除 {0} 个选中项吗？",
+    "zh-tw": "確定要從壓縮檔中永久刪除 {0} 個選中項嗎？",
+  },
+  "archive.renaming": {
+    en: "Renaming...",
+    "zh-cn": "正在重命名...",
+    "zh-tw": "正在重新命名...",
+  },
+  "archive.addingFilesProgress": {
+    en: "Adding files...",
+    "zh-cn": "正在添加文件...",
+    "zh-tw": "正在新增檔案...",
+  },
+  "archive.creatingFolder": {
+    en: "Creating folder...",
+    "zh-cn": "正在创建文件夹...",
+    "zh-tw": "正在建立資料夾...",
+  },
+  "archive.converting": {
+    en: "Converting...",
+    "zh-cn": "正在转换格式...",
+    "zh-tw": "正在轉換格式...",
+  },
+  "archive.merging": {
+    en: "Merging volumes...",
+    "zh-cn": "正在合并分卷...",
+    "zh-tw": "正在合併分卷...",
+  },
+  "archive.splitting": {
+    en: "Splitting...",
+    "zh-cn": "正在分割分卷...",
+    "zh-tw": "正在分割分卷...",
+  },
+  "archive.encrypting": {
+    en: "Encrypting...",
+    "zh-cn": "正在加密...",
+    "zh-tw": "正在加密...",
+  },
+  "archive.decrypting": {
+    en: "Decrypting...",
+    "zh-cn": "正在解密...",
+    "zh-tw": "正在解密...",
+  },
+  "archive.renamePrompt": {
+    en: "Rename to",
+    "zh-cn": "重命名为",
+    "zh-tw": "重新命名為",
+  },
+  "archive.folderNamePrompt": {
+    en: "Folder name",
+    "zh-cn": "文件夹名称",
+    "zh-tw": "資料夾名稱",
+  },
+  "archive.folderNamePlaceholder": {
+    en: "new-folder",
+    "zh-cn": "新建文件夹",
+    "zh-tw": "新建資料夾",
+  },
+  "archive.encryptPrompt": {
+    en: "Enter a password to encrypt this archive",
+    "zh-cn": "输入密码以加密此压缩包",
+    "zh-tw": "輸入密碼以加密此壓縮檔",
+  },
+  "archive.encryptConfirm": {
+    en: "Confirm encryption password",
+    "zh-cn": "确认加密密码",
+    "zh-tw": "確認加密密碼",
+  },
+  "archive.decryptPrompt": {
+    en: "Enter the archive password to decrypt",
+    "zh-cn": "输入压缩包密码以解密",
+    "zh-tw": "輸入壓縮檔密碼以解密",
+  },
+
+  // ---- Validation ----
+  "validation.nameEmpty": {
+    en: "Name cannot be empty",
+    "zh-cn": "名称不能为空",
+    "zh-tw": "名稱不能為空",
+  },
+  "validation.nameInvalidChar": {
+    en: "Invalid character",
+    "zh-cn": "无效字符",
+    "zh-tw": "無效字元",
+  },
+  "validation.nameInvalidChars": {
+    en: 'Invalid characters: < > : " / \\ | ? *',
+    "zh-cn": '非法字符：< > : " / \\ | ? *',
+    "zh-tw": '無效字元：< > : " / \\ | ? *',
+  },
+  "validation.nameSameName": {
+    en: "New name is the same as current",
+    "zh-cn": "新名称与当前名称相同",
+    "zh-tw": "新名稱與當前名稱相同",
+  },
+  "validation.nameTooLong": {
+    en: "Name too long",
+    "zh-cn": "名称过长",
+    "zh-tw": "名稱過長",
+  },
+  "validation.passwordMismatch": {
+    en: "Passwords do not match",
+    "zh-cn": "密码不匹配",
+    "zh-tw": "密碼不匹配",
+  },
+
+  // ---- Add to archive QuickPick ----
+  "addToArchive.addFiles": {
+    en: "Add Files",
+    "zh-cn": "添加文件",
+    "zh-tw": "新增檔案",
+  },
+  "addToArchive.addFilesDesc": {
+    en: "Select individual files",
+    "zh-cn": "选择单个文件",
+    "zh-tw": "選取個別檔案",
+  },
+  "addToArchive.addFolders": {
+    en: "Add Folders",
+    "zh-cn": "添加文件夹",
+    "zh-tw": "新增資料夾",
+  },
+  "addToArchive.addFoldersDesc": {
+    en: "Select whole folders",
+    "zh-cn": "选择整个文件夹",
+    "zh-tw": "選取整個資料夾",
+  },
+  "addToArchive.addBoth": {
+    en: "Add Both",
+    "zh-cn": "添加文件和文件夹",
+    "zh-tw": "新增檔案和資料夾",
+  },
+  "addToArchive.addBothDesc": {
+    en: "Select files then folders",
+    "zh-cn": "依次选择文件和文件夹",
+    "zh-tw": "依序選取檔案和資料夾",
+  },
+
+  // ---- Size limit ----
+  "security.extractAnyway": {
+    en: "Extract anyway",
+    "zh-cn": "仍然解压",
+    "zh-tw": "仍然解壓",
+  },
+  "security.passwordTooLong": {
+    en: "Password too long (max 1024 characters)",
+    "zh-cn": "密码过长（最多 1024 个字符）",
+    "zh-tw": "密碼過長（最多 1024 個字元）",
+  },
+  "security.notValidRar": {
+    en: "Not a valid RAR archive (bad header)",
+    "zh-cn": "不是有效的 RAR 压缩文件（文件头错误）",
+    "zh-tw": "不是有效的 RAR 壓縮檔（檔案頭錯誤）",
+  },
+
+  // ---- Preview ----
+  "preview.notFound": {
+    en: "Preview file not found: {0}",
+    "zh-cn": "预览文件未找到: {0}",
+    "zh-tw": "預覽檔案未找到: {0}",
+  },
+  "preview.notFoundInner": {
+    en: "Preview file not found in inner archive: {0}",
+    "zh-cn": "在内层压缩包中未找到预览文件: {0}",
+    "zh-tw": "在內層壓縮檔中未找到預覽檔案: {0}",
+  },
+
+  // ---- Test ----
+  "test.passed": {
+    en: "Archive integrity test passed",
+    "zh-cn": "压缩包完整性测试通过",
+    "zh-tw": "壓縮檔完整性測試通過",
+  },
+  "test.warnings": {
+    en: "Test completed with warnings:\n",
+    "zh-cn": "测试完成，但有警告：\n",
+    "zh-tw": "測試完成，但有警告：\n",
+  },
 };
 
 /**

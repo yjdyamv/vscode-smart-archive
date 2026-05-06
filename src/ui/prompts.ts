@@ -69,15 +69,15 @@ export async function promptPassword(hint: string): Promise<PasswordResult> {
     let shown = false;
     const eyeBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye"),
-      tooltip: "Show password",
+      tooltip: t("password.show"),
     };
     const eyeOffBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye-closed"),
-      tooltip: "Hide password",
+      tooltip: t("password.hide"),
     };
     const clearBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("close"),
-      tooltip: "Clear",
+      tooltip: t("input.clear"),
     };
     ib.prompt = t("password.prompt");
     ib.placeholder = hint;

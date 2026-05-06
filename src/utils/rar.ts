@@ -10,6 +10,7 @@
  */
 
 import * as fs from "fs";
+import { t } from "../i18n";
 
 /** Matches .rar and multi-volume parts .r00–.r99 */
 const RAR_PATTERN = /^\.(?:rar|r\d{2})$/i;
@@ -56,7 +57,7 @@ export function validateRarHeader(filePath: string): void {
     const buf = Buffer.alloc(4);
     const n = fs.readSync(fd, buf, 0, 4, 0);
     if (n < 4 || buf.toString("ascii", 0, 4) !== "Rar!") {
-      throw new Error("Not a valid RAR archive (bad header)");
+      throw new Error(t("security.notValidRar"));
     }
   } finally {
     fs.closeSync(fd);
