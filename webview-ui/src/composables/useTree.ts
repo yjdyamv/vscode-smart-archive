@@ -16,9 +16,15 @@ function persistExpanded(paths: Set<string>): void {
   saveState({ expanded: [...paths] });
 }
 
-function loadExpanded(): Set<string> {
-  const state = loadState<{ expanded?: string[] }>();
-  return new Set(state?.expanded ?? []);
+function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
+  for (const node of nodes) {
+    if (node.path === path) return node;
+    if (node.children) {
+      const found = findNode(node.children, path);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
@@ -57,8 +63,10 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     const result: FlatNode[] = [];
     function walk(nodes: TreeNodeData[], depth: number, inheritCollapsed: boolean) {
       for (const node of nodes) {
-        const hasKids = !!(node.kind === "DIRECTORY"
-          && ((node.children && node.children.length > 0) || node.hasMore));
+        const hasKids = !!(
+          node.kind === "DIRECTORY" &&
+          ((node.children && node.children.length > 0) || node.hasMore)
+        );
         const exp = expandedPaths.value.has(node.path);
         const isCollapsed = !!node.collapsed || inheritCollapsed;
         result.push({
@@ -91,8 +99,10 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   function expandAll(): void {
     function collect(nodes: TreeNodeData[]) {
       for (const node of nodes) {
-        const hasKids = !!(node.kind === "DIRECTORY"
-          && ((node.children && node.children.length > 0) || node.hasMore));
+        const hasKids = !!(
+          node.kind === "DIRECTORY" &&
+          ((node.children && node.children.length > 0) || node.hasMore)
+        );
         if (hasKids) {
           expandedPaths.value.add(node.path);
           if (node.children) collect(node.children);
@@ -117,17 +127,6 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     }
   }
 
-  function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
-    for (const node of nodes) {
-      if (node.path === path) return node;
-      if (node.children) {
-        const found = findNode(node.children, path);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-
   function insertChildren(parentPath: string, children: TreeNodeData[]): string[] {
     const node = findNode(treeData.value, parentPath);
     if (!node) return [];
@@ -147,8 +146,11 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     const result: string[] = [];
     function walk(nodes: TreeNodeData[]) {
       for (const node of nodes) {
-        if (node.hasMore && (!node.children || node.children.length === 0)
-          && expandedPaths.value.has(node.path)) {
+        if (
+          node.hasMore &&
+          (!node.children || node.children.length === 0) &&
+          expandedPaths.value.has(node.path)
+        ) {
           result.push(node.path);
         }
         if (node.children) walk(node.children);

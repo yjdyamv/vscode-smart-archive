@@ -30,8 +30,6 @@ describe("Toast", () => {
       props: { msg: "Error", ok: false, visible: true },
     });
     const div = wrapper.find(".fixed");
-    expect(div.classes().join(" ")).toContain(
-      "bg-[var(--vscode-inputValidation-errorBackground)]",
-    );
+    expect(div.classes().join(" ")).toContain("bg-[var(--vscode-inputValidation-errorBackground)]");
   });
 });

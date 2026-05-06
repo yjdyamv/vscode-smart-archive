@@ -415,7 +415,7 @@ void (async () => {
   });
 
   await test("parse7zListing: skips archive self-reference", () => {
-    const stdout = mock7zListing([
+    const _stdout = mock7zListing([
       { path: "/archive.7z", size: 200, attr: "A" },
       { path: "/archive.7z", size: 200, attr: "A" }, // without leading slash
       { path: "readme.md", size: 30, attr: "A" },

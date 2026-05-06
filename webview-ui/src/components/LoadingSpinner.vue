@@ -11,11 +11,16 @@ defineProps<{ msg: string }>();
 
 <style scoped>
 .spinner {
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border: 3px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
   border-top-color: var(--vscode-progressBar-background, #007acc);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>

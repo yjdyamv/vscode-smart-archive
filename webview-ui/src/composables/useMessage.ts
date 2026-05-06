@@ -5,13 +5,13 @@ export function useMessage() {
     vscode.postMessage(msg);
   }
 
-  function onMessage(handler: (msg: Record<string, unknown>) => void): () => void {
-    const listener = (e: MessageEvent) => handler(e.data as Record<string, unknown>);
-    window.addEventListener("message", listener);
-    return () => window.removeEventListener("message", listener);
-  }
-
   return { post, onMessage };
+}
+
+function onMessage(handler: (msg: Record<string, unknown>) => void): () => void {
+  const listener = (e: MessageEvent) => handler(e.data as Record<string, unknown>);
+  window.addEventListener("message", listener);
+  return () => window.removeEventListener("message", listener);
 }
 
 export function saveState(state: unknown): void {
