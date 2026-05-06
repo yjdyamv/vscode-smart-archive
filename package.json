@@ -225,13 +225,7 @@
         "icon": "$(add)"
       }
     ],
-    "keybindings": [
-      {
-        "command": "yjdyamv.smart-archive.compress",
-        "key": "ctrl+shift+c",
-        "when": "explorerResourceIsFolder || (filesExplorerFocus || listViewHasSelection) && resourceScheme == file && resourceFilename !~ /\\.(7z|zip|rar|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
-      }
-    ],
+    "keybindings": [],
     "menus": {
       "commandPalette": [
         {
