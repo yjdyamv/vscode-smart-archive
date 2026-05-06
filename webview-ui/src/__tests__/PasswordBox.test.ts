@@ -22,7 +22,7 @@ describe("PasswordBox", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
     const input = wrapper.find("input");
     await input.setValue("secret123");
-    await wrapper.find("button.btn").trigger("click");
+    await wrapper.find(".unlock-btn").trigger("click");
     expect(wrapper.emitted("submit")?.[0]).toEqual(["secret123"]);
   });
 
@@ -38,7 +38,7 @@ describe("PasswordBox", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
     const input = wrapper.find("input");
     await input.setValue("");
-    await wrapper.find("button.btn").trigger("click");
+    await wrapper.find(".unlock-btn").trigger("click");
     expect(wrapper.emitted("submit")).toBeUndefined();
   });
 
@@ -70,19 +70,20 @@ describe("PasswordBox", () => {
 
   it("toggles password visibility", async () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
-    const eyeBtn = wrapper.find('button[class*="absolute"]');
+    const eyeBtn = wrapper.find(".codicon-eye");
     expect(eyeBtn.exists()).toBe(true);
 
-    await eyeBtn.trigger("mousedown");
+    await eyeBtn.trigger("click");
     expect(wrapper.find('input[type="text"]').exists()).toBe(true);
 
-    await eyeBtn.trigger("mouseup");
+    await eyeBtn.trigger("click");
     expect(wrapper.find('input[type="password"]').exists()).toBe(true);
   });
 
   it("has error state hidden by default", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
-    const errDiv = wrapper.find(".min-h-\\[1\\.4em\\]");
-    expect(errDiv.attributes("style")).toContain("opacity: 0");
+    const errDiv = wrapper.find(".pw-error");
+    expect(errDiv.exists()).toBe(true);
+    expect(errDiv.classes()).not.toContain("show");
   });
 });
