@@ -88,15 +88,15 @@ function promptInputBox(opts: {
     let shown = false;
     const eyeBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye"),
-      tooltip: "Show password",
+      tooltip: t("password.show"),
     };
     const eyeOffBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye-closed"),
-      tooltip: "Hide password",
+      tooltip: t("password.hide"),
     };
     const clearBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("close"),
-      tooltip: "Clear",
+      tooltip: t("input.clear"),
     };
     const isPw = !!opts.password;
     ib.prompt = opts.prompt;
@@ -153,7 +153,7 @@ async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectFormat"),
     withBack: false,
-    title: "Format",
+    title: t("wizard.step.format"),
   });
   if (res.kind !== "ok") return res;
   return {
@@ -175,7 +175,7 @@ async function promptLevelWizard(): Promise<StepResult<number>> {
   const items = order.map((i) => ({ label: labels[i], level: LEVEL_VALUES[i] }));
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectLevel"),
-    title: "Step 2: Level",
+    title: t("wizard.step.level"),
   });
   if (res.kind !== "ok") return res;
   const idx = labels.indexOf(res.value.label);
@@ -214,7 +214,7 @@ async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
   }
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectVolume"),
-    title: "Step 3: Volume size",
+    title: t("wizard.step.volume"),
   });
   if (res.kind !== "ok") return res;
   if (res.value.value === "__custom__") {
@@ -235,7 +235,7 @@ async function promptEncryptWizard(): Promise<StepResult<boolean>> {
       { label: t("encrypt.no"), value: false },
       { label: t("encrypt.yes"), value: true },
     ],
-    { placeHolder: t("encrypt.title"), title: "Step 4: Encryption" },
+    { placeHolder: t("encrypt.title"), title: t("wizard.step.encrypt") },
   );
   if (res.kind !== "ok") return res;
   return { kind: "ok", value: res.value.value };

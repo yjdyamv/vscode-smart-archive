@@ -75,15 +75,15 @@ function pwInputBox(
     let shown = false;
     const eyeBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye"),
-      tooltip: "Show password",
+      tooltip: t("password.show"),
     };
     const eyeOffBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye-closed"),
-      tooltip: "Hide password",
+      tooltip: t("password.hide"),
     };
     const clearBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("close"),
-      tooltip: "Clear",
+      tooltip: t("input.clear"),
     };
     ib.prompt = prompt;
     ib.password = true;
@@ -162,7 +162,9 @@ async function convertArchive(
         },
         outputPath: dstPath,
         password: outputPassword ?? password,
-        level: 5,
+        level: vscode.workspace
+          .getConfiguration("smart-archive")
+          .get<number>("defaultCompressionLevel", 5),
         volumeSize,
       },
       { report: () => {} },
@@ -311,8 +313,16 @@ async function handleDelete(
     return;
   }
   logger.info({ event: "webview.delSel", count: msg.paths.length, first: msg.paths[0] });
+
+  const confirm = await vscode.window.showWarningMessage(
+    t("archive.deletingProgress", String(msg.paths.length)),
+    { modal: true },
+    t("delete.confirm"),
+  );
+  if (confirm !== t("delete.confirm")) return;
+
   try {
-    webview.postMessage({ c: "loading", t: "Deleting..." });
+    webview.postMessage({ c: "loading", t: t("archive.deleting") });
     await deleteFromArchive(s.filePath, msg.paths, s.password);
     try {
       await setupWebview(

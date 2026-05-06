@@ -57,13 +57,21 @@ export async function runAddToArchive(): Promise<void> {
 
     const pick = await vscode.window.showQuickPick(
       [
-        { label: "$(new-file) Add Files", desc: "files", description: "Select individual files" },
         {
-          label: "$(new-folder) Add Folders",
-          desc: "folders",
-          description: "Select whole folders",
+          label: `$(new-file) ${t("addToArchive.addFiles")}`,
+          desc: "files",
+          description: t("addToArchive.addFilesDesc"),
         },
-        { label: "$(files) Add Both", desc: "both", description: "Select files then folders" },
+        {
+          label: `$(new-folder) ${t("addToArchive.addFolders")}`,
+          desc: "folders",
+          description: t("addToArchive.addFoldersDesc"),
+        },
+        {
+          label: `$(files) ${t("addToArchive.addBoth")}`,
+          desc: "both",
+          description: t("addToArchive.addBothDesc"),
+        },
       ],
       { placeHolder: "Choose what to add to the archive" },
     );

@@ -11,6 +11,7 @@ import { t } from "../i18n";
 import { initTempCleanup } from "./tempFiles";
 import { setupWebview } from "./webviewHandler";
 import { pasteCopiedFromArchive } from "./copyPaste";
+import { EXT_ID } from "./webview/state";
 
 class ArchiveEditorProvider implements vscode.CustomReadonlyEditorProvider {
   openCustomDocument(uri: vscode.Uri): vscode.CustomDocument {
@@ -21,9 +22,11 @@ class ArchiveEditorProvider implements vscode.CustomReadonlyEditorProvider {
     document: vscode.CustomDocument,
     webviewPanel: vscode.WebviewPanel,
   ): Promise<void> {
+    const extUri = vscode.extensions.getExtension(EXT_ID)!.extensionUri;
     webviewPanel.webview.options = {
       enableScripts: true,
       enableCommandUris: true,
+      localResourceRoots: [extUri],
     };
     await setupWebview(webviewPanel.webview, document.uri);
   }
@@ -44,7 +47,11 @@ export async function openArchivePreview(archiveUri: vscode.Uri): Promise<void> 
     "archiveViewer",
     t("decompress.previewTitle"),
     vscode.ViewColumn.Active,
-    { enableScripts: true, retainContextWhenHidden: true },
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [vscode.extensions.getExtension(EXT_ID)!.extensionUri],
+    },
   );
   await setupWebview(panel.webview, archiveUri);
 }

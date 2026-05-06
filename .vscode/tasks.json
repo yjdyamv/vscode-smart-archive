@@ -4,7 +4,7 @@
     {
       "type": "npm",
       "script": "compile",
-      "problemMatcher": [],
+      "problemMatcher": "$tsc",
       "label": "npm: compile"
     },
     {
@@ -12,6 +12,26 @@
       "script": "build:webview",
       "problemMatcher": [],
       "label": "npm: build webview"
+    },
+    {
+      "type": "npm",
+      "script": "watch",
+      "problemMatcher": "$tsc-watch",
+      "isBackground": true,
+      "label": "npm: watch (tsc)"
+    },
+    {
+      "type": "npm",
+      "script": "dev:webview",
+      "problemMatcher": [],
+      "isBackground": true,
+      "label": "npm: dev webview"
+    },
+    {
+      "label": "watch",
+      "dependsOn": ["npm: watch (tsc)", "npm: dev webview"],
+      "group": "build",
+      "problemMatcher": []
     },
     {
       "type": "npm",
