@@ -10,6 +10,6 @@ describe("LoadingSpinner", () => {
 
   it("has spinner element", () => {
     const wrapper = mount(LoadingSpinner, { props: { msg: "Working" } });
-    expect(wrapper.find(".animate-spin").exists()).toBe(true);
+    expect(wrapper.find(".spinner").exists()).toBe(true);
   });
 });

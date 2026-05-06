@@ -1,12 +1,19 @@
-import * as path from "path";
-import * as fs from "fs";
+/**
+ * Test helpers — Smart Archive VSCode Extension
+ *
+ * Shared VFS utilities, compression/decompression wrappers, tree builders,
+ * and format utilities used by extension test files.
+ * Pure logic — no vscode dependency.
+ */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const JS7z = require("js7z-tools") as (opts?: Record<string, unknown>) => Promise<JS7zInstance>;
+import * as path from "path";
+
+// js7z-tools is a CommonJS module
+const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
 
 // ── Types ──
 
-interface JS7zInstance {
+export interface JS7zInstance {
   FS: {
     mkdir(p: string): void;
     writeFile(p: string, data: Uint8Array): void;
@@ -27,34 +34,24 @@ interface JS7zInstance {
   NODEFS: unknown;
 }
 
-interface TreeNode {
+export interface TreeNode {
   name: string;
   path: string;
   size: number;
   kind: string;
   children?: TreeNode[];
+  collapsed?: boolean;
 }
 
-// ── Test runner ──
-
-let passed = 0;
-let failed = 0;
-
-async function test(name: string, fn: () => Promise<void> | void): Promise<void> {
-  try {
-    await fn();
-    passed++;
-    console.log(`  PASS: ${name}`);
-  } catch (err) {
-    failed++;
-    console.error(`  FAIL: ${name}`);
-    console.error(`        ${(err as Error).message}`);
-  }
+export interface FlatEntry {
+  path: string;
+  size: number;
+  type: string;
 }
 
 // ── VFS helpers ──
 
-function mkdirP(j: JS7zInstance, p: string): void {
+export function mkdirP(j: JS7zInstance, p: string): void {
   let cur = "";
   for (const part of p.split("/").filter(Boolean)) {
     cur += "/" + part;
@@ -66,13 +63,17 @@ function mkdirP(j: JS7zInstance, p: string): void {
   }
 }
 
-function run7z(j: JS7zInstance, args: string[]): Promise<void> {
+export function run7z(j: JS7zInstance, args: string[]): Promise<void> {
   let err = "";
+  j.print = () => {};
   j.printErr = (t: string) => {
     err += t + "\n";
   };
   return new Promise((resolve, reject) => {
     j.onExit = (ec: number) => {
+      j.onExit = null;
+      j.print = undefined;
+      j.printErr = undefined;
       if (ec === 0) resolve();
       else reject(new Error(`7z exit ${ec}\n${err}`));
     };
@@ -80,7 +81,13 @@ function run7z(j: JS7zInstance, args: string[]): Promise<void> {
   });
 }
 
-async function j7zCompress(
+export function disposeJS7z(j: JS7zInstance): void {
+  j.onExit = null;
+  j.print = undefined;
+  j.printErr = undefined;
+}
+
+export async function j7zCompress(
   files: Record<string, string>,
   archive: string,
   extra: string[] = [],
@@ -95,7 +102,7 @@ async function j7zCompress(
   return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
 }
 
-async function j7zCompressDir(
+export async function j7zCompressDir(
   files: Record<string, string>,
   archive: string,
   extra: string[] = [],
@@ -111,7 +118,7 @@ async function j7zCompressDir(
   return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
 }
 
-function copyFS(j: JS7zInstance, dir: string, prefix: string, res: Record<string, string>): void {
+export function copyFS(j: JS7zInstance, dir: string, prefix: string, res: Record<string, string>): void {
   for (const e of j.FS.readdir(dir)) {
     if (e === "." || e === "..") continue;
     const fp = path.posix.join(dir, e);
@@ -135,7 +142,7 @@ function copyFS(j: JS7zInstance, dir: string, prefix: string, res: Record<string
 
 // ── Selective extraction helpers ──
 
-async function j7zSelective(
+export async function j7zSelective(
   buf: Buffer,
   paths: string[],
   pw = "",
@@ -144,7 +151,7 @@ async function j7zSelective(
   j.FS.writeFile("/a", new Uint8Array(buf));
   j.FS.mkdir("/o");
   const args = ["x", "/a", "-o/o"];
-  if (pw) args.splice(1, 0, "-p" + pw);
+  if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
   args.push(...paths);
   const res: Record<string, string> = {};
   await run7z(j, args);
@@ -152,12 +159,12 @@ async function j7zSelective(
   return res;
 }
 
-async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string, string>> {
+export async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string, string>> {
   const j = await JS7z();
   j.FS.writeFile("/a", new Uint8Array(buf));
   j.FS.mkdir("/o");
   const args = ["x", "/a", "-o/o"];
-  if (pw) args.splice(1, 0, "-p" + pw);
+  if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
   const res: Record<string, string> = {};
   await run7z(j, args);
   copyFS(j, "/o", "", res);
@@ -166,15 +173,14 @@ async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string, strin
 
 // ── Wrapped archive helpers ──
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const zstd = require("@bokuweb/zstd-wasm") as {
+const zstd: {
   init: () => Promise<void>;
   compress: (data: Uint8Array, level?: number) => Uint8Array;
   decompress: (data: Uint8Array) => Uint8Array;
-};
+} = require("@bokuweb/zstd-wasm");
 let zstdReady = false;
 
-async function createWrapped(files: Record<string, string>, ext: string): Promise<Buffer> {
+export async function createWrapped(files: Record<string, string>, ext: string): Promise<Buffer> {
   const j1 = await JS7z();
   for (const [fp, c] of Object.entries(files)) {
     const d = path.posix.dirname(fp);
@@ -197,7 +203,7 @@ async function createWrapped(files: Record<string, string>, ext: string): Promis
   return Buffer.from(j2.FS.readFile("/_w." + ext, { encoding: "binary" }));
 }
 
-function walkFS(j: JS7zInstance, dir: string, prefix: string): string[] {
+export function walkFS(j: JS7zInstance, dir: string, prefix: string): string[] {
   const res: string[] = [];
   for (const name of j.FS.readdir(dir)) {
     if (name === "." || name === "..") continue;
@@ -218,13 +224,10 @@ function walkFS(j: JS7zInstance, dir: string, prefix: string): string[] {
   return res;
 }
 
-// ── Tree builder (production logic for tests) ──
+// ── Tree builder (production-mirror) ──
 
-function buildTree(
-  entries: { path: string; size: number; type: string }[],
-  archiveName: string,
-): TreeNode[] {
-  const normed: { entry: (typeof entries)[0]; parts: string[] }[] = [];
+export function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
+  const normed: { entry: FlatEntry; parts: string[] }[] = [];
   for (const e of entries) {
     const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
     if (parts.length === 1 && parts[0] === archiveName) continue;
@@ -279,9 +282,7 @@ function buildTree(
   return root;
 }
 
-function countTreeStats(
-  nodes: TreeNode[],
-): { files: number; dirs: number; total: number } {
+export function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total: number } {
   let files = 0;
   let dirs = 0;
   for (const n of nodes) {
@@ -301,7 +302,9 @@ function countTreeStats(
 
 // ── Encryption detection ──
 
-async function isEncryptedInline(filePath: string): Promise<boolean> {
+import * as fs from "fs";
+
+export async function isEncryptedInline(filePath: string): Promise<boolean> {
   const data = fs.readFileSync(filePath);
   let stdout = "",
     stderr = "";
@@ -313,7 +316,7 @@ async function isEncryptedInline(filePath: string): Promise<boolean> {
   try {
     await new Promise<void>((resolve, reject) => {
       j.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
-      j.callMain(["l", "-slt", "-p", "/_ie"]);
+      j.callMain(["l", "-slt", "-p-", "/_ie"]);
     });
     return stdout.includes("Encrypted = +");
   } catch {
@@ -322,16 +325,15 @@ async function isEncryptedInline(filePath: string): Promise<boolean> {
   }
 }
 
-// ── Format / encoding utilities ──
+// ── Format / encoding utilities (mirrors src/) ──
 
-function fixArchiveEncoding(raw: string): string {
+export function fixArchiveEncoding(raw: string): string {
   if (!raw) return raw;
-  // oxlint-disable-next-line no-control-regex
-  if (/^[\x00-\x7F]*$/.test(raw)) return raw;
+  if (/^[ -~]*$/.test(raw)) return raw;
   return raw;
 }
 
-function getFullExt(fp: string): string {
+export function getFullExt(fp: string): string {
   const lower = fp.toLowerCase();
   const compounds = [".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tgz", ".tbz2", ".txz"];
   for (const ext of compounds) {
@@ -340,7 +342,7 @@ function getFullExt(fp: string): string {
   return path.extname(fp).toLowerCase();
 }
 
-function formatCompactSize(bytes: number): string {
+export function formatCompactSize(bytes: number): string {
   if (bytes === 0) return "0 B";
   const k = 1024;
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -349,7 +351,7 @@ function formatCompactSize(bytes: number): string {
   return `${i === 0 ? val.toFixed(0) : val.toFixed(1)} ${units[i]}`;
 }
 
-function formatDuration(ms: number): string {
+export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const s = Math.floor(ms / 1000) % 60;
   const m = Math.floor(ms / 60000);
@@ -357,35 +359,10 @@ function formatDuration(ms: number): string {
   return `${m}m ${s}s`;
 }
 
-function isRarExt(ext: string): boolean {
+export function isRarExt(ext: string): boolean {
   return /^\.(?:rar|r\d{2})$/i.test(ext);
 }
 
-function isRarVolume(ext: string): boolean {
+export function isRarVolume(ext: string): boolean {
   return /^\.r\d{2}$/i.test(ext);
 }
-
-export type { JS7zInstance, TreeNode };
-export {
-  passed,
-  failed,
-  test,
-  mkdirP,
-  run7z,
-  j7zCompress,
-  j7zCompressDir,
-  copyFS,
-  j7zSelective,
-  j7zDecompress,
-  createWrapped,
-  walkFS,
-  buildTree,
-  countTreeStats,
-  isEncryptedInline,
-  fixArchiveEncoding,
-  getFullExt,
-  formatCompactSize,
-  formatDuration,
-  isRarExt,
-  isRarVolume,
-};
