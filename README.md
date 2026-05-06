@@ -7,7 +7,7 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 
 ## Features
 
-- **Compress** to 7z, ZIP, TAR, WIM, GZip, BZip2, XZ, tar.gz, tar.bz2, tar.xz, tar.zst
+- **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst
 - **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
 - **Archive browser** — opens as default editor for archives; virtual-scrolled tree (Vue 3 + TanStack Virtual), search, sort, partial extract, add/delete/rename, integrity test
@@ -55,9 +55,6 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 | tar.bz2 | — | TAR + BZip2 compressed archive |
 | tar.xz | — | TAR + XZ compressed archive |
 | tar.zst | — | TAR + Zstandard compressed archive |
-| gz | — | Single-file GZip (auto-wraps in tar for folders) |
-| bz2 | — | Single-file BZip2 (auto-wraps in tar for folders) |
-| xz | — | Single-file XZ (auto-wraps in tar for folders) |
 | wim | — | Windows Imaging Format |
 | rar | — | **Extraction only** — creation not supported by free tools |
 
