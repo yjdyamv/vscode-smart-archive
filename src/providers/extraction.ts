@@ -46,6 +46,8 @@ function copyFromFSWithStrip(
       const full = currentDir === "/" ? `/${name}` : `${currentDir}/${name}`;
       const rel = relPart ? `${relPart}/${name}` : name;
 
+      if (name === ".smartarchive") continue;
+
       try {
         const st = js7z.FS.stat(full);
         if (js7z.FS.isDir(st.mode)) {

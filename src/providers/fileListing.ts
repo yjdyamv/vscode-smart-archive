@@ -40,7 +40,9 @@ async function fetchFileList(
   } catch (err) {
     const msg = (err as Error).message || "";
     if (/can\s*not\s*open|unexpected\s+end|missing\s+volume/i.test(msg)) {
-      throw new Error(t("decompress.missingVolumes"));
+      const wrapped = new Error(t("decompress.missingVolumes"));
+      (wrapped as any).cause = err;
+      throw wrapped;
     }
     logger.warn({ event: "fetchFileList.listFiles.failed", err, filePath }, "js7z listing failed");
   }
