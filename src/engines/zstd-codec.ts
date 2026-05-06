@@ -147,7 +147,7 @@ export function zstdCompressFile(input: string, output: string, level: number): 
 
 function cleanup(path: string): void {
   try {
-    require("fs").unlinkSync(path);
+    fs.unlinkSync(path);
   } catch {
     /* ignore */
   }

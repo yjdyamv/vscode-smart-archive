@@ -22,9 +22,3 @@ export function saveExpandedPaths(archiveUri: vscode.Uri, paths: string[]): void
 export function loadExpandedPaths(archiveUri: vscode.Uri): string[] {
   return _globalState?.get<string[]>(`expanded:${archiveUri.toString()}`) ?? [];
 }
-
-export function clearAllExpanded(): void {
-  if (!_globalState) return;
-  // VSCode globalState doesn't support listing keys — just clear known keys
-  // Individual entries are small, leaving them is harmless
-}

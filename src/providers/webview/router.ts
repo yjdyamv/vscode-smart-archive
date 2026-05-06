@@ -355,19 +355,19 @@ async function handleRename(
   const oldPath = msg.path;
   const oldName = path.basename(oldPath);
   const newName = await vscode.window.showInputBox({
-    prompt: "Rename to",
+    prompt: t("archive.renamePrompt"),
     value: oldName,
     validateInput: (v) =>
       !v.trim()
-        ? "Name cannot be empty"
+        ? t("validation.nameEmpty")
         : v.includes("\0")
-          ? "Invalid character"
+          ? t("validation.nameInvalidChar")
           : /[<>:"/\\|?*]/.test(v)
-            ? 'Invalid characters: < > : " / \\ | ? *'
+            ? t("validation.nameInvalidChars")
             : v.trim() === oldName
-              ? "New name is the same as current"
+              ? t("validation.nameSameName")
               : v.length > 255
-                ? "Name too long"
+                ? t("validation.nameTooLong")
                 : null,
   });
   if (!newName || !newName.trim() || newName.trim() === oldName) {
@@ -378,7 +378,7 @@ async function handleRename(
   const newPath = parentDir + newName.trim();
   logger.info({ event: "webview.rename", oldPath, newPath });
   try {
-    webview.postMessage({ c: "loading", t: "Renaming..." });
+    webview.postMessage({ c: "loading", t: t("archive.renaming") });
     await renameInArchive(s.filePath, oldPath, newPath, s.password);
     if (s.archiveUri) {
       try {
@@ -438,7 +438,7 @@ async function handleDropFiles(
     first: msg.paths[0],
   });
   try {
-    webview.postMessage({ c: "loading", t: "Adding files..." });
+    webview.postMessage({ c: "loading", t: t("archive.addingFilesProgress") });
     await addToArchive(s.filePath, msg.paths, targetDir, s.password);
     try {
       await setupWebview(webview, s.archiveUri, t("archive.toastAddedFiles"));
@@ -468,17 +468,17 @@ async function handleNewFolder(
     return;
   }
   const folderName = await vscode.window.showInputBox({
-    prompt: "Folder name",
-    placeHolder: "new-folder",
+    prompt: t("archive.folderNamePrompt"),
+    placeHolder: t("archive.folderNamePlaceholder"),
     validateInput: (v) =>
       !v.trim()
-        ? "Folder name cannot be empty"
+        ? t("validation.nameEmpty")
         : v.includes("\0")
-          ? "Invalid character"
+          ? t("validation.nameInvalidChar")
           : /[<>:"/\\|?*]/.test(v)
-            ? 'Invalid characters: < > : " / \\ | ? *'
+            ? t("validation.nameInvalidChars")
             : v.length > 255
-              ? "Name too long"
+              ? t("validation.nameTooLong")
               : null,
   });
   if (!folderName || !folderName.trim()) {
@@ -489,7 +489,7 @@ async function handleNewFolder(
   const name = folderName.trim();
   logger.info({ event: "webview.newFolder", dir: targetDir, name });
   try {
-    webview.postMessage({ c: "loading", t: "Creating folder..." });
+    webview.postMessage({ c: "loading", t: t("archive.creatingFolder") });
     await createFolderInArchive(s.filePath, targetDir, name, s.password);
     if (s.archiveUri) {
       try {
@@ -526,7 +526,7 @@ async function handleConvert(webview: vscode.Webview, s: HandlerState): Promise<
     if (!fmt) return;
     const oldExt = getFullExt(s.filePath);
     const dst = s.filePath.slice(0, -oldExt.length) + `.${fmt}`;
-    webview.postMessage({ c: "loading", t: "Converting..." });
+    webview.postMessage({ c: "loading", t: t("archive.converting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "");
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
@@ -543,7 +543,7 @@ async function handleMerge(webview: vscode.Webview, s: HandlerState): Promise<vo
     const ext = getFullExt(s.filePath);
     const fmt = ext.slice(1);
     const dst = removeVolumeSuffix(s.filePath);
-    webview.postMessage({ c: "loading", t: "Merging volumes..." });
+    webview.postMessage({ c: "loading", t: t("archive.merging") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "");
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
@@ -571,7 +571,7 @@ async function handleSplit(webview: vscode.Webview, s: HandlerState): Promise<vo
       folderPath = path.join(dir, `${folderName}_${i}`);
     }
     const dst = path.join(folderPath, base);
-    webview.postMessage({ c: "loading", t: "Splitting..." });
+    webview.postMessage({ c: "loading", t: t("archive.splitting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize);
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
   } catch (err) {
@@ -585,14 +585,14 @@ async function handleSplit(webview: vscode.Webview, s: HandlerState): Promise<vo
 async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<void> {
   logger.info({ event: "webview.encrypt", path: s.filePath });
   try {
-    const newPw = await pwInputBox("Enter a password to encrypt this archive", (v) =>
-      v ? undefined : "Password is required",
+    const newPw = await pwInputBox(t("archive.encryptPrompt"), (v) =>
+      v ? undefined : t("security.passwordEmpty"),
     );
     if (!newPw) return;
-    const confirmPw = await pwInputBox("Confirm encryption password");
+    const confirmPw = await pwInputBox(t("archive.encryptConfirm"));
     if (!confirmPw) return;
     if (confirmPw !== newPw) {
-      vscode.window.showErrorMessage("Passwords do not match");
+      vscode.window.showErrorMessage(t("validation.passwordMismatch"));
       return;
     }
     const ext = getFullExt(s.filePath);
@@ -615,7 +615,7 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
     } else {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_encrypted" + ext);
     }
-    webview.postMessage({ c: "loading", t: "Encrypting..." });
+    webview.postMessage({ c: "loading", t: t("archive.encrypting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: true });
@@ -632,7 +632,7 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
   try {
     let pw = s.password;
     if (!pw) {
-      pw = await pwInputBox("Enter the archive password to decrypt");
+      pw = await pwInputBox(t("archive.decryptPrompt"));
       if (!pw) return;
     }
     const ext = getFullExt(s.filePath);
@@ -655,7 +655,7 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
     } else {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted" + ext);
     }
-    webview.postMessage({ c: "loading", t: "Decrypting..." });
+    webview.postMessage({ c: "loading", t: t("archive.decrypting") });
     await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: false });

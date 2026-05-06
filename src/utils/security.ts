@@ -48,7 +48,7 @@ export async function promptOversizeFile(label: string, size: number): Promise<b
     { modal: true },
     t("security.extractAnyway"),
   );
-  return choice === "Extract anyway";
+  return choice === t("security.extractAnyway");
 }
 
 /**
@@ -73,9 +73,10 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
     throw new Error(`Archive entry path too long (${entryName.length} chars)`);
   }
 
-  // Reject Windows Alternate Data Streams (e.g., file.txt:evil)
-  if (process.platform === "win32" && entryName.includes(":")) {
-    throw new Error(`Archive entry contains invalid character ':' (ADS): ${entryName}`);
+  // Reject colon in entry names (Alternate Data Streams on Windows, also
+  // problematic on other platforms for cross-archive compatibility)
+  if (entryName.includes(":")) {
+    throw new Error(`Archive entry contains invalid character ':': ${entryName}`);
   }
 
   // Strip leading slashes and drive letters (cross-platform)
