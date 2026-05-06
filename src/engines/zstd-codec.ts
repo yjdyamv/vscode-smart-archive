@@ -9,7 +9,6 @@
 
 import { logger } from "../utils/logger";
 import { checkFileSize } from "../utils/security";
-import { t } from "../i18n";
 import { spawn } from "child_process";
 import * as fs from "fs";
 
@@ -69,7 +68,7 @@ function resolveSystemZstd(): string | null {
       { timeout: 3000 },
     );
     if (whichProc.status === 0) {
-      sysZstdPath = whichProc.stdout.toString().trim().split("\n")[0] || "zstd";
+      sysZstdPath = whichProc.stdout.toString().trim().split("\n")[0].trim() || "zstd";
     } else {
       // Try locating via --version as fallback
       const verProc = require("child_process").spawnSync("zstd", ["--version"], { timeout: 3000 });
@@ -84,7 +83,9 @@ function resolveSystemZstd(): string | null {
 export function zstdCompressFile(input: string, output: string, level: number): Promise<void> {
   const zstdPath = resolveSystemZstd();
   if (zstdPath) {
+    logger.info({ event: "zstd.compress.system", path: zstdPath });
     return new Promise((resolve, reject) => {
+      let settled = false;
       const proc = spawn(
         zstdPath,
         [
@@ -104,6 +105,8 @@ export function zstdCompressFile(input: string, output: string, level: number): 
       });
 
       proc.on("close", (code) => {
+        if (settled) return;
+        settled = true;
         if (code === 0) {
           resolve();
         } else {
@@ -112,14 +115,33 @@ export function zstdCompressFile(input: string, output: string, level: number): 
         }
       });
 
-      proc.on("error", () => {
+      proc.on("error", (err) => {
+        if (settled) return;
         cleanup(output);
-        // eslint-disable-next-line preserve-caught-error
-        reject(new Error(t("zstd.notAvailable")));
+        logger.warn(
+          { event: "zstd.system.failed", err, path: zstdPath },
+          "System zstd failed, falling back to WASM",
+        );
+        // Fall through to WASM — resolve the outer promise via WASM result
+        wasmCompressFile(input, output, level).then(
+          () => {
+            settled = true;
+            resolve();
+          },
+          (e) => {
+            settled = true;
+            reject(e);
+          },
+        );
       });
     });
   }
 
+  logger.info({ event: "zstd.compress.wasm" });
+  return wasmCompressFile(input, output, level);
+}
+
+function wasmCompressFile(input: string, output: string, level: number): Promise<void> {
   // WASM chunked: compress file in 50MB chunks, 7z handles multi-frame decompression
   const CHUNK = 50 * 1024 * 1024;
   return ensureInit().then(() => {

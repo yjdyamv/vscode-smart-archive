@@ -15,6 +15,7 @@ import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
 import { JS7z } from "./js7z-factory";
 import { parse7zListing } from "../utils/parse7z";
+import { hasSystem7z, listWithSystem7z, isEncryptedSystem7z } from "./system7z";
 
 export async function listFiles(
   filePath: string,
@@ -22,6 +23,11 @@ export async function listFiles(
   data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
   logger.debug({ event: "listFiles.start", filePath, hasPassword: !!password });
+
+  if (hasSystem7z() && !data) {
+    return listWithSystem7z(filePath, password);
+  }
+
   const useData = !!data;
   let stdout = "";
   let stderr = "";
@@ -69,6 +75,10 @@ export async function listFiles(
 }
 
 export async function isEncrypted(filePath: string): Promise<boolean> {
+  if (hasSystem7z()) {
+    return isEncryptedSystem7z(filePath);
+  }
+
   checkFileSize(fs.statSync(filePath).size);
   let stdout = "",
     stderr = "";

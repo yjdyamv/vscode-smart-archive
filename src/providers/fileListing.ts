@@ -75,10 +75,17 @@ async function listViaExtract(
       js7z.callMain(args);
     });
     const topEntries = js7z.FS.readdir("/_ls").filter((e: string) => e !== "." && e !== "..");
-    if (topEntries.length === 1 && topEntries[0].endsWith(".tar")) {
-      const innerTar = topEntries[0];
+
+    // Wrapped formats: if extraction produced a single .tar, list its contents.
+    // Also handle the case where 7z auto-unpacks the inner tar — the .tar is an
+    // intermediate artifact that should be hidden from the tree.
+    const tarEntries = topEntries.filter((e) => e.endsWith(".tar"));
+    const nonTar = topEntries.filter((e) => !e.endsWith(".tar"));
+
+    if (tarEntries.length === 1 && nonTar.length === 0) {
+      // Pure wrapped: one .tar file, no auto-unpack — list inner tar contents
+      const innerTar = tarEntries[0];
       const innerData = js7z.FS.readFile(`/_ls/${innerTar}`, { encoding: "binary" });
-      // List inner tar via 7z l -slt (metadata-only, no extraction)
       let stdout = "";
       let stderr = "";
       const js7z2 = await JS7z({
@@ -103,7 +110,10 @@ async function listViaExtract(
         tryCleanup(js7z2);
       }
     }
-    return readDirEntries(js7z, "/_ls", "");
+
+    // Mixed: 7z auto-unpacked — return non-tar entries only
+    const entries = nonTar.length > 0 ? nonTar : tarEntries;
+    return readDirEntries(js7z, "/_ls", "", entries);
   } finally {
     tryCleanup(js7z);
   }
@@ -113,18 +123,20 @@ function readDirEntries(
   js7z: JS7zInstance,
   dir: string,
   prefix: string,
+  skipNames?: string[],
 ): { path: string; size: number; type: string }[] {
   const results: { path: string; size: number; type: string }[] = [];
   const entries = js7z.FS.readdir(dir);
+  const skip = new Set(skipNames ?? []);
   for (const name of entries) {
-    if (name === "." || name === "..") continue;
+    if (name === "." || name === ".." || skip.has(name)) continue;
     const fp = dir === "/" ? `/${name}` : `${dir}/${name}`;
     const childPath = prefix ? `${prefix}/${name}` : name;
     try {
       const st = js7z.FS.stat(fp);
       if (js7z.FS.isDir(st.mode)) {
         results.push({ path: childPath, size: 0, type: "DIRECTORY" });
-        results.push(...readDirEntries(js7z, fp, childPath));
+        results.push(...readDirEntries(js7z, fp, childPath, skipNames));
       } else {
         results.push({ path: childPath, size: st.size || 0, type: "REGULAR_FILE" });
       }

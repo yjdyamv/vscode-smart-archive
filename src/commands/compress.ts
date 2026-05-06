@@ -14,10 +14,15 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { compressWith7z } from "../engines/js7z-engine";
-import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS, VOLUME_SIZES } from "../constants";
+import {
+  COMPRESS_EXCLUDE_DEFAULTS,
+  COMPRESS_FORMATS,
+  VOLUME_SIZES,
+  getFullExt,
+} from "../constants";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
-import { t, compressLevels } from "../i18n";
+import { t, compressLevels, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 
 // ── Shared helpers for back-navigable QuickPick / InputBox ──
@@ -247,7 +252,7 @@ async function promptSaveNameWizard(defaultName: string, ext: string): Promise<S
   });
   if (res.kind !== "ok") return res;
   // Strip trailing extension the user may have typed, then re-append the format ext.
-  const clean = path.basename(res.value, path.extname(res.value));
+  const clean = path.basename(res.value, getFullExt(res.value) || path.extname(res.value));
   return { kind: "ok", value: `${clean}.${ext}` };
 }
 
@@ -468,7 +473,13 @@ export async function compressCommand(
                 vscode.workspace
                   .getConfiguration("smart-archive")
                   .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
+              const startTime = Date.now();
               await compressWith7z(options, progress, token, excludePatterns);
+              vscode.window.showInformationMessage(
+                t("compress.done") +
+                  options.outputPath +
+                  t("time.elapsed", formatDuration(Date.now() - startTime)),
+              );
             } catch (err) {
               logger.error({ event: "compress.command.failed", err }, "Compression failed");
               try {

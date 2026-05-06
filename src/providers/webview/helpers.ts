@@ -9,7 +9,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { FORMAT_TABLE, NOISY_DIR_PATTERNS } from "../../constants";
+import { FORMAT_TABLE, NOISY_DIR_PATTERNS, getFullExt } from "../../constants";
 import { EXT_ID } from "./state";
 import { t } from "../../i18n";
 
@@ -37,7 +37,7 @@ export function showErrorWithCopy(msg: string): void {
 export function uniquePath(filePath: string): string {
   if (!fs.existsSync(filePath)) return filePath;
   const dir = path.dirname(filePath);
-  const ext = path.extname(filePath);
+  const ext = getFullExt(filePath) || path.extname(filePath);
   const base = path.basename(filePath, ext);
   let i = 1;
   while (fs.existsSync(path.join(dir, `${base}_${i}${ext}`))) i++;

@@ -13,22 +13,30 @@ import * as vscode from "vscode";
 import type { DecompressOptions } from "../types";
 import { tryCleanup, OUTPUT_DIR, run7z, streamToVFS } from "./js7z-helpers";
 import { copyDirFromFS } from "../utils/fs";
-import { t, formatDuration } from "../i18n";
+import { t } from "../i18n";
 import { logger } from "../utils/logger";
 import { checkFileSize, checkTotalSize, validatePassword } from "../utils/security";
 import { JS7z } from "./js7z-factory";
+import { hasSystem7zForFormat, decompressWithSystem7z } from "./system7z";
+import { getFullExt } from "../constants";
 
 export async function decompressWith7z(
   options: DecompressOptions,
   progress: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
 ): Promise<void> {
-  const startTime = Date.now();
   logger.info({
     event: "decompress.start",
     inputPath: options.inputPath,
     outputDir: options.outputDir,
   });
+
+  if (hasSystem7zForFormat(getFullExt(options.inputPath), true)) {
+    logger.info({ event: "decompress.usingSystem7z" });
+    await decompressWithSystem7z(options, progress, token);
+    return;
+  }
+
   progress.report({ message: t("decompress.initEngine") });
 
   const js7z = await JS7z();
@@ -64,11 +72,6 @@ export async function decompressWith7z(
     }
 
     await unwrapInnerTar(options.outputDir, progress);
-
-    const elapsed = formatDuration(Date.now() - startTime);
-    vscode.window.showInformationMessage(
-      t("decompress.done") + options.outputDir + t("time.elapsed", elapsed),
-    );
   } finally {
     tryCleanup(js7z);
   }
