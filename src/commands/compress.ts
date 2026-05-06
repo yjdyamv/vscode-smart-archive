@@ -421,9 +421,7 @@ export async function compressCommand(
             return;
           }
           const baseName = r.value;
-          const dir = isWorkspaceCompress
-            ? firstTarget.fsPath
-            : path.dirname(firstTarget.fsPath);
+          const dir = isWorkspaceCompress ? firstTarget.fsPath : path.dirname(firstTarget.fsPath);
           const folderName =
             targets.length === 1
               ? path.basename(firstTarget.fsPath)
