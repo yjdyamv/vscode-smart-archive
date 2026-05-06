@@ -17,7 +17,11 @@ export interface ArchiveEntry {
   type: string;
 }
 
-export function parse7zListing(stdout: string, archiveName: string): ArchiveEntry[] {
+export function parse7zListing(
+  stdout: string,
+  archiveName: string,
+  archivePath?: string,
+): ArchiveEntry[] {
   const results: ArchiveEntry[] = [];
   let curPath = "";
   let curSize = 0;
@@ -54,8 +58,14 @@ export function parse7zListing(stdout: string, archiveName: string): ArchiveEntr
 
   const volBase = getSplitVolumeBase(archiveName);
   return results.filter((r) => {
-    if (r.path === `/${archiveName}` || r.path === archiveName) return false;
-    if (volBase && (r.path === `/${volBase}` || r.path === volBase)) return false;
+    const p = r.path;
+    if (p === `/${archiveName}` || p === archiveName) return false;
+    if (volBase && (p === `/${volBase}` || p === volBase)) return false;
+    if (archivePath) {
+      if (p === archivePath) return false;
+      if (p === archivePath.replace(/\\/g, "/")) return false;
+      if (p.toLowerCase() === archivePath.toLowerCase()) return false;
+    }
     return true;
   });
 }

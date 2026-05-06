@@ -94,7 +94,8 @@ export async function promptSavePath(
   const dir = saveDir ?? path.dirname(targetPath);
 
   if (targetCount === 1) {
-    const base = path.basename(targetPath, path.extname(targetPath));
+    // Keep original filename intact, append format: file.tar.gz → file.tar.gz.7z
+    const base = path.basename(targetPath);
     defaultUri = vscode.Uri.file(path.join(dir, `${base}.${format}`));
   } else {
     defaultUri = vscode.Uri.file(path.join(dir, `archive.${format}`));

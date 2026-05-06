@@ -421,6 +421,17 @@
           "type": "string",
           "default": "",
           "description": "Default split volume size (number + k/m/g suffix, e.g. 100m, 1g). Leave empty to skip splitting by default."
+        },
+        "smart-archive.useSystem7z": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "always", "never"],
+          "enumDescriptions": [
+            "Detect system 7-Zip automatically. If found and version >= 21, use it for faster compression; otherwise fall back to bundled WASM engine.",
+            "Always use system 7-Zip. Show an error if 7-Zip is not installed or too old.",
+            "Never use system 7-Zip. Always use the bundled WASM engine, even if 7-Zip is installed."
+          ],
+          "description": "Whether to use a system-installed 7-Zip binary for compress/decompress operations. System 7-Zip is significantly faster and uses less memory, but requires a local installation."
         }
       }
     }

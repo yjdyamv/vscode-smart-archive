@@ -216,7 +216,8 @@ export async function previewFileFromArchive(
     const buf = Buffer.from(fileData);
     fs.mkdirSync(PREVIEW_TMP_DIR, { recursive: true });
     const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 16);
-    const ext = path.extname(normalizedFile);
+    // Use full extension (e.g. .tar.gz) so the viewer knows it's wrapped
+    const ext = getFullExt(normalizedFile) || path.extname(normalizedFile);
     const tmpPath = path.join(PREVIEW_TMP_DIR, `${hash}${ext}`);
     if (!fs.existsSync(tmpPath)) {
       pruneOldPreviews();
@@ -260,9 +261,11 @@ async function unwrapArchives(
     try {
       return js7z2.FS.readFile(vfsPath, { encoding: "binary" });
     } catch {
-      // 7z may have flattened the path — look for the base name
+      // 7z may have flattened the path — look for the base name.
+      // Skip .tar entries (intermediate artifacts from wrapped archives).
       const top2 = js7z2.FS.readdir("/_pv2").filter((e: string) => e !== "." && e !== "..");
       for (const entry of top2) {
+        if (entry.endsWith(".tar")) continue;
         const ep = `/_pv2/${entry}`;
         try {
           const st = js7z2.FS.stat(ep);

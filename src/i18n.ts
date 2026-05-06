@@ -704,6 +704,22 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "{0} 大小为 {1}，超过了 {2} 的限制。\n\n解压可能导致高内存占用或磁盘耗尽。",
     "zh-tw": "{0} 大小為 {1}，超過了 {2} 的限制。\n\n解壓可能導致高記憶體佔用或磁碟耗盡。",
   },
+
+  // ---- System 7-Zip ----
+  "system7z.notInstalled": {
+    en: 'System 7-Zip is not installed. Set smart-archive.useSystem7z to "auto" or "never" to use the bundled engine.',
+    "zh-cn":
+      '未安装系统 7-Zip。请将 smart-archive.useSystem7z 设为 "auto" 或 "never" 以使用内置引擎。',
+    "zh-tw":
+      '未安裝系統 7-Zip。請將 smart-archive.useSystem7z 設為 "auto" 或 "never" 以使用內建引擎。',
+  },
+  "system7z.tooOld": {
+    en: 'System 7-Zip version is too old (requires v21+). Install a newer version or set smart-archive.useSystem7z to "never".',
+    "zh-cn":
+      '系统 7-Zip 版本太旧（需要 v21+）。请安装新版本或将 smart-archive.useSystem7z 设为 "never"。',
+    "zh-tw":
+      '系統 7-Zip 版本太舊（需要 v21+）。請安裝新版本或將 smart-archive.useSystem7z 設為 "never"。',
+  },
 };
 
 /**
