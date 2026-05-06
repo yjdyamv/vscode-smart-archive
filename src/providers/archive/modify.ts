@@ -13,7 +13,7 @@ import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { streamToVFS } from "../../engines/js7z-helpers";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
-import { PREVIEW_TMP_DIR } from "../tempFiles";
+import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
 
@@ -218,6 +218,7 @@ export async function previewFileFromArchive(
     const ext = path.extname(normalizedFile);
     const tmpPath = path.join(PREVIEW_TMP_DIR, `${hash}${ext}`);
     if (!fs.existsSync(tmpPath)) {
+      pruneOldPreviews();
       fs.writeFileSync(tmpPath, buf);
     }
     const uri = vscode.Uri.file(tmpPath);

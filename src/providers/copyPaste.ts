@@ -7,6 +7,7 @@
  */
 
 import * as vscode from "vscode";
+import * as path from "path";
 import * as fs from "fs";
 import { extractSelected } from "./extraction";
 import { cleanupPreviewTemp } from "./tempFiles";
@@ -45,6 +46,7 @@ export function pasteCopiedFromArchive(): void {
       canSelectFiles: false,
       canSelectMany: false,
       openLabel: t("archive.pasteHere"),
+      title: `${t("archive.pasteHere")} — ${path.basename(source)} (${paths.length} items)`,
     })
     .then(async (uris) => {
       if (!uris || uris.length === 0) return;
@@ -75,6 +77,13 @@ export function setCopiedPaths(
   password?: string,
   flat?: boolean,
 ): void {
+  if (copiedArchivePath && copiedArchivePath !== archivePath && copiedPaths && copiedPaths.length > 0) {
+    logger.warn({
+      event: "setCopiedPaths.overwriting",
+      prevArchive: copiedArchivePath,
+      newArchive: archivePath,
+    });
+  }
   logger.info({ event: "setCopiedPaths", pathCount: paths.length, archivePath, flat });
   copiedPaths = paths;
   copiedArchivePath = archivePath;

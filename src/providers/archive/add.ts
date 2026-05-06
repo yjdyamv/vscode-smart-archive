@@ -16,6 +16,8 @@ import { getBaseName } from "../../utils/path";
 import { logger } from "../../utils/logger";
 import { t } from "../../i18n";
 import { withWrappedArchive } from "./wrappedHelper";
+import { prepareExclusions, isPathExcluded, type ExclusionSet } from "../../utils/exclude";
+import { COMPRESS_EXCLUDE_DEFAULTS } from "../../constants";
 
 // ── Module-level state for add-to-archive ──
 
@@ -136,9 +138,15 @@ export async function addToArchive(
 ): Promise<void> {
   const ext = getFullExt(archivePath);
 
+  const patterns =
+    vscode.workspace
+      .getConfiguration("smart-archive")
+      .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
+  const exclusions = prepareExclusions(patterns);
+
   if (isWrappedFormat(ext)) {
     logger.info({ event: "addToArchive.wrapped", archivePath, ext });
-    return addToWrappedArchive(archivePath, localPaths, targetDir, password);
+    return addToWrappedArchive(archivePath, localPaths, targetDir, password, exclusions);
   }
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
@@ -148,7 +156,7 @@ export async function addToArchive(
   try {
     const archiveFsPath = streamToVFS(js7z, archivePath);
 
-    const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z, localPaths, targetDir);
+    const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z, localPaths, targetDir, exclusions);
 
     const args = vfsDir
       ? ["a", archiveFsPath, "-aot", vfsDir]
@@ -184,9 +192,10 @@ async function addToWrappedArchive(
   localPaths: string[],
   targetDir: string,
   password?: string,
+  exclusions?: ExclusionSet,
 ): Promise<void> {
   return withWrappedArchive(archivePath, password, async (js7z2) => {
-    const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z2, localPaths, targetDir);
+    const { vfsPaths, vfsDir } = copyLocalToFSWithPrefix(js7z2, localPaths, targetDir, exclusions);
 
     const aArgs = vfsDir
       ? ["a", "/inner.tar", "-aot", vfsDir]
@@ -211,6 +220,7 @@ function copyLocalToFSWithPrefix(
   js7z: JS7zInstance,
   localPaths: string[],
   targetDir: string,
+  exclusions?: ExclusionSet,
 ): { vfsPaths: string[]; vfsDir: string | null } {
   const normDir = targetDir.replace(/\\/g, "/").replace(/^\/+/, "");
   const parts = normDir ? normDir.split("/").filter(Boolean) : [];
@@ -237,12 +247,16 @@ function copyLocalToFSWithPrefix(
 
   for (const localPath of localPaths) {
     const name = getBaseName(localPath);
+    if (exclusions && isPathExcluded(name, exclusions)) {
+      logger.info({ event: "addToArchive.skipExcluded", path: localPath, name });
+      continue;
+    }
     const vfsTarget = vfsBase ? `${vfsBase}/${name}` : `/${name}`;
     const stat = fs.statSync(localPath);
 
     if (stat.isDirectory()) {
       js7z.FS.mkdir(vfsTarget);
-      copyDirToFSRecursive(js7z, localPath, vfsTarget);
+      copyDirToFSRecursive(js7z, localPath, vfsTarget, exclusions);
     } else {
       streamToVFS(js7z, localPath, vfsTarget);
     }
@@ -251,14 +265,27 @@ function copyLocalToFSWithPrefix(
   return { vfsPaths, vfsDir };
 }
 
-function copyDirToFSRecursive(js7z: JS7zInstance, localDir: string, vfsDir: string): void {
+function copyDirToFSRecursive(
+  js7z: JS7zInstance,
+  localDir: string,
+  vfsDir: string,
+  exclusions?: ExclusionSet,
+): void {
   const entries = fs.readdirSync(localDir, { withFileTypes: true });
   for (const entry of entries) {
+    if (exclusions && isPathExcluded(entry.name, exclusions)) {
+      logger.info({
+        event: "addToArchive.skipExcludedRecursive",
+        name: entry.name,
+        dir: localDir,
+      });
+      continue;
+    }
     const localEntry = path.join(localDir, entry.name);
     const vfsEntry = `${vfsDir}/${entry.name}`;
     if (entry.isDirectory()) {
       js7z.FS.mkdir(vfsEntry);
-      copyDirToFSRecursive(js7z, localEntry, vfsEntry);
+      copyDirToFSRecursive(js7z, localEntry, vfsEntry, exclusions);
     } else {
       streamToVFS(js7z, localEntry, vfsEntry);
     }

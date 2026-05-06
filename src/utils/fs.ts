@@ -115,6 +115,9 @@ function _copyDirFromFS(
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
     if (entry === "." || entry === "..") continue;
 
+    // Skip internal .smartarchive marker files used to preserve empty folders
+    if (entry === ".smartarchive") continue;
+
     // Reject entries with embedded path separators or null bytes —
     // these indicate a malicious archive attempting path traversal
     if (entry.includes("/") || entry.includes("\\") || entry.includes("\0")) {

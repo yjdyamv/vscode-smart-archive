@@ -55,4 +55,34 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
   });
 }
 
-export { PREVIEW_TMP_DIR, initTempCleanup, cleanupPreviewTemp };
+const MAX_PREVIEW_FILES = 50;
+
+function pruneOldPreviews(): void {
+  try {
+    if (!fs.existsSync(PREVIEW_TMP_DIR)) return;
+    const files = fs
+      .readdirSync(PREVIEW_TMP_DIR, { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => ({
+        name: e.name,
+        mtime: fs.statSync(path.join(PREVIEW_TMP_DIR, e.name)).mtimeMs,
+      }))
+      .sort((a, b) => a.mtime - b.mtime);
+
+    while (files.length > MAX_PREVIEW_FILES) {
+      const oldest = files.shift()!;
+      try {
+        fs.unlinkSync(path.join(PREVIEW_TMP_DIR, oldest.name));
+      } catch {
+        logger.warn(
+          { event: "tempFiles.prune.failed", file: oldest.name },
+          "Failed to remove old preview temp file",
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn({ event: "tempFiles.prune.failed", err }, "Failed to prune preview temp files");
+  }
+}
+
+export { PREVIEW_TMP_DIR, initTempCleanup, cleanupPreviewTemp, pruneOldPreviews };

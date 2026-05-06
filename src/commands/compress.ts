@@ -408,14 +408,13 @@ export async function compressCommand(
         } else {
           const saveUri = await promptSavePath(firstTarget.fsPath, targets.length, ext);
           if (!saveUri) {
-            step = 2; // cancelled → back to level
-            continue;
+            return;
           }
           outputPath = saveUri.fsPath;
         }
 
         const options: CompressOptions = {
-          targets: targets.map((t) => ({ fsPath: t.fsPath })),
+          targets: targets.map((target) => ({ fsPath: target.fsPath })),
           format: {
             label: format!.label,
             description: "",

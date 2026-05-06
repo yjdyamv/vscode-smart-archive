@@ -51,8 +51,14 @@ export function resolveRarVolume(firstPath: string): string | null {
  * "Rar!" magic header. Throws if not valid.
  */
 export function validateRarHeader(filePath: string): void {
-  const buf = fs.readFileSync(filePath, { flag: "r" });
-  if (buf.toString("ascii", 0, 4) !== "Rar!") {
-    throw new Error("Not a valid RAR archive (bad header)");
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const buf = Buffer.alloc(4);
+    const n = fs.readSync(fd, buf, 0, 4, 0);
+    if (n < 4 || buf.toString("ascii", 0, 4) !== "Rar!") {
+      throw new Error("Not a valid RAR archive (bad header)");
+    }
+  } finally {
+    fs.closeSync(fd);
   }
 }

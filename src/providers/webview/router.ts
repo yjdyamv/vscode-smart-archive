@@ -99,6 +99,13 @@ function pwInputBox(
       ib.hide();
       resolve(val);
     });
+    ib.onDidChangeValue(() => {
+      if (shown) {
+        shown = false;
+        ib.password = true;
+        ib.buttons = [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+      }
+    });
     ib.onDidTriggerButton((b) => {
       if (b === clearBtn) {
         ib.value = "";
