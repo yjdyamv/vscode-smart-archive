@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import type { FlatNode } from "../composables/useTree";
 import type { TreeNodeData } from "../types";
@@ -24,20 +24,18 @@ const emit = defineEmits<{
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
+const rowHeight = ref(25);
 
-const estimateSize = () => {
-  const fontSize =
-    typeof document !== "undefined"
-      ? parseFloat(getComputedStyle(document.documentElement).fontSize)
-      : 14;
-  return fontSize * 1.8;
-};
+onMounted(() => {
+  const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 14;
+  rowHeight.value = Math.round(fontSize * 1.8);
+});
 
 const virtualizer = useVirtualizer(
   computed(() => ({
     count: props.flatNodes.length,
     getScrollElement: () => containerRef.value,
-    estimateSize,
+    estimateSize: () => rowHeight.value,
     overscan: 10,
   })),
 );
@@ -66,7 +64,7 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
           top: 0,
           left: 0,
           width: '100%',
-          height: estimateSize() + 'px',
+          height: rowHeight + 'px',
           transform: `translateY(${item.start}px)`,
         }"
       >

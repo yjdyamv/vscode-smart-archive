@@ -1,6 +1,6 @@
 import { ref, computed, type Ref } from "vue";
 import type { TreeNodeData } from "../types";
-import { saveState, loadState } from "./useMessage";
+import { loadState } from "./useMessage";
 
 export interface FlatNode {
   node: TreeNodeData;
@@ -12,24 +12,28 @@ export interface FlatNode {
   inheritCollapsed: boolean;
 }
 
-function persistExpanded(paths: Set<string>): void {
-  saveState({ expanded: [...paths] });
-}
-
-function findNode(nodes: TreeNodeData[], path: string): TreeNodeData | null {
-  for (const node of nodes) {
-    if (node.path === path) return node;
-    if (node.children) {
-      const found = findNode(node.children, path);
-      if (found) return found;
+function buildNodeMap(nodes: TreeNodeData[]): Map<string, TreeNodeData> {
+  const map = new Map<string, TreeNodeData>();
+  function walk(ns: TreeNodeData[]) {
+    for (const node of ns) {
+      map.set(node.path, node);
+      if (node.children) walk(node.children);
     }
   }
-  return null;
+  walk(nodes);
+  return map;
 }
 
 export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   const expandedPaths = ref(new Set<string>());
   const loadingPaths = ref(new Set<string>());
+
+  // O(1) path → node lookup, rebuilt only when treeData changes
+  const nodeMap = computed(() => buildNodeMap(treeData.value));
+
+  function findNodeFast(path: string): TreeNodeData | null {
+    return nodeMap.value.get(path) ?? null;
+  }
 
   function initExpandedFromTree(maxDepth = 2) {
     const saved = loadState<{ expanded?: string[] }>();
@@ -37,13 +41,11 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
       expandedPaths.value = new Set(saved.expanded);
       return;
     }
-    // Restore from extension's persistent state (survives tab close)
     const persistent = (window as any)._xExpanded as string[] | undefined;
     if (persistent?.length) {
       expandedPaths.value = new Set(persistent);
       return;
     }
-    // Auto-expand non-collapsed directories up to maxDepth levels deep
     const paths: string[] = [];
     function collect(nodes: TreeNodeData[], depth: number) {
       if (depth > maxDepth) return;
@@ -93,7 +95,6 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     } else {
       expandedPaths.value.add(path);
     }
-    persistExpanded(expandedPaths.value);
   }
 
   function expandAll(): void {
@@ -110,12 +111,10 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
       }
     }
     collect(treeData.value);
-    persistExpanded(expandedPaths.value);
   }
 
   function collapseAll(): void {
     expandedPaths.value.clear();
-    persistExpanded(expandedPaths.value);
   }
 
   function expandTo(path: string): void {
@@ -128,7 +127,7 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   }
 
   function insertChildren(parentPath: string, children: TreeNodeData[]): string[] {
-    const node = findNode(treeData.value, parentPath);
+    const node = findNodeFast(parentPath);
     if (!node) return [];
     node.children = children;
     node.hasMore = false;
@@ -149,7 +148,8 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
         if (
           node.hasMore &&
           (!node.children || node.children.length === 0) &&
-          expandedPaths.value.has(node.path)
+          expandedPaths.value.has(node.path) &&
+          !loadingPaths.value.has(node.path)
         ) {
           result.push(node.path);
         }
@@ -172,11 +172,12 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     expandedPaths,
     loadingPaths,
     flatNodes,
+    nodeMap,
     toggleExpand,
     expandAll,
     collapseAll,
     expandTo,
-    findNode,
+    findNode: findNodeFast,
     insertChildren,
     getPathsNeedingLoad,
     initExpandedFromTree,
