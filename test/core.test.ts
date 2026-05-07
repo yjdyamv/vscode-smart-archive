@@ -7,7 +7,7 @@
  * rename, convert, merge, encrypt/decrypt workflows.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
