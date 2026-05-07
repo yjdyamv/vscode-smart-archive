@@ -374,7 +374,7 @@ export async function compressWithSystem7z(
       const compressArgs = ["a", `-t${typeFlag}`, options.outputPath, tarPath];
       if (options.password) {
         validatePassword(options.password);
-        compressArgs.splice(1, 0, `-p${options.password}`);
+        compressArgs.splice(1, 0, "-p");
       }
       logger.info({
         event: "system7z.compress.wrap",
@@ -382,7 +382,7 @@ export async function compressWithSystem7z(
         argsPreview: compressArgs.filter((a) => !a.startsWith("-p")).join(" "),
       });
       progress.report({ message: t("compress.compressingTar", typeFlag) });
-      await run7z(sz, compressArgs, progress, token);
+      await run7z(sz, compressArgs, progress, token, options.password);
     } finally {
       try {
         fs.unlinkSync(tarPath);
@@ -399,7 +399,7 @@ export async function compressWithSystem7z(
 
   if (options.password) {
     validatePassword(options.password);
-    args.push(`-p${options.password}`);
+    args.push("-p");
     if (options.format.label === "7z") args.push("-mhe=on");
   }
   if (options.volumeSize) args.push(`-v${options.volumeSize}`);
@@ -428,7 +428,7 @@ export async function compressWithSystem7z(
   progress.report({ message: t("compress.inProgress") });
 
   try {
-    await run7z(sz, args, progress, token);
+    await run7z(sz, args, progress, token, options.password);
   } catch (err) {
     logger.error({ event: "system7z.compress.failed", err }, "System 7z compression failed");
     throw err;
@@ -452,7 +452,7 @@ export async function decompressWithSystem7z(
 
   if (options.password) {
     validatePassword(options.password);
-    args.splice(1, 0, `-p${options.password}`);
+    args.splice(1, 0, "-p");
   }
 
   args.push(options.inputPath);
@@ -469,7 +469,7 @@ export async function decompressWithSystem7z(
   progress.report({ message: t("decompress.inProgress") });
 
   try {
-    await run7z(sz, args, progress, token);
+    await run7z(sz, args, progress, token, options.password);
   } catch (err) {
     logger.error({ event: "system7z.decompress.failed", err }, "System 7z decompression failed");
     throw err;
@@ -489,7 +489,7 @@ export async function listWithSystem7z(
   const args: string[] = ["l", "-slt", "-sccUTF-8"];
   if (password) {
     validatePassword(password);
-    args.splice(1, 0, `-p${password}`);
+    args.splice(1, 0, "-p");
   }
   args.push(filePath);
 
@@ -500,7 +500,7 @@ export async function listWithSystem7z(
     args: args.filter((a) => !a.startsWith("-p")).join(" "),
   });
 
-  const { stdout } = await spawnCapture(sz, args);
+  const { stdout } = await spawnCapture(sz, args, 30_000, password);
   const results = parse7zListing(stdout, archiveName, filePath);
 
   logger.debug({ event: "system7z.list.ok", count: results.length });
@@ -545,7 +545,7 @@ interface CaptureResult {
   code: number | null;
 }
 
-function spawnCapture(binary: string, args: string[], timeoutMs = 30_000): Promise<CaptureResult> {
+function spawnCapture(binary: string, args: string[], timeoutMs = 30_000, password?: string): Promise<CaptureResult> {
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
@@ -553,6 +553,12 @@ function spawnCapture(binary: string, args: string[], timeoutMs = 30_000): Promi
     logger.debug({ event: "system7z.spawn", binary, args: args.join(" ") });
 
     const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true, timeout: timeoutMs });
+
+    // Pipe password via stdin — avoids exposing it in process listing
+    if (password) {
+      proc.stdin!.write(password);
+      proc.stdin!.end();
+    }
 
     const timer = setTimeout(() => {
       if (!settled) {
@@ -602,6 +608,7 @@ function run7z(
   args: string[],
   progress: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
+  password?: string,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     let stderr = "";
@@ -611,6 +618,12 @@ function run7z(
     logger.debug({ event: "system7z.run.start", binary, argsPreview: args.join(" ") });
 
     const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true });
+
+    // Pipe password via stdin — avoids exposing it in process listing
+    if (password) {
+      proc.stdin!.write(password);
+      proc.stdin!.end();
+    }
 
     token?.onCancellationRequested(() => {
       logger.info({ event: "system7z.run.cancelled", elapsedMs: Date.now() - startTime });
