@@ -18,7 +18,7 @@ import type { JS7zInstance } from "../types";
 import { safeJoinPath, checkFileSize, checkTotalSize } from "./security";
 import { getFullExt } from "../constants";
 import { logger } from "./logger";
-import { streamToVFS } from "../engines/js7z-helpers";
+import { streamToVFS } from "../engines/vfs-io";
 
 /**
  * Generate a collision-free output path.

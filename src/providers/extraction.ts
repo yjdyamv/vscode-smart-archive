@@ -13,7 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { JS7z, tryCleanupJS7z } from "./fileListing";
-import { streamToVFS } from "../engines/js7z-helpers";
+import { streamToVFS } from "../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../constants";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
