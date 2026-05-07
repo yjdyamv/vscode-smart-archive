@@ -83,11 +83,10 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 ## Requirements
 
 - VS Code 1.85.0 or later
-- Node.js 18+ (v22+ recommended for WASM memory64 support)
-- System 7-Zip (optional) — install via:
-  - **Windows**: [7-Zip](https://7-zip.org/) (`winget install 7zip`)
+- System 7-Zip (optional, for faster compression):
+  - **Windows**: [7-Zip](https://7-zip.org/) or `winget install 7zip`
   - **macOS**: `brew install sevenzip`
-  - **Linux**: `apt install 7zip` or `p7zip-full` (v21+ for full feature support)
+  - **Linux**: `apt install 7zip`
 
 ## Development
 
