@@ -432,6 +432,17 @@
             "Never use system 7-Zip. Always use the bundled WASM engine, even if 7-Zip is installed."
           ],
           "description": "Whether to use a system-installed 7-Zip binary for compress/decompress operations. System 7-Zip is significantly faster and uses less memory, but requires a local installation."
+        },
+        "smart-archive.useSystemZstd": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "always", "never"],
+          "enumDescriptions": [
+            "Detect system zstd automatically. If found, use it for faster tar.zst compression; otherwise fall back to bundled zstd-wasm.",
+            "Always use system zstd. Show an error if zstd is not installed.",
+            "Never use system zstd. Always use the bundled zstd-wasm engine, even if zstd is installed."
+          ],
+          "description": "Whether to use a system-installed zstd binary for tar.zst compression. System zstd is faster, but requires a local installation (brew install zstd / apt install zstd / winget install zstd)."
         }
       }
     }
