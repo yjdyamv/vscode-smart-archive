@@ -9,7 +9,8 @@
  */
 
 import * as fs from "fs";
-import { tryCleanup, streamToVFS } from "./js7z-helpers";
+import { tryCleanup } from "./js7z-helpers";
+import { streamToVFS } from "./vfs-io";
 import { getBaseName } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";

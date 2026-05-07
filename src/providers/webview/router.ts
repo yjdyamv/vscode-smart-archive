@@ -54,7 +54,7 @@ import {
 } from "../treeBuilder";
 import { contentHtml } from "../htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "../fileListing";
-import { streamToVFS } from "../../engines/js7z-helpers";
+import { streamToVFS } from "../../engines/vfs-io";
 import { extractSelected } from "../extraction";
 import {
   createFolderInArchive,

@@ -6,7 +6,7 @@
 
 import * as vscode from "vscode";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
-import { streamToVFS } from "../../engines/js7z-helpers";
+import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
 import { logger } from "../../utils/logger";

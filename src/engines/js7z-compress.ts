@@ -14,14 +14,8 @@ import * as os from "os";
 import * as vscode from "vscode";
 import type { CompressOptions, FormatInfo, JS7zInstance } from "../types";
 import { JS7z } from "./js7z-factory";
-import {
-  tryCleanup,
-  INPUT_DIR,
-  OUTPUT_DIR,
-  copyInputsToFS,
-  streamToVFS,
-  run7z,
-} from "./js7z-helpers";
+import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z } from "./js7z-helpers";
+import { streamToVFS } from "./vfs-io";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -126,43 +120,47 @@ export async function compressWith7z(
       if (!innerName.endsWith(".tar")) innerName += ".tar";
       const tarDiskPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
 
-      progress.report({ message: t("compress.creatingTar") });
-      await createTarFile(
-        tarDiskPath,
-        options.targets.map((target) => target.fsPath),
-        token,
-        excludePatterns,
-      );
-      if (token?.isCancellationRequested) throw new vscode.CancellationError();
-
-      let compressedData: Uint8Array | undefined;
-      if (wrapExt === "zst") {
-        progress.report({ message: t("compress.compressingTar", wrapExt) });
-        const zstOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.zst");
-        await zstdCompressFile(tarDiskPath, zstOut, options.level);
-        compressedData = new Uint8Array(fs.readFileSync(zstOut));
-      } else {
-        progress.report({ message: t("compress.compressingTar", wrapExt) });
-        const js7z2 = await JS7z();
-        try {
-          streamToVFS(js7z2, tarDiskPath, `/${innerName}`);
-          await run7z(js7z2, ["a", archiveFsPath, `/${innerName}`, "-mmt=on"], progress);
-          compressedData = new Uint8Array(js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }));
-        } finally {
-          tryCleanup(js7z2);
-        }
-      }
-
       try {
-        fs.unlinkSync(tarDiskPath);
-        fs.rmSync(path.dirname(tarDiskPath), { recursive: true, force: true });
-      } catch {
-        logger.warn({ event: "compress.cleanup.failed" }, "Failed to clean up temporary files");
-      }
+        progress.report({ message: t("compress.creatingTar") });
+        await createTarFile(
+          tarDiskPath,
+          options.targets.map((target) => target.fsPath),
+          token,
+          excludePatterns,
+        );
+        if (token?.isCancellationRequested) throw new vscode.CancellationError();
 
-      if (token?.isCancellationRequested) throw new vscode.CancellationError();
-      if (compressedData) {
-        fs.writeFileSync(options.outputPath, Buffer.from(compressedData));
+        let compressedData: Uint8Array | undefined;
+        if (wrapExt === "zst") {
+          progress.report({ message: t("compress.compressingTar", wrapExt) });
+          const zstOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.zst");
+          await zstdCompressFile(tarDiskPath, zstOut, options.level);
+          compressedData = new Uint8Array(fs.readFileSync(zstOut));
+        } else {
+          progress.report({ message: t("compress.compressingTar", wrapExt) });
+          const js7z2 = await JS7z();
+          try {
+            streamToVFS(js7z2, tarDiskPath, `/${innerName}`);
+            await run7z(js7z2, ["a", archiveFsPath, `/${innerName}`, "-mmt=on"], progress);
+            compressedData = new Uint8Array(
+              js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }),
+            );
+          } finally {
+            tryCleanup(js7z2);
+          }
+        }
+
+        if (token?.isCancellationRequested) throw new vscode.CancellationError();
+        if (compressedData) {
+          fs.writeFileSync(options.outputPath, Buffer.from(compressedData));
+        }
+      } finally {
+        try {
+          fs.unlinkSync(tarDiskPath);
+          fs.rmSync(path.dirname(tarDiskPath), { recursive: true, force: true });
+        } catch {
+          logger.warn({ event: "compress.cleanup.failed" }, "Failed to clean up temporary files");
+        }
       }
       return;
     }
