@@ -127,6 +127,7 @@ export function zstdCompressFile(input: string, output: string, level: number): 
           resolve();
         } else {
           cleanup(output);
+          logger.error({ event: "zstd.compress.system.failed", code, stderr: stderr.slice(0, 200), input, output });
           reject(new Error(`zstd exited with code ${code}: ${stderr.slice(0, 200)}`));
         }
       });
