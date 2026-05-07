@@ -9,6 +9,8 @@
 
 import { logger } from "../utils/logger";
 import { checkFileSize } from "../utils/security";
+import * as vscode from "vscode";
+import { t } from "../i18n";
 import { spawn } from "child_process";
 import * as fs from "fs";
 
@@ -60,6 +62,15 @@ export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
 let sysZstdPath: string | null | false = null;
 
 function resolveSystemZstd(): string | null {
+  const config = vscode.workspace.getConfiguration("smart-archive");
+  const setting = config.get<string>("useSystemZstd", "auto");
+
+  if (setting === "never") {
+    logger.debug({ event: "zstd.system.disabled" });
+    sysZstdPath = false;
+    return null;
+  }
+
   if (sysZstdPath !== null) return sysZstdPath || null;
   try {
     const whichProc = require("child_process").spawnSync(
@@ -70,13 +81,17 @@ function resolveSystemZstd(): string | null {
     if (whichProc.status === 0) {
       sysZstdPath = whichProc.stdout.toString().trim().split("\n")[0].trim() || "zstd";
     } else {
-      // Try locating via --version as fallback
       const verProc = require("child_process").spawnSync("zstd", ["--version"], { timeout: 3000 });
       sysZstdPath = verProc.status === 0 ? "zstd" : false;
     }
   } catch {
     sysZstdPath = false;
   }
+
+  if (!sysZstdPath && setting === "always") {
+    vscode.window.showWarningMessage(t("zstd.notAvailable"));
+  }
+
   return sysZstdPath || null;
 }
 
