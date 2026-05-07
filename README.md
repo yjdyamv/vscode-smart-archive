@@ -3,13 +3,13 @@
 [![Version](https://img.shields.io/visual-studio-marketplace/v/yjdyamv.smart-archive)](https://marketplace.visualstudio.com/items?itemName=yjdyamv.smart-archive)
 [![License](https://img.shields.io/github/license/yjdyamv/vscode-smart-archive)](LICENSE)
 
-VSCode extension for compressing and decompressing files using **7-Zip WebAssembly** — no native binaries required. Optionally uses a system-installed 7-Zip for faster performance.
+VSCode extension for compressing and decompressing files using **7-Zip WebAssembly** and **zstd-wasm** — no native binaries required. Optionally uses a system-installed 7-Zip for faster performance.
 
 ## Features
 
 - **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst
 - **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
-- **System 7-Zip support** — auto-detects local 7-Zip installation (Windows/macOS/Linux) for significantly faster compression and decompression; falls back to WASM when not available
+- **System 7-Zip/zstd support** — auto-detects local 7-Zip/zstd installation (Windows/macOS/Linux) for significantly faster compression and decompression; falls back to WASM when not available
 - **System zstd support** — optionally uses system zstd binary for tar.zst compression
 - **AES-256 encryption** — password-protect 7z and ZIP archives
 - **Archive browser** — opens as default editor for archives; virtual-scrolled tree (Vue 3 + TanStack Virtual), search, sort, partial extract, add/delete/rename, integrity test
@@ -29,8 +29,7 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 
 ```bash
 npm install               # installs root + webview-ui deps (postinstall hook)
-npm run build:webview     # build Vue frontend
-npm run compile           # compile TypeScript
+npm run build             # build Vue frontend + this extension
 ```
 
 Then press `F5` in VSCode to launch the Extension Development Host.
@@ -83,10 +82,10 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 ## Requirements
 
 - VS Code 1.85.0 or later
-- System 7-Zip (optional, for faster compression):
-  - **Windows**: [7-Zip](https://7-zip.org/) or `winget install 7zip`
-  - **macOS**: `brew install sevenzip`
-  - **Linux**: `apt install 7zip`
+- System 7-Zip (**optional**, for faster compression):
+  - Windows: [7-Zip](https://7-zip.org/) or `winget install 7zip`
+  - macOS: `brew install sevenzip`
+  - Linux: `apt install 7zip` and so on
 
 ## Development
 
