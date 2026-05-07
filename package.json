@@ -270,16 +270,16 @@
             "wim"
           ],
           "enumDescriptions": [
-            "7-Zip — best compression ratio, AES-256 encryption",
-            "ZIP — universal compatibility, AES-256 encryption",
-            "TAR — archive only, no compression",
-            "TAR + GZip — compressed archive with directory structure",
-            "TAR + BZip2 — high compression with directory structure",
-            "TAR + XZ — best compression with directory structure",
-            "TAR + Zstandard — fast compression with directory structure",
-            "WIM — Windows Imaging Format"
+            "%config.defaultFormat.7z%",
+            "%config.defaultFormat.zip%",
+            "%config.defaultFormat.tar%",
+            "%config.defaultFormat.tar.gz%",
+            "%config.defaultFormat.tar.bz2%",
+            "%config.defaultFormat.tar.xz%",
+            "%config.defaultFormat.tar.zst%",
+            "%config.defaultFormat.wim%"
           ],
-          "description": "Default archive format used when compressing files."
+          "description": "%config.defaultFormat.description%"
         },
         "smart-archive.defaultCompressionLevel": {
           "type": "integer",
@@ -295,14 +295,14 @@
             9
           ],
           "enumDescriptions": [
-            "0 – Store (no compression, fastest)",
-            "1 – Fastest",
-            "3 – Fast",
-            "5 – Normal",
-            "7 – Maximum",
-            "9 – Ultra (slowest, best ratio)"
+            "%config.defaultCompressionLevel.0%",
+            "%config.defaultCompressionLevel.1%",
+            "%config.defaultCompressionLevel.3%",
+            "%config.defaultCompressionLevel.5%",
+            "%config.defaultCompressionLevel.7%",
+            "%config.defaultCompressionLevel.9%"
           ],
-          "description": "Default compression level (0=store, 5=normal, 9=ultra)."
+          "description": "%config.defaultCompressionLevel.description%"
         },
         "smart-archive.defaultOutputDir": {
           "type": "string",
@@ -312,24 +312,22 @@
             "prompt"
           ],
           "enumDescriptions": [
-            "Extract/compress next to the source file",
-            "Always prompt for output directory"
+            "%config.defaultOutputDir.source%",
+            "%config.defaultOutputDir.prompt%"
           ],
-          "description": "Where to place extracted/compressed files by default."
+          "description": "%config.defaultOutputDir.description%"
         },
-        "smart-archive.maxFileSizeMiB": {
-          "type": "integer",
-          "default": 1024,
-          "minimum": 1,
-          "maximum": 102400,
-          "description": "Maximum allowed size for a single decompressed file (MiB). Default: 1024 MiB (= 1 GiB)."
+        "smart-archive.maxFileSize": {
+          "type": ["integer", "string"],
+          "default": "1g",
+          "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
+          "description": "%config.maxFileSize.description%"
         },
-        "smart-archive.maxTotalSizeMiB": {
-          "type": "integer",
-          "default": 10240,
-          "minimum": 1,
-          "maximum": 512000,
-          "description": "Maximum total decompressed size across all files (MiB). Default: 10240 MiB (= 10 GiB)."
+        "smart-archive.maxTotalSize": {
+          "type": ["integer", "string"],
+          "default": "10g",
+          "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
+          "description": "%config.maxTotalSize.description%"
         },
         "smart-archive.collapsedDirPatterns": {
           "type": "array",
@@ -372,7 +370,7 @@
             "bower_components",
             ".terraform"
           ],
-          "description": "Directory name patterns to keep collapsed by default in the archive preview. Remove or adjust patterns to suit your preferences."
+          "description": "%config.collapsedDirPatterns.description%"
         },
         "smart-archive.compressExcludePatterns": {
           "type": "array",
@@ -415,34 +413,34 @@
             "bower_components",
             ".terraform"
           ],
-          "description": "Glob patterns (gitignore syntax) for files/directories to exclude when compressing. Example: ['node_modules', '.venv', '*.log', '**/dist']"
+          "description": "%config.compressExcludePatterns.description%"
         },
         "smart-archive.defaultVolumeSize": {
           "type": "string",
           "default": "",
-          "description": "Default split volume size (number + k/m/g suffix, e.g. 100m, 1g). Leave empty to skip splitting by default."
+          "description": "%config.defaultVolumeSize.description%"
         },
         "smart-archive.useSystem7z": {
           "type": "string",
           "default": "auto",
           "enum": ["auto", "always", "never"],
           "enumDescriptions": [
-            "Detect system 7-Zip automatically. If found and version >= 21, use it for faster compression; otherwise fall back to bundled WASM engine.",
-            "Always use system 7-Zip. Show an error if 7-Zip is not installed or too old.",
-            "Never use system 7-Zip. Always use the bundled WASM engine, even if 7-Zip is installed."
+            "%config.useSystem7z.auto%",
+            "%config.useSystem7z.always%",
+            "%config.useSystem7z.never%"
           ],
-          "description": "Whether to use a system-installed 7-Zip binary for compress/decompress operations. System 7-Zip is significantly faster and uses less memory, but requires a local installation."
+          "description": "%config.useSystem7z.description%"
         },
         "smart-archive.useSystemZstd": {
           "type": "string",
           "default": "auto",
           "enum": ["auto", "always", "never"],
           "enumDescriptions": [
-            "Detect system zstd automatically. If found, use it for faster tar.zst compression; otherwise fall back to bundled zstd-wasm.",
-            "Always use system zstd. Show an error if zstd is not installed.",
-            "Never use system zstd. Always use the bundled zstd-wasm engine, even if zstd is installed."
+            "%config.useSystemZstd.auto%",
+            "%config.useSystemZstd.always%",
+            "%config.useSystemZstd.never%"
           ],
-          "description": "Whether to use a system-installed zstd binary for tar.zst compression. System zstd is faster, but requires a local installation (brew install zstd / apt install zstd / winget install zstd)."
+          "description": "%config.useSystemZstd.description%"
         }
       }
     }
