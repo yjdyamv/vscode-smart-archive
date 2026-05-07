@@ -11,10 +11,9 @@ import { logger } from "../utils/logger";
 import { checkFileSize } from "../utils/security";
 import * as vscode from "vscode";
 import { t } from "../i18n";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const zstd = require("@bokuweb/zstd-wasm") as {
   init: () => Promise<void>;
   compress: (data: Uint8Array, level?: number) => Uint8Array;
@@ -22,11 +21,18 @@ const zstd = require("@bokuweb/zstd-wasm") as {
 };
 
 let initP: Promise<void> | null = null;
+let initFailed = false;
 
 function ensureInit(): Promise<void> {
+  if (initFailed) {
+    return Promise.reject(
+      new Error("Zstd WASM initialization previously failed — restart may be required"),
+    );
+  }
   if (!initP) {
     initP = zstd.init().catch((err) => {
       logger.error({ event: "zstd.init.failed", err }, "Zstd initialization failed");
+      initFailed = true;
       initP = null;
       throw err;
     });
@@ -73,15 +79,13 @@ function resolveSystemZstd(): string | null {
 
   if (sysZstdPath !== null) return sysZstdPath || null;
   try {
-    const whichProc = require("child_process").spawnSync(
-      process.platform === "win32" ? "where" : "which",
-      ["zstd"],
-      { timeout: 3000 },
-    );
+    const whichProc = spawnSync(process.platform === "win32" ? "where" : "which", ["zstd"], {
+      timeout: 3000,
+    });
     if (whichProc.status === 0) {
       sysZstdPath = whichProc.stdout.toString().trim().split("\n")[0].trim() || "zstd";
     } else {
-      const verProc = require("child_process").spawnSync("zstd", ["--version"], { timeout: 3000 });
+      const verProc = spawnSync("zstd", ["--version"], { timeout: 3000 });
       sysZstdPath = verProc.status === 0 ? "zstd" : false;
     }
   } catch {
