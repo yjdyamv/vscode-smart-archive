@@ -101,7 +101,6 @@ defineEmits<{
   (e: "extract-selected"): void;
   (e: "delete-selected"): void;
   (e: "add-files"): void;
-  (e: "copy"): void;
   (e: "expand-all"): void;
   (e: "collapse-all"): void;
   (e: "sort", key: "name" | "size"): void;

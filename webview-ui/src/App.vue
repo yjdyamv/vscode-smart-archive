@@ -6,7 +6,6 @@ import { useSelection } from "./composables/useSelection";
 import { useSort, type SortKey } from "./composables/useSort";
 import { useSearch } from "./composables/useSearch";
 import { useTreeFlatten } from "./composables/useTree";
-import { formatSize } from "./utils/icons";
 import LoadingSpinner from "./components/LoadingSpinner.vue";
 import PasswordBox from "./components/PasswordBox.vue";
 import Toolbar from "./components/Toolbar.vue";
@@ -74,6 +73,10 @@ function showToast(msg: string, ok = true) {
     },
     ok ? 1800 : 4000,
   );
+}
+
+function onToggleRegex() {
+  search.toggleRegex(treeData.value);
 }
 
 function onSearch(q: string) {
@@ -301,7 +304,7 @@ function toggleWithDescendants(path: string) {
   }
 }
 
-function handleRowClick(path: string, isDir: boolean, shift: boolean, ctrl: boolean) {
+function handleRowClick(path: string, _isDir: boolean, shift: boolean, ctrl: boolean) {
   if (shift && selection.state.anchorPath) {
     const flatList = visibleFlatNodes.value;
     const anchorIdx = flatList.findIndex((f) => f.path === selection.state.anchorPath);
@@ -389,35 +392,40 @@ const selectionBreakdown = computed(() => {
 });
 
 onMounted(() => {
-  const rawTree = window._xTree ?? [];
-  const props = window._xProps;
-  const files = window._xFiles ?? 0;
-  const dirs = window._xDirs ?? 0;
-  const initView = window._xViewState;
+  try {
+    const rawTree = window._xTree ?? [];
+    const props = window._xProps;
+    const files = window._xFiles ?? 0;
+    const dirs = window._xDirs ?? 0;
+    const initView = window._xViewState;
 
-  if (initView === "password") {
-    if (props) archiveProps.value = props;
-    viewState.value = "password";
-    return;
-  }
+    if (initView === "password") {
+      if (props) archiveProps.value = props;
+      viewState.value = "password";
+      return;
+    }
 
-  if (props) {
-    archiveProps.value = props;
-    totalFiles.value = files;
-    totalDirs.value = dirs;
-  }
+    if (props) {
+      archiveProps.value = props;
+      totalFiles.value = files;
+      totalDirs.value = dirs;
+    }
 
-  if (rawTree.length > 0) {
-    treeData.value = sort.sortNodes(rawTree);
-    viewState.value = "content";
-    tree.initExpandedFromTree();
-    // Show toast from page reload (after delete/rename/add/folder operations)
-    const toastMsg = window._xToast;
-    if (toastMsg) showToast(toastMsg, true);
-    // Trigger lazy loading for auto-expanded (non-noisy) directories
-    loadExpandedPaths();
-  } else {
+    if (rawTree.length > 0) {
+      treeData.value = sort.sortNodes(rawTree);
+      viewState.value = "content";
+      tree.initExpandedFromTree();
+      // Show toast from page reload (after delete/rename/add/folder operations)
+      const toastMsg = window._xToast;
+      if (toastMsg) showToast(toastMsg, true);
+      // Trigger lazy loading for auto-expanded (non-noisy) directories
+      loadExpandedPaths();
+    } else {
+      viewState.value = "empty";
+    }
+  } catch (err) {
     viewState.value = "empty";
+    showToast("Failed to initialize archive view: " + (err instanceof Error ? err.message : String(err)), false);
   }
 
   const cleanupMessage = onMessage((msg) => {
@@ -457,6 +465,9 @@ onMounted(() => {
         }
         break;
       }
+      default:
+        console.warn('Unknown message type:', msg.c);
+        break;
     }
   });
 
@@ -582,10 +593,18 @@ provide(
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
         @search="onSearch"
-        @toggle-regex="search.toggleRegex"
+        @toggle-regex="onToggleRegex"
         @convert="convertFormat"
       />
+      <div
+        v-if="search.query.value.trim() && visibleFlatNodes.length === 0"
+        class="flex-1 flex flex-col items-center justify-center gap-2 text-[var(--vscode-descriptionForeground)] text-sm"
+      >
+        <div>No matching files</div>
+        <div class="text-xs opacity-50">Try adjusting your search terms or clear the query</div>
+      </div>
       <FileTree
+        v-else
         :flat-nodes="visibleFlatNodes"
         :tree-data="treeData"
         :selected="selection.state.selected"
@@ -621,14 +640,21 @@ provide(
       v-else
       class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]"
     >
-      <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
-      <div class="text-[1.1em] text-[var(--vscode-foreground)]">
-        {{ archiveProps?.name ?? "Archive" }}
-      </div>
-      <div class="text-sm opacity-70">No files to display</div>
-      <div v-if="!readOnly" class="text-xs opacity-50 mt-1">
-        Add files with the + button or extract existing content
-      </div>
+      <template v-if="search.query.value.trim()">
+        <div class="empty-icon"><span class="codicon codicon-search"></span></div>
+        <div class="text-sm opacity-70">No matching files</div>
+        <div class="text-xs opacity-50 mt-1">Try adjusting your search terms or clear the query</div>
+      </template>
+      <template v-else>
+        <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
+        <div class="text-[1.1em] text-[var(--vscode-foreground)]">
+          {{ archiveProps?.name ?? "Archive" }}
+        </div>
+        <div class="text-sm opacity-70">No files to display</div>
+        <div v-if="!readOnly" class="text-xs opacity-50 mt-1">
+          Add files with the + button or extract existing content
+        </div>
+      </template>
     </div>
 
     <Toast :msg="toast.msg" :ok="toast.ok" :visible="toast.show" />

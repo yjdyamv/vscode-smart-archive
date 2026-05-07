@@ -164,10 +164,6 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     loadingPaths.value.add(path);
   }
 
-  function isLoading(path: string): boolean {
-    return loadingPaths.value.has(path);
-  }
-
   return {
     expandedPaths,
     loadingPaths,
@@ -182,6 +178,5 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     getPathsNeedingLoad,
     initExpandedFromTree,
     setLoading,
-    isLoading,
   };
 }
