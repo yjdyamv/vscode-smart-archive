@@ -123,6 +123,7 @@ export function zstdCompressFile(input: string, output: string, level: number): 
         if (settled) return;
         settled = true;
         if (code === 0) {
+          logger.info({ event: "zstd.compress.system.ok", input, output, level });
           resolve();
         } else {
           cleanup(output);
@@ -172,6 +173,7 @@ function wasmCompressFile(input: string, output: string, level: number): Promise
         fs.writeSync(out, Buffer.from(frame));
         pos += n;
       }
+      logger.info({ event: "zstd.compress.wasm.ok", input, output, level });
     } finally {
       fs.closeSync(rfd);
       fs.closeSync(out);
