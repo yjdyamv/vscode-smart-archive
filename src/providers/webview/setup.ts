@@ -66,8 +66,10 @@ export async function setupWebview(
     try {
       encrypted = await isEncrypted(filePath);
     } catch {
-      // isEncrypted can fail for multi-volume archives that need
-      // all parts to list — don't blindly assume encryption.
+      logger.warn(
+        { event: "setupWebview.isEncrypted.failed" },
+        "isEncrypted failed, may be multi-volume archive",
+      );
     }
     if (encrypted) isEnc = true;
 
@@ -227,4 +229,6 @@ export async function setupWebview(
     handlerRegistered.add(webview);
     registerHandler(webview);
   }
+
+  logger.info({ event: "setupWebview.done", filePath, entryCount: entries.length });
 }

@@ -105,7 +105,10 @@ function copyFromFSWithStrip(
         try {
           checkFileSize(js7z.FS.stat(full).size);
         } catch {
-          /* stat may fail, fall through */
+          logger.warn(
+            { event: "extractSelected.statSize.failed" },
+            "Stat may fail for size check, falling through",
+          );
         }
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
@@ -122,7 +125,10 @@ function copyFromFSWithStrip(
       try {
         reportedSize = js7z.FS.stat(full).size;
       } catch {
-        /* stat may fail, skip bomb check */
+        logger.debug(
+          { event: "extractSelected.statReportedSize.failed" },
+          "Stat may fail, skipping bomb check",
+        );
       }
       if (reportedSize !== undefined && data.byteLength > reportedSize * 4 && reportedSize > 1024) {
         throw new Error(
