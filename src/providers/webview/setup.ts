@@ -108,22 +108,14 @@ export async function setupWebview(
         undefined,
         "password",
       );
+      const flags: string[] = [];
       if (isSplitVolume(filePath)) {
-        webview.html = webview.html.replace(
-          "</body>",
-          `<script>window._xIsSplit=true</script></body>`,
-        );
+        flags.push("window._xIsSplit=true");
+      } else if ([".7z", ".zip"].includes(ext)) {
+        flags.push("window._xCanSplit=true");
       }
-      if ([".7z", ".zip"].includes(ext) && !isSplitVolume(filePath)) {
-        webview.html = webview.html.replace(
-          "</body>",
-          `<script>window._xCanSplit=true</script></body>`,
-        );
-      }
-      webview.html = webview.html.replace(
-        "</body>",
-        `<script>window._xIsEncrypted=true</script></body>`,
-      );
+      flags.push("window._xIsEncrypted=true");
+      webview.html = webview.html.replace("</body>", `<script>${flags.join(";")}</script></body>`);
       if (!handlerRegistered.has(webview)) {
         handlerRegistered.add(webview);
         registerHandler(webview);
@@ -187,42 +179,19 @@ export async function setupWebview(
     roToast,
   );
 
-  // Pass read-only flag
-  const readOnly = isReadOnlyExt(getFullExt(filePath)) || isSplitVolume(filePath);
-  if (readOnly) {
-    webview.html = webview.html.replace(
-      "</body>",
-      `<script>window._xReadOnly=true</script></body>`,
-    );
-  }
-
-  // Pass split-volume flag so the frontend can show a Merge button
+  // Collect window flags for a single script injection
+  const flags: string[] = [];
   if (isSplitVolume(filePath)) {
-    webview.html = webview.html.replace("</body>", `<script>window._xIsSplit=true</script></body>`);
+    flags.push("window._xReadOnly=true", "window._xIsSplit=true");
+  } else {
+    if (isReadOnlyExt(getFullExt(filePath))) flags.push("window._xReadOnly=true");
+    if ([".7z", ".zip"].includes(ext)) flags.push("window._xCanSplit=true");
   }
-
-  // For non-split 7z/zip, flag that splitting is available
-  if ([".7z", ".zip"].includes(ext) && !isSplitVolume(filePath)) {
-    webview.html = webview.html.replace(
-      "</body>",
-      `<script>window._xCanSplit=true</script></body>`,
-    );
-  }
-
-  if (isEnc) {
-    webview.html = webview.html.replace(
-      "</body>",
-      `<script>window._xIsEncrypted=true</script></body>`,
-    );
-  }
-
-  // Restore previously expanded directories
+  if (isEnc) flags.push("window._xIsEncrypted=true");
   const persisted = loadPersistedExpanded(archiveUri);
-  if (persisted.length > 0) {
-    webview.html = webview.html.replace(
-      "</body>",
-      `<script>window._xExpanded=${JSON.stringify(persisted)}</script></body>`,
-    );
+  if (persisted.length > 0) flags.push(`window._xExpanded=${JSON.stringify(persisted)}`);
+  if (flags.length > 0) {
+    webview.html = webview.html.replace("</body>", `<script>${flags.join(";")}</script></body>`);
   }
 
   if (!handlerRegistered.has(webview)) {

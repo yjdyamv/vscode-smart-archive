@@ -20,6 +20,7 @@ import {
   walkFS,
 } from "./helpers";
 import type { JS7zInstance, TreeNode, FlatEntry } from "./helpers";
+import { markNoisyDirs } from "../src/utils/noisy-patterns";
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
 const zstd: {
@@ -28,9 +29,6 @@ const zstd: {
   decompress: (data: Uint8Array) => Uint8Array;
 } = require("@bokuweb/zstd-wasm");
 
-const { minimatch } = require("minimatch") as {
-  minimatch: (p: string, pattern: string, opts?: Record<string, unknown>) => boolean;
-};
 
 // ── Format matrix (mirrors FORMAT_TABLE from constants.ts) ──
 
@@ -381,35 +379,6 @@ describe("parse7zListing", () => {
     expect(r.some((e) => e.type === "DIRECTORY")).toBe(true);
   });
 });
-
-// ════════════════════════════════════════════════════════════════════
-// markNoisyDirs
-// ════════════════════════════════════════════════════════════════════
-
-function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
-  if (noisyPatterns.length === 0) return;
-  for (const node of nodes) {
-    if (node.kind === "DIRECTORY") {
-      for (const pattern of noisyPatterns) {
-        if (
-          minimatch(node.path, pattern, { dot: true }) ||
-          minimatch(node.name, pattern, { dot: true })
-        ) {
-          node.collapsed = true;
-          break;
-        }
-        for (const seg of node.path.split("/")) {
-          if (minimatch(seg, pattern, { dot: true })) {
-            node.collapsed = true;
-            break;
-          }
-        }
-        if (node.collapsed) break;
-      }
-    }
-    if (node.children) markNoisyDirs(node.children, noisyPatterns);
-  }
-}
 
 function buildTreeLocal(entries: FlatEntry[]): TreeNode[] {
   const normed: { entry: FlatEntry; parts: string[] }[] = [];

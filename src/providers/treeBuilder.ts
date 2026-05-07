@@ -7,8 +7,8 @@
  * @module providers/treeBuilder
  */
 
-import { minimatch } from "minimatch";
 import { getSplitVolumeBase } from "../constants";
+import { markNoisyDirs } from "../utils/noisy-patterns";
 
 interface TreeNode {
   name: string;
@@ -362,35 +362,6 @@ function getDirChildren(parentPath: string, entries: FlatEntry[], index?: EntryI
   }
 
   return children;
-}
-
-// ── Noisy directory marking ────────────────────────────────────────
-
-function markNoisyDirs(nodes: TreeNode[], noisyPatterns: string[]): void {
-  if (noisyPatterns.length === 0) return;
-  for (const node of nodes) {
-    if (node.kind === "DIRECTORY") {
-      for (const pattern of noisyPatterns) {
-        if (
-          minimatch(node.path, pattern, { dot: true }) ||
-          minimatch(node.name, pattern, { dot: true })
-        ) {
-          node.collapsed = true;
-          break;
-        }
-        // Also collapse if any ancestor segment matches (e.g. node_modules/express
-        // is a child of node_modules and should not auto-expand)
-        for (const seg of node.path.split("/")) {
-          if (minimatch(seg, pattern, { dot: true })) {
-            node.collapsed = true;
-            break;
-          }
-        }
-        if (node.collapsed) break;
-      }
-    }
-    if (node.children) markNoisyDirs(node.children, noisyPatterns);
-  }
 }
 
 // ── Stats helpers ──────────────────────────────────────────────────

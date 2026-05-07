@@ -8,13 +8,13 @@
  */
 
 import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
 import { copyDirToFS } from "../utils/fs";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
+import { streamToVFS } from "./vfs-io";
 
 function tryCleanup(instance: JS7zInstance): void {
   try {
@@ -102,157 +102,4 @@ function run7z(
   });
 }
 
-const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
-const CHUNK = 100 * 1024 * 1024;
-
-function matchPartNum(name: string, pattern: RegExp): string {
-  const m = name.match(pattern);
-  return m ? m[1] : "0";
-}
-
-function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): string {
-  const archiveName = getBaseName(filePath);
-  const target = vfsPath ?? `/${archiveName}`;
-
-  // For split volumes (archive.7z.001), stream ALL parts so 7z can
-  // find .002, .003, etc. in the same VFS directory.
-  const splitMatch = filePath.match(/^(.+\.(?:7z|zip|wim))\.(\d+)$/i);
-  if (splitMatch) {
-    const base = splitMatch[1];
-    const dir = path.dirname(base);
-    const name = path.basename(base);
-    const nameEscaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const partPattern = new RegExp(`^${nameEscaped}\\.(\\d+)$`, "i");
-
-    const parts = fs
-      .readdirSync(dir)
-      .filter((f) => partPattern.test(f))
-      .sort(
-        (a, b) =>
-          parseInt(matchPartNum(a, partPattern), 10) - parseInt(matchPartNum(b, partPattern), 10),
-      );
-
-    if (parts.length === 0) {
-      throw new Error(t("decompress.noSplitParts", path.basename(filePath)));
-    }
-
-    for (const partName of parts) {
-      const partPath = path.join(dir, partName);
-      const partTarget = vfsPath
-        ? `${vfsPath.replace(/\.\d+$/, "")}.${matchPartNum(partName, partPattern)}`
-        : `/${partName}`;
-      copyToVFS(js7z, partPath, partTarget);
-    }
-
-    const first = parts[0];
-    return vfsPath
-      ? `${vfsPath.replace(/\.\d+$/, "")}.${matchPartNum(first, partPattern)}`
-      : `/${first}`;
-  }
-
-  // RAR split volumes: basename.part1.rar, basename.part2.rar, ...
-  const rarPartMatch = filePath.match(/^(.+)\.part(\d+)\.rar$/i);
-  if (rarPartMatch) {
-    const base = rarPartMatch[1];
-    const dir = path.dirname(base);
-    const fn = path.basename(base);
-    const fnEscaped = fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const partPattern = new RegExp(`^${fnEscaped}\\.part(\\d+)\\.rar$`, "i");
-
-    const parts = fs
-      .readdirSync(dir)
-      .filter((f) => partPattern.test(f))
-      .sort(
-        (a, b) =>
-          parseInt(matchPartNum(a, partPattern), 10) - parseInt(matchPartNum(b, partPattern), 10),
-      );
-
-    for (const partName of parts) {
-      const partPath = path.join(dir, partName);
-      const partTarget = vfsPath
-        ? `${vfsPath.replace(/\.part\d+/, `.part${matchPartNum(partName, partPattern)}`)}`
-        : `/${partName}`;
-      copyToVFS(js7z, partPath, partTarget);
-    }
-
-    // Also copy the .rar base file if it exists (legacy volume set)
-    const rarBase = path.join(dir, `${fn}.rar`);
-    if (fs.existsSync(rarBase)) {
-      const baseTarget = vfsPath ? vfsPath.replace(/\.part\d+\.rar$/, ".rar") : `/${fn}.rar`;
-      copyToVFS(js7z, rarBase, baseTarget);
-    }
-
-    const firstNum = parts.length > 0 ? matchPartNum(parts[0], partPattern) : "1";
-    return vfsPath ? vfsPath.replace(/\.part\d+/, `.part${firstNum}`) : `/${fn}.part1.rar`;
-  }
-
-  // RAR split volumes: basename.r00, basename.r01, ... + basename.rar
-  const rarVolMatch = filePath.match(/^(.+)\.(r(?:ar|\d{2}))$/i);
-  if (rarVolMatch && /^r\d{2}$/i.test(rarVolMatch[2])) {
-    const baseName = rarVolMatch[1];
-    const dir = path.dirname(baseName);
-    const fn = path.basename(baseName);
-    const fnEscaped = fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const rnnPattern = new RegExp(`^${fnEscaped}\\.r(\\d{2})$`, "i");
-
-    // Copy the main .rar first
-    const rarFile = path.join(dir, `${fn}.rar`);
-    if (fs.existsSync(rarFile)) {
-      const rarTarget = vfsPath ? vfsPath.replace(/\.r\d{2}$/, ".rar") : `/${fn}.rar`;
-      copyToVFS(js7z, rarFile, rarTarget);
-    }
-
-    const parts = fs
-      .readdirSync(dir)
-      .filter((f) => rnnPattern.test(f))
-      .sort(
-        (a, b) =>
-          parseInt(matchPartNum(a, rnnPattern), 10) - parseInt(matchPartNum(b, rnnPattern), 10),
-      );
-
-    for (const partName of parts) {
-      const partPath = path.join(dir, partName);
-      const partTarget = vfsPath
-        ? vfsPath.replace(/\.r\d{2}$/, `.r${matchPartNum(partName, rnnPattern)}`)
-        : `/${partName}`;
-      copyToVFS(js7z, partPath, partTarget);
-    }
-
-    return vfsPath ? vfsPath.replace(/\.r\d{2}$/, ".rar") : `/${fn}.rar`;
-  }
-
-  copyToVFS(js7z, filePath, target);
-  return target;
-}
-
-function copyToVFS(js7z: JS7zInstance, filePath: string, vfsPath: string): void {
-  const stat = fs.statSync(filePath);
-  if (stat.size <= MAX_BUFFER) {
-    const data = fs.readFileSync(filePath);
-    js7z.FS.writeFile(vfsPath, data);
-    return;
-  }
-
-  // Stream in chunks via VFS open/write/close
-  const rfd = fs.openSync(filePath, "r");
-  try {
-    js7z.FS.createDataFile("/", vfsPath.replace(/^\//, ""), new Uint8Array(0), true, true, 0o777);
-    const vfsStream = js7z.FS.open(vfsPath, "w");
-    try {
-      const buf = Buffer.alloc(CHUNK);
-      let pos = 0;
-      while (true) {
-        const n = fs.readSync(rfd, buf, 0, buf.length, pos);
-        if (n === 0) break;
-        js7z.FS.write(vfsStream, new Uint8Array(buf.slice(0, n)), 0, n, pos);
-        pos += n;
-      }
-    } finally {
-      js7z.FS.close(vfsStream);
-    }
-  } finally {
-    fs.closeSync(rfd);
-  }
-}
-
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, streamToVFS, run7z, MAX_BUFFER };
+export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z };
