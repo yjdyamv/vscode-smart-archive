@@ -20,8 +20,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { spawn } from "child_process";
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import * as vscode from "vscode";
 import * as iconv from "iconv-lite";
 import type { CompressOptions, DecompressOptions } from "../types";
@@ -301,12 +300,19 @@ function detectEncoding(): string {
     // chcp.com not available — fall through
   }
 
-  // Fallback: check environment or default to system ANSI
+  // Fallback: check environment or derive from system locale
   const legacy = process.env.LANG || process.env.LC_ALL || process.env.LC_CTYPE || "";
   if (legacy.toLowerCase().includes("utf-8") || legacy.toLowerCase().includes("utf8")) {
     _codePageCache = "utf8";
   } else {
-    _codePageCache = "cp936"; // most common for Chinese Windows
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase();
+    if (locale.startsWith("ja")) {
+      _codePageCache = "cp932";
+    } else if (locale.startsWith("ko")) {
+      _codePageCache = "cp949";
+    } else {
+      _codePageCache = "cp936";
+    }
   }
   logger.info({ event: "system7z.codepage", encoding: _codePageCache, method: "fallback" });
   return _codePageCache;
@@ -545,7 +551,12 @@ interface CaptureResult {
   code: number | null;
 }
 
-function spawnCapture(binary: string, args: string[], timeoutMs = 30_000, password?: string): Promise<CaptureResult> {
+function spawnCapture(
+  binary: string,
+  args: string[],
+  timeoutMs = 30_000,
+  password?: string,
+): Promise<CaptureResult> {
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";

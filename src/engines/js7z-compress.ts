@@ -155,7 +155,7 @@ export async function compressWith7z(
 
       try {
         fs.unlinkSync(tarDiskPath);
-        fs.rmdirSync(path.dirname(tarDiskPath));
+        fs.rmSync(path.dirname(tarDiskPath), { recursive: true, force: true });
       } catch {
         logger.warn({ event: "compress.cleanup.failed" }, "Failed to clean up temporary files");
       }
