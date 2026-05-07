@@ -17,7 +17,10 @@ const emit = defineEmits<{
   (e: "new-folder"): void;
   (e: "rename"): void;
 }>();
-const lastAddDir = inject<ComputedRef<string>>("lastAddDir", computed(() => ""));
+const lastAddDir = inject<ComputedRef<string>>(
+  "lastAddDir",
+  computed(() => ""),
+);
 const dirLabel = computed(() => (lastAddDir.value ? ` → ${lastAddDir.value}` : " → (root)"));
 const menuRef = ref<HTMLElement | null>(null);
 function onMouseDown(e: MouseEvent) {

@@ -130,7 +130,7 @@ async function decompressSingleFile(
           if (fs.existsSync(outputDir)) {
             const contents = fs.readdirSync(outputDir);
             if (contents.length === 0) {
-              fs.rmdirSync(outputDir);
+              fs.rmSync(outputDir, { recursive: true, force: true });
             }
           }
         } catch {

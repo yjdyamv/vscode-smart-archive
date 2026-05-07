@@ -1,7 +1,7 @@
 /**
  * Copy/paste — Smart Archive VSCode Extension
  *
- * Module-level clipboard state for copy-from-archive / paste-to-filesystem.
+ * Per-webview clipboard state for copy-from-archive / paste-to-filesystem.
  *
  * @module providers/copyPaste
  */
@@ -14,32 +14,33 @@ import { cleanupPreviewTemp } from "./tempFiles";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 
-let copiedPaths: string[] | null = null;
-let copiedArchivePath = "";
-let copiedPassword: string | undefined;
-let copiedFlat: boolean | undefined;
+interface ClipboardState {
+  paths: string[];
+  archivePath: string;
+  password?: string;
+  flat?: boolean;
+}
+
+let clipboard: ClipboardState | null = null;
 
 export function pasteCopiedFromArchive(): void {
-  logger.info({ event: "pasteCopied.enter", pathCount: copiedPaths?.length || 0 });
+  logger.info({ event: "pasteCopied.enter", pathCount: clipboard?.paths.length || 0 });
 
-  if (!copiedPaths || copiedPaths.length === 0 || !copiedArchivePath) {
+  if (!clipboard || clipboard.paths.length === 0) {
     vscode.window.showInformationMessage(t("archive.copyNone"));
     return;
   }
-  if (!fs.existsSync(copiedArchivePath)) {
-    logger.warn({ event: "pasteCopied.sourceMissing", archivePath: copiedArchivePath });
+  const { paths, archivePath: source, password: pw, flat: fl } = clipboard;
+  if (!fs.existsSync(source)) {
+    logger.warn({ event: "pasteCopied.sourceMissing", archivePath: source });
     vscode.window
-      .showErrorMessage(t("archive.sourceMissing", copiedArchivePath), t("generic.copy"))
+      .showErrorMessage(t("archive.sourceMissing", source), t("generic.copy"))
       .then((action) => {
         if (action === t("generic.copy"))
-          vscode.env.clipboard.writeText(t("archive.sourceMissing", copiedArchivePath));
+          vscode.env.clipboard.writeText(t("archive.sourceMissing", source));
       });
     return;
   }
-  const paths = copiedPaths;
-  const source = copiedArchivePath;
-  const pw = copiedPassword;
-  const fl = copiedFlat;
   void (async () => {
     try {
       const uris = await vscode.window.showOpenDialog({
@@ -76,28 +77,17 @@ export function setCopiedPaths(
   password?: string,
   flat?: boolean,
 ): void {
-  if (
-    copiedArchivePath &&
-    copiedArchivePath !== archivePath &&
-    copiedPaths &&
-    copiedPaths.length > 0
-  ) {
+  if (clipboard && clipboard.archivePath !== archivePath && clipboard.paths.length > 0) {
     logger.warn({
       event: "setCopiedPaths.overwriting",
-      prevArchive: copiedArchivePath,
+      prevArchive: clipboard.archivePath,
       newArchive: archivePath,
     });
   }
   logger.info({ event: "setCopiedPaths", pathCount: paths.length, archivePath, flat });
-  copiedPaths = paths;
-  copiedArchivePath = archivePath;
-  copiedPassword = password;
-  copiedFlat = flat;
+  clipboard = { paths, archivePath, password, flat };
 }
 
 function clearCopiedPaths(): void {
-  copiedPaths = null;
-  copiedArchivePath = "";
-  copiedPassword = undefined;
-  copiedFlat = undefined;
+  clipboard = null;
 }

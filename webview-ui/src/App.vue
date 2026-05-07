@@ -425,7 +425,10 @@ onMounted(() => {
     }
   } catch (err) {
     viewState.value = "empty";
-    showToast("Failed to initialize archive view: " + (err instanceof Error ? err.message : String(err)), false);
+    showToast(
+      "Failed to initialize archive view: " + (err instanceof Error ? err.message : String(err)),
+      false,
+    );
   }
 
   const cleanupMessage = onMessage((msg) => {
@@ -466,7 +469,7 @@ onMounted(() => {
         break;
       }
       default:
-        console.warn('Unknown message type:', msg.c);
+        console.warn("Unknown message type:", msg.c);
         break;
     }
   });
@@ -643,7 +646,9 @@ provide(
       <template v-if="search.query.value.trim()">
         <div class="empty-icon"><span class="codicon codicon-search"></span></div>
         <div class="text-sm opacity-70">No matching files</div>
-        <div class="text-xs opacity-50 mt-1">Try adjusting your search terms or clear the query</div>
+        <div class="text-xs opacity-50 mt-1">
+          Try adjusting your search terms or clear the query
+        </div>
       </template>
       <template v-else>
         <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
