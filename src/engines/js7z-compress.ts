@@ -74,6 +74,8 @@ function writeVolumeFiles(js7z: JS7zInstance, vfsDir: string, outputPath: string
     count++;
   }
 
+  logger.info({ event: "compress.writeVolumes", count, outputPath });
+
   // If no volume files were created, fall back to a single file
   if (count === 0) {
     const mainEntry = entries.find((e) => e === baseName);
@@ -95,6 +97,8 @@ export async function compressWith7z(
     await compressWithSystem7z(options, progress, token, excludePatterns);
     return;
   }
+
+  logger.info({ event: "compress.wasm.fallback", format: options.format.label });
 
   progress.report({ message: t("compress.initEngine") });
 
@@ -152,7 +156,9 @@ export async function compressWith7z(
       try {
         fs.unlinkSync(tarDiskPath);
         fs.rmdirSync(path.dirname(tarDiskPath));
-      } catch {}
+      } catch {
+        logger.warn({ event: "compress.cleanup.failed" }, "Failed to clean up temporary files");
+      }
 
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
       if (compressedData) {
@@ -199,6 +205,8 @@ export async function compressWith7z(
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
       fs.writeFileSync(options.outputPath, Buffer.from(data));
     }
+
+    logger.info({ event: "compress.wasm.complete", outputPath: options.outputPath });
   } finally {
     tryCleanup(js7z);
   }

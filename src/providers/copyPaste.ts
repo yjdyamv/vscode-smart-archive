@@ -40,40 +40,34 @@ export function pasteCopiedFromArchive(): void {
   const source = copiedArchivePath;
   const pw = copiedPassword;
   const fl = copiedFlat;
-  void vscode.window
-    .showOpenDialog({
-      canSelectFolders: true,
-      canSelectFiles: false,
-      canSelectMany: false,
-      openLabel: t("archive.pasteHere"),
-      title: `${t("archive.pasteHere")} — ${path.basename(source)} (${paths.length} items)`,
-    })
-    .then(
-      async (uris) => {
-        if (!uris || uris.length === 0) return;
-        try {
-          await extractSelected(source, paths, pw, fl, uris[0].fsPath);
-          logger.info({
-            event: "pasteCopied.success",
-            pathCount: paths.length,
-            outputDir: uris[0].fsPath,
-          });
-          cleanupPreviewTemp();
-          clearCopiedPaths();
-        } catch (err) {
-          logger.error({ event: "paste.failed", err }, (err as Error).message);
-          vscode.window
-            .showErrorMessage(t("decompress.failed") + (err as Error).message, t("generic.copy"))
-            .then((action) => {
-              if (action === t("generic.copy"))
-                vscode.env.clipboard.writeText(t("decompress.failed") + (err as Error).message);
-            });
-        }
-      },
-      (err: unknown) => {
-        logger.error({ event: "pasteCopied.unhandled", err }, "Unhandled error in paste dialog");
-      },
-    );
+  void (async () => {
+    try {
+      const uris = await vscode.window.showOpenDialog({
+        canSelectFolders: true,
+        canSelectFiles: false,
+        canSelectMany: false,
+        openLabel: t("archive.pasteHere"),
+        title: `${t("archive.pasteHere")} — ${path.basename(source)} (${paths.length} items)`,
+      });
+      if (!uris || uris.length === 0) return;
+      await extractSelected(source, paths, pw, fl, uris[0].fsPath);
+      logger.info({
+        event: "pasteCopied.success",
+        pathCount: paths.length,
+        outputDir: uris[0].fsPath,
+      });
+      cleanupPreviewTemp();
+      clearCopiedPaths();
+    } catch (err: unknown) {
+      logger.error({ event: "pasteCopied.failed", err }, (err as Error).message);
+      vscode.window
+        .showErrorMessage(t("decompress.failed") + (err as Error).message, t("generic.copy"))
+        .then((action) => {
+          if (action === t("generic.copy"))
+            vscode.env.clipboard.writeText(t("decompress.failed") + (err as Error).message);
+        });
+    }
+  })();
 }
 
 export function setCopiedPaths(

@@ -53,7 +53,10 @@ export async function createFolderInArchive(
       try {
         js7z.FS.mkdir(cur);
       } catch {
-        /* ignore */
+        logger.warn(
+          { event: "createFolder.mkdir.failed" },
+          "Failed to create directory in virtual FS",
+        );
       }
     }
     const dotfile = `${vfsFolder}/.smartarchive`;
@@ -177,6 +180,10 @@ export async function previewFileFromArchive(
     try {
       fileData = js7z.FS.readFile(directPath, { encoding: "binary" });
     } catch {
+      logger.debug(
+        { event: "previewFile.directRead.failed" },
+        "Preview direct read failed, trying unwrap",
+      );
       // File not found directly — try unwrapping inner tar archives
       const tarPatterns = [
         ".tar",
@@ -201,6 +208,10 @@ export async function previewFileFromArchive(
           found = true;
           break;
         } catch {
+          logger.warn(
+            { event: "previewFile.unwrap.failed" },
+            "Preview unwrap failed for tar entry",
+          );
           continue;
         }
       }
@@ -229,6 +240,7 @@ export async function previewFileFromArchive(
       preserveFocus: false,
       viewColumn: vscode.ViewColumn.Beside,
     });
+    logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
   } finally {
     tryCleanupJS7z(js7z);
   }
@@ -240,6 +252,7 @@ async function unwrapArchives(
   target: string,
   password?: string,
 ): Promise<ArrayBuffer> {
+  logger.info({ event: "preview.unwrap", archiveVfsPath, target });
   const archiveName = archiveVfsPath.replace(/^\/_pv\//, "");
   const rawData = js7z.FS.readFile(archiveVfsPath, { encoding: "binary" });
   const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
@@ -261,6 +274,10 @@ async function unwrapArchives(
     try {
       return js7z2.FS.readFile(vfsPath, { encoding: "binary" });
     } catch {
+      logger.debug(
+        { event: "previewFile.unwrapDirectRead.failed" },
+        "Direct read failed in unwrap, checking flattened entries",
+      );
       // 7z may have flattened the path — look for the base name.
       // Skip .tar entries (intermediate artifacts from wrapped archives).
       const top2 = js7z2.FS.readdir("/_pv2").filter((e: string) => e !== "." && e !== "..");
@@ -273,6 +290,7 @@ async function unwrapArchives(
             return js7z2.FS.readFile(ep, { encoding: "binary" });
           }
         } catch {
+          logger.debug({ event: "previewFile.stat.failed" }, "Stat failed for entry, skipping");
           continue;
         }
       }
@@ -284,6 +302,7 @@ async function unwrapArchives(
 }
 
 export async function testArchive(archivePath: string, password?: string): Promise<string> {
+  logger.info({ event: "testArchive.start", archivePath });
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
   checkFileSize(stat.size);
   const data = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
@@ -308,7 +327,9 @@ export async function testArchive(archivePath: string, password?: string): Promi
       js7z.callMain(tArgs);
     });
     const ok = stdout.includes("Everything is Ok");
-    return ok ? t("test.passed") : t("test.warnings") + stdout.slice(-200);
+    const result = ok ? t("test.passed") : t("test.warnings") + stdout.slice(-200);
+    logger.info({ event: "testArchive.ok", archivePath, passed: ok });
+    return result;
   } finally {
     tryCleanupJS7z(js7z);
   }
@@ -358,9 +379,10 @@ async function renameInWrappedArchive(
   newPath: string,
   password?: string,
 ): Promise<void> {
+  logger.info({ event: "renameInWrapped.start", archivePath, oldPath, newPath });
   const oldNorm = oldPath.replace(/\\/g, "/");
   const newNorm = newPath.replace(/\\/g, "/");
-  return withWrappedArchive(archivePath, password, async (js7z2) => {
+  await withWrappedArchive(archivePath, password, async (js7z2) => {
     const rnArgs = ["rn", "/inner.tar", sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
     if (password) rnArgs.splice(1, 0, `-p${password}`);
     await new Promise<void>((resolve, reject) => {
@@ -368,4 +390,5 @@ async function renameInWrappedArchive(
       js7z2.callMain(rnArgs);
     });
   });
+  logger.info({ event: "renameInWrapped.ok", archivePath, oldPath, newPath });
 }

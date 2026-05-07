@@ -73,6 +73,7 @@ function pwInputBox(
   return new Promise((resolve) => {
     const ib = vscode.window.createInputBox();
     let shown = false;
+    let accepted = false;
     const eyeBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye"),
       tooltip: t("password.show"),
@@ -97,6 +98,7 @@ function pwInputBox(
     ib.onDidAccept(() => {
       if (validate && validate(ib.value)) return;
       const val = ib.value;
+      accepted = true;
       ib.hide();
       resolve(val);
     });
@@ -121,7 +123,12 @@ function pwInputBox(
         resolve(undefined);
       }
     });
-    ib.onDidHide(() => resolve(undefined));
+    ib.onDidHide(() => {
+      if (!accepted) {
+        logger.debug({ event: "pwInputBox.cancelled" });
+      }
+      resolve(undefined);
+    });
     ib.show();
   });
 }
@@ -143,6 +150,7 @@ async function convertArchive(
   volumeSize?: string,
   outputPassword?: string,
 ): Promise<void> {
+  logger.info({ event: "convertArchive.start", srcPath, dstFormat, dstPath });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_cvt_"));
   try {
     await decompressWith7z({ inputPath: srcPath, outputDir: tmp, password }, { report: () => {} });
@@ -172,7 +180,12 @@ async function convertArchive(
   } finally {
     try {
       fs.rmSync(tmp, { recursive: true, force: true });
-    } catch {}
+    } catch (err) {
+      logger.warn(
+        { event: "convertArchive.cleanupFailed", err },
+        "Failed to cleanup temp directory",
+      );
+    }
   }
 }
 
@@ -267,6 +280,7 @@ async function handleExtractAll(webview: vscode.Webview, s: HandlerState): Promi
     } else {
       await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", s.archiveUri);
     }
+    logger.info({ event: "webview.extAll.complete", archiveName: s.archiveName });
     webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
   } catch (err) {
     logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
@@ -287,6 +301,7 @@ async function handleExtractSelected(
   }
   try {
     await extractSelected(s.filePath, msg.paths, s.password, msg.flat, undefined, msg.excludes);
+    logger.info({ event: "webview.extSel.complete", count: msg.paths.length });
     webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
   } catch (err) {
     logger.error({ event: "webview.extSel.failed", err }, (err as Error).message);
@@ -327,13 +342,19 @@ async function handleDelete(
   try {
     webview.postMessage({ c: "loading", t: t("archive.deleting") });
     await deleteFromArchive(s.filePath, msg.paths, s.password);
+    logger.info({ event: "webview.delSel.complete", count: msg.paths.length });
     try {
       await setupWebview(
         webview,
         s.archiveUri,
         t("archive.toastDeleted", String(msg.paths.length)),
       );
-    } catch {}
+    } catch (err) {
+      logger.warn(
+        { event: "webview.delSel.refreshFailed", err },
+        "Failed to refresh webview after delete",
+      );
+    }
   } catch (err) {
     logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
@@ -380,10 +401,16 @@ async function handleRename(
   try {
     webview.postMessage({ c: "loading", t: t("archive.renaming") });
     await renameInArchive(s.filePath, oldPath, newPath, s.password);
+    logger.info({ event: "webview.rename.complete", oldPath, newPath });
     if (s.archiveUri) {
       try {
         await setupWebview(webview, s.archiveUri, t("archive.toastRenamed"));
-      } catch {}
+      } catch (err) {
+        logger.warn(
+          { event: "webview.rename.refreshFailed", err },
+          "Failed to refresh webview after rename",
+        );
+      }
     }
   } catch (err) {
     logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
@@ -440,9 +467,15 @@ async function handleDropFiles(
   try {
     webview.postMessage({ c: "loading", t: t("archive.addingFilesProgress") });
     await addToArchive(s.filePath, msg.paths, targetDir, s.password);
+    logger.info({ event: "webview.dropFiles.complete", count: msg.paths.length });
     try {
       await setupWebview(webview, s.archiveUri, t("archive.toastAddedFiles"));
-    } catch {}
+    } catch (err) {
+      logger.warn(
+        { event: "webview.dropFiles.refreshFailed", err },
+        "Failed to refresh webview after dropFiles",
+      );
+    }
   } catch (err) {
     logger.error({ event: "webview.dropFiles.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
@@ -491,10 +524,16 @@ async function handleNewFolder(
   try {
     webview.postMessage({ c: "loading", t: t("archive.creatingFolder") });
     await createFolderInArchive(s.filePath, targetDir, name, s.password);
+    logger.info({ event: "webview.newFolder.complete", dir: targetDir, name });
     if (s.archiveUri) {
       try {
         await setupWebview(webview, s.archiveUri, t("archive.toastCreatedFolder"));
-      } catch {}
+      } catch (err) {
+        logger.warn(
+          { event: "webview.newFolder.refreshFailed", err },
+          "Failed to refresh webview after newFolder",
+        );
+      }
     }
   } catch (err) {
     logger.error({ event: "webview.newFolder.failed", err }, (err as Error).message);
@@ -513,6 +552,7 @@ async function handlePreview(
   logger.info({ event: "webview.preview", path: msg.path });
   try {
     await previewFileFromArchive(s.filePath, msg.path, s.password);
+    logger.info({ event: "webview.preview.complete", path: msg.path });
   } catch (err) {
     logger.error({ event: "webview.preview.failed", err }, (err as Error).message);
     showErrorWithCopy(t("decompress.failed") + (err as Error).message);
@@ -528,6 +568,7 @@ async function handleConvert(webview: vscode.Webview, s: HandlerState): Promise<
     const dst = s.filePath.slice(0, -oldExt.length) + `.${fmt}`;
     webview.postMessage({ c: "loading", t: t("archive.converting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "");
+    logger.info({ event: "webview.convert.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
     logger.error({ event: "webview.convert.failed", err }, (err as Error).message);
@@ -545,6 +586,7 @@ async function handleMerge(webview: vscode.Webview, s: HandlerState): Promise<vo
     const dst = removeVolumeSuffix(s.filePath);
     webview.postMessage({ c: "loading", t: t("archive.merging") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "");
+    logger.info({ event: "webview.merge.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
     logger.error({ event: "webview.merge.failed", err }, (err as Error).message);
@@ -573,6 +615,7 @@ async function handleSplit(webview: vscode.Webview, s: HandlerState): Promise<vo
     const dst = path.join(folderPath, base);
     webview.postMessage({ c: "loading", t: t("archive.splitting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize);
+    logger.info({ event: "webview.split.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
   } catch (err) {
     logger.error({ event: "webview.split.failed", err }, (err as Error).message);
@@ -617,6 +660,7 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
     }
     webview.postMessage({ c: "loading", t: t("archive.encrypting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
+    logger.info({ event: "webview.encrypt.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: true });
   } catch (err) {
@@ -657,6 +701,7 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
     }
     webview.postMessage({ c: "loading", t: t("archive.decrypting") });
     await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
+    logger.info({ event: "webview.decrypt.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: false });
   } catch (err) {
@@ -671,6 +716,7 @@ async function handleTest(webview: vscode.Webview, s: HandlerState): Promise<voi
   logger.info({ event: "webview.test", path: s.filePath });
   try {
     const result = await testArchive(s.filePath, s.password);
+    logger.info({ event: "webview.test.complete" });
     webview.postMessage({ c: "ok", t: result });
   } catch (err) {
     logger.error({ event: "webview.test.failed", err }, (err as Error).message);

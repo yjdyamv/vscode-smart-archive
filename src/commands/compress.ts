@@ -475,6 +475,7 @@ export async function compressCommand(
                   .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
               const startTime = Date.now();
               await compressWith7z(options, progress, token, excludePatterns);
+              logger.info({ event: "compress.command.done", outputPath: options.outputPath });
               vscode.window.showInformationMessage(
                 t("compress.done") +
                   options.outputPath +
