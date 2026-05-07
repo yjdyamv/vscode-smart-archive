@@ -1,8 +1,38 @@
 /**
  * Webview message router — Smart Archive VSCode Extension
  *
- * Dispatches 17 message types from the archive webview.
- * Each handler is a separate named function for readability.
+ * Dispatches webview → extension messages using a command string `c` field.
+ *
+ * ── Message protocol ──────────────────────────────────────────────────
+ *
+ * Extension → Webview (postMessage):
+ *   { c: "ok",        t: string }                     success notification
+ *   { c: "err",       t: string }                     error notification
+ *   { c: "pwerr",     t: string }                     wrong-password feedback
+ *   { c: "loading",   t: string | false }             loading overlay
+ *   { c: "dirChildren", path: string, children }      lazy directory expansion
+ *   { c: "encState",  v: boolean }                    encryption state change
+ *
+ * Webview → Extension (`c` field):
+ *   pw            { c: "pw",            pw: string }              password submit
+ *   extAll        { c: "extAll" }                                extract all
+ *   extSel        { c: "extSel",        paths: string[], flat?, excludes? }
+ *   copy          { c: "copy",          paths: string[], flat? } copy to clipboard
+ *   delSel        { c: "delSel",        paths: string[] }        delete entries
+ *   renamePrompt  { c: "renamePrompt",  path: string }           rename entry
+ *   addFiles      { c: "addFiles",      dir?: string }           add files dialog
+ *   dropFiles     { c: "dropFiles",     paths: string[], dir? }  drag-drop add
+ *   newFolderPrompt { c: "newFolderPrompt", dir?: string }        create folder
+ *   preview       { c: "preview",       path: string }           preview file
+ *   merge         { c: "merge" }                                merge split volumes
+ *   split         { c: "split" }                                split into volumes
+ *   convert       { c: "convert" }                              convert format
+ *   encrypt       { c: "encrypt" }                              add encryption
+ *   decrypt       { c: "decrypt" }                              remove encryption
+ *   test          { c: "test" }                                 integrity test
+ *   expandDir     { c: "expandDir",     path: string }          lazy load children
+ *   saveExpanded  { c: "saveExpanded",  paths: string[] }       persist expanded state
+ *   log           { c: "log",           msg: string }           debug logging
  *
  * @module providers/webview/router
  */

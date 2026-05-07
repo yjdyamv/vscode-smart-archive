@@ -25,7 +25,10 @@ export function parseSize(raw: string | number | undefined, defaultBytes: number
   // Legacy integer format (MiB)
   if (typeof raw === "number") {
     if (!Number.isFinite(raw) || raw <= 0) {
-      logger.warn({ event: "security.parseSize.legacyInvalid", raw }, "Invalid legacy size, using default");
+      logger.warn(
+        { event: "security.parseSize.legacyInvalid", raw },
+        "Invalid legacy size, using default",
+      );
       return defaultBytes;
     }
     return Math.min(raw * 1024 * 1024, Number.MAX_SAFE_INTEGER);
@@ -33,19 +36,28 @@ export function parseSize(raw: string | number | undefined, defaultBytes: number
 
   const s = String(raw).trim().toLowerCase();
   if (s === "" || s === "0") {
-    logger.warn({ event: "security.parseSize.empty", raw: s }, "Empty or zero size config, using default");
+    logger.warn(
+      { event: "security.parseSize.empty", raw: s },
+      "Empty or zero size config, using default",
+    );
     return defaultBytes;
   }
 
   const m = s.match(/^(\d+(?:\.\d+)?)\s*(k|m|g)$/i);
   if (!m) {
-    logger.warn({ event: "security.parseSize.invalid", raw: s }, "Invalid size config format, using default");
+    logger.warn(
+      { event: "security.parseSize.invalid", raw: s },
+      "Invalid size config format, using default",
+    );
     return defaultBytes;
   }
 
   const num = parseFloat(m[1]);
   if (!Number.isFinite(num) || num <= 0) {
-    logger.warn({ event: "security.parseSize.zero", raw: s }, "Zero or negative size, using default");
+    logger.warn(
+      { event: "security.parseSize.zero", raw: s },
+      "Zero or negative size, using default",
+    );
     return defaultBytes;
   }
 
