@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, ref } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, type ComputedRef } from "vue";
 
 const props = defineProps<{
   x: number;
@@ -17,8 +17,8 @@ const emit = defineEmits<{
   (e: "new-folder"): void;
   (e: "rename"): void;
 }>();
-const lastAddDir = inject<string>("lastAddDir", "");
-const dirLabel = lastAddDir ? ` → ${lastAddDir}` : " → (root)";
+const lastAddDir = inject<ComputedRef<string>>("lastAddDir", computed(() => ""));
+const dirLabel = computed(() => (lastAddDir.value ? ` → ${lastAddDir.value}` : " → (root)"));
 const menuRef = ref<HTMLElement | null>(null);
 function onMouseDown(e: MouseEvent) {
   if (menuRef.value && !menuRef.value.contains(e.target as Node)) emit("close");

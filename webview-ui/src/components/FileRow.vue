@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { FlatNode } from "../composables/useTree";
-import { getFileIcon } from "../utils/icons";
+import { getFileIcon, formatSize, escapeHtml } from "../utils/icons";
 
 const props = defineProps<{
   flatNode: FlatNode;
@@ -66,27 +66,6 @@ function getNameHtml(): string {
   }
   result += escapeHtml(name.substring(last));
   return result;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function formatSize(bytes: number): string {
-  if (bytes <= 0) return "";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let size = bytes;
-  while (size >= 1024 && i < units.length - 1) {
-    size /= 1024;
-    i++;
-  }
-  return size.toFixed(size < 10 ? 1 : 0) + " " + units[i];
 }
 
 function onRowClick(e: MouseEvent) {

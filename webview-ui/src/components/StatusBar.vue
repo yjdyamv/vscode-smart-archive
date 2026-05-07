@@ -28,7 +28,7 @@
         <span class="codicon codicon-unlock"></span> Decrypt
       </button>
       <button
-        v-if="!isEncrypted && (canSplit || isSplit)"
+        v-if="!isEncrypted"
         class="btn"
         title="Add encryption to this archive"
         @click="$emit('encrypt')"
