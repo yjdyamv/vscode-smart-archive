@@ -102,12 +102,12 @@ export function useSearch() {
     return matchSet.value.has(path);
   }
 
-  function toggleRegex(): void {
+  function toggleRegex(nodes: TreeNodeData[]): void {
     isRegex.value = !isRegex.value;
     regexError.value = "";
-    query.value = "";
-    matchSet.value.clear();
-    directMatchSet.value.clear();
+    if (query.value.trim()) {
+      updateSearch(query.value, nodes);
+    }
   }
 
   function clearSearch(): void {

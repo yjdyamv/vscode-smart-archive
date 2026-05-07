@@ -23,4 +23,8 @@ interface Window {
   _xToast?: string;
   _xViewState?: string;
   _xReadOnly?: boolean;
+  _xExpanded?: string[];
+  _xIsSplit?: boolean;
+  _xCanSplit?: boolean;
+  _xIsEncrypted?: boolean;
 }
