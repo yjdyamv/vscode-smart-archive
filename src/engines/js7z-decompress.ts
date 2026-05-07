@@ -72,6 +72,7 @@ export async function decompressWith7z(
     }
 
     await unwrapInnerTar(options.outputDir, progress);
+    logger.info({ event: "decompress.complete", outputDir: options.outputDir });
   } finally {
     tryCleanup(js7z);
   }
@@ -99,7 +100,12 @@ async function unwrapInnerTar(
 
   let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
 
-  if (entries.length === 0) return;
+  logger.info({ event: "decompress.unwrapTar.start", outputDir });
+
+  if (entries.length === 0) {
+    logger.info({ event: "decompress.unwrapTar.noEntries", outputDir });
+    return;
+  }
 
   let depth = 0;
   let totalSize = 0;
@@ -108,7 +114,10 @@ async function unwrapInnerTar(
   while (depth < maxDepth) {
     depth++;
     const tarFiles = entries.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
-    if (tarFiles.length === 0) break;
+    if (tarFiles.length === 0) {
+      logger.info({ event: "decompress.unwrapTar.noTarFound", outputDir, depth });
+      break;
+    }
 
     for (const tarFile of tarFiles) {
       const tarPath = path.join(outputDir, tarFile);

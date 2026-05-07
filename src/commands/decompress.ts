@@ -38,6 +38,7 @@ export async function decompressCommand(
   for (const fileUri of uris) {
     await decompressSingleFile(fileUri, uris.length > 1 ? ++idx : 0, uris.length);
   }
+  logger.info({ event: "decompress.batch.done", total: uris.length });
 }
 
 async function decompressSingleFile(
@@ -92,7 +93,10 @@ async function decompressSingleFile(
         password = pwd;
       }
     } catch {
-      // isEncrypted can fail for multi-volume archives — skip prompt
+      logger.warn(
+        { event: "decompress.isEncrypted.failed" },
+        "Cannot detect encryption, skipping password prompt",
+      );
     }
   }
 
@@ -117,6 +121,7 @@ async function decompressSingleFile(
         vscode.window.showInformationMessage(
           t("decompress.done") + outputDir + t("time.elapsed", elapsed),
         );
+        logger.info({ event: "decompress.complete", outputDir });
       } catch (err) {
         logger.error({ event: "decompress.extraction.failed", err }, "Decompression failed");
         // Clean up output directory only if it's empty (partial extraction
@@ -162,6 +167,7 @@ export async function browseCommand(uri: vscode.Uri | undefined): Promise<void> 
 
   try {
     await openArchivePreview(uri);
+    logger.info({ event: "browse.ok", path: uri.fsPath });
   } catch (err) {
     logger.error({ event: "decompress.browse.failed", err }, "Browse command failed");
     vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);

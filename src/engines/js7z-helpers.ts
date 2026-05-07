@@ -93,7 +93,12 @@ function run7z(
         reject(new Error(t("decompress.exitError", String(exitCode)) + "\n" + stderr));
       }
     };
-    js7z.callMain(args);
+    try {
+      js7z.callMain(args);
+    } catch (err) {
+      logger.error({ event: "run7z.callMain.failed", err }, "callMain threw synchronously");
+      reject(err);
+    }
   });
 }
 
