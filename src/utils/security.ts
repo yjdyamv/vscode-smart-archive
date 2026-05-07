@@ -12,28 +12,74 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { t } from "../i18n";
+import { logger } from "./logger";
 
-function getLimit(key: string, defaultMiB: number): number {
-  return (
-    vscode.workspace.getConfiguration("smart-archive").get<number>(key, defaultMiB) * 1024 * 1024
-  );
+/**
+ * Parse a size string like "100m", "1g", "500k" to bytes.
+ * Bare numbers are treated as MiB for backward compatibility.
+ * Invalid or zero/negative values fall back to the default.
+ */
+export function parseSize(raw: string | number | undefined, defaultBytes: number): number {
+  if (raw === undefined || raw === null) return defaultBytes;
+
+  // Legacy integer format (MiB)
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw) || raw <= 0) {
+      logger.warn({ event: "security.parseSize.legacyInvalid", raw }, "Invalid legacy size, using default");
+      return defaultBytes;
+    }
+    return Math.min(raw * 1024 * 1024, Number.MAX_SAFE_INTEGER);
+  }
+
+  const s = String(raw).trim().toLowerCase();
+  if (s === "" || s === "0") {
+    logger.warn({ event: "security.parseSize.empty", raw: s }, "Empty or zero size config, using default");
+    return defaultBytes;
+  }
+
+  const m = s.match(/^(\d+(?:\.\d+)?)\s*(k|m|g)$/i);
+  if (!m) {
+    logger.warn({ event: "security.parseSize.invalid", raw: s }, "Invalid size config format, using default");
+    return defaultBytes;
+  }
+
+  const num = parseFloat(m[1]);
+  if (!Number.isFinite(num) || num <= 0) {
+    logger.warn({ event: "security.parseSize.zero", raw: s }, "Zero or negative size, using default");
+    return defaultBytes;
+  }
+
+  const unit = m[2].toLowerCase();
+  const multipliers: Record<string, number> = { k: 1024, m: 1024 * 1024, g: 1024 * 1024 * 1024 };
+  const bytes = Math.round(num * multipliers[unit]);
+
+  if (bytes > Number.MAX_SAFE_INTEGER) {
+    logger.warn({ event: "security.parseSize.overflow", raw: s, bytes }, "Size too large, capping");
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return bytes;
+}
+
+function getLimit(key: string, defaultBytes: number): number {
+  const raw = vscode.workspace.getConfiguration("smart-archive").get<string | number>(key);
+  return parseSize(raw, defaultBytes);
 }
 
 export function getMaxFileSize(): number {
-  return getLimit("maxFileSizeMiB", 1024);
+  return getLimit("maxFileSize", 1024 * 1024 * 1024); // 1 GiB default
 }
 
 export function getMaxTotalSize(): number {
-  return getLimit("maxTotalSizeMiB", 10240);
+  return getLimit("maxTotalSize", 10 * 1024 * 1024 * 1024); // 10 GiB default
 }
 
-/** Human-readable size string used in dialogs */
+/** Human-readable size string used in dialogs, matching the config format */
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
-  const k = 1024;
-  const units = ["KiB", "MiB", "GiB", "TiB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), units.length - 1);
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 /**

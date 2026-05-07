@@ -7,7 +7,7 @@
  * rename, convert, merge, encrypt/decrypt workflows.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -63,6 +63,23 @@ function safeJoin(outDir: string, entry: string): string {
       : resolved.startsWith(norm);
   if (!within && resolved !== path.resolve(outDir)) throw new Error("outside");
   return resolved;
+}
+
+function parseSize(raw: string | number | undefined, def: number): number {
+  if (raw === undefined || raw === null) return def;
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw) || raw <= 0) return def;
+    return Math.min(raw * 1024 * 1024, Number.MAX_SAFE_INTEGER);
+  }
+  const s = String(raw).trim().toLowerCase();
+  if (s === "" || s === "0") return def;
+  const m = s.match(/^(\d+(?:\.\d+)?)\s*(k|m|g)$/i);
+  if (!m) return def;
+  const num = parseFloat(m[1]);
+  if (!Number.isFinite(num) || num <= 0) return def;
+  const mult: Record<string, number> = { k: 1024, m: 1024 * 1024, g: 1024 * 1024 * 1024 };
+  const bytes = Math.round(num * mult[m[2].toLowerCase()]);
+  return bytes > Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : bytes;
 }
 
 // ── Exclusion module (direct import — src/utils/exclude.ts has no vscode dep) ──
@@ -258,6 +275,35 @@ describe("security", () => {
     expect(() => sanitizeTargetDir("../etc")).toThrow(/path traversal/);
     expect(() => sanitizeTargetDir("a/../../b")).toThrow(/path traversal/);
     expect(() => sanitizeTargetDir(".")).toThrow(/path traversal/);
+  });
+
+  it("parseSize: string formats", () => {
+    const d = 999;
+    expect(parseSize("100m", d)).toBe(100 * 1024 * 1024);
+    expect(parseSize("1g", d)).toBe(1024 * 1024 * 1024);
+    expect(parseSize("500k", d)).toBe(500 * 1024);
+    expect(parseSize("0.5g", d)).toBe(512 * 1024 * 1024);
+    expect(parseSize("2.5m", d)).toBe(Math.round(2.5 * 1024 * 1024));
+  });
+
+  it("parseSize: legacy integer (MiB)", () => {
+    const d = 999;
+    expect(parseSize(100, d)).toBe(100 * 1024 * 1024);
+    expect(parseSize(1024, d)).toBe(1024 * 1024 * 1024);
+  });
+
+  it("parseSize: edge cases fall back to default", () => {
+    const d = 42;
+    expect(parseSize("", d)).toBe(d);
+    expect(parseSize("0", d)).toBe(d);
+    expect(parseSize("abc", d)).toBe(d);
+    expect(parseSize("10xy", d)).toBe(d);
+    expect(parseSize("-5m", d)).toBe(d);
+    expect(parseSize(NaN, d)).toBe(d);
+    expect(parseSize(Infinity, d)).toBe(d);
+    expect(parseSize(-1, d)).toBe(d);
+    expect(parseSize(undefined, d)).toBe(d);
+    expect(parseSize(null as unknown as string, d)).toBe(d);
   });
 });
 
