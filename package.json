@@ -204,7 +204,7 @@
         "command": "yjdyamv.smart-archive.decompress",
         "title": "Smart Archive: Decompress",
         "shortTitle": "Decompress",
-        "icon": "$(extract-zip)"
+        "icon": "$(folder-opened)"
       },
       {
         "command": "yjdyamv.smart-archive.browse",
@@ -215,14 +215,12 @@
       {
         "command": "yjdyamv.smart-archive.paste",
         "title": "Smart Archive: Paste Copied Files",
-        "shortTitle": "Paste Files",
-        "icon": "$(paste)"
+        "shortTitle": "Paste Files"
       },
       {
         "command": "yjdyamv.smart-archive.addToArchive",
         "title": "Smart Archive: Add to Archive",
-        "shortTitle": "Add to Archive",
-        "icon": "$(add)"
+        "shortTitle": "Add to Archive"
       }
     ],
     "menus": {
