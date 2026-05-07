@@ -17,6 +17,7 @@ import { tryCleanup } from "../engines/js7z-helpers";
 import { parse7zListing } from "../utils/parse7z";
 import { validatePassword } from "../utils/security";
 import { t } from "../i18n";
+import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
 
 /**
@@ -38,8 +39,7 @@ async function fetchFileList(
     const f = await listFiles(filePath, password, data);
     if (f && f.length > 0) return f;
   } catch (err) {
-    const msg = (err as Error).message || "";
-    if (/can\s*not\s*open|unexpected\s+end|missing\s+volume/i.test(msg)) {
+    if (isNotAnArchiveError(err)) {
       const wrapped = new Error(t("decompress.missingVolumes"));
       (wrapped as any).cause = err;
       throw wrapped;
