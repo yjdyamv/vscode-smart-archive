@@ -521,15 +521,34 @@ export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
 
   checkFileSize(fs.statSync(filePath).size);
 
+  // Strategy: `7z l -slt -p` with empty password piped via stdin.
+  // Non-header-encrypted archives list normally and show "Encrypted = +".
+  // Header-encrypted archives (7z -mhe=on) fail to list and emit
+  // "Wrong password" / "Cannot open encrypted archive" to stderr.
   try {
-    const { stdout } = await spawnCapture(sz, ["l", "-slt", "-p", filePath]);
-    const encrypted = stdout.includes("Encrypted = +");
-    logger.debug({ event: "system7z.isEncrypted", encrypted, file: filePath });
-    return encrypted;
+    const { stdout, stderr } = await spawnCapture(sz, ["l", "-slt", "-p", filePath]);
+    if (stdout.includes("Encrypted = +")) {
+      logger.debug({ event: "system7z.isEncrypted", encrypted: true, file: filePath });
+      return true;
+    }
+    // Listing succeeded but no encrypted entries — not encrypted
+    if (stdout.includes("Path = ")) {
+      logger.debug({ event: "system7z.isEncrypted", encrypted: false, file: filePath });
+      return false;
+    }
+    // Listing produced no entries — likely header-encrypted
+    const msg = (stdout + stderr).toLowerCase();
+    if (msg.includes("encrypt") || msg.includes("wrong password") || msg.includes("cannot open")) {
+      logger.debug({ event: "system7z.isEncrypted", encrypted: true, via: "stderr", file: filePath });
+      return true;
+    }
+    logger.debug({ event: "system7z.isEncrypted", encrypted: false, via: "noEntries", file: filePath });
+    return false;
   } catch (err) {
+    // spawnCapture only rejects on timeout or spawn error
     logger.warn(
       { event: "system7z.isEncrypted.detectFailed", err },
-      "Encryption detection via listing failed",
+      "Encryption detection via listing failed, falling back to test",
     );
     try {
       const { stderr } = await spawnCapture(sz, ["t", "-p", filePath]);
@@ -565,11 +584,13 @@ function spawnCapture(
 
     const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true, timeout: timeoutMs });
 
-    // Pipe password via stdin — avoids exposing it in process listing
+    // Pipe password via stdin — avoids exposing it in process listing.
+    // Always call end() so 7z doesn't hang when -p flag is used without a
+    // password (e.g. encryption detection).
     if (password) {
-      proc.stdin!.write(password);
-      proc.stdin!.end();
+      proc.stdin?.write(password);
     }
+    proc.stdin?.end();
 
     const timer = setTimeout(() => {
       if (!settled) {
@@ -630,11 +651,13 @@ function run7z(
 
     const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true });
 
-    // Pipe password via stdin — avoids exposing it in process listing
+    // Pipe password via stdin — avoids exposing it in process listing.
+    // Always call end() so 7z doesn't hang when -p flag is used without a
+    // password.
     if (password) {
-      proc.stdin!.write(password);
-      proc.stdin!.end();
+      proc.stdin?.write(password);
     }
+    proc.stdin?.end();
 
     token?.onCancellationRequested(() => {
       logger.info({ event: "system7z.run.cancelled", elapsedMs: Date.now() - startTime });
