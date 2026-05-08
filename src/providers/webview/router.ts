@@ -77,7 +77,7 @@ import {
   getWebviewUris,
 } from "./helpers";
 import { setupWebview } from "./setup";
-import { saveExpandedPaths } from "./expandedState";
+import { saveExpandedPaths, loadExpandedPaths } from "./expandedState";
 
 // ── Message type ──
 
@@ -286,6 +286,13 @@ async function handlePassword(
       "</body>",
       `<script>window._xIsEncrypted=true</script></body>`,
     );
+    const persisted = loadExpandedPaths(s.archiveUri);
+    if (persisted.length > 0) {
+      webview.html = webview.html.replace(
+        "</body>",
+        `<script>window._xExpanded=${JSON.stringify(persisted)}</script></body>`,
+      );
+    }
   } catch (err) {
     logger.error({ event: "webview.password.error", err });
     webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
