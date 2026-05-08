@@ -606,12 +606,10 @@ function spawnCapture(
     const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true, timeout: timeoutMs });
 
     // Pipe password via stdin — avoids exposing it in process listing.
-    // Always call end() so 7z doesn't hang when -p flag is used without a
-    // password (e.g. encryption detection).
-    if (password) {
-      proc.stdin?.write(password);
-    }
-    proc.stdin?.end();
+    // Use end(data) to atomically write-and-close: separate write()+end()
+    // can race on Windows and cause 7z to read EOF before the password.
+    // 7z reads passwords as a line from stdin, so include trailing \n.
+    proc.stdin?.end(password ? password + "\n" : "");
 
     const timer = setTimeout(() => {
       if (!settled) {
@@ -673,12 +671,8 @@ function run7z(
     const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true });
 
     // Pipe password via stdin — avoids exposing it in process listing.
-    // Always call end() so 7z doesn't hang when -p flag is used without a
-    // password.
-    if (password) {
-      proc.stdin?.write(password);
-    }
-    proc.stdin?.end();
+    // Use end(data) to atomically write-and-close; 7z reads lines from stdin.
+    proc.stdin?.end(password ? password + "\n" : "");
 
     token?.onCancellationRequested(() => {
       logger.info({ event: "system7z.run.cancelled", elapsedMs: Date.now() - startTime });
