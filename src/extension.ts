@@ -14,7 +14,7 @@ import { decompressCommand, browseCommand } from "./commands/decompress";
 import { registerArchiveEditor, pasteCopiedFromArchive } from "./providers/archiveProvider";
 import { runAddToArchive } from "./providers/archive";
 import { logger } from "./utils/logger";
-import { setGlobalState } from "./providers/webview/expandedState";
+import { setSecrets } from "./providers/webview/expandedState";
 
 /**
  * Called when the extension is activated.
@@ -25,7 +25,7 @@ import { setGlobalState } from "./providers/webview/expandedState";
 export function activate(context: vscode.ExtensionContext): void {
   logger.info({ event: "extension.activate", vscode: vscode.version });
 
-  setGlobalState(context.globalState);
+  setSecrets(context.secrets);
 
   // Register custom editor as default viewer for archive files (.7z, .zip, …)
   registerArchiveEditor(context);
