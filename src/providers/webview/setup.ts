@@ -188,7 +188,7 @@ export async function setupWebview(
     if ([".7z", ".zip"].includes(ext)) flags.push("window._xCanSplit=true");
   }
   if (isEnc) flags.push("window._xIsEncrypted=true");
-  const persisted = loadPersistedExpanded(archiveUri);
+  const persisted = await loadPersistedExpanded(archiveUri);
   if (persisted.length > 0) flags.push(`window._xExpanded=${JSON.stringify(persisted)}`);
   if (flags.length > 0) {
     webview.html = webview.html.replace("</body>", `<script>${flags.join(";")}</script></body>`);

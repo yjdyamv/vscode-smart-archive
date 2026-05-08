@@ -1,24 +1,38 @@
 /**
  * Persistent expanded state — Smart Archive VSCode Extension
  *
- * Saves expanded directory paths to extension globalState so they survive
- * closing and reopening an archive. Cleared on extension deactivation.
+ * Stores expanded directory paths via VS Code's SecretStorage API
+ * (OS-level encryption: Credential Manager / Keychain / libsecret).
+ * Key is hashed so the full archive path is never stored in plain text.
  *
  * @module providers/webview/expandedState
  */
 
 import * as vscode from "vscode";
+import * as crypto from "crypto";
 
-let _globalState: vscode.Memento | null = null;
+let _secrets: vscode.SecretStorage | null = null;
 
-export function setGlobalState(state: vscode.Memento): void {
-  _globalState = state;
+export function setSecrets(secrets: vscode.SecretStorage): void {
+  _secrets = secrets;
 }
 
-export function saveExpandedPaths(archiveUri: vscode.Uri, paths: string[]): void {
-  _globalState?.update(`expanded:${archiveUri.toString()}`, paths);
+function hashKey(uri: string): string {
+  return crypto.createHash("sha256").update(uri).digest("hex");
 }
 
-export function loadExpandedPaths(archiveUri: vscode.Uri): string[] {
-  return _globalState?.get<string[]>(`expanded:${archiveUri.toString()}`) ?? [];
+export async function saveExpandedPaths(
+  archiveUri: vscode.Uri,
+  paths: string[],
+): Promise<void> {
+  if (!_secrets) return;
+  const key = `expanded:${hashKey(archiveUri.toString())}`;
+  await _secrets.store(key, JSON.stringify(paths));
+}
+
+export async function loadExpandedPaths(archiveUri: vscode.Uri): Promise<string[]> {
+  if (!_secrets) return [];
+  const key = `expanded:${hashKey(archiveUri.toString())}`;
+  const raw = await _secrets.get(key);
+  return raw ? JSON.parse(raw) : [];
 }
