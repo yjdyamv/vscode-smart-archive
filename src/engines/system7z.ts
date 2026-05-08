@@ -513,6 +513,27 @@ export async function listWithSystem7z(
   return results;
 }
 
+// ── Test integrity ────────────────────────────────────────────────────
+
+/**
+ * Run `7z t` with system 7-Zip to verify archive integrity / password.
+ * Returns true when 7z reports "Everything is Ok".
+ */
+export async function testWithSystem7z(filePath: string, password?: string): Promise<boolean> {
+  const sz = getSystem7zOrNull();
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  if (password) {
+    validatePassword(password);
+  }
+
+  const { stdout, stderr } = await spawnCapture(sz, ["t", "-p", filePath], 30_000, password);
+  const combined = stdout + stderr;
+  const ok = combined.includes("Everything is Ok");
+  logger.debug({ event: "system7z.test", ok, file: filePath });
+  return ok;
+}
+
 // ── Encryption detection ─────────────────────────────────────────────
 
 export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {

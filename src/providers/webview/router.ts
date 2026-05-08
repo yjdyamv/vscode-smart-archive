@@ -55,6 +55,7 @@ import {
 import { contentHtml } from "../htmlRenderer";
 import { JS7z, tryCleanupJS7z, fetchFileList } from "../fileListing";
 import { streamToVFS } from "../../engines/vfs-io";
+import { hasSystem7z, testWithSystem7z } from "../../engines/system7z";
 import { extractSelected } from "../extraction";
 import {
   createFolderInArchive,
@@ -237,20 +238,36 @@ async function handlePassword(
       webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
       return;
     }
-    const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-    try {
-      validatePassword(msg.pw);
-      const testPath = streamToVFS(js7z, s.filePath);
-      await new Promise<void>((resolve, reject) => {
-        js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
-        js7z.callMain(["t", `-p${msg.pw}`, testPath]);
-      });
-    } catch {
-      logger.warn({ event: "webview.password.testFailed" }, "Password verification failed");
+
+    // Verify password with `7z t` — use system 7z when available to avoid
+    // WASM memory limits and engine inconsistencies.
+    validatePassword(msg.pw);
+    let verified = false;
+    if (hasSystem7z()) {
+      try {
+        verified = await testWithSystem7z(s.filePath, msg.pw);
+      } catch (err) {
+        logger.warn({ event: "webview.password.system7zTestFailed", err });
+      }
+    }
+    if (!verified) {
+      const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+      try {
+        const testPath = streamToVFS(js7z, s.filePath);
+        await new Promise<void>((resolve, reject) => {
+          js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
+          js7z.callMain(["t", `-p${msg.pw}`, testPath]);
+        });
+        verified = true;
+      } catch {
+        logger.warn({ event: "webview.password.testFailed" }, "Password verification failed");
+      } finally {
+        tryCleanupJS7z(js7z);
+      }
+    }
+    if (!verified) {
       webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
       return;
-    } finally {
-      tryCleanupJS7z(js7z);
     }
     logger.info({ event: "webview.password.ok", count: pwEntries.length });
     s.password = msg.pw;
