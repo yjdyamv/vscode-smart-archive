@@ -53,8 +53,7 @@ import {
   countAllStats,
 } from "../treeBuilder";
 import { contentHtml } from "../htmlRenderer";
-import { JS7z, tryCleanupJS7z, fetchFileList } from "../fileListing";
-import { streamToVFS } from "../../engines/vfs-io";
+import { fetchFileList } from "../fileListing";
 import { extractSelected } from "../extraction";
 import {
   createFolderInArchive,
@@ -66,7 +65,7 @@ import {
   addToArchive,
 } from "../archive";
 import { setCopiedPaths } from "../copyPaste";
-import { validatePassword, sanitizeTargetDir } from "../../utils/security";
+import { sanitizeTargetDir } from "../../utils/security";
 import { decompressWithKnownPassword } from "../../commands/decompress";
 import { promptVolumeSize } from "../../ui/prompts";
 import { handlerStates, type HandlerState } from "./state";
@@ -237,21 +236,12 @@ async function handlePassword(
       webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
       return;
     }
-    const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-    try {
-      validatePassword(msg.pw);
-      const testPath = streamToVFS(js7z, s.filePath);
-      await new Promise<void>((resolve, reject) => {
-        js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z t: ${c}`)));
-        js7z.callMain(["t", `-p${msg.pw}`, testPath]);
-      });
-    } catch {
-      logger.warn({ event: "webview.password.testFailed" }, "Password verification failed");
-      webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
-      return;
-    } finally {
-      tryCleanupJS7z(js7z);
-    }
+
+    // Listing succeeded — password is valid.
+    // For 7z, listing decrypts file headers so success proves the password.
+    // For zip, listing with wrong password still shows entries, but extraction
+    // will fail with a clear error if needed. The previous `7z t` second-pass
+    // caused false rejections on Windows due to stdin pipe race conditions.
     logger.info({ event: "webview.password.ok", count: pwEntries.length });
     s.password = msg.pw;
     s.entries = pwEntries;

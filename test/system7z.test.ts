@@ -62,6 +62,134 @@ describe("system 7-Zip", () => {
     expect(r.stdout.toString()).toContain("7-Zip");
   });
 
+  itOrSkip("detects unencrypted 7z archive", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_enc_"));
+    const src = path.join(tmpDir, "hello.txt");
+    fs.writeFileSync(src, "plain text");
+    const archive = path.join(tmpDir, "plain.7z");
+
+    let r = spawnSync(sz!, ["a", "-t7z", archive, src], { stdio: "pipe", timeout: 30_000 });
+    expect(r.status).toBe(0);
+
+    // Simulate fixed behaviour: pipe empty password via stdin so 7z doesn't hang.
+    r = spawnSync(sz!, ["l", "-slt", "-p", archive], { stdio: "pipe", input: "", timeout: 10_000 });
+    const stdout = r.stdout.toString();
+    expect(stdout).toContain("hello.txt");
+    expect(stdout).toContain("Encrypted = -");
+    expect(stdout).not.toContain("Encrypted = +");
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  itOrSkip("detects encrypted 7z with header encryption (-mhe=on)", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_enc_"));
+    const src = path.join(tmpDir, "secret.txt");
+    fs.writeFileSync(src, "classified");
+    const archive = path.join(tmpDir, "secret.7z");
+
+    let r = spawnSync(sz!, ["a", "-t7z", "-pp4ss", "-mhe=on", archive, src], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(r.status).toBe(0);
+
+    // Listing with empty password — header-encrypted 7z fails to list
+    r = spawnSync(sz!, ["l", "-slt", "-p", archive], { stdio: "pipe", input: "", timeout: 10_000 });
+    const stdout = r.stdout.toString();
+    const combined = (stdout + r.stderr.toString()).toLowerCase();
+    const isEnc = stdout.includes("Encrypted = +")
+      || combined.includes("encrypt")
+      || combined.includes("wrong password")
+      || combined.includes("cannot open");
+    expect(isEnc).toBe(true);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  itOrSkip("detects encrypted zip archive", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_enc_"));
+    const src = path.join(tmpDir, "data.txt");
+    fs.writeFileSync(src, "sensitive");
+    const archive = path.join(tmpDir, "locked.zip");
+
+    let r = spawnSync(sz!, ["a", "-tzip", "-pzip4ss", archive, src], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(r.status).toBe(0);
+
+    // zip has no header encryption — listing succeeds and shows Encrypted = +
+    r = spawnSync(sz!, ["l", "-slt", "-p", archive], { stdio: "pipe", input: "", timeout: 10_000 });
+    const stdout = r.stdout.toString();
+    expect(stdout).toContain("data.txt");
+    expect(stdout).toContain("Encrypted = +");
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  itOrSkip("detects unencrypted zip archive", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_enc_"));
+    const src = path.join(tmpDir, "info.txt");
+    fs.writeFileSync(src, "public");
+    const archive = path.join(tmpDir, "open.zip");
+
+    let r = spawnSync(sz!, ["a", "-tzip", archive, src], { stdio: "pipe", timeout: 30_000 });
+    expect(r.status).toBe(0);
+
+    r = spawnSync(sz!, ["l", "-slt", "-p", archive], { stdio: "pipe", input: "", timeout: 10_000 });
+    const stdout = r.stdout.toString();
+    expect(stdout).toContain("info.txt");
+    expect(stdout).toContain("Encrypted = -");
+    expect(stdout).not.toContain("Encrypted = +");
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  itOrSkip("lists encrypted 7z with correct password via -p flag", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_enc_"));
+    const src = path.join(tmpDir, "correct.txt");
+    fs.writeFileSync(src, "secret content");
+    const archive = path.join(tmpDir, "correct.7z");
+
+    let r = spawnSync(sz!, ["a", "-t7z", "-pp4ss", "-mhe=on", archive, src], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(r.status).toBe(0);
+
+    // List with -pPASSWORD on command line (7z on Windows cannot read pw from stdin pipe)
+    r = spawnSync(sz!, ["l", "-slt", "-pp4ss", archive], {
+      stdio: "pipe",
+      timeout: 10_000,
+    });
+    const stdout = r.stdout.toString();
+    expect(stdout).toContain("correct.txt");
+    expect(stdout).toContain("Encrypted = +");
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  itOrSkip("encrypted 7z detection is fast (no stdin hang)", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_enc_"));
+    const src = path.join(tmpDir, "fast.txt");
+    fs.writeFileSync(src, "quick");
+    const archive = path.join(tmpDir, "fast.7z");
+
+    let r = spawnSync(sz!, ["a", "-t7z", "-pp4ss", "-mhe=on", archive, src], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(r.status).toBe(0);
+
+    const start = Date.now();
+    r = spawnSync(sz!, ["l", "-slt", "-p", archive], { stdio: "pipe", input: "", timeout: 10_000 });
+    const elapsed = Date.now() - start;
+    // Should complete in under 5 seconds with ended stdin
+    expect(elapsed).toBeLessThan(5000);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
   itOrSkip("compresses and decompresses a directory", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_"));
     const srcDir = path.join(tmpDir, "src");
