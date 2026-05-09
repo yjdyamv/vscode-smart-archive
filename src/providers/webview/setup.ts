@@ -10,7 +10,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { isEncrypted } from "../../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt, isSplitVolume } from "../../constants";
+import { getFullExt, isWrappedFormat, isEncryptableExt, isSplitVolume, resolveSplitVolume } from "../../constants";
 import { isRarVolume, resolveRarVolume } from "../../utils/rar";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
@@ -35,6 +35,23 @@ export async function setupWebview(
     const rarPath = resolveRarVolume(filePath);
     if (rarPath) {
       filePath = rarPath;
+    } else {
+      webview.html = emptyHtml(
+        t("decompress.rarVolume", path.basename(filePath)),
+        cssUri,
+        jsUri,
+        codiconCssUri,
+      );
+      return;
+    }
+  }
+
+  // Redirect 7z/zip/wim .002+ → .001 so system 7z can find archive headers
+  const nonFirstVol = filePath.match(/\.(7z|zip|wim)\.(\d+)$/i);
+  if (nonFirstVol && nonFirstVol[2] !== "001") {
+    const resolved = resolveSplitVolume(filePath);
+    if (resolved) {
+      filePath = resolved;
     } else {
       webview.html = emptyHtml(
         t("decompress.rarVolume", path.basename(filePath)),
