@@ -300,6 +300,13 @@ function toggleWithDescendants(path: string) {
       for (const childPath of collectDescendantPaths(node)) {
         selection.state.selected.add(childPath);
       }
+      // If dir has unloaded children, trigger lazy load
+      // (children will be auto-selected via dirChildren handler)
+      if (node.hasMore && (!node.children || node.children.length === 0)) {
+        tree.toggleExpand(path);
+        tree.setLoading(path);
+        post({ c: "expandDir", path });
+      }
     }
   }
 }
@@ -458,6 +465,12 @@ onMounted(() => {
         const children = msg.children as TreeNodeData[];
         if (parentPath && Array.isArray(children)) {
           const childPaths = tree.insertChildren(parentPath, children);
+          // Expand newly arrived child dirs so loadExpandedPaths picks them up
+          for (const c of children) {
+            if (c.kind === "DIRECTORY" && (c.hasMore || (c.children?.length ?? 0) > 0)) {
+              tree.expandedPaths.value.add(c.path);
+            }
+          }
           if (selection.state.selected.has(parentPath)) {
             for (const childPath of childPaths) {
               selection.state.selected.add(childPath);
@@ -487,6 +500,8 @@ function handleKeyboard(e: KeyboardEvent) {
 
   if ((e.ctrlKey || e.metaKey) && e.key === "a") {
     e.preventDefault();
+    tree.expandAll();
+    loadExpandedPaths();
     for (const fn of visibleFlatNodes.value) {
       selection.state.selected.add(fn.path);
     }

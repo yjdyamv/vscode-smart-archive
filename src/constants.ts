@@ -11,6 +11,7 @@
 
 import type { FormatInfo } from "./types";
 import * as path from "path";
+import * as fs from "fs";
 import { isRarExt } from "./utils/rar";
 
 // ════════════════════════════════════════════════════════════════════
@@ -346,6 +347,19 @@ export function getSplitVolumeBase(fileName: string): string | null {
  */
 export function removeVolumeSuffix(filePath: string): string {
   return filePath.replace(/\.\d+$/, "");
+}
+
+/**
+ * For a 7z/zip/wim split volume like archive.7z.002, locates the first
+ * volume (archive.7z.001) if it exists in the same directory.
+ * Returns null if the .001 file does not exist.
+ */
+export function resolveSplitVolume(filePath: string): string | null {
+  const base = getSplitVolumeBase(path.basename(filePath));
+  if (!base) return null;
+  const dir = path.dirname(filePath);
+  const target = path.join(dir, base + ".001");
+  return fs.existsSync(target) ? target : null;
 }
 
 export function isWrappedFormat(ext: string): boolean {

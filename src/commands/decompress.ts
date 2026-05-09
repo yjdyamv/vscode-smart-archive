@@ -18,7 +18,7 @@ import { decompressWith7z } from "../engines/js7z-engine";
 import { isEncrypted } from "../engines/js7z-engine";
 import { promptPassword } from "../ui/prompts";
 import { getOutputPath } from "../utils/fs";
-import { DECOMPRESS_EXTENSIONS, getFullExt, isEncryptableExt } from "../constants";
+import { DECOMPRESS_EXTENSIONS, getFullExt, isEncryptableExt, isSplitVolume, resolveSplitVolume } from "../constants";
 import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../utils/rar";
 import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
@@ -62,6 +62,15 @@ async function decompressSingleFile(
       t("decompress.failed") + t("decompress.rarVolume", path.basename(inputPath)),
     );
     return;
+  }
+
+  // Redirect 7z/zip/wim .002+ → .001
+  if (isSplitVolume(inputPath) && !isRarVolume(ext)) {
+    const resolved = resolveSplitVolume(inputPath);
+    if (resolved) {
+      logger.info({ event: "decompress.splitVolume.redirect", from: inputPath, to: resolved });
+      return decompressSingleFile(vscode.Uri.file(resolved), batchIdx, batchTotal);
+    }
   }
 
   if (isRarExt(ext)) {
@@ -163,6 +172,11 @@ export async function browseCommand(uri: vscode.Uri | undefined): Promise<void> 
   const rarPath = resolveRarVolume(uri.fsPath);
   if (rarPath) {
     return openArchivePreview(vscode.Uri.file(rarPath));
+  }
+
+  const splitResolved = resolveSplitVolume(uri.fsPath);
+  if (splitResolved) {
+    return openArchivePreview(vscode.Uri.file(splitResolved));
   }
 
   try {
