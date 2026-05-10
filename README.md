@@ -10,7 +10,6 @@ VSCode extension for compressing and decompressing files using **7-Zip WebAssemb
 - **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst
 - **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **System 7-Zip/zstd support** — auto-detects local 7-Zip/zstd installation (Windows/macOS/Linux) for significantly faster compression and decompression; falls back to WASM when not available
-- **System zstd support** — optionally uses system zstd binary for tar.zst compression
 - **AES-256 encryption** — password-protect 7z and ZIP archives
 - **Archive browser** — opens as default editor for archives; virtual-scrolled tree (Vue 3 + TanStack Virtual), search, sort, partial extract, add/delete/rename, integrity test
 - **File preview** — double-click any file in the archive to open it in VSCode
@@ -62,7 +61,7 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 
 ### Decompression (extract)
 
-7z · ZIP · RAR (v4/v5) · TAR · GZ · BZ2 · XZ · Z · CAB · ARJ · LZH · CHM · MSI · WIM · CPIO · RPM · DEB · UHA · XAR · ISO · VHD · VMDK · FAT · NTFS · SquashFS · DMG · HFS · APM · MBR · ELF · Mach-O · SWF · FLV
+all 7zip support and zstd.
 
 ## Configuration
 
@@ -82,9 +81,9 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 ## Requirements
 
 - VS Code 1.85.0 or later
-- System 7-Zip (**optional**, for faster compression):
-  - Windows: [7-Zip](https://7-zip.org/) or `winget install 7zip`
-  - macOS: `brew install sevenzip`
+- System 7-Zip/zstd (**optional**, for faster compression):
+  - Windows: `winget install 7zip` `winget install zstd`
+  - macOS: `brew install sevenzip` `brew install zstd`
   - Linux: `apt install 7zip` and so on
 
 ## Development
@@ -108,7 +107,11 @@ npm run package          # create .vsix
 npm run release          # build + check + package
 ```
 
-Press `F5` in VS Code to launch the Extension Development Host. The webview must be built first (`npm run build:webview`).
+> Quick Develop
+>
+> 1. `npm install`
+> 2. `npm run build`
+> 3. Press `F5` in VS Code to launch the Extension Development Host.
 
 ## Dependencies
 
