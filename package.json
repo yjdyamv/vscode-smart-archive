@@ -2,7 +2,7 @@
   "name": "smart-archive",
   "displayName": "Smart Archive",
   "description": "Compress and decompress files using JS7z + zstd-wasm. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
-  "version": "1.13.4",
+  "version": "1.13.5",
   "publisher": "yjdyamv",
   "license": "MIT",
   "repository": {
@@ -328,13 +328,19 @@
           "description": "%config.defaultOutputDir.description%"
         },
         "smart-archive.maxFileSize": {
-          "type": ["integer", "string"],
+          "type": [
+            "integer",
+            "string"
+          ],
           "default": "1g",
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
           "description": "%config.maxFileSize.description%"
         },
         "smart-archive.maxTotalSize": {
-          "type": ["integer", "string"],
+          "type": [
+            "integer",
+            "string"
+          ],
           "default": "10g",
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
           "description": "%config.maxTotalSize.description%"
@@ -433,7 +439,11 @@
         "smart-archive.useSystem7z": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "always", "never"],
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
           "enumDescriptions": [
             "%config.useSystem7z.auto%",
             "%config.useSystem7z.always%",
@@ -444,7 +454,11 @@
         "smart-archive.useSystemZstd": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "always", "never"],
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
           "enumDescriptions": [
             "%config.useSystemZstd.auto%",
             "%config.useSystemZstd.always%",
