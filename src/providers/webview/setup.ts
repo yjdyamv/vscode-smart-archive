@@ -10,7 +10,13 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { isEncrypted } from "../../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt, isSplitVolume, resolveSplitVolume } from "../../constants";
+import {
+  getFullExt,
+  isWrappedFormat,
+  isEncryptableExt,
+  isSplitVolume,
+  resolveSplitVolume,
+} from "../../constants";
 import { isRarVolume, resolveRarVolume } from "../../utils/rar";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
@@ -20,7 +26,7 @@ import { fetchFileList } from "../fileListing";
 import { handlerStates, handlerRegistered } from "./state";
 import { getNoisyPatterns, isReadOnlyExt, getWebviewUris } from "./helpers";
 import { registerHandler } from "./router";
-import { loadExpandedPaths as loadPersistedExpanded } from "./expandedState";
+import { loadExpandedPaths } from "./expandedState";
 
 export async function setupWebview(
   webview: vscode.Webview,
@@ -112,6 +118,7 @@ export async function setupWebview(
         password,
         entries: [],
         entryIndex: new Map(),
+        isEncrypted: true,
       });
       webview.html = contentHtml(
         [],
@@ -164,6 +171,7 @@ export async function setupWebview(
     password,
     entries,
     entryIndex,
+    isEncrypted: isEnc,
   });
   // Lazy root-only build for fast initial load.
   // Noisy dirs (node_modules etc.) stay collapsed — no loading triggered.
@@ -205,7 +213,7 @@ export async function setupWebview(
     if ([".7z", ".zip"].includes(ext)) flags.push("window._xCanSplit=true");
   }
   if (isEnc) flags.push("window._xIsEncrypted=true");
-  const persisted = await loadPersistedExpanded(archiveUri);
+  const persisted = await loadExpandedPaths(archiveUri, isEnc);
   if (persisted.length > 0) flags.push(`window._xExpanded=${JSON.stringify(persisted)}`);
   if (flags.length > 0) {
     webview.html = webview.html.replace("</body>", `<script>${flags.join(";")}</script></body>`);

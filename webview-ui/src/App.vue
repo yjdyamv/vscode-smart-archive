@@ -465,10 +465,12 @@ onMounted(() => {
         const children = msg.children as TreeNodeData[];
         if (parentPath && Array.isArray(children)) {
           const childPaths = tree.insertChildren(parentPath, children);
-          // Expand newly arrived child dirs so loadExpandedPaths picks them up
+          // Expand newly arrived child dirs that should be auto-expanded
           for (const c of children) {
             if (c.kind === "DIRECTORY" && (c.hasMore || (c.children?.length ?? 0) > 0)) {
-              tree.expandedPaths.value.add(c.path);
+              if (tree.shouldAutoExpandChild(c.path)) {
+                tree.expandedPaths.value.add(c.path);
+              }
             }
           }
           if (selection.state.selected.has(parentPath)) {

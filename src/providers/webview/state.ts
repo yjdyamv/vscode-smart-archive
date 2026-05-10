@@ -18,6 +18,7 @@ export interface HandlerState {
   password: string | undefined;
   entries: FlatEntry[];
   entryIndex: EntryIndex;
+  isEncrypted: boolean;
 }
 
 export const handlerStates = new WeakMap<vscode.Webview, HandlerState>();

@@ -226,6 +226,18 @@
     "menus": {
       "commandPalette": [
         {
+          "command": "yjdyamv.smart-archive.compress",
+          "when": "false"
+        },
+        {
+          "command": "yjdyamv.smart-archive.decompress",
+          "when": "false"
+        },
+        {
+          "command": "yjdyamv.smart-archive.browse",
+          "when": "false"
+        },
+        {
           "command": "yjdyamv.smart-archive.paste",
           "when": "false"
         },
