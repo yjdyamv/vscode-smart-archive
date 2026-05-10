@@ -466,9 +466,11 @@ onMounted(() => {
         if (parentPath && Array.isArray(children)) {
           const childPaths = tree.insertChildren(parentPath, children);
           // Expand newly arrived child dirs that should be auto-expanded
+          // Noisy dirs (node_modules, .venv, etc.) are marked collapsed
+          // and must never be auto-expanded regardless of depth.
           for (const c of children) {
             if (c.kind === "DIRECTORY" && (c.hasMore || (c.children?.length ?? 0) > 0)) {
-              if (tree.shouldAutoExpandChild(c.path)) {
+              if (!c.collapsed && tree.shouldAutoExpandChild(c.path)) {
                 tree.expandedPaths.value.add(c.path);
               }
             }
