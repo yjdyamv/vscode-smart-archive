@@ -18,7 +18,13 @@ import { decompressWith7z } from "../engines/js7z-engine";
 import { isEncrypted } from "../engines/js7z-engine";
 import { promptPassword } from "../ui/prompts";
 import { getOutputPath } from "../utils/fs";
-import { DECOMPRESS_EXTENSIONS, getFullExt, isEncryptableExt, isSplitVolume, resolveSplitVolume } from "../constants";
+import {
+  DECOMPRESS_EXTENSIONS,
+  getFullExt,
+  isEncryptableExt,
+  isSplitVolume,
+  resolveSplitVolume,
+} from "../constants";
 import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../utils/rar";
 import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";

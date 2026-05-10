@@ -539,10 +539,20 @@ export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
     // Listing produced no entries — likely header-encrypted
     const msg = (stdout + stderr).toLowerCase();
     if (msg.includes("encrypt") || msg.includes("wrong password") || msg.includes("cannot open")) {
-      logger.debug({ event: "system7z.isEncrypted", encrypted: true, via: "stderr", file: filePath });
+      logger.debug({
+        event: "system7z.isEncrypted",
+        encrypted: true,
+        via: "stderr",
+        file: filePath,
+      });
       return true;
     }
-    logger.debug({ event: "system7z.isEncrypted", encrypted: false, via: "noEntries", file: filePath });
+    logger.debug({
+      event: "system7z.isEncrypted",
+      encrypted: false,
+      via: "noEntries",
+      file: filePath,
+    });
     return false;
   } catch (err) {
     // spawnCapture only rejects on timeout or spawn error
@@ -570,11 +580,7 @@ interface CaptureResult {
   code: number | null;
 }
 
-function spawnCapture(
-  binary: string,
-  args: string[],
-  timeoutMs = 30_000,
-): Promise<CaptureResult> {
+function spawnCapture(binary: string, args: string[], timeoutMs = 30_000): Promise<CaptureResult> {
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
