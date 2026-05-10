@@ -27,6 +27,8 @@ function buildNodeMap(nodes: TreeNodeData[]): Map<string, TreeNodeData> {
 export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   const expandedPaths = ref(new Set<string>());
   const loadingPaths = ref(new Set<string>());
+  // null = restore mode (respect persisted set), number = auto-expand depth limit
+  const autoExpandMaxDepth = ref<number | null>(null);
 
   // O(1) path → node lookup, rebuilt only when treeData changes
   const nodeMap = computed(() => buildNodeMap(treeData.value));
@@ -39,13 +41,19 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     const saved = loadState<{ expanded?: string[] }>();
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);
+      autoExpandMaxDepth.value = null;
       return;
     }
     const persistent = (window as any)._xExpanded as string[] | undefined;
     if (persistent?.length) {
+      autoExpandMaxDepth.value = null;
       expandedPaths.value = new Set(persistent);
+      for (const p of persistent) {
+        expandTo(p);
+      }
       return;
     }
+    autoExpandMaxDepth.value = maxDepth;
     const paths: string[] = [];
     function collect(nodes: TreeNodeData[], depth: number) {
       if (depth > maxDepth) return;
@@ -164,6 +172,14 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     loadingPaths.value.add(path);
   }
 
+  function shouldAutoExpandChild(path: string): boolean {
+    if (autoExpandMaxDepth.value === null) {
+      return expandedPaths.value.has(path);
+    }
+    const depth = (path.match(/\//g) || []).length;
+    return depth <= autoExpandMaxDepth.value;
+  }
+
   return {
     expandedPaths,
     loadingPaths,
@@ -178,5 +194,6 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     getPathsNeedingLoad,
     initExpandedFromTree,
     setLoading,
+    shouldAutoExpandChild,
   };
 }

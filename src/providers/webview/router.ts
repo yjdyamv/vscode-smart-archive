@@ -286,7 +286,7 @@ async function handlePassword(
       "</body>",
       `<script>window._xIsEncrypted=true</script></body>`,
     );
-    const persisted = await loadExpandedPaths(s.archiveUri);
+    const persisted = await loadExpandedPaths(s.archiveUri, true);
     if (persisted.length > 0) {
       webview.html = webview.html.replace(
         "</body>",
@@ -773,7 +773,7 @@ export function registerHandler(webview: vscode.Webview): void {
       }
 
       if (msg.c === "saveExpanded" && Array.isArray(msg.paths)) {
-        await saveExpandedPaths(s.archiveUri, msg.paths);
+        await saveExpandedPaths(s.archiveUri, msg.paths, s.isEncrypted);
         return;
       }
 
