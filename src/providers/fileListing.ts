@@ -19,6 +19,7 @@ import { validatePassword } from "../utils/security";
 import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
+import { listWithSystem7z } from "../engines/system7z";
 
 let _lz4: {
   init: () => Promise<void>;
@@ -48,6 +49,18 @@ async function fetchFileList(
   data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
   const ext = getFullExt(filePath);
+
+  // LZ4: use system 7z (v26+ supports LZ4 natively) to avoid
+  // loading multi-GB archives into WASM memory.
+  if (ext === ".tar.lz4" || ext === ".tlz4") {
+    try {
+      return await listWithSystem7z(filePath, password);
+    } catch {
+      // Fall through to WASM path if system 7z is unavailable
+      logger.warn({ event: "fetchFileList.lz4.system7z.failed" });
+    }
+  }
+
   if (isWrappedFormat(ext)) return listViaExtract(filePath, password, data);
   try {
     const f = await listFiles(filePath, password, data);
