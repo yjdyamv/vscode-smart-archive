@@ -152,8 +152,12 @@ export async function previewFileFromArchive(
     // and feed the inner tar to 7z.
     if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
       const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-      const lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
-      const innerTar = lz4js.decompress(Buffer.from(buf));
+      const lz4 = require("@addmaple/lz4") as {
+        init: () => Promise<void>;
+        decompress: (data: Uint8Array) => Promise<Uint8Array>;
+      };
+      await lz4.init();
+      const innerTar = await lz4.decompress(Buffer.from(buf));
       const tarName = path.basename(archivePath, archiveExt) + ".tar";
       archiveFsPath = `/${tarName}`;
       js7z.FS.writeFile(archiveFsPath, new Uint8Array(innerTar));

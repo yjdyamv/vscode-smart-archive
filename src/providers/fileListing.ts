@@ -20,13 +20,18 @@ import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
 
-let _lz4js: { decompress: (data: Uint8Array) => Uint8Array } | null = null;
+let _lz4: {
+  init: () => Promise<void>;
+  compress: (data: Uint8Array) => Promise<Uint8Array>;
+  decompress: (data: Uint8Array) => Promise<Uint8Array>;
+} | null = null;
 
-function getLz4js(): { decompress: (data: Uint8Array) => Uint8Array } {
-  if (!_lz4js) {
-    _lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
+async function getLz4() {
+  if (!_lz4) {
+    _lz4 = require("@addmaple/lz4");
+    await _lz4!.init();
   }
-  return _lz4js;
+  return _lz4;
 }
 
 /**
@@ -73,7 +78,8 @@ async function listViaExtract(
     // js7z WASM doesn't support LZ4 decompression. Decompress manually,
     // then feed the inner tar to 7z for listing.
     if (ext === ".tar.lz4" || ext === ".tlz4") {
-      const innerTar = getLz4js().decompress(Buffer.from(buf));
+      const lz4 = await getLz4();
+      const innerTar = await lz4!.decompress(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       let stdout = "";
       let stderr = "";
