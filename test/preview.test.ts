@@ -66,6 +66,30 @@ for (let i = 1; i <= 10; i++) files10[`/many/${i}.txt`] = `file-${i}`;
 
 let td: string;
 
+// Minimal tar builder for LZ4 test
+function tarHeader(name: string, size: number): Buffer {
+  const h = Buffer.alloc(512, 0);
+  h.write(name, 0, 100, "ascii");
+  h.write("000644 ", 100, 8, "ascii");
+  h.write("000000 ", 108, 7, "ascii");
+  h.write("000000 ", 116, 7, "ascii");
+  h.write(size.toString(8).padStart(11, "0"), 124, 12, "ascii");
+  h.write("00000000000 ", 136, 12, "ascii");
+  h.write("0", 156, 1, "ascii");
+  let sum = 0;
+  for (let i = 0; i < 512; i++) sum += i >= 148 && i < 156 ? 32 : h[i];
+  h.write(sum.toString(8).padStart(6, "0") + " ", 148, 8, "ascii");
+  return h;
+}
+
+function randPad512(buf: Buffer): Buffer {
+  const rem = buf.length % 512;
+  if (rem === 0) return buf;
+  const pad = Buffer.alloc(512 - rem);
+  for (let i = 0; i < pad.length; i++) pad[i] = (i * 7 + 13) % 251 + 1;
+  return Buffer.concat([buf, pad]);
+}
+
 describe("selective extraction", () => {
   beforeAll(() => {
     td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
@@ -261,28 +285,6 @@ describe("selective extraction", () => {
   it("lz4 roundtrip: tar.lz4 → self-decompress → 7z extract", async () => {
     // Build a minimal tar with incompressible random padding
     // to work around @addmaple/lz4's outLen = len * 10 estimate.
-    function tarHeader(name: string, size: number): Buffer {
-      const h = Buffer.alloc(512, 0);
-      h.write(name, 0, 100, "ascii");
-      h.write("000644 ", 100, 8, "ascii");
-      h.write("000000 ", 108, 7, "ascii");
-      h.write("000000 ", 116, 7, "ascii");
-      h.write(size.toString(8).padStart(11, "0"), 124, 12, "ascii");
-      h.write("00000000000 ", 136, 12, "ascii");
-      h.write("0", 156, 1, "ascii");
-      let sum = 0;
-      for (let i = 0; i < 512; i++) sum += i >= 148 && i < 156 ? 32 : h[i];
-      h.write(sum.toString(8).padStart(6, "0") + " ", 148, 8, "ascii");
-      return h;
-    }
-    function randPad512(buf: Buffer): Buffer {
-      const rem = buf.length % 512;
-      if (rem === 0) return buf;
-      const pad = Buffer.alloc(512 - rem);
-      for (let i = 0; i < pad.length; i++) pad[i] = (i * 7 + 13) % 251 + 1;
-      return Buffer.concat([buf, pad]);
-    }
-
     const content = Buffer.from("hello from lz4 test\n");
     const entry = Buffer.concat([
       tarHeader("hello.txt", content.length),
