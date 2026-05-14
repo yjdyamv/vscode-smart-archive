@@ -20,6 +20,15 @@ import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
 
+let _lz4js: { decompress: (data: Uint8Array) => Uint8Array } | null = null;
+
+function getLz4js(): { decompress: (data: Uint8Array) => Uint8Array } {
+  if (!_lz4js) {
+    _lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
+  }
+  return _lz4js;
+}
+
 /**
  * Fetch the file list for an archive.
  *
@@ -55,11 +64,38 @@ async function listViaExtract(
   password = "",
   data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
+  const ext = getFullExt(filePath);
   const buf = data ?? (await vscode.workspace.fs.readFile(vscode.Uri.file(filePath)));
   const archiveName = path.basename(filePath);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
+    // js7z WASM doesn't support LZ4 decompression. Decompress manually,
+    // then feed the inner tar to 7z for listing.
+    if (ext === ".tar.lz4" || ext === ".tlz4") {
+      const innerTar = getLz4js().decompress(Buffer.from(buf));
+      const innerName = path.basename(filePath, ext) + ".tar";
+      let stdout = "";
+      let stderr = "";
+      const js7z2 = await JS7z({
+        print: (text: string) => { stdout += text + "\n"; },
+        printErr: (text: string) => { stderr += text + "\n"; },
+      });
+      try {
+        js7z2.FS.writeFile(`/${innerName}`, new Uint8Array(innerTar));
+        await new Promise<void>((resolve, reject) => {
+          js7z2.onExit = (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`7z l inner tar: ${code}\n${stderr}`));
+          };
+          js7z2.callMain(["l", "-slt", "-sccUTF-8", `/${innerName}`]);
+        });
+        return parse7zListing(stdout, innerName);
+      } finally {
+        tryCleanup(js7z2);
+      }
+    }
+
     js7z.FS.writeFile(`/${archiveName}`, buf);
     js7z.FS.mkdir("/_ls");
     const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
