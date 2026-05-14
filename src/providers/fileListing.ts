@@ -85,7 +85,14 @@ async function listViaExtract(
 
       // Write inner tar to VFS and extract with 7z (same pattern as
       // the non-LZ4 branch below — x then list VFS entries).
-      js7z.FS.writeFile(`/${innerName}`, new Uint8Array(innerTar));
+      // Use the Uint8Array directly to avoid an extra 50MB copy.
+      js7z.FS.writeFile(`/${innerName}`, innerTar);
+      const vfsStat = js7z.FS.stat(`/${innerName}`);
+      logger.info({
+        event: "listViaExtract.vfsWritten",
+        vfsSize: vfsStat.size,
+        expected: innerTar.length,
+      });
       js7z.FS.mkdir("/_ls");
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (c: number) => {
