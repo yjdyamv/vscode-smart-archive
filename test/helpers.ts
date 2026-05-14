@@ -180,6 +180,12 @@ const zstd: {
 } = require("@bokuweb/zstd-wasm");
 let zstdReady = false;
 
+const lz4: {
+  init: () => Promise<void>;
+  compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
+} = require("@addmaple/lz4");
+let lz4Ready = false;
+
 export async function createWrapped(files: Record<string, string>, ext: string): Promise<Buffer> {
   const j1 = await JS7z();
   for (const [fp, c] of Object.entries(files)) {
@@ -196,6 +202,13 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       zstdReady = true;
     }
     return Buffer.from(zstd.compress(new Uint8Array(tb), 3));
+  }
+  if (ext === "tar.lz4" || ext === "tlz4") {
+    if (!lz4Ready) {
+      await lz4.init();
+      lz4Ready = true;
+    }
+    return Buffer.from(await lz4.compress(new Uint8Array(tb)));
   }
   const j2 = await JS7z();
   j2.FS.writeFile("/_t.tar", new Uint8Array(tb));
