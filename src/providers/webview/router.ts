@@ -270,27 +270,22 @@ async function handlePassword(
       getNoisyPatterns(),
       pwToast,
     );
+    const scripts: string[] = [];
     if (isSplitVolume(s.filePath)) {
-      webview.html = webview.html.replace(
-        "</body>",
-        `<script>window._xIsSplit=true</script></body>`,
-      );
+      scripts.push("window._xIsSplit=true");
     }
     if ([".7z", ".zip"].includes(ext) && !isSplitVolume(s.filePath)) {
-      webview.html = webview.html.replace(
-        "</body>",
-        `<script>window._xCanSplit=true</script></body>`,
-      );
+      scripts.push("window._xCanSplit=true");
     }
-    webview.html = webview.html.replace(
-      "</body>",
-      `<script>window._xIsEncrypted=true</script></body>`,
-    );
+    scripts.push("window._xIsEncrypted=true");
     const persisted = await loadExpandedPaths(s.archiveUri, true);
     if (persisted.length > 0) {
+      scripts.push(`window._xExpanded=${JSON.stringify(persisted)}`);
+    }
+    if (scripts.length > 0) {
       webview.html = webview.html.replace(
         "</body>",
-        `<script>window._xExpanded=${JSON.stringify(persisted)}</script></body>`,
+        `<script>${scripts.join(";")}</script></body>`,
       );
     }
   } catch (err) {

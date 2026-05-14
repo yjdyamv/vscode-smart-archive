@@ -62,7 +62,7 @@ async function decompressSingleFile(
     const rarPath = resolveRarVolume(inputPath);
     if (rarPath) {
       logger.info({ event: "decompress.rarVolume.redirect", from: inputPath, to: rarPath });
-      return decompressSingleFile(vscode.Uri.file(rarPath), batchIdx, batchTotal);
+      return decompressSingleFile(vscode.Uri.file(rarPath), batchIdx, batchTotal, knownPassword);
     }
     vscode.window.showErrorMessage(
       t("decompress.failed") + t("decompress.rarVolume", path.basename(inputPath)),
@@ -75,7 +75,7 @@ async function decompressSingleFile(
     const resolved = resolveSplitVolume(inputPath);
     if (resolved) {
       logger.info({ event: "decompress.splitVolume.redirect", from: inputPath, to: resolved });
-      return decompressSingleFile(vscode.Uri.file(resolved), batchIdx, batchTotal);
+      return decompressSingleFile(vscode.Uri.file(resolved), batchIdx, batchTotal, knownPassword);
     }
   }
 

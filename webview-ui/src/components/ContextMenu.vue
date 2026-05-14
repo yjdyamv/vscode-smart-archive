@@ -31,10 +31,15 @@ onUnmounted(() => document.removeEventListener("mousedown", onMouseDown, true));
 
 const style = computed(() => {
   const menuW = 180;
-  const menuH = 250;
+  const maxY = Math.max(props.y, 0);
   const x = Math.min(props.x, window.innerWidth - menuW);
-  const y = Math.min(props.y, window.innerHeight - menuH);
-  return { left: Math.max(x, 0) + "px", top: Math.max(y, 0) + "px" };
+  const y = Math.min(maxY, window.innerHeight - 250);
+  return {
+    left: Math.max(x, 0) + "px",
+    top: Math.max(y, 0) + "px",
+    maxHeight: Math.min(250, window.innerHeight - Math.max(y, 0) - 8) + "px",
+    overflowY: "auto" as const,
+  };
 });
 
 const isReadOnly = computed(() => props.readOnly);

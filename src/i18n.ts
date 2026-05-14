@@ -757,7 +757,7 @@ export function t(key: string, ...args: string[]): string {
 
   let text = entry[locale] ?? entry.en;
   for (let i = 0; i < args.length; i++) {
-    text = text.replace(`{${i}}`, args[i]);
+    text = text.split(`{${i}}`).join(args[i]);
   }
   return text;
 }

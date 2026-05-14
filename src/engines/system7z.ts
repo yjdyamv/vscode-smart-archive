@@ -314,8 +314,10 @@ function detectEncoding(): string {
       _codePageCache = "cp932";
     } else if (locale.startsWith("ko")) {
       _codePageCache = "cp949";
-    } else {
+    } else if (locale.startsWith("zh")) {
       _codePageCache = "cp936";
+    } else {
+      _codePageCache = "cp1252";
     }
   }
   logger.info({ event: "system7z.codepage", encoding: _codePageCache, method: "fallback" });
@@ -372,7 +374,7 @@ export async function compressWithSystem7z(
     const tarPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
     try {
       // Step 1: create tar with exclusions
-      const tarArgs = ["a", "-ttar", "-mx0", tarPath, ...options.targets.map((tg) => tg.fsPath)];
+      const tarArgs = ["a", "-ttar", "-mx0", tarPath, "--", ...options.targets.map((tg) => tg.fsPath)];
       if (excludePatterns && excludePatterns.length > 0) {
         for (const pat of excludePatterns) tarArgs.push(`-xr!${pat}`);
       }
@@ -381,7 +383,7 @@ export async function compressWithSystem7z(
       await run7z(sz, tarArgs, progress, token);
 
       // Step 2: compress the tar
-      const compressArgs = ["a", `-t${typeFlag}`, options.outputPath, tarPath];
+      const compressArgs = ["a", `-t${typeFlag}`, options.outputPath, "--", tarPath];
       if (options.password) {
         validatePassword(options.password);
         compressArgs.splice(1, 0, `-p${options.password}`);
@@ -420,7 +422,7 @@ export async function compressWithSystem7z(
     }
   }
 
-  args.push(options.outputPath);
+  args.push("--", options.outputPath);
   for (const target of options.targets) args.push(target.fsPath);
 
   logger.info({
@@ -465,7 +467,7 @@ export async function decompressWithSystem7z(
     args.splice(1, 0, `-p${options.password}`);
   }
 
-  args.push(options.inputPath);
+  args.push("--", options.inputPath);
 
   logger.info({
     event: "system7z.decompress.start",
@@ -648,7 +650,7 @@ function run7z(
   token?: vscode.CancellationToken,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    let stderr = "";
+    let combinedOutput = "";
     let lastPct = -1;
     const startTime = Date.now();
 
@@ -674,12 +676,12 @@ function run7z(
     });
 
     proc.stdout?.on("data", (d: Buffer) => {
-      stderr += decodeBuffer(d);
+      combinedOutput += decodeBuffer(d);
     });
 
     proc.stderr?.on("data", (d: Buffer) => {
       const text = decodeBuffer(d);
-      stderr += text;
+      combinedOutput += text;
 
       // Parse progress: 7z outputs lines like " 45% 12 - file.txt" to stderr
       const m = text.match(/(\d{1,3})%/);
@@ -715,7 +717,7 @@ function run7z(
         code,
         signal,
         elapsedMs: elapsed,
-        stderrTail: stderr.slice(-120),
+        stderrTail: combinedOutput.slice(-120),
       };
 
       if (token?.isCancellationRequested) {
@@ -730,40 +732,32 @@ function run7z(
         return;
       }
 
+      // 7-Zip exit code 1 means "Warning (Non fatal error(s))" per official docs.
+      // Some files may have failed but the archive was processed successfully.
+      // This is not a fatal error, so resolve rather than reject.
       if (code === 1) {
-        // Code 1 can be "WARNING" (non-fatal) or "ERROR" (fatal).
-        // Inspect stderr to decide.
-        const stderrLower = stderr.toLowerCase();
-        const hasError = /\berror\b/.test(stderrLower) && !/\bwarning\b/.test(stderrLower);
-        // If the archive output file exists and has size > 0, 7z likely succeeded
-        // despite the warning. This covers cases where stderr wording is ambiguous.
-        if (!hasError) {
-          logger.warn(
-            { ...logMeta, event: "system7z.run.warning", stderrTail: stderr.slice(-200) },
-            "7z exited with warning (code 1)",
-          );
-          resolve();
-          return;
-        }
-        // Fall through to error handling below — stderr contained ERROR but no WARNING
+        logger.warn(
+          { ...logMeta, event: "system7z.run.warning", stderrTail: combinedOutput.slice(-200) },
+          "7z exited with warning (code 1)",
+        );
+        resolve();
+        return;
       }
 
-      // code 2+ or code 1 with ERROR, or null (killed by signal)
+      // code 2+ or null (killed by signal)
       const reason =
         code === null
           ? `killed by signal ${signal}`
-          : code === 1
-            ? "error (code 1 with ERROR in output)"
-            : code === 2
-              ? "fatal error"
-              : code === 7
-                ? "command line error"
-                : code === 8
-                  ? "out of memory"
-                  : `exit code ${code}`;
+          : code === 2
+            ? "fatal error"
+            : code === 7
+              ? "command line error"
+              : code === 8
+                ? "out of memory"
+                : `exit code ${code}`;
 
       logger.error({ ...logMeta, event: "system7z.run.failed", reason });
-      reject(new Error(`7z ${reason}${stderr ? `\n${stderr.slice(-300)}` : ""}`));
+      reject(new Error(`7z ${reason}${combinedOutput ? `\n${combinedOutput.slice(-300)}` : ""}`));
     });
   });
 }

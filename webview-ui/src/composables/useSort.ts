@@ -1,9 +1,9 @@
-import { ref, type Ref } from "vue";
+import { ref } from "vue";
 import type { TreeNodeData } from "../types";
 
 export type SortKey = "name" | "size";
 
-export function useSort(_treeData: Ref<TreeNodeData[]>) {
+export function useSort() {
   const sortKey = ref<SortKey>("name");
   const sortAsc = ref(true);
 
@@ -14,6 +14,13 @@ export function useSort(_treeData: Ref<TreeNodeData[]>) {
       sortKey.value = key;
       sortAsc.value = true;
     }
+  }
+
+  function cloneNode(node: TreeNodeData): TreeNodeData {
+    return {
+      ...node,
+      children: node.children ? node.children.map(cloneNode) : undefined,
+    };
   }
 
   function sortNodes(nodes: TreeNodeData[]): TreeNodeData[] {
@@ -31,12 +38,15 @@ export function useSort(_treeData: Ref<TreeNodeData[]>) {
       return sortAsc.value ? cmp : -cmp;
     });
 
+    const result: TreeNodeData[] = [];
     for (const node of sorted) {
-      if (node.children && node.children.length > 0) {
-        node.children = sortNodes(node.children);
+      const cloned = cloneNode(node);
+      if (cloned.children && cloned.children.length > 0) {
+        cloned.children = sortNodes(cloned.children);
       }
+      result.push(cloned);
     }
-    return sorted;
+    return result;
   }
 
   return { sortKey, sortAsc, setSort, sortNodes };

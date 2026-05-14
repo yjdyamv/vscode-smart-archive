@@ -8,7 +8,7 @@ import * as vscode from "vscode";
 import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
-import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
+import { validatePassword, sanitizeCliPath } from "../../utils/security";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
 
@@ -23,9 +23,6 @@ export async function deleteFromArchive(
     logger.info({ event: "deleteFromArchive.wrapped", archivePath, ext });
     return deleteFromWrappedArchive(archivePath, selectedPaths, password);
   }
-
-  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
-  checkFileSize(stat.size);
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {

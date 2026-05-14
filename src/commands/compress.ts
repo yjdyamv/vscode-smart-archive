@@ -209,7 +209,13 @@ async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
     const ibRes = await promptInputBox({
       prompt: t("compress.volume.prompt"),
       placeholder: "100m",
-      validate: (v) => (/^\d+[kmg]?$/i.test(v.trim()) ? undefined : t("compress.volume.invalid")),
+      validate: (v) => {
+        const trimmed = v.trim();
+        if (!/^\d+[kmg]?$/i.test(trimmed)) return t("compress.volume.invalid");
+        const num = parseInt(trimmed, 10);
+        if (num <= 0) return t("compress.volume.invalid");
+        return undefined;
+      },
     });
     if (ibRes.kind !== "ok") return ibRes;
     return { kind: "ok", value: ibRes.value };

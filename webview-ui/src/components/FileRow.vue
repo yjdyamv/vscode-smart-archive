@@ -38,7 +38,16 @@ function getNameHtml(): string {
   const raw = props.searchQuery.trim();
   if (raw.length > 2 && raw[0] === "/" && raw.lastIndexOf("/") === raw.length - 1) {
     try {
-      const re = new RegExp("(" + raw.slice(1, -1) + ")", "gi");
+      const pattern = raw.slice(1, -1);
+      // ReDoS safety check — reject patterns with nested quantifiers
+      if (
+        /\((?!\?[:!=]).*\)(\+|\*|\{\d+,\})\s*(\+|\*|\{\d+,\})/.test(pattern) ||
+        /(\+|\*)\s*(\+|\*)/.test(pattern) ||
+        pattern.length > 200
+      ) {
+        return escapeHtml(name);
+      }
+      const re = new RegExp("(" + pattern + ")", "gi");
       return escapeHtml(name).replace(re, "<mark>$1</mark>");
     } catch {
       return escapeHtml(name);

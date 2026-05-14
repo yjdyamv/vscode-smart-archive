@@ -185,9 +185,14 @@ function wasmCompressFile(input: string, output: string, level: number): Promise
         pos += n;
       }
       logger.info({ event: "zstd.compress.wasm.ok", input, output, level });
-    } finally {
+    } catch (err) {
       fs.closeSync(rfd);
       fs.closeSync(out);
+      cleanup(output);
+      throw err;
+    } finally {
+      try { fs.closeSync(rfd); } catch {}
+      try { fs.closeSync(out); } catch {}
     }
   });
 }
