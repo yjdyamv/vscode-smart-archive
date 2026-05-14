@@ -251,8 +251,16 @@ async function promptSaveNameWizard(defaultName: string, ext: string): Promise<S
     },
   });
   if (res.kind !== "ok") return res;
-  // Strip trailing extension the user may have typed, then re-append the format ext.
-  const clean = path.basename(res.value, getFullExt(res.value) || path.extname(res.value));
+  // Strip ALL trailing compound extensions (e.g. .tar.lz4.tar.lz4 → clean),
+  // then re-append the format ext.
+  let clean = res.value.trim();
+  let prev = "";
+  while (prev !== clean) {
+    prev = clean;
+    const e = getFullExt(clean) || path.extname(clean);
+    if (!e) break;
+    clean = path.basename(clean, e);
+  }
   return { kind: "ok", value: `${clean}.${ext}` };
 }
 

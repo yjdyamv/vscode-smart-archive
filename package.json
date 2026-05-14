@@ -89,6 +89,9 @@
             "filenamePattern": "*.tar.lzma"
           },
           {
+            "filenamePattern": "*.tar.lz4"
+          },
+          {
             "filenamePattern": "*.tgz"
           },
           {
@@ -105,6 +108,9 @@
           },
           {
             "filenamePattern": "*.tlz"
+          },
+          {
+            "filenamePattern": "*.tlz4"
           },
           {
             "filenamePattern": "*.wim"
@@ -254,12 +260,12 @@
         {
           "command": "yjdyamv.smart-archive.decompress",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
         },
         {
           "command": "yjdyamv.smart-archive.browse",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
         }
       ]
     },
@@ -277,6 +283,7 @@
             "tar.bz2",
             "tar.xz",
             "tar.zst",
+            "tar.lz4",
             "wim"
           ],
           "enumDescriptions": [
@@ -287,6 +294,7 @@
             "%config.defaultFormat.tar.bz2%",
             "%config.defaultFormat.tar.xz%",
             "%config.defaultFormat.tar.zst%",
+            "%config.defaultFormat.tar.lz4%",
             "%config.defaultFormat.wim%"
           ],
           "description": "%config.defaultFormat.description%"
@@ -497,10 +505,12 @@
     "encoding-sniffer": "1.0.2"
   },
   "dependencies": {
+    "@addmaple/lz4": "^0.2.0",
     "@bokuweb/zstd-wasm": "^0.0.27",
     "@vscode/codicons": "^0.0.45",
     "iconv-lite": "^0.7.2",
     "js7z-tools": "^2.5.0",
+    "lz4js": "^0.2.0",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1"
   },

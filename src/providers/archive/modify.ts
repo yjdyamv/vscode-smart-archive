@@ -9,7 +9,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
-import { JS7z, tryCleanupJS7z } from "../fileListing";
+import { JS7z, tryCleanupJS7z, decompressLz4Frames, writeLargeVFS } from "../fileListing";
 import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
@@ -146,7 +146,20 @@ export async function previewFileFromArchive(
   let fileData: ArrayBuffer = new ArrayBuffer(0);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const archiveFsPath = streamToVFS(js7z, archivePath);
+    let archiveFsPath: string;
+
+    // js7z WASM doesn't support LZ4. For .tar.lz4, decompress manually
+    // and feed the inner tar to 7z.
+    if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
+      const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+      const innerTar = decompressLz4Frames(Buffer.from(buf));
+      const tarName = path.basename(archivePath, archiveExt) + ".tar";
+      archiveFsPath = `/${tarName}`;
+      writeLargeVFS(js7z, archiveFsPath, innerTar);
+    } else {
+      archiveFsPath = streamToVFS(js7z, archivePath);
+    }
+
     js7z.FS.mkdir("/_pv");
 
     const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];

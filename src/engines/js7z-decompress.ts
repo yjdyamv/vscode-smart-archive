@@ -91,12 +91,14 @@ async function unwrapInnerTar(
     ".tar.zst",
     ".tar.lz",
     ".tar.lzma",
+    ".tar.lz4",
     ".tgz",
     ".tbz2",
     ".tbz",
     ".txz",
     ".tzst",
     ".tlz",
+    ".tlz4",
   ];
 
   let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
