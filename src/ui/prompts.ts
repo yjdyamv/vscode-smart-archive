@@ -94,17 +94,22 @@ export async function promptSavePath(
   const dir = saveDir ?? path.dirname(targetPath);
 
   if (targetCount === 1) {
-    // Let VS Code apply the filter extension — avoids stacking with
-    // compound extensions (.tar.lz4) on Windows save dialogs.
+    // Keep original filename intact, append format: file.tar.gz → file.tar.gz.7z
     const base = path.basename(targetPath);
-    defaultUri = vscode.Uri.file(path.join(dir, base));
+    defaultUri = vscode.Uri.file(path.join(dir, `${base}.${format}`));
   } else {
-    defaultUri = vscode.Uri.file(path.join(dir, "archive"));
+    defaultUri = vscode.Uri.file(path.join(dir, `archive.${format}`));
   }
+
+  // Include the last-segment extension in the filter so VS Code
+  // recognises compound extensions (.tar.lz4) on Windows save dialogs.
+  const filterExts = [format];
+  const dotIdx = format.lastIndexOf(".");
+  if (dotIdx >= 0) filterExts.push(format.substring(dotIdx + 1));
 
   return vscode.window.showSaveDialog({
     defaultUri,
-    filters: { [t("save.filterName")]: [format] },
+    filters: { [t("save.filterName")]: filterExts },
   });
 }
 
