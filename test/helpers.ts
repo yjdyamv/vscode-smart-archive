@@ -183,6 +183,7 @@ let zstdReady = false;
 const lz4: {
   init: () => Promise<void>;
   compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
+  decompress: (data: Uint8Array) => Promise<Uint8Array>;
 } = require("@addmaple/lz4");
 let lz4Ready = false;
 
