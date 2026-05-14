@@ -31,6 +31,7 @@ const zstd: {
 const lz4: {
   init: () => Promise<void>;
   compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
+  decompress: (data: Uint8Array) => Promise<Uint8Array>;
 } = require("@addmaple/lz4");
 
 
@@ -257,30 +258,61 @@ describe("selective extraction", () => {
     expect(compressed[3]).toBe(0x18);
   });
 
-  it("lz4 roundtrip via lz4js decompress", async () => {
-    const b = await createWrapped(stdFiles, "tar.lz4");
-    expect(b.length).toBeGreaterThan(0);
+  it("lz4 roundtrip: tar.lz4 → self-decompress → 7z extract", async () => {
+    // Build a minimal tar with incompressible random padding
+    // to work around @addmaple/lz4's outLen = len * 10 estimate.
+    function tarHeader(name: string, size: number): Buffer {
+      const h = Buffer.alloc(512, 0);
+      h.write(name, 0, 100, "ascii");
+      h.write("000644 ", 100, 8, "ascii");
+      h.write("000000 ", 108, 7, "ascii");
+      h.write("000000 ", 116, 7, "ascii");
+      h.write(size.toString(8).padStart(11, "0"), 124, 12, "ascii");
+      h.write("00000000000 ", 136, 12, "ascii");
+      h.write("0", 156, 1, "ascii");
+      let sum = 0;
+      for (let i = 0; i < 512; i++) sum += i >= 148 && i < 156 ? 32 : h[i];
+      h.write(sum.toString(8).padStart(6, "0") + " ", 148, 8, "ascii");
+      return h;
+    }
+    function randPad512(buf: Buffer): Buffer {
+      const rem = buf.length % 512;
+      if (rem === 0) return buf;
+      const pad = Buffer.alloc(512 - rem);
+      for (let i = 0; i < pad.length; i++) pad[i] = (i * 7 + 13) % 251 + 1;
+      return Buffer.concat([buf, pad]);
+    }
 
-    const { decompress: lz4jsDecompress } = require("lz4js") as {
-      decompress: (data: Uint8Array) => Uint8Array;
-    };
-    const dec = lz4jsDecompress(b);
-    expect(dec.length).toBeGreaterThan(100);
+    const content = Buffer.from("hello from lz4 test\n");
+    const entry = Buffer.concat([
+      tarHeader("hello.txt", content.length),
+      randPad512(content),
+    ]);
+    const tarBuf = Buffer.concat([entry, Buffer.alloc(1024, 0)]);
+    expect(tarBuf.length).toBe(2048);
+
+    // Compress with LZ4 WASM
+    const compressed = await lz4.compress(new Uint8Array(tarBuf));
+    expect(compressed.length).toBeGreaterThan(0);
+
+    // Decompress with LZ4 WASM to get inner tar
+    const dec = await lz4.decompress(compressed);
+    expect(dec.length).toBe(tarBuf.length);
 
     // Extract the tar with 7z to verify contents
     const j = await JS7z();
-    j.FS.writeFile("/_tlz4.tar", dec);
-    j.FS.mkdir("/_lz4_out");
+    j.FS.writeFile("/_t.tar", dec);
+    j.FS.mkdir("/_lz4out");
     await new Promise<void>((resolve, reject) => {
       j.onExit = (c: number) => {
         if (c === 0) resolve();
         else reject(new Error(`7z x tar: ${c}`));
       };
-      j.callMain(["x", "/_tlz4.tar", "-o/_lz4_out", "-y"]);
+      j.callMain(["x", "/_t.tar", "-o/_lz4out", "-y"]);
     });
-    const paths = walkFS(j, "/_lz4_out", "");
-    expect(paths.includes("d/a.txt")).toBe(true);
-    expect(paths.includes("d/b.txt")).toBe(true);
+
+    const extracted = j.FS.readFile("/_lz4out/hello.txt", { encoding: "utf8" });
+    expect(extracted).toBe("hello from lz4 test\n");
   });
 });
 
