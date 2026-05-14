@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import type { FlatNode } from "../composables/useTree";
 import type { TreeNodeData } from "../types";
@@ -24,11 +24,9 @@ const emit = defineEmits<{
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
-const rowHeight = ref(25);
-
-onMounted(() => {
+const rowHeight = computed(() => {
   const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 14;
-  rowHeight.value = Math.round(fontSize * 1.8);
+  return Math.round(fontSize * 1.8);
 });
 
 const virtualizer = useVirtualizer(

@@ -60,6 +60,7 @@ function run7z(
   args: string[],
   progress?: vscode.Progress<{ message?: string; increment?: number }>,
   onStdout?: (text: string) => void,
+  timeoutMs = 600_000, // 10 minutes default
 ): Promise<void> {
   logger.info({ event: "run7z.enter", args: sanitizeArgs(args) });
   const prevPrint = js7z.print;
@@ -83,7 +84,19 @@ function run7z(
   };
 
   return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        logger.warn({ event: "run7z.timeout", timeoutMs }, "WASM 7z operation timed out");
+        reject(new Error(`7z operation timed out after ${Math.round(timeoutMs / 1000)}s`));
+      }
+    }, timeoutMs);
+
     js7z.onExit = (exitCode: number) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       js7z.print = prevPrint;
       js7z.printErr = prevPrintErr;
       logger.info({ event: "run7z.exit", exitCode });
@@ -96,6 +109,9 @@ function run7z(
     try {
       js7z.callMain(args);
     } catch (err) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       logger.error({ event: "run7z.callMain.failed", err }, "callMain threw synchronously");
       reject(err);
     }

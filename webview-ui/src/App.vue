@@ -24,7 +24,7 @@ const archiveProps = ref<ArchiveProps | null>(null);
 const totalFiles = ref(0);
 const totalDirs = ref(0);
 
-const sort = useSort(treeData);
+const sort = useSort();
 const tree = useTreeFlatten(treeData);
 
 // Apply sort to treeData when sort key/direction changes
@@ -81,6 +81,8 @@ function onToggleRegex() {
 
 function onSearch(q: string) {
   search.query.value = q;
+  // Clear matchSet immediately so stale results aren't shown while debounce runs
+  if (!q.trim()) search.matchSet.value = new Set();
   if (searchDebounce) clearTimeout(searchDebounce);
   searchDebounce = setTimeout(() => search.updateSearch(q, treeData.value), 150);
 }
@@ -317,9 +319,21 @@ function handleRowClick(path: string, _isDir: boolean, shift: boolean, ctrl: boo
     const anchorIdx = flatList.findIndex((f) => f.path === selection.state.anchorPath);
     const targetIdx = flatList.findIndex((f) => f.path === path);
     if (anchorIdx >= 0 && targetIdx >= 0) {
+      // Clear previous range selection, then add the new range additively.
+      // Using toggle would deselect the anchor (which was just selected by
+      // the non-shift click), producing a gap at the anchor position.
       const [from, to] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
       for (let i = from; i <= to; i++) {
-        toggleWithDescendants(flatList[i].path);
+        const nodePath = flatList[i].path;
+        if (!selection.state.selected.has(nodePath)) {
+          selection.state.selected.add(nodePath);
+          const node = tree.findNode(nodePath);
+          if (node) {
+            for (const childPath of collectDescendantPaths(node)) {
+              selection.state.selected.add(childPath);
+            }
+          }
+        }
       }
     }
   } else if (ctrl) {
@@ -496,6 +510,8 @@ onMounted(() => {
   onUnmounted(() => {
     cleanupMessage();
     document.removeEventListener("keydown", handleKeyboard);
+    if (toastTimer) clearTimeout(toastTimer);
+    if (searchDebounce) clearTimeout(searchDebounce);
   });
 });
 

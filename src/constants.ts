@@ -38,7 +38,7 @@ export interface FormatMeta {
   /** Inner tar compression extension when creating wrapped formats; null for non-wrapped */
   wrapCompression: string | null;
   /** Short-form aliases of `tar.<compression>` (e.g. .tgz = tar.gz) */
-  shortAlises: Record<string, string>;
+  shortAliases: Record<string, string>;
 }
 
 export const FORMAT_TABLE: FormatMeta[] = [
@@ -52,7 +52,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: true,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".zip"],
@@ -64,7 +64,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: true,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".tar"],
@@ -76,7 +76,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: true,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".gz"],
@@ -88,7 +88,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: true,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".bz2"],
@@ -100,7 +100,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: true,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".xz"],
@@ -112,7 +112,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: true,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".tar.gz", ".tgz"],
@@ -124,7 +124,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: true,
     wrapCompression: "gz",
-    shortAlises: { ".tgz": "tar.gz" },
+    shortAliases: { ".tgz": "tar.gz" },
   },
   {
     exts: [".tar.bz2", ".tbz2", ".tbz"],
@@ -136,7 +136,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: true,
     wrapCompression: "bz2",
-    shortAlises: { ".tbz2": "tar.bz2", ".tbz": "tar.bz2" },
+    shortAliases: { ".tbz2": "tar.bz2", ".tbz": "tar.bz2" },
   },
   {
     exts: [".tar.xz", ".txz"],
@@ -148,7 +148,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: true,
     wrapCompression: "xz",
-    shortAlises: { ".txz": "tar.xz" },
+    shortAliases: { ".txz": "tar.xz" },
   },
   {
     exts: [".tar.zst", ".tzst"],
@@ -160,7 +160,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: true,
     wrapCompression: "zst",
-    shortAlises: { ".tzst": "tar.zst" },
+    shortAliases: { ".tzst": "tar.zst" },
   },
   {
     exts: [".tar.lz", ".tlz"],
@@ -172,7 +172,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: true,
     wrapCompression: "lz",
-    shortAlises: { ".tlz": "tar.lz" },
+    shortAliases: { ".tlz": "tar.lz" },
   },
   {
     exts: [".tar.lzma"],
@@ -184,7 +184,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: true,
     wrapCompression: "lzma",
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".tar.lz4", ".tlz4"],
@@ -196,7 +196,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: true,
     wrapCompression: "lz4",
-    shortAlises: { ".tlz4": "tar.lz4" },
+    shortAliases: { ".tlz4": "tar.lz4" },
   },
   {
     exts: [".rar"],
@@ -208,7 +208,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   {
     exts: [".wim"],
@@ -220,7 +220,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: true,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   },
   // ── Extraction-only formats (7z can read but not create) ──
   ...(
@@ -261,7 +261,7 @@ export const FORMAT_TABLE: FormatMeta[] = [
     j7zSelective: false,
     wrapsTar: false,
     wrapCompression: null,
-    shortAlises: {},
+    shortAliases: {},
   })),
 ];
 
@@ -302,7 +302,7 @@ export const J7Z_SELECTIVE_EXTS: ReadonlySet<string> = new Set(
 
 /** Map short-form extension to canonical long-form (e.g. .tgz → .tar.gz) */
 export const SHORT_EXT_MAP: ReadonlyMap<string, string> = new Map(
-  FORMAT_TABLE.flatMap((f) => Object.entries(f.shortAlises)),
+  FORMAT_TABLE.flatMap((f) => Object.entries(f.shortAliases)),
 );
 
 // ════════════════════════════════════════════════════════════════════

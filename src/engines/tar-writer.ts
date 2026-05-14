@@ -11,12 +11,19 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { prepareExclusions, isPathExcluded, isTargetExcluded } from "../utils/exclude";
+import { logger } from "../utils/logger";
 
 const BLOCK = 512;
 
 function tarHeader(name: string, size: number, isDir: boolean): Buffer {
   const buf = Buffer.alloc(BLOCK);
-  // name (100) — zero-padded
+  // name (100) — zero-padded; warn if truncated
+  if (Buffer.byteLength(name) > 100) {
+    logger.warn(
+      { event: "tar.nameTruncated", name, originalLen: name.length },
+      "TAR header name truncated to 100 bytes",
+    );
+  }
   Buffer.from(name.slice(0, 100)).copy(buf, 0);
   // mode (8) — octal string, space-padded right
   const mode = isDir ? "000755 " : "000644 ";
@@ -90,6 +97,10 @@ export async function createTarFile(
   token?: vscode.CancellationToken,
   excludePatterns: string[] = [],
 ): Promise<void> {
+  if (localPaths.length === 0) {
+    throw new Error("No files to add to TAR archive");
+  }
+
   const outDir = path.dirname(outputPath);
   fs.mkdirSync(outDir, { recursive: true });
   const fd = fs.openSync(outputPath, "w");

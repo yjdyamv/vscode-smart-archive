@@ -15,7 +15,7 @@ import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { logger } from "../utils/logger";
 import { tryCleanup } from "../engines/js7z-helpers";
 import { parse7zListing } from "../utils/parse7z";
-import { validatePassword } from "../utils/security";
+import { validatePassword, checkFileSize, checkTotalSize } from "../utils/security";
 import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
@@ -36,26 +36,23 @@ function getLz4js(): { decompress: (data: Uint8Array) => Uint8Array } {
  */
 function decompressLz4Frames(compressed: Buffer): Uint8Array {
   const lz4js = getLz4js();
-  const LZ4_MAGIC = 0x184d2204; // LZ4 frame magic in LE memory order
+  const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]); // LZ4 frame magic in LE bytes
   const parts: Uint8Array[] = [];
+  let totalDecompressed = 0;
   let offset = 0;
   while (offset < compressed.length) {
-    // Look for next frame magic (little-endian)
-    if (offset + 4 > compressed.length) break;
-    if (compressed.readUInt32LE(offset) !== LZ4_MAGIC) {
-      offset++;
-      continue;
-    }
+    // Use Buffer.indexOf for fast magic-byte scanning instead of byte-by-byte
+    const magicIdx = compressed.indexOf(LZ4_MAGIC_BUF, offset);
+    if (magicIdx < 0) break;
+    offset = magicIdx;
     // Find end of this frame (next magic or EOF)
-    let end = offset + 4;
-    while (end + 4 <= compressed.length && compressed.readUInt32LE(end) !== LZ4_MAGIC) {
-      end++;
-    }
-    if (end + 4 > compressed.length) {
-      end = compressed.length;
-    }
+    const nextMagic = compressed.indexOf(LZ4_MAGIC_BUF, offset + 4);
+    const end = nextMagic < 0 ? compressed.length : nextMagic;
     const frame = compressed.subarray(offset, end);
-    parts.push(lz4js.decompress(frame));
+    const decompressed = lz4js.decompress(frame);
+    totalDecompressed = checkTotalSize(totalDecompressed, decompressed.length);
+    checkFileSize(decompressed.length);
+    parts.push(decompressed);
     offset = end;
   }
   if (parts.length === 0) throw new Error("No LZ4 frames found");

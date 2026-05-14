@@ -24,6 +24,12 @@ export function useSelection() {
   function toggle(path: string): void {
     if (state.selected.has(path)) {
       state.selected.delete(path);
+      // If the deselected item is the one that set lastAddDir, clear it
+      const normPath = path.endsWith("/") ? path.replace(/\/$/, "") : path;
+      const addParent = !normPath.includes("/") ? "" : normPath.slice(0, normPath.lastIndexOf("/"));
+      if (state.lastAddDir === addParent || state.lastAddDir === normPath) {
+        state.lastAddDir = "";
+      }
     } else {
       state.selected.add(path);
       if (!path.endsWith("/")) {
@@ -38,6 +44,7 @@ export function useSelection() {
   function clearAll(): void {
     state.selected.clear();
     state.anchorPath = null;
+    state.lastAddDir = "";
   }
 
   function isSelected(path: string): boolean {

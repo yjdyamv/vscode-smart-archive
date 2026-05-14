@@ -60,7 +60,7 @@ export async function setupWebview(
       filePath = resolved;
     } else {
       webview.html = emptyHtml(
-        t("decompress.rarVolume", path.basename(filePath)),
+        t("decompress.noSplitParts", path.basename(filePath)),
         cssUri,
         jsUri,
         codiconCssUri,
@@ -70,11 +70,13 @@ export async function setupWebview(
   }
 
   const archiveName = path.basename(filePath);
+  // Recalculate ext after potential volume redirection above
+  const resolvedExt = getFullExt(filePath);
   logger.info({
     event: "setupWebview.start",
     filePath,
-    ext,
-    wrapped: isWrappedFormat(getFullExt(filePath)),
+    ext: resolvedExt,
+    wrapped: isWrappedFormat(resolvedExt),
   });
 
   webview.html = loadingHtml(codiconCssUri);
@@ -127,7 +129,7 @@ export async function setupWebview(
         cssUri,
         jsUri,
         codiconCssUri,
-        { name: archiveName, format: ext, count: 0, size: "" },
+        { name: archiveName, format: resolvedExt, count: 0, size: "" },
         undefined,
         undefined,
         "password",
@@ -135,7 +137,7 @@ export async function setupWebview(
       const flags: string[] = [];
       if (isSplitVolume(filePath)) {
         flags.push("window._xIsSplit=true");
-      } else if ([".7z", ".zip"].includes(ext)) {
+      } else if ([".7z", ".zip"].includes(resolvedExt)) {
         flags.push("window._xCanSplit=true");
       }
       flags.push("window._xIsEncrypted=true");
@@ -184,7 +186,7 @@ export async function setupWebview(
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
-  const roExt = getFullExt(filePath);
+  const roExt = resolvedExt;
   const roToast =
     [".deb", ".rpm"].includes(roExt) || isSplitVolume(filePath) ? t("archive.readOnly") : toast;
   webview.html = contentHtml(
@@ -196,7 +198,7 @@ export async function setupWebview(
     codiconCssUri,
     {
       name: archiveName,
-      format: ext,
+      format: resolvedExt,
       count: itemCount,
       size: formatCompactSize(totalSize),
     },
@@ -209,8 +211,8 @@ export async function setupWebview(
   if (isSplitVolume(filePath)) {
     flags.push("window._xReadOnly=true", "window._xIsSplit=true");
   } else {
-    if (isReadOnlyExt(getFullExt(filePath))) flags.push("window._xReadOnly=true");
-    if ([".7z", ".zip"].includes(ext)) flags.push("window._xCanSplit=true");
+    if (isReadOnlyExt(resolvedExt)) flags.push("window._xReadOnly=true");
+    if ([".7z", ".zip"].includes(resolvedExt)) flags.push("window._xCanSplit=true");
   }
   if (isEnc) flags.push("window._xIsEncrypted=true");
   const persisted = await loadExpandedPaths(archiveUri, isEnc);

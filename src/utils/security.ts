@@ -137,10 +137,12 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
     throw new Error(`Archive entry contains invalid character ':': ${entryName}`);
   }
 
-  // Strip leading slashes and drive letters (cross-platform)
+  // Strip leading slashes and drive letters (cross-platform).
+  // Match any single Unicode letter followed by colon, not just ASCII A-Z,
+  // to prevent homoglyph bypass (e.g. Cyrillic С:).
   const safe = entryName
-    .replace(/^[a-zA-Z]:\\/, "") // Windows drive letter with backslash
-    .replace(/^[a-zA-Z]:/, "") // Windows drive letter (no backslash)
+    .replace(/^\p{L}:\\./u, "") // Windows drive letter with backslash
+    .replace(/^\p{L}:/u, "") // Windows drive letter (no backslash)
     .replace(/^\/+/, ""); // Unix absolute path
 
   // Normalize and resolve against output directory

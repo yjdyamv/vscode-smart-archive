@@ -101,15 +101,19 @@ function copyFromFSWithStrip(
 
       let data: Uint8Array | ArrayBuffer;
       try {
-        // Pre-check size from VFS stat before reading into memory
+        // Pre-check size from VFS stat before reading into memory.
+        // If the stat size exceeds limits, throw immediately to avoid
+        // reading the oversized file into memory.
+        let statSize: number | undefined;
         try {
-          checkFileSize(js7z.FS.stat(full).size);
+          statSize = js7z.FS.stat(full).size;
         } catch {
           logger.warn(
             { event: "extractSelected.statSize.failed" },
             "Stat may fail for size check, falling through",
           );
         }
+        if (statSize !== undefined) checkFileSize(statSize);
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
         logger.warn(

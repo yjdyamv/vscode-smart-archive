@@ -112,7 +112,9 @@ async function unwrapInnerTar(
 
   let depth = 0;
   let totalSize = 0;
+  let tarCount = 0;
   const maxDepth = 3;
+  const maxTarFiles = 100;
 
   while (depth < maxDepth) {
     depth++;
@@ -123,6 +125,14 @@ async function unwrapInnerTar(
     }
 
     for (const tarFile of tarFiles) {
+      tarCount++;
+      if (tarCount > maxTarFiles) {
+        logger.warn(
+          { event: "decompress.unwrapTar.tooManyTars", tarCount, maxTarFiles },
+          "Too many inner tar files, stopping unwrap",
+        );
+        return;
+      }
       const tarPath = path.join(outputDir, tarFile);
       progress.report({ message: t("decompress.unwrapTar") });
 
@@ -145,7 +155,7 @@ async function unwrapInnerTar(
 
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
         if (!usesMount) {
-          totalSize = copyDirFromFS(js7z, "/_inner_out", outputDir);
+          totalSize = checkTotalSize(totalSize, copyDirFromFS(js7z, "/_inner_out", outputDir));
         }
 
         try {
