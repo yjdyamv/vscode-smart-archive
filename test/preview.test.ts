@@ -316,6 +316,55 @@ describe("selective extraction", () => {
     const extracted = j.FS.readFile("/_lz4out/hello.txt", { encoding: "utf8" });
     expect(extracted).toBe("hello from lz4 test\n");
   });
+
+  // ── Multi-frame LZ4 roundtrip (concatenated frames from chunked compress) ──
+
+  it("lz4 multi-frame roundtrip: compress chunks → concat → decompress all", async () => {
+    // Simulate chunked compression like lz4CompressFile with small chunks
+    const CHUNK = 1024; // deliberately small to produce many frames
+    const totalSize = CHUNK * 5; // 5 frames
+    const data = new Uint8Array(Buffer.alloc(totalSize).map((_, i) => i % 251));
+
+    // Compress each chunk into an LZ4 frame, concatenate
+    const frames: Uint8Array[] = [];
+    for (let pos = 0; pos < data.length; pos += CHUNK) {
+      const chunk = data.subarray(pos, pos + CHUNK);
+      const frame = await lz4.compress(chunk);
+      frames.push(frame);
+    }
+    const compressed = Buffer.concat(frames.map((f) => Buffer.from(f)));
+    expect(compressed.length).toBeGreaterThan(0);
+
+    // Decompress all frames — lz4js.decompress handles one frame at a time
+    const { decompress: lz4jsDec } = require("lz4js") as {
+      decompress: (data: Uint8Array) => Uint8Array;
+    };
+
+    const parts: Uint8Array[] = [];
+    let offset = 0;
+    const buf = Buffer.from(compressed);
+    const MAGIC = 0x184d2204; // LZ4 frame magic in LE memory order
+    while (offset < buf.length) {
+      if (offset + 4 > buf.length) break;
+      if (buf.readUInt32LE(offset) !== MAGIC) { offset++; continue; }
+      let end = offset + 4;
+      while (end + 4 <= buf.length && buf.readUInt32LE(end) !== MAGIC) end++;
+      if (end + 4 > buf.length) end = buf.length;
+      parts.push(lz4jsDec(buf.subarray(offset, end)));
+      offset = end;
+    }
+
+    const totalParts = parts.reduce((s, p) => s + p.length, 0);
+    const result = new Uint8Array(totalParts);
+    let pos = 0;
+    for (const p of parts) {
+      result.set(p, pos);
+      pos += p.length;
+    }
+
+    expect(result.length).toBe(data.length);
+    expect(Buffer.from(result).equals(Buffer.from(data))).toBe(true);
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════

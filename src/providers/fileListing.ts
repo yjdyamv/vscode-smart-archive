@@ -30,6 +30,47 @@ function getLz4js(): { decompress: (data: Uint8Array) => Uint8Array } {
 }
 
 /**
+ * Decompress concatenated LZ4 frames into a single Uint8Array.
+ * lz4js.decompress() handles one frame at a time; this loops until
+ * all frames in the buffer are consumed.
+ */
+function decompressLz4Frames(compressed: Buffer): Uint8Array {
+  const lz4js = getLz4js();
+  const LZ4_MAGIC = 0x184d2204; // LZ4 frame magic in LE memory order
+  const parts: Uint8Array[] = [];
+  let offset = 0;
+  while (offset < compressed.length) {
+    // Look for next frame magic (little-endian)
+    if (offset + 4 > compressed.length) break;
+    if (compressed.readUInt32LE(offset) !== LZ4_MAGIC) {
+      offset++;
+      continue;
+    }
+    // Find end of this frame (next magic or EOF)
+    let end = offset + 4;
+    while (end + 4 <= compressed.length && compressed.readUInt32LE(end) !== LZ4_MAGIC) {
+      end++;
+    }
+    if (end + 4 > compressed.length && compressed.readUInt32LE(end) !== LZ4_MAGIC) {
+      end = compressed.length;
+    }
+    const frame = compressed.subarray(offset, end);
+    parts.push(lz4js.decompress(frame));
+    offset = end;
+  }
+  if (parts.length === 0) throw new Error("No LZ4 frames found");
+  // Concatenate all parts
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const p of parts) {
+    result.set(p, pos);
+    pos += p.length;
+  }
+  return result;
+}
+
+/**
  * Write a potentially large Uint8Array to VFS in chunks to avoid
  * hitting WASM memory limits with a single FS.writeFile call.
  */
@@ -93,23 +134,20 @@ async function listViaExtract(
     // js7z WASM doesn't support LZ4 decompression. Decompress manually,
     // then feed the inner tar to 7z for listing.
     if (ext === ".tar.lz4" || ext === ".tlz4") {
-      const innerTar = getLz4js().decompress(Buffer.from(buf));
+      const innerTar = decompressLz4Frames(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
 
-      // Use 7z l (not x) — only reads metadata, avoids extracting all files
-      // into VFS which would double memory usage.
       let stdout = "";
       let stderr = "";
-      // Release outer js7z (idempotent) before creating js7z2 to free WASM memory
-      tryCleanup(js7z);
       const js7z2 = await JS7z({
         print: (text: string) => { stdout += text + "\n"; },
         printErr: (text: string) => { stderr += text + "\n"; },
       });
       try {
-        // Write inner tar via chunked VFS to stay within WASM memory limits
+        // Write inner tar via chunked VFS (may be 500MB+ for large archives)
         writeLargeVFS(js7z2, `/${innerName}`, innerTar);
+
         await new Promise<void>((resolve, reject) => {
           js7z2.onExit = (code: number) => {
             if (code === 0) resolve();
@@ -218,4 +256,6 @@ export {
   listViaExtract,
   readDirEntries,
   parse7zListing,
+  decompressLz4Frames,
+  writeLargeVFS,
 };

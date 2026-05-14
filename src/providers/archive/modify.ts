@@ -9,7 +9,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
-import { JS7z, tryCleanupJS7z } from "../fileListing";
+import { JS7z, tryCleanupJS7z, decompressLz4Frames, writeLargeVFS } from "../fileListing";
 import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
@@ -17,21 +17,6 @@ import { t } from "../../i18n";
 import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
-
-function writeLargeBufferToVFS(js7z: JS7zInstance, vfsPath: string, data: Uint8Array): void {
-  const CHUNK = 100 * 1024 * 1024;
-  const name = vfsPath.replace(/^\//, "");
-  js7z.FS.createDataFile("/", name, new Uint8Array(0), true, true, 0o777);
-  const stream = js7z.FS.open(vfsPath, "w");
-  try {
-    for (let pos = 0; pos < data.length; pos += CHUNK) {
-      const end = Math.min(pos + CHUNK, data.length);
-      js7z.FS.write(stream, data.subarray(pos, end), 0, end - pos, pos);
-    }
-  } finally {
-    js7z.FS.close(stream);
-  }
-}
 
 export async function createFolderInArchive(
   archivePath: string,
@@ -167,11 +152,10 @@ export async function previewFileFromArchive(
     // and feed the inner tar to 7z.
     if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
       const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-      const lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
-      const innerTar = lz4js.decompress(Buffer.from(buf));
+      const innerTar = decompressLz4Frames(Buffer.from(buf));
       const tarName = path.basename(archivePath, archiveExt) + ".tar";
       archiveFsPath = `/${tarName}`;
-      writeLargeBufferToVFS(js7z, archiveFsPath, innerTar);
+      writeLargeVFS(js7z, archiveFsPath, innerTar);
     } else {
       archiveFsPath = streamToVFS(js7z, archivePath);
     }
