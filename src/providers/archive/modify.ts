@@ -18,6 +18,21 @@ import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
 
+function writeLargeBufferToVFS(js7z: JS7zInstance, vfsPath: string, data: Uint8Array): void {
+  const CHUNK = 100 * 1024 * 1024;
+  const name = vfsPath.replace(/^\//, "");
+  js7z.FS.createDataFile("/", name, new Uint8Array(0), true, true, 0o777);
+  const stream = js7z.FS.open(vfsPath, "w");
+  try {
+    for (let pos = 0; pos < data.length; pos += CHUNK) {
+      const end = Math.min(pos + CHUNK, data.length);
+      js7z.FS.write(stream, data.subarray(pos, end), 0, end - pos, pos);
+    }
+  } finally {
+    js7z.FS.close(stream);
+  }
+}
+
 export async function createFolderInArchive(
   archivePath: string,
   targetDir: string,
@@ -152,15 +167,11 @@ export async function previewFileFromArchive(
     // and feed the inner tar to 7z.
     if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
       const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-      const lz4 = require("@addmaple/lz4") as {
-        init: () => Promise<void>;
-        decompress: (data: Uint8Array) => Promise<Uint8Array>;
-      };
-      await lz4.init();
-      const innerTar = await lz4.decompress(Buffer.from(buf));
+      const lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
+      const innerTar = lz4js.decompress(Buffer.from(buf));
       const tarName = path.basename(archivePath, archiveExt) + ".tar";
       archiveFsPath = `/${tarName}`;
-      js7z.FS.writeFile(archiveFsPath, new Uint8Array(innerTar));
+      writeLargeBufferToVFS(js7z, archiveFsPath, innerTar);
     } else {
       archiveFsPath = streamToVFS(js7z, archivePath);
     }

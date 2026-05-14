@@ -19,20 +19,34 @@ import { validatePassword } from "../utils/security";
 import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
-import { listWithSystem7z } from "../engines/system7z";
 
-let _lz4: {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array) => Promise<Uint8Array>;
-  decompress: (data: Uint8Array) => Promise<Uint8Array>;
-} | null = null;
+let _lz4js: { decompress: (data: Uint8Array) => Uint8Array } | null = null;
 
-async function getLz4() {
-  if (!_lz4) {
-    _lz4 = require("@addmaple/lz4");
-    await _lz4!.init();
+function getLz4js(): { decompress: (data: Uint8Array) => Uint8Array } {
+  if (!_lz4js) {
+    _lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
   }
-  return _lz4;
+  return _lz4js;
+}
+
+/**
+ * Write a potentially large Uint8Array to VFS in chunks to avoid
+ * hitting WASM memory limits with a single FS.writeFile call.
+ */
+function writeLargeVFS(js7z: JS7zInstance, vfsPath: string, data: Uint8Array): void {
+  const CHUNK = 100 * 1024 * 1024; // 100MB
+  const name = vfsPath.replace(/^\//, "");
+  js7z.FS.createDataFile("/", name, new Uint8Array(0), true, true, 0o777);
+  const stream = js7z.FS.open(vfsPath, "w");
+  try {
+    for (let pos = 0; pos < data.length; pos += CHUNK) {
+      const end = Math.min(pos + CHUNK, data.length);
+      const chunk = data.subarray(pos, end);
+      js7z.FS.write(stream, chunk, 0, chunk.length, pos);
+    }
+  } finally {
+    js7z.FS.close(stream);
+  }
 }
 
 /**
@@ -49,18 +63,6 @@ async function fetchFileList(
   data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
   const ext = getFullExt(filePath);
-
-  // LZ4: use system 7z (v26+ supports LZ4 natively) to avoid
-  // loading multi-GB archives into WASM memory.
-  if (ext === ".tar.lz4" || ext === ".tlz4") {
-    try {
-      return await listWithSystem7z(filePath, password);
-    } catch {
-      // Fall through to WASM path if system 7z is unavailable
-      logger.warn({ event: "fetchFileList.lz4.system7z.failed" });
-    }
-  }
-
   if (isWrappedFormat(ext)) return listViaExtract(filePath, password, data);
   try {
     const f = await listFiles(filePath, password, data);
@@ -91,21 +93,13 @@ async function listViaExtract(
     // js7z WASM doesn't support LZ4 decompression. Decompress manually,
     // then feed the inner tar to 7z for listing.
     if (ext === ".tar.lz4" || ext === ".tlz4") {
-      const lz4 = await getLz4();
-      const innerTar = await lz4!.decompress(Buffer.from(buf));
+      const innerTar = getLz4js().decompress(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
 
-      // Write inner tar to VFS and extract with 7z (same pattern as
-      // the non-LZ4 branch below — x then list VFS entries).
-      // Use the Uint8Array directly to avoid an extra 50MB copy.
-      js7z.FS.writeFile(`/${innerName}`, innerTar);
-      const vfsStat = js7z.FS.stat(`/${innerName}`);
-      logger.info({
-        event: "listViaExtract.vfsWritten",
-        vfsSize: vfsStat.size,
-        expected: innerTar.length,
-      });
+      // Write inner tar to VFS in chunks (100MB at a time) to stay within
+      // WASM memory limits for multi-GB archives.
+      writeLargeVFS(js7z, `/${innerName}`, innerTar);
       js7z.FS.mkdir("/_ls");
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (c: number) => {
