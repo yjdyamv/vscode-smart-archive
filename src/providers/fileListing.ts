@@ -82,25 +82,21 @@ async function listViaExtract(
       const innerTar = await lz4!.decompress(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
-      let stdout = "";
-      let stderr = "";
-      const js7z2 = await JS7z({
-        print: (text: string) => { stdout += text + "\n"; },
-        printErr: (text: string) => { stderr += text + "\n"; },
+
+      // Write inner tar to VFS and extract with 7z (same pattern as
+      // the non-LZ4 branch below — x then list VFS entries).
+      js7z.FS.writeFile(`/${innerName}`, new Uint8Array(innerTar));
+      js7z.FS.mkdir("/_ls");
+      await new Promise<void>((resolve, reject) => {
+        js7z.onExit = (c: number) => {
+          if (c === 0) resolve();
+          else reject(new Error(`7z x inner tar: ${c}`));
+        };
+        js7z.callMain(["x", `/${innerName}`, "-o/_ls", "-y"]);
       });
-      try {
-        js7z2.FS.writeFile(`/${innerName}`, new Uint8Array(innerTar));
-        await new Promise<void>((resolve, reject) => {
-          js7z2.onExit = (code: number) => {
-            if (code === 0) resolve();
-            else reject(new Error(`7z l inner tar: ${code}\n${stderr}`));
-          };
-          js7z2.callMain(["l", "-slt", "-sccUTF-8", `/${innerName}`]);
-        });
-        return parse7zListing(stdout, innerName);
-      } finally {
-        tryCleanup(js7z2);
-      }
+
+      const topEntries = js7z.FS.readdir("/_ls").filter((e: string) => e !== "." && e !== "..");
+      return readDirEntries(js7z, "/_ls", "", topEntries);
     }
 
     js7z.FS.writeFile(`/${archiveName}`, buf);
