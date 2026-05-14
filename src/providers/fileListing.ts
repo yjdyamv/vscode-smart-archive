@@ -81,6 +81,7 @@ async function listViaExtract(
       const lz4 = await getLz4();
       const innerTar = await lz4!.decompress(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
+      logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
       let stdout = "";
       let stderr = "";
       const js7z2 = await JS7z({
