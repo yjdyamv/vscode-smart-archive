@@ -51,7 +51,7 @@ function decompressLz4Frames(compressed: Buffer): Uint8Array {
     while (end + 4 <= compressed.length && compressed.readUInt32LE(end) !== LZ4_MAGIC) {
       end++;
     }
-    if (end + 4 > compressed.length && compressed.readUInt32LE(end) !== LZ4_MAGIC) {
+    if (end + 4 > compressed.length) {
       end = compressed.length;
     }
     const frame = compressed.subarray(offset, end);
