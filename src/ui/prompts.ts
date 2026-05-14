@@ -101,9 +101,15 @@ export async function promptSavePath(
     defaultUri = vscode.Uri.file(path.join(dir, `archive.${format}`));
   }
 
+  // Include the last-segment extension in the filter so VS Code
+  // recognises compound extensions (.tar.lz4) on Windows save dialogs.
+  const filterExts = [format];
+  const dotIdx = format.lastIndexOf(".");
+  if (dotIdx >= 0) filterExts.push(format.substring(dotIdx + 1));
+
   return vscode.window.showSaveDialog({
     defaultUri,
-    filters: { [t("save.filterName")]: [format] },
+    filters: { [t("save.filterName")]: filterExts },
   });
 }
 
