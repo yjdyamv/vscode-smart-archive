@@ -146,7 +146,21 @@ export async function previewFileFromArchive(
   let fileData: ArrayBuffer = new ArrayBuffer(0);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const archiveFsPath = streamToVFS(js7z, archivePath);
+    let archiveFsPath: string;
+
+    // js7z WASM doesn't support LZ4. For .tar.lz4, decompress manually
+    // and feed the inner tar to 7z.
+    if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
+      const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+      const lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
+      const innerTar = lz4js.decompress(Buffer.from(buf));
+      const tarName = path.basename(archivePath, archiveExt) + ".tar";
+      archiveFsPath = `/${tarName}`;
+      js7z.FS.writeFile(archiveFsPath, new Uint8Array(innerTar));
+    } else {
+      archiveFsPath = streamToVFS(js7z, archivePath);
+    }
+
     js7z.FS.mkdir("/_pv");
 
     const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
