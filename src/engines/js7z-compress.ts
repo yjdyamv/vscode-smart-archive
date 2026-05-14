@@ -20,6 +20,7 @@ import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
 import { zstdCompressFile } from "./zstd-codec";
+import { lz4CompressFile } from "./lz4-codec";
 import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger";
 import { validatePassword } from "../utils/security";
@@ -136,6 +137,11 @@ export async function compressWith7z(
           const zstOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.zst");
           await zstdCompressFile(tarDiskPath, zstOut, options.level);
           compressedData = new Uint8Array(fs.readFileSync(zstOut));
+        } else if (wrapExt === "lz4") {
+          progress.report({ message: t("compress.compressingTar", wrapExt) });
+          const lz4Out = path.join(path.dirname(tarDiskPath), "_tmp.tar.lz4");
+          await lz4CompressFile(tarDiskPath, lz4Out, options.level);
+          compressedData = new Uint8Array(fs.readFileSync(lz4Out));
         } else {
           progress.report({ message: t("compress.compressingTar", wrapExt) });
           const js7z2 = await JS7z();

@@ -28,6 +28,10 @@ const zstd: {
   compress: (data: Uint8Array, level?: number) => Uint8Array;
   decompress: (data: Uint8Array) => Uint8Array;
 } = require("@bokuweb/zstd-wasm");
+const lz4: {
+  init: () => Promise<void>;
+  compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
+} = require("@addmaple/lz4");
 
 
 // ── Format matrix (mirrors FORMAT_TABLE from constants.ts) ──
@@ -49,6 +53,7 @@ const FM: Fmt[] = [
   { ext: "tar.zst", wraps: true, j7z: false, short: ["tzst"] },
   { ext: "tar.lz", wraps: true, j7z: false, short: ["tlz"] },
   { ext: "tar.lzma", wraps: true, j7z: false, short: [] },
+  { ext: "tar.lz4", wraps: true, j7z: false, short: ["tlz4"] },
   { ext: "gz", wraps: false, j7z: true, short: [] },
   { ext: "bz2", wraps: false, j7z: true, short: [] },
   { ext: "xz", wraps: false, j7z: true, short: [] },
@@ -233,6 +238,47 @@ describe("selective extraction", () => {
       j.callMain(["x", "/_t.tar", "-o/_out", "-y"]);
     });
     const paths = walkFS(j, "/_out", "");
+    expect(paths.includes("d/a.txt")).toBe(true);
+    expect(paths.includes("d/b.txt")).toBe(true);
+  });
+
+  // ── LZ4 compression roundtrip ──
+
+  it("lz4 init and basic compress", async () => {
+    await lz4.init();
+    const data = new TextEncoder().encode("hello world lz4 test data");
+    const compressed = await lz4.compress(data);
+    expect(compressed.length).toBeGreaterThan(0);
+    expect(compressed.length).toBeLessThan(data.length + 64);
+    // LZ4 frame magic: 0x04224D18 in little-endian
+    expect(compressed[0]).toBe(0x04);
+    expect(compressed[1]).toBe(0x22);
+    expect(compressed[2]).toBe(0x4d);
+    expect(compressed[3]).toBe(0x18);
+  });
+
+  it("lz4 roundtrip via lz4js decompress", async () => {
+    const b = await createWrapped(stdFiles, "tar.lz4");
+    expect(b.length).toBeGreaterThan(0);
+
+    const { decompress: lz4jsDecompress } = require("lz4js") as {
+      decompress: (data: Uint8Array) => Uint8Array;
+    };
+    const dec = lz4jsDecompress(b);
+    expect(dec.length).toBeGreaterThan(100);
+
+    // Extract the tar with 7z to verify contents
+    const j = await JS7z();
+    j.FS.writeFile("/_tlz4.tar", dec);
+    j.FS.mkdir("/_lz4_out");
+    await new Promise<void>((resolve, reject) => {
+      j.onExit = (c: number) => {
+        if (c === 0) resolve();
+        else reject(new Error(`7z x tar: ${c}`));
+      };
+      j.callMain(["x", "/_tlz4.tar", "-o/_lz4_out", "-y"]);
+    });
+    const paths = walkFS(j, "/_lz4_out", "");
     expect(paths.includes("d/a.txt")).toBe(true);
     expect(paths.includes("d/b.txt")).toBe(true);
   });

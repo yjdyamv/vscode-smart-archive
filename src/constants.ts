@@ -187,6 +187,18 @@ export const FORMAT_TABLE: FormatMeta[] = [
     shortAlises: {},
   },
   {
+    exts: [".tar.lz4", ".tlz4"],
+    label: "tar.lz4",
+    description: "TAR + LZ4 — fast compression with directory structure",
+    canCreate: true,
+    supportsEncryption: false,
+    category: "wrapped",
+    j7zSelective: false,
+    wrapsTar: true,
+    wrapCompression: "lz4",
+    shortAlises: { ".tlz4": "tar.lz4" },
+  },
+  {
     exts: [".rar"],
     label: "rar",
     description: "RAR — extraction only (creation unavailable)",
