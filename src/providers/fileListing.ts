@@ -97,20 +97,30 @@ async function listViaExtract(
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
 
-      // Write inner tar to VFS in chunks (100MB at a time) to stay within
-      // WASM memory limits for multi-GB archives.
-      writeLargeVFS(js7z, `/${innerName}`, innerTar);
-      js7z.FS.mkdir("/_ls");
-      await new Promise<void>((resolve, reject) => {
-        js7z.onExit = (c: number) => {
-          if (c === 0) resolve();
-          else reject(new Error(`7z x inner tar: ${c}`));
-        };
-        js7z.callMain(["x", `/${innerName}`, "-o/_ls", "-y"]);
+      // Use 7z l (not x) — only reads metadata, avoids extracting all files
+      // into VFS which would double memory usage.
+      let stdout = "";
+      let stderr = "";
+      // Release outer js7z (idempotent) before creating js7z2 to free WASM memory
+      tryCleanup(js7z);
+      const js7z2 = await JS7z({
+        print: (text: string) => { stdout += text + "\n"; },
+        printErr: (text: string) => { stderr += text + "\n"; },
       });
-
-      const topEntries = js7z.FS.readdir("/_ls").filter((e: string) => e !== "." && e !== "..");
-      return readDirEntries(js7z, "/_ls", "", topEntries);
+      try {
+        // Write inner tar via chunked VFS to stay within WASM memory limits
+        writeLargeVFS(js7z2, `/${innerName}`, innerTar);
+        await new Promise<void>((resolve, reject) => {
+          js7z2.onExit = (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`7z l inner tar: ${code}\n${stderr}`));
+          };
+          js7z2.callMain(["l", "-slt", "-sccUTF-8", `/${innerName}`]);
+        });
+        return parse7zListing(stdout, innerName);
+      } finally {
+        tryCleanup(js7z2);
+      }
     }
 
     js7z.FS.writeFile(`/${archiveName}`, buf);
