@@ -81,6 +81,38 @@ export async function lz4Compress(data: Uint8Array, _level?: number): Promise<Ui
   return lz4.compress(data);
 }
 
+export function lz4Decompress(data: Uint8Array): Uint8Array {
+  checkFileSize(data.byteLength);
+  const compressed = Buffer.from(data);
+  const lz4js = getLz4js();
+  const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]);
+  const parts: Uint8Array[] = [];
+  let offset = 0;
+  let totalSize = 0;
+  while (offset < compressed.length) {
+    const magicIdx = compressed.indexOf(LZ4_MAGIC_BUF, offset);
+    if (magicIdx < 0) break;
+    offset = magicIdx;
+    const nextMagic = compressed.indexOf(LZ4_MAGIC_BUF, offset + 4);
+    const end = nextMagic < 0 ? compressed.length : nextMagic;
+    const frame = compressed.subarray(offset, end);
+    const decompressed = lz4js.decompress(frame);
+    totalSize = checkTotalSize(totalSize, decompressed.length);
+    checkFileSize(decompressed.length);
+    parts.push(decompressed);
+    offset = end;
+  }
+  if (parts.length === 0) throw new Error("No LZ4 frames found");
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const p of parts) {
+    result.set(p, pos);
+    pos += p.length;
+  }
+  return result;
+}
+
 export async function lz4DecompressFile(input: string, output: string): Promise<void> {
   const rfd = fs.openSync(input, "r");
   const wfd = fs.openSync(output, "w");
