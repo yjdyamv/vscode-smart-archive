@@ -17,6 +17,7 @@ import { t } from "../../i18n";
 import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
+import { brotliDecompress } from "../../engines/brotli-codec";
 
 export async function createFolderInArchive(
   archivePath: string,
@@ -156,6 +157,14 @@ export async function previewFileFromArchive(
       const tarName = path.basename(archivePath, archiveExt) + ".tar";
       archiveFsPath = `/${tarName}`;
       writeLargeVFS(js7z, archiveFsPath, innerTar);
+    } else if (archiveExt === ".tar.br" || archiveExt === ".tbr") {
+      // js7z WASM doesn't support Brotli. Decompress with brotli-wasm,
+      // then feed the inner tar to 7z for extraction.
+      const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+      const innerTar = brotliDecompress(new Uint8Array(buf));
+      const tarName = path.basename(archivePath, archiveExt) + ".tar";
+      archiveFsPath = `/${tarName}`;
+      writeLargeVFS(js7z, archiveFsPath, innerTar);
     } else {
       archiveFsPath = streamToVFS(js7z, archivePath);
     }
@@ -206,12 +215,16 @@ export async function previewFileFromArchive(
         ".tar.zst",
         ".tar.lz",
         ".tar.lzma",
+        ".tar.lz4",
+        ".tar.br",
         ".tgz",
         ".tbz2",
         ".tbz",
         ".txz",
         ".tzst",
         ".tlz",
+        ".tlz4",
+        ".tbr",
       ];
       const tarEntries = top.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
       let found = false;
