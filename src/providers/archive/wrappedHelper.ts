@@ -14,6 +14,7 @@ import { JS7z, tryCleanupJS7z } from "../fileListing";
 import { getFullExt, getWrapExtension } from "../../constants";
 import { zstdCompress } from "../../engines/zstd-codec";
 import { brotliCompress } from "../../engines/brotli-codec";
+import { lz4Compress } from "../../engines/lz4-codec";
 import { validatePassword } from "../../utils/security";
 import { t } from "../../i18n";
 
@@ -66,6 +67,8 @@ export async function withWrappedArchive(
       let compressedData: Uint8Array;
       if (wrapExt === "zst") {
         compressedData = await zstdCompress(new Uint8Array(modifiedTar), 5);
+      } else if (wrapExt === "lz4") {
+        compressedData = await lz4Compress(new Uint8Array(modifiedTar));
       } else if (wrapExt === "br") {
         compressedData = brotliCompress(new Uint8Array(modifiedTar), 5);
       } else {

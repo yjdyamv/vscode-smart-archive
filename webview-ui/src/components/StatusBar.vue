@@ -19,22 +19,24 @@
       >
         <span class="codicon codicon-split-horizontal"></span> Split
       </button>
-      <button
-        v-if="isEncrypted"
-        class="btn"
-        title="Remove encryption and re-pack"
-        @click="$emit('decrypt')"
-      >
-        <span class="codicon codicon-unlock"></span> Decrypt
-      </button>
-      <button
-        v-if="!isEncrypted"
-        class="btn"
-        title="Add encryption to this archive"
-        @click="$emit('encrypt')"
-      >
-        <span class="codicon codicon-lock"></span> Encrypt
-      </button>
+      <template v-if="canEncrypt">
+        <button
+          v-if="isEncrypted"
+          class="btn"
+          title="Remove encryption and re-pack"
+          @click="$emit('decrypt')"
+        >
+          <span class="codicon codicon-unlock"></span> Decrypt
+        </button>
+        <button
+          v-if="!isEncrypted"
+          class="btn"
+          title="Add encryption to this archive"
+          @click="$emit('encrypt')"
+        >
+          <span class="codicon codicon-lock"></span> Encrypt
+        </button>
+      </template>
       <button class="btn-ico" title="Test Archive Integrity" @click="$emit('test')">
         <span class="codicon codicon-verified"></span>
       </button>
@@ -61,6 +63,7 @@ defineProps<{
   isSplit?: boolean;
   canSplit?: boolean;
   isEncrypted?: boolean;
+  canEncrypt?: boolean;
 }>();
 defineEmits<{
   (e: "test"): void;

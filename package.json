@@ -266,12 +266,12 @@
         {
           "command": "yjdyamv.smart-archive.decompress",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|tbr|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|tar\\.br|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
         },
         {
           "command": "yjdyamv.smart-archive.browse",
           "group": "7_modification",
-          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
+          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|tbr|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|tar\\.br|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|elf|macho|swf|flv|vsix)$/"
         }
       ]
     },
