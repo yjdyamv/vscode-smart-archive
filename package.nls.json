@@ -7,6 +7,8 @@
   "config.defaultFormat.tar.bz2": "TAR + BZip2 — high compression with directory structure",
   "config.defaultFormat.tar.xz": "TAR + XZ — best compression with directory structure",
   "config.defaultFormat.tar.zst": "TAR + Zstandard — fast compression with directory structure",
+  "config.defaultFormat.tar.lz4": "TAR + LZ4 — fastest compression with directory structure",
+  "config.defaultFormat.tar.br": "TAR + Brotli — high compression ratio with directory structure",
   "config.defaultFormat.wim": "WIM — Windows Imaging Format",
   "config.defaultCompressionLevel.description": "Default compression level (0=store, 5=normal, 9=ultra).",
   "config.defaultCompressionLevel.0": "0 – Store (no compression, fastest)",
