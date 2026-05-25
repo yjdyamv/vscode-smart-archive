@@ -22,6 +22,7 @@ import { JS7z } from "./js7z-factory";
 import { hasSystem7zForFormat, decompressWithSystem7z } from "./system7z";
 import { getFullExt, getWrapExtension } from "../constants";
 import { brotliDecompressFile } from "./brotli-codec";
+import { lz4DecompressFile } from "./lz4-codec";
 
 export async function decompressWith7z(
   options: DecompressOptions,
@@ -47,6 +48,43 @@ export async function decompressWith7z(
     const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
     try {
       await brotliDecompressFile(options.inputPath, tmpTar);
+      const js7z = await JS7z();
+      try {
+        const tarFsPath = streamToVFS(js7z, tmpTar);
+        const usesMount = tarFsPath.startsWith("/mnt_");
+        let outPath: string;
+        if (usesMount) {
+          outPath = "/out_mnt";
+          js7z.FS.mkdir(outPath);
+          js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outPath);
+        } else {
+          js7z.FS.mkdir(OUTPUT_DIR);
+          outPath = OUTPUT_DIR;
+        }
+        progress.report({ message: t("decompress.inProgress") });
+        await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
+        if (token?.isCancellationRequested) throw new vscode.CancellationError();
+        if (!usesMount) {
+          copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+        }
+      } finally {
+        tryCleanup(js7z);
+      }
+      logger.info({ event: "decompress.complete", outputDir: options.outputDir });
+    } finally {
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch {}
+    }
+    return;
+  }
+
+  if (getWrapExtension(ext) === "lz4") {
+    progress.report({ message: t("decompress.unwrapTar") });
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sal_"));
+    const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
+    try {
+      await lz4DecompressFile(options.inputPath, tmpTar);
       const js7z = await JS7z();
       try {
         const tarFsPath = streamToVFS(js7z, tmpTar);
