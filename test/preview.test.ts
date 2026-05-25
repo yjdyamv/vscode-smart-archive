@@ -21,6 +21,8 @@ import {
 } from "./helpers";
 import type { JS7zInstance, TreeNode, FlatEntry } from "./helpers";
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
+import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
+import { brotliCompressFile, brotliDecompressFile } from "../src/engines/brotli-codec";
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
 const zstd: {
@@ -33,6 +35,14 @@ const lz4: {
   compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
   decompress: (data: Uint8Array) => Promise<Uint8Array>;
 } = require("@addmaple/lz4");
+const brWasm: {
+  compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
+  decompress: (data: Uint8Array) => Uint8Array;
+  DecompressStream: new () => {
+    decompress: (input: Uint8Array, outputSize?: number) => { code: number; buf: Uint8Array; input_offset: number };
+    free: () => void;
+  };
+} = require("brotli-wasm");
 
 
 // ── Format matrix (mirrors FORMAT_TABLE from constants.ts) ──
@@ -365,6 +375,187 @@ describe("selective extraction", () => {
     expect(result.length).toBe(data.length);
     expect(Buffer.from(result).equals(Buffer.from(data))).toBe(true);
   });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// Brotli round-trip tests
+// ════════════════════════════════════════════════════════════════════
+
+describe("brotli", () => {
+  it("brotli basic compress and decompress", () => {
+    const data = new TextEncoder().encode("hello brotli compression test data");
+    const compressed = brWasm.compress(data, { quality: 6 });
+    expect(compressed.length).toBeGreaterThan(0);
+    expect(compressed.length).toBeLessThan(data.length + 64);
+    const decompressed = brWasm.decompress(compressed);
+    expect(decompressed.length).toBe(data.length);
+    expect(Buffer.from(decompressed).equals(Buffer.from(data))).toBe(true);
+  });
+
+  it("brotli roundtrip: tar.br -> decompress -> 7z extract", async () => {
+    const b = await createWrapped(stdFiles, "tar.br");
+    expect(b.length).toBeLessThan(4096);
+
+    const dec = brWasm.decompress(b);
+    expect(dec.length).toBeGreaterThan(100);
+
+    const j = await JS7z();
+    j.FS.writeFile("/_t.tar", dec);
+    j.FS.mkdir("/_out");
+    await new Promise<void>((resolve, reject) => {
+      j.onExit = (c: number) => {
+        if (c === 0) resolve();
+        else reject(new Error(`7z x tar: ${c}`));
+      };
+      j.callMain(["x", "/_t.tar", "-o/_out", "-y"]);
+    });
+    const paths = walkFS(j, "/_out", "");
+    expect(paths.includes("d/a.txt")).toBe(true);
+    expect(paths.includes("d/b.txt")).toBe(true);
+  });
+
+  it("brotli multi-frame roundtrip", () => {
+    const parts = [
+      new TextEncoder().encode("first part "),
+      new TextEncoder().encode("second part "),
+      new TextEncoder().encode("third part "),
+    ];
+    const expected = Buffer.concat(parts.map((p) => Buffer.from(p)));
+
+    const frames: Uint8Array[] = parts.map((p) => brWasm.compress(p, { quality: 6 }));
+    const compressed = Buffer.concat(frames.map((f) => Buffer.from(f)));
+
+    let allOut: Uint8Array[] = [];
+    let offset = 0;
+    while (offset < compressed.length) {
+      const stream = new brWasm.DecompressStream();
+      const r = stream.decompress(compressed.subarray(offset), 50 * 1024 * 1024);
+      if (r.buf.length > 0) allOut.push(r.buf);
+      if (r.input_offset === 0) {
+        stream.free();
+        break;
+      }
+      offset += r.input_offset;
+      stream.free();
+    }
+    const total = allOut.reduce((s, a) => s + a.length, 0);
+    const result = new Uint8Array(total);
+    let pos = 0;
+    for (const p of allOut) {
+      result.set(p, pos);
+      pos += p.length;
+    }
+
+    expect(result.length).toBe(expected.length);
+    expect(Buffer.from(result).equals(expected)).toBe(true);
+  });
+
+  it("tar.br format constants: ext, wrap, category", () => {
+    const fmt = getFormatByExt(".tar.br");
+    expect(fmt).toBeDefined();
+    expect(fmt!.label).toBe("tar.br");
+    expect(fmt!.wrapsTar).toBe(true);
+    expect(fmt!.wrapCompression).toBe("br");
+    expect(fmt!.canCreate).toBe(true);
+    expect(fmt!.supportsEncryption).toBe(false);
+    expect(fmt!.category).toBe("wrapped");
+
+    const fmtShort = getFormatByExt(".tbr");
+    expect(fmtShort).toBeDefined();
+    expect(fmtShort!.label).toBe("tar.br");
+    expect(fmtShort!.wrapCompression).toBe("br");
+
+    expect(isWrappedFormat(".tar.br")).toBe(true);
+    expect(isWrappedFormat(".tbr")).toBe(true);
+    expect(getWrapExtension(".tar.br")).toBe("br");
+    expect(getWrapExtension(".tbr")).toBe("br");
+    expect(getFullExt("archive.tar.br")).toBe(".tar.br");
+    expect(getFullExt("archive.tbr")).toBe(".tbr");
+  });
+
+  it("tar.br format: canCompress and short alias works", async () => {
+    const b1 = await createWrapped(stdFiles, "tar.br");
+    expect(b1.length).toBeLessThan(4096);
+    const b2 = await createWrapped(stdFiles, "tbr");
+    expect(b2.length).toBeLessThan(4096);
+  });
+
+  it("brotli file-to-file roundtrip: compress -> decompress (15MB)", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+    const original = path.join(tmpDir, "original.bin");
+    const compressed = path.join(tmpDir, "compressed.br");
+    const decompressed = path.join(tmpDir, "decompressed.bin");
+
+    try {
+      const SIZE = 15 * 1024 * 1024;
+      const buf = Buffer.alloc(SIZE);
+      for (let i = 0; i < SIZE; i++) {
+        buf[i] = (i * 7 + 13) % 251;
+      }
+      fs.writeFileSync(original, buf);
+
+      await brotliCompressFile(original, compressed, 5);
+      const compSize = fs.statSync(compressed).size;
+      expect(compSize).toBeGreaterThan(0);
+      expect(compSize).toBeLessThan(SIZE);
+
+      await brotliDecompressFile(compressed, decompressed);
+      const decBuf = fs.readFileSync(decompressed);
+      expect(decBuf.length).toBe(SIZE);
+      expect(decBuf.equals(buf)).toBe(true);
+    } finally {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  it("brotli file-to-file stream: 100MB multi-frame roundtrip", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sab_"));
+    const original = path.join(tmpDir, "big.bin");
+    const compressed = path.join(tmpDir, "big.br");
+    const decompressed = path.join(tmpDir, "big_out.bin");
+
+    try {
+      // 100MB spans 2 compression chunks (50MB each) → tests multi-frame concatenation
+      const SIZE = 100 * 1024 * 1024;
+      const out = fs.openSync(original, "w");
+      const CHUNK_WRITE = 1024 * 1024;
+      const pattern = Buffer.alloc(CHUNK_WRITE);
+      for (let i = 0; i < CHUNK_WRITE; i++) {
+        pattern[i] = (i * 3 + 7) % 173;
+      }
+      for (let pos = 0; pos < SIZE; pos += CHUNK_WRITE) {
+        const n = Math.min(CHUNK_WRITE, SIZE - pos);
+        fs.writeSync(out, n === CHUNK_WRITE ? pattern : pattern.subarray(0, n));
+      }
+      fs.closeSync(out);
+
+      await brotliCompressFile(original, compressed, 5);
+      const compSize = fs.statSync(compressed).size;
+      expect(compSize).toBeGreaterThan(0);
+      expect(compSize).toBeLessThan(SIZE * 0.8);
+
+      await brotliDecompressFile(compressed, decompressed);
+      const decSize = fs.statSync(decompressed).size;
+      expect(decSize).toBe(SIZE);
+
+      const srcFd = fs.openSync(original, "r");
+      const decFd = fs.openSync(decompressed, "r");
+      try {
+        const bufA = Buffer.alloc(4096);
+        const bufB = Buffer.alloc(4096);
+        for (const pos of [0, SIZE / 4, SIZE / 2, SIZE * 3 / 4, SIZE - 4096]) {
+          fs.readSync(srcFd, bufA, 0, 4096, Math.floor(pos));
+          fs.readSync(decFd, bufB, 0, 4096, Math.floor(pos));
+          expect(bufA.equals(bufB)).toBe(true);
+        }
+      } finally {
+        fs.closeSync(srcFd);
+        fs.closeSync(decFd);
+      }
+    } finally {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
+  }, 120_000);
 });
 
 // ════════════════════════════════════════════════════════════════════

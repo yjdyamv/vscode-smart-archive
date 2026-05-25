@@ -113,6 +113,12 @@
             "filenamePattern": "*.tlz4"
           },
           {
+            "filenamePattern": "*.tar.br"
+          },
+          {
+            "filenamePattern": "*.tbr"
+          },
+          {
             "filenamePattern": "*.wim"
           },
           {
@@ -284,6 +290,7 @@
             "tar.xz",
             "tar.zst",
             "tar.lz4",
+            "tar.br",
             "wim"
           ],
           "enumDescriptions": [
@@ -295,6 +302,7 @@
             "%config.defaultFormat.tar.xz%",
             "%config.defaultFormat.tar.zst%",
             "%config.defaultFormat.tar.lz4%",
+            "%config.defaultFormat.tar.br%",
             "%config.defaultFormat.wim%"
           ],
           "description": "%config.defaultFormat.description%"
@@ -508,6 +516,7 @@
     "@addmaple/lz4": "^0.2.0",
     "@bokuweb/zstd-wasm": "^0.0.27",
     "@vscode/codicons": "^0.0.45",
+    "brotli-wasm": "^3.0.1",
     "iconv-lite": "^0.7.2",
     "js7z-tools": "^2.5.0",
     "lz4js": "^0.2.0",

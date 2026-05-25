@@ -187,6 +187,11 @@ const lz4: {
 } = require("@addmaple/lz4");
 let lz4Ready = false;
 
+const brWasm: {
+  compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
+  decompress: (data: Uint8Array) => Uint8Array;
+} = require("brotli-wasm");
+
 export async function createWrapped(files: Record<string, string>, ext: string): Promise<Buffer> {
   const j1 = await JS7z();
   for (const [fp, c] of Object.entries(files)) {
@@ -210,6 +215,9 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       lz4Ready = true;
     }
     return Buffer.from(await lz4.compress(new Uint8Array(tb)));
+  }
+  if (ext === "tar.br" || ext === "tbr") {
+    return Buffer.from(brWasm.compress(new Uint8Array(tb), { quality: 6 }));
   }
   const j2 = await JS7z();
   j2.FS.writeFile("/_t.tar", new Uint8Array(tb));

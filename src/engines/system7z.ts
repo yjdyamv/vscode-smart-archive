@@ -374,7 +374,14 @@ export async function compressWithSystem7z(
     const tarPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
     try {
       // Step 1: create tar with exclusions
-      const tarArgs = ["a", "-ttar", "-mx0", tarPath, "--", ...options.targets.map((tg) => tg.fsPath)];
+      const tarArgs = [
+        "a",
+        "-ttar",
+        "-mx0",
+        tarPath,
+        "--",
+        ...options.targets.map((tg) => tg.fsPath),
+      ];
       if (excludePatterns && excludePatterns.length > 0) {
         for (const pat of excludePatterns) tarArgs.push(`-xr!${pat}`);
       }
