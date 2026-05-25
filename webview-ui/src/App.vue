@@ -415,53 +415,8 @@ const selectionBreakdown = computed(() => {
 });
 
 onMounted(() => {
-  try {
-    const rawTree = window._xTree ?? [];
-    const props = window._xProps;
-    const files = window._xFiles ?? 0;
-    const dirs = window._xDirs ?? 0;
-    const initView = window._xViewState;
-
-    if (initView === "password") {
-      if (props) archiveProps.value = props;
-      viewState.value = "password";
-      return;
-    }
-
-    if (props) {
-      archiveProps.value = props;
-      totalFiles.value = files;
-      totalDirs.value = dirs;
-    }
-
-    if (rawTree.length > 0) {
-      treeData.value = sort.sortNodes(rawTree);
-      viewState.value = "content";
-      tree.initExpandedFromTree();
-      // Filter restored selection to only paths that still exist in the tree
-      const validPaths = new Set(tree.nodeMap.value.keys());
-      const filtered = new Set(
-        [...selection.state.selected].filter((p) => validPaths.has(p)),
-      );
-      if (filtered.size !== selection.state.selected.size) {
-        selection.state.selected = filtered;
-      }
-      // Show toast from page reload (after delete/rename/add/folder operations)
-      const toastMsg = window._xToast;
-      if (toastMsg) showToast(toastMsg, true);
-      // Trigger lazy loading for auto-expanded (non-noisy) directories
-      loadExpandedPaths();
-    } else {
-      viewState.value = "empty";
-    }
-  } catch (err) {
-    viewState.value = "empty";
-    showToast(
-      "Failed to initialize archive view: " + (err instanceof Error ? err.message : String(err)),
-      false,
-    );
-  }
-
+  // Register message handler first — must run for all view states
+  // including password, so that pwerr/err toasts reach the UI.
   const cleanupMessage = onMessage((msg) => {
     switch (msg.c) {
       case "ok":
@@ -516,6 +471,52 @@ onMounted(() => {
         break;
     }
   });
+
+  // Initialize tree / view state after message handler is registered
+  try {
+    const rawTree = window._xTree ?? [];
+    const props = window._xProps;
+    const files = window._xFiles ?? 0;
+    const dirs = window._xDirs ?? 0;
+    const initView = window._xViewState;
+
+    if (initView === "password") {
+      if (props) archiveProps.value = props;
+      viewState.value = "password";
+    } else if (rawTree.length > 0) {
+      if (props) {
+        archiveProps.value = props;
+        totalFiles.value = files;
+        totalDirs.value = dirs;
+      }
+      treeData.value = sort.sortNodes(rawTree);
+      viewState.value = "content";
+      tree.initExpandedFromTree();
+      const validPaths = new Set(tree.nodeMap.value.keys());
+      const filtered = new Set(
+        [...selection.state.selected].filter((p) => validPaths.has(p)),
+      );
+      if (filtered.size !== selection.state.selected.size) {
+        selection.state.selected = filtered;
+      }
+      const toastMsg = window._xToast;
+      if (toastMsg) showToast(toastMsg, true);
+      loadExpandedPaths();
+    } else {
+      if (props) {
+        archiveProps.value = props;
+        totalFiles.value = files;
+        totalDirs.value = dirs;
+      }
+      viewState.value = "empty";
+    }
+  } catch (err) {
+    viewState.value = "empty";
+    showToast(
+      "Failed to initialize archive view: " + (err instanceof Error ? err.message : String(err)),
+      false,
+    );
+  }
 
   document.addEventListener("keydown", handleKeyboard);
 
