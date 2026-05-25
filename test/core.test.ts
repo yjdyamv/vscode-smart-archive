@@ -39,7 +39,6 @@ const zstd: {
   compress: (data: Uint8Array, level?: number) => Uint8Array;
   decompress: (data: Uint8Array) => Uint8Array;
 } = require("@bokuweb/zstd-wasm");
-let zstdInited = false;
 
 const lz4Wasm: {
   init: () => Promise<void>;
@@ -1507,13 +1506,15 @@ const codecs: WrappedCodec[] = [
     ext: "tar.zst",
     shortAlias: "tzst",
     compress: async (tar) => {
-      if (!zstdInited) {
-        try { await zstd.init(); } catch { /* already initialized */ }
-        zstdInited = true;
-      }
-      return zstd.compress(new Uint8Array(tar), 3);
+      const copy = Buffer.alloc(tar.length);
+      copy.set(tar);
+      return zstd.compress(copy, 3);
     },
-    decompress: (data: Buffer) => zstd.decompress(new Uint8Array(data)),
+    decompress: (data: Buffer) => {
+      const copy = Buffer.allocUnsafe(data.length);
+      data.copy(copy);
+      return zstd.decompress(copy);
+    },
   },
   {
     ext: "tar.lz4",
@@ -1620,8 +1621,7 @@ for (const c of codecs) {
       expect(res["newdir/new.txt"]).toBe("added");
     });
 
-    if (c.ext !== "tar.zst") {
-      it("delete files: unwrap -> delete from tar -> recompress -> verify", async () => {
+    it("delete files: unwrap -> delete from tar -> recompress -> verify", async () => {
         const wrapped = await createWrapped(stdFiles, c.ext);
         const innerTar = c.decompress(wrapped);
 
@@ -1686,7 +1686,6 @@ for (const c of codecs) {
         expect(res["d/a.txt"]).toBe("hello");
         expect(res["newfolder/.smartarchive"]).toBe(".");
       });
-    }
 
     it("encrypt unsupported: isEncryptableExt returns false", async () => {
       const { isEncryptableExt } = await import("../src/constants");
