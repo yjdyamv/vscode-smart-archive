@@ -215,6 +215,7 @@ export async function setupWebview(
     if ([".7z", ".zip"].includes(resolvedExt)) flags.push("window._xCanSplit=true");
   }
   if (isEnc) flags.push("window._xIsEncrypted=true");
+  if (isEncryptableExt(resolvedExt)) flags.push("window._xCanEncrypt=true");
   const persisted = await loadExpandedPaths(archiveUri, isEnc);
   if (persisted.length > 0) flags.push(`window._xExpanded=${JSON.stringify(persisted)}`);
   if (flags.length > 0) {

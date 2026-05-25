@@ -199,6 +199,18 @@ export const FORMAT_TABLE: FormatMeta[] = [
     shortAliases: { ".tlz4": "tar.lz4" },
   },
   {
+    exts: [".tar.br", ".tbr"],
+    label: "tar.br",
+    description: "TAR + Brotli — high compression ratio with directory structure",
+    canCreate: true,
+    supportsEncryption: false,
+    category: "wrapped",
+    j7zSelective: false,
+    wrapsTar: true,
+    wrapCompression: "br",
+    shortAliases: { ".tbr": "tar.br" },
+  },
+  {
     exts: [".rar"],
     label: "rar",
     description: "RAR — extraction only (creation unavailable)",
