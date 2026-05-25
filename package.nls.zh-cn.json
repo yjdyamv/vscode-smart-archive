@@ -7,6 +7,8 @@
   "config.defaultFormat.tar.bz2": "TAR + BZip2 — 高压缩率带目录结构",
   "config.defaultFormat.tar.xz": "TAR + XZ — 最佳压缩率带目录结构",
   "config.defaultFormat.tar.zst": "TAR + Zstandard — 快速压缩带目录结构",
+  "config.defaultFormat.tar.lz4": "TAR + LZ4 — 极速压缩带目录结构",
+  "config.defaultFormat.tar.br": "TAR + Brotli — 高压缩率带目录结构",
   "config.defaultFormat.wim": "WIM — Windows 映像格式",
   "config.defaultCompressionLevel.description": "默认压缩级别（0=仅存储，5=标准，9=极限）。",
   "config.defaultCompressionLevel.0": "0 – 仅存储（最快）",
