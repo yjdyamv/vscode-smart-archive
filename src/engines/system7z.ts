@@ -152,10 +152,12 @@ function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
 
 const ZSTD_EXTS = new Set([".zst", ".tar.zst", ".tzst"]);
 const LZ4_EXTS = new Set([".tar.lz4", ".tlz4"]);
+const BROTLI_EXTS = new Set([".tar.br", ".tbr"]);
 
 /**
  * Check whether system 7-Zip is usable for a given archive format.
  * tar.zst / tar.lz4 creation is impossible (7z only unpacks these),
+ * tar.br is handled entirely by brotli-wasm (system 7z bypassed).
  * everything else uses system 7z when available (wrapped formats use
  * outer type: gzip/bzip2/xz).
  */
@@ -179,6 +181,14 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
     ZSTD_EXTS.has(extOrLabel.toLowerCase()) || ZSTD_EXTS.has("." + extOrLabel.toLowerCase());
   const isLz4 =
     LZ4_EXTS.has(extOrLabel.toLowerCase()) || LZ4_EXTS.has("." + extOrLabel.toLowerCase());
+  const isBrotli =
+    BROTLI_EXTS.has(extOrLabel.toLowerCase()) || BROTLI_EXTS.has("." + extOrLabel.toLowerCase());
+
+  // Brotli is handled entirely by brotli-wasm, bypass system 7z
+  if (isBrotli) {
+    logger.info({ event: "system7z.skipBrotli", ext: extOrLabel });
+    return false;
+  }
 
   // System 7z cannot create zstd / lz4 archives at all (only decompress)
   if ((isZstd || isLz4) && !isDecompress) {
