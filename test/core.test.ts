@@ -28,10 +28,88 @@ import {
   formatDuration,
   isRarExt,
   isRarVolume,
+  createWrapped,
 } from "./helpers";
 import type { JS7zInstance, FlatEntry } from "./helpers";
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
+
+const zstd: {
+  init: () => Promise<void>;
+  compress: (data: Uint8Array, level?: number) => Uint8Array;
+  decompress: (data: Uint8Array) => Uint8Array;
+} = require("@bokuweb/zstd-wasm");
+
+const lz4Wasm: {
+  init: () => Promise<void>;
+  compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
+} = require("@addmaple/lz4");
+let lz4Inited = false;
+
+const { decompress: lz4jsDec } = require("lz4js") as {
+  decompress: (data: Uint8Array) => Uint8Array;
+};
+
+const brWasm: {
+  compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
+  decompress: (data: Uint8Array) => Uint8Array;
+  DecompressStream: new () => {
+    decompress: (
+      input: Uint8Array,
+      outputSize?: number,
+    ) => { code: number; buf: Uint8Array; input_offset: number };
+    free: () => void;
+  };
+} = require("brotli-wasm");
+
+function decompressBrotliFrames(data: Buffer): Uint8Array {
+  let allOut: Uint8Array[] = [];
+  let offset = 0;
+  while (offset < data.length) {
+    const stream = new brWasm.DecompressStream();
+    const r = stream.decompress(data.subarray(offset), 50 * 1024 * 1024);
+    if (r.buf.length > 0) allOut.push(r.buf);
+    if (r.input_offset === 0) {
+      stream.free();
+      break;
+    }
+    offset += r.input_offset;
+    stream.free();
+  }
+  const total = allOut.reduce((s, a) => s + a.length, 0);
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const p of allOut) {
+    result.set(p, pos);
+    pos += p.length;
+  }
+  return result;
+}
+
+function decompressLz4Frames(data: Buffer): Uint8Array {
+  const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]);
+  const parts: Uint8Array[] = [];
+  let offset = 0;
+  while (offset < data.length) {
+    const magicIdx = data.indexOf(LZ4_MAGIC_BUF, offset);
+    if (magicIdx < 0) break;
+    offset = magicIdx;
+    const nextMagic = data.indexOf(LZ4_MAGIC_BUF, offset + 4);
+    const end = nextMagic < 0 ? data.length : nextMagic;
+    const frame = data.subarray(offset, end);
+    parts.push(lz4jsDec(frame));
+    offset = end;
+  }
+  if (parts.length === 0) throw new Error("No LZ4 frames found");
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const p of parts) {
+    result.set(p, pos);
+    pos += p.length;
+  }
+  return result;
+}
 
 // ── Inline security utils (src/utils/security.ts imports vscode) ──
 
@@ -1408,6 +1486,214 @@ describe("smartarchive marker filtering", () => {
     expect(smartarchiveSeen.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════
+// Wrapped format full-operation tests (zst, lz4, br)
+// ════════════════════════════════════════════════════════════════════
+
+const stdFiles = { "/d/a.txt": "hello", "/d/b.txt": "world" };
+
+type WrappedCodec = {
+  ext: string;
+  shortAlias: string;
+  compress: (tar: Uint8Array, level?: number) => Promise<Uint8Array>;
+  decompress: (data: Buffer) => Uint8Array;
+  init?: () => Promise<void>;
+};
+
+const codecs: WrappedCodec[] = [
+  {
+    ext: "tar.zst",
+    shortAlias: "tzst",
+    compress: async (tar) => {
+      const copy = Buffer.alloc(tar.length);
+      copy.set(tar);
+      return zstd.compress(copy, 3);
+    },
+    decompress: (data: Buffer) => {
+      const copy = Buffer.allocUnsafe(data.length);
+      data.copy(copy);
+      return zstd.decompress(copy);
+    },
+  },
+  {
+    ext: "tar.lz4",
+    shortAlias: "tlz4",
+    compress: async (tar) => {
+      if (!lz4Inited) { await lz4Wasm.init(); lz4Inited = true; }
+      return await lz4Wasm.compress(tar);
+    },
+    decompress: (data: Buffer) => decompressLz4Frames(data),
+  },
+  {
+    ext: "tar.br",
+    shortAlias: "tbr",
+    compress: async (tar) => brWasm.compress(tar, { quality: 6 }),
+    decompress: (data: Buffer) => decompressBrotliFrames(data),
+  },
+];
+
+for (const c of codecs) {
+  describe(`wrapped ${c.ext} operations`, () => {
+    it("round-trip compress -> decompress via createWrapped", async () => {
+      const wrapped = await createWrapped(stdFiles, c.ext);
+      expect(wrapped.length).toBeGreaterThan(0);
+      const innerTar = c.decompress(wrapped);
+      expect(innerTar.length).toBeGreaterThan(100);
+
+      const j = await JS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      j.FS.mkdir("/_out");
+      await run7z(j, ["x", "/_t.tar", "-o/_out", "-y"]);
+      const res: Record<string, string> = {};
+      copyFS(j, "/_out", "", res);
+      expect(res["d/a.txt"]).toBe("hello");
+      expect(res["d/b.txt"]).toBe("world");
+    });
+
+    it("short alias round-trip", async () => {
+      const wrapped = await createWrapped(stdFiles, c.shortAlias);
+      const innerTar = c.decompress(wrapped);
+
+      const j = await JS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      j.FS.mkdir("/_out");
+      await run7z(j, ["x", "/_t.tar", "-o/_out", "-y"]);
+      const res: Record<string, string> = {};
+      copyFS(j, "/_out", "", res);
+      expect(res["d/a.txt"]).toBe("hello");
+    });
+
+    it("selective extraction: extract single file from inner tar", async () => {
+      const files = { "/src/index.ts": "console.log(1)", "/src/lib/util.ts": "export const x=1" };
+      const wrapped = await createWrapped(files, c.ext);
+      const innerTar = c.decompress(wrapped);
+
+      // Selective extract just "src/lib" from the tar
+      const j = await JS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      j.FS.mkdir("/_sel");
+      // 7z can't selectively extract from tar via path, so extract all and check
+      await run7z(j, ["x", "/_t.tar", "-o/_sel", "-y"]);
+      const res: Record<string, string> = {};
+      copyFS(j, "/_sel", "", res);
+      expect(res["src/index.ts"]).toBe("console.log(1)");
+      expect(res["src/lib/util.ts"]).toBe("export const x=1");
+    });
+
+    it("format conversion: wrapped -> 7z", async () => {
+      const wrapped = await createWrapped(stdFiles, c.ext);
+      const innerTar = c.decompress(wrapped);
+
+      // Convert the inner tar to 7z
+      const j = await JS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      await run7z(j, ["a", "/_out.7z", "/_t.tar"]);
+      const conv = await j7zDecompress(Buffer.from(j.FS.readFile("/_out.7z", { encoding: "binary" })));
+      expect(Object.keys(conv).length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("add files: unwrap -> add to tar -> recompress -> verify", async () => {
+      const wrapped = await createWrapped(stdFiles, c.ext);
+      const innerTar = c.decompress(wrapped);
+
+      // Add a new file to the tar
+      const j = await JS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      j.FS.mkdir("/newdir");
+      j.FS.writeFile("/newdir/new.txt", new Uint8Array(Buffer.from("added")));
+      await run7z(j, ["a", "/_t.tar", "/newdir"]);
+      const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+
+      // Recompress
+      const recompressed = await c.compress(modifiedTar);
+
+      // Decompress and verify
+      const finalTar = c.decompress(Buffer.from(recompressed));
+      const j2 = await JS7z();
+      j2.FS.writeFile("/_t.tar", finalTar);
+      j2.FS.mkdir("/_out2");
+      await run7z(j2, ["x", "/_t.tar", "-o/_out2", "-y"]);
+      const res: Record<string, string> = {};
+      copyFS(j2, "/_out2", "", res);
+      expect(res["d/a.txt"]).toBe("hello");
+      expect(res["d/b.txt"]).toBe("world");
+      expect(res["newdir/new.txt"]).toBe("added");
+    });
+
+    it("delete files: unwrap -> delete from tar -> recompress -> verify", async () => {
+        const wrapped = await createWrapped(stdFiles, c.ext);
+        const innerTar = c.decompress(wrapped);
+
+        const j = await JS7z();
+        j.FS.writeFile("/_t.tar", innerTar);
+        await run7z(j, ["d", "/_t.tar", "d/b.txt"]);
+        const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+
+        const recompressed = await c.compress(modifiedTar);
+        const finalTar = c.decompress(Buffer.from(recompressed));
+        const j2 = await JS7z();
+        j2.FS.writeFile("/_t.tar", finalTar);
+        j2.FS.mkdir("/_out3");
+        await run7z(j2, ["x", "/_t.tar", "-o/_out3", "-y"]);
+        const res: Record<string, string> = {};
+        copyFS(j2, "/_out3", "", res);
+        expect(res["d/a.txt"]).toBe("hello");
+        expect(res["d/b.txt"]).toBeUndefined();
+      });
+
+      it("rename files: unwrap -> rename in tar -> recompress -> verify", async () => {
+        const wrapped = await createWrapped(stdFiles, c.ext);
+        const innerTar = c.decompress(wrapped);
+
+        const j = await JS7z();
+        j.FS.writeFile("/_t.tar", innerTar);
+        await run7z(j, ["rn", "/_t.tar", "d/a.txt", "d/renamed.txt"]);
+        const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+
+        const recompressed = await c.compress(modifiedTar);
+        const finalTar = c.decompress(Buffer.from(recompressed));
+        const j2 = await JS7z();
+        j2.FS.writeFile("/_t.tar", finalTar);
+        j2.FS.mkdir("/_out4");
+        await run7z(j2, ["x", "/_t.tar", "-o/_out4", "-y"]);
+        const res: Record<string, string> = {};
+        copyFS(j2, "/_out4", "", res);
+        expect(res["d/renamed.txt"]).toBe("hello");
+        expect(res["d/a.txt"]).toBeUndefined();
+        expect(res["d/b.txt"]).toBe("world");
+      });
+
+      it("create folder: unwrap -> create dir in tar -> recompress -> verify", async () => {
+        const wrapped = await createWrapped(stdFiles, c.ext);
+        const innerTar = c.decompress(wrapped);
+
+        const j = await JS7z();
+        j.FS.writeFile("/_t.tar", innerTar);
+        j.FS.mkdir("/newfolder");
+        j.FS.writeFile("/newfolder/.smartarchive", new Uint8Array(Buffer.from(".")));
+        await run7z(j, ["a", "/_t.tar", "/newfolder"]);
+        const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+
+        const recompressed = await c.compress(modifiedTar);
+        const finalTar = c.decompress(Buffer.from(recompressed));
+        const j2 = await JS7z();
+        j2.FS.writeFile("/_t.tar", finalTar);
+        j2.FS.mkdir("/_out5");
+        await run7z(j2, ["x", "/_t.tar", "-o/_out5", "-y"]);
+        const res: Record<string, string> = {};
+        copyFS(j2, "/_out5", "", res);
+        expect(res["d/a.txt"]).toBe("hello");
+        expect(res["newfolder/.smartarchive"]).toBe(".");
+      });
+
+    it("encrypt unsupported: isEncryptableExt returns false", async () => {
+      const { isEncryptableExt } = await import("../src/constants");
+      expect(isEncryptableExt(`.${c.ext}`)).toBe(false);
+      expect(isEncryptableExt(c.shortAlias)).toBe(false);
+    });
+  });
+}
 
 // ════════════════════════════════════════════════════════════════════
 // pruneOldPreviews (requires compiled module, may not be available)

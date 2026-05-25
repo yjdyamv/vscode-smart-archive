@@ -12,12 +12,22 @@
  */
 
 import { logger } from "../utils/logger";
+import { checkFileSize, checkTotalSize } from "../utils/security";
 import * as fs from "fs";
 
 const lz4 = require("@addmaple/lz4") as {
   init: () => Promise<void>;
   compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
 };
+
+let _lz4js: { decompress: (data: Uint8Array) => Uint8Array } | null = null;
+
+function getLz4js(): { decompress: (data: Uint8Array) => Uint8Array } {
+  if (!_lz4js) {
+    _lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
+  }
+  return _lz4js;
+}
 
 let initP: Promise<void> | null = null;
 let initFailed = false;
@@ -63,5 +73,77 @@ export async function lz4CompressFile(
   } finally {
     fs.closeSync(rfd);
     fs.closeSync(out);
+  }
+}
+
+export async function lz4Compress(data: Uint8Array, _level?: number): Promise<Uint8Array> {
+  await ensureInit();
+  return lz4.compress(data);
+}
+
+export function lz4Decompress(data: Uint8Array): Uint8Array {
+  checkFileSize(data.byteLength);
+  const compressed = Buffer.from(data);
+  const lz4js = getLz4js();
+  const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]);
+  const parts: Uint8Array[] = [];
+  let offset = 0;
+  let totalSize = 0;
+  while (offset < compressed.length) {
+    const magicIdx = compressed.indexOf(LZ4_MAGIC_BUF, offset);
+    if (magicIdx < 0) break;
+    offset = magicIdx;
+    const nextMagic = compressed.indexOf(LZ4_MAGIC_BUF, offset + 4);
+    const end = nextMagic < 0 ? compressed.length : nextMagic;
+    const frame = compressed.subarray(offset, end);
+    const decompressed = lz4js.decompress(frame);
+    totalSize = checkTotalSize(totalSize, decompressed.length);
+    checkFileSize(decompressed.length);
+    parts.push(decompressed);
+    offset = end;
+  }
+  if (parts.length === 0) throw new Error("No LZ4 frames found");
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const p of parts) {
+    result.set(p, pos);
+    pos += p.length;
+  }
+  return result;
+}
+
+export async function lz4DecompressFile(input: string, output: string): Promise<void> {
+  const rfd = fs.openSync(input, "r");
+  const wfd = fs.openSync(output, "w");
+  try {
+    const compressed = Buffer.alloc(fs.fstatSync(rfd).size);
+    fs.readSync(rfd, compressed, 0, compressed.length, 0);
+
+    const lz4js = getLz4js();
+    const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]);
+    let offset = 0;
+    let totalSize = 0;
+    while (offset < compressed.length) {
+      const magicIdx = compressed.indexOf(LZ4_MAGIC_BUF, offset);
+      if (magicIdx < 0) break;
+      offset = magicIdx;
+      const nextMagic = compressed.indexOf(LZ4_MAGIC_BUF, offset + 4);
+      const end = nextMagic < 0 ? compressed.length : nextMagic;
+      const frame = compressed.subarray(offset, end);
+      const decompressed = lz4js.decompress(frame);
+      totalSize = checkTotalSize(totalSize, decompressed.length);
+      checkFileSize(decompressed.length);
+      fs.writeSync(wfd, Buffer.from(decompressed));
+      offset = end;
+    }
+    logger.info({ event: "lz4.decompress.ok", input, output });
+  } finally {
+    try {
+      fs.closeSync(rfd);
+    } catch {}
+    try {
+      fs.closeSync(wfd);
+    } catch {}
   }
 }

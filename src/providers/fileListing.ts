@@ -19,6 +19,7 @@ import { validatePassword, checkFileSize, checkTotalSize } from "../utils/securi
 import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
+import { brotliDecompress } from "../engines/brotli-codec";
 
 let _lz4js: { decompress: (data: Uint8Array) => Uint8Array } | null = null;
 
@@ -138,11 +139,49 @@ async function listViaExtract(
       let stdout = "";
       let stderr = "";
       const js7z2 = await JS7z({
-        print: (text: string) => { stdout += text + "\n"; },
-        printErr: (text: string) => { stderr += text + "\n"; },
+        print: (text: string) => {
+          stdout += text + "\n";
+        },
+        printErr: (text: string) => {
+          stderr += text + "\n";
+        },
       });
       try {
         // Write inner tar via chunked VFS (may be 500MB+ for large archives)
+        writeLargeVFS(js7z2, `/${innerName}`, innerTar);
+
+        await new Promise<void>((resolve, reject) => {
+          js7z2.onExit = (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`7z l inner tar: ${code}\n${stderr}`));
+          };
+          js7z2.callMain(["l", "-slt", "-sccUTF-8", `/${innerName}`]);
+        });
+        return parse7zListing(stdout, innerName);
+      } finally {
+        tryCleanup(js7z2);
+      }
+    }
+
+    // js7z WASM doesn't support Brotli decompression. Decompress manually,
+    // then feed the inner tar to 7z for listing.
+    if (ext === ".tar.br" || ext === ".tbr") {
+      tryCleanup(js7z);
+      const innerTar = brotliDecompress(new Uint8Array(buf));
+      const innerName = path.basename(filePath, ext) + ".tar";
+      logger.info({ event: "listViaExtract.brotliDecompressed", size: innerTar.length });
+
+      let stdout = "";
+      let stderr = "";
+      const js7z2 = await JS7z({
+        print: (text: string) => {
+          stdout += text + "\n";
+        },
+        printErr: (text: string) => {
+          stderr += text + "\n";
+        },
+      });
+      try {
         writeLargeVFS(js7z2, `/${innerName}`, innerTar);
 
         await new Promise<void>((resolve, reject) => {

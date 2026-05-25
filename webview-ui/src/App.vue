@@ -61,6 +61,7 @@ const readOnly = ref(!!(window as any)._xReadOnly);
 const isSplit = ref(!!(window as any)._xIsSplit);
 const canSplit = ref(!!(window as any)._xCanSplit);
 const isEncrypted = ref(!!(window as any)._xIsEncrypted);
+const canEncrypt = ref(!!(window as any)._xCanEncrypt);
 
 function showToast(msg: string, ok = true) {
   toast.msg = msg;
@@ -667,6 +668,7 @@ provide(
         :is-split="isSplit"
         :can-split="canSplit"
         :is-encrypted="isEncrypted"
+        :can-encrypt="canEncrypt"
         @test="testArchive"
         @merge="mergeVolumes"
         @split="splitVolumes"

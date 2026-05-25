@@ -191,8 +191,12 @@ function wasmCompressFile(input: string, output: string, level: number): Promise
       cleanup(output);
       throw err;
     } finally {
-      try { fs.closeSync(rfd); } catch {}
-      try { fs.closeSync(out); } catch {}
+      try {
+        fs.closeSync(rfd);
+      } catch {}
+      try {
+        fs.closeSync(out);
+      } catch {}
     }
   });
 }
