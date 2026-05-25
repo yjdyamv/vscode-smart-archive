@@ -91,6 +91,7 @@ export interface JS7zInstance {
  */
 export interface EmscriptenFS {
   mkdir(path: string): void;
+  rmdir(path: string): void;
   writeFile(path: string, data: Uint8Array): void;
   readFile(path: string, options?: { encoding: "binary" }): ArrayBuffer;
   readdir(path: string): string[];

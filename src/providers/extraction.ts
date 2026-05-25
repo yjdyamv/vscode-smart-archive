@@ -235,8 +235,8 @@ async function extractSelected(
             `/${innerTar}`,
             "-o/_x2",
             flat ? "-aou" : "-y",
-            ...normalizedPaths,
             ...excludeFlags,
+            ...normalizedPaths,
           ]);
         });
         fs.mkdirSync(outputDir, { recursive: true });
@@ -288,12 +288,12 @@ async function extractSelected(
         validatePassword(password);
         eArgs.splice(1, 0, `-p${password}`);
       }
-      eArgs.push(...normalizedPaths);
       if (excludes && excludes.length > 0) {
         for (const ex of excludes) {
           eArgs.push("-xr!" + ex.replace(/\\/g, "/"));
         }
       }
+      eArgs.push(...normalizedPaths);
       js7z.callMain(eArgs);
     });
     fs.mkdirSync(outputDir, { recursive: true });

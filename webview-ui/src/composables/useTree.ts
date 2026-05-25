@@ -42,6 +42,9 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);
       autoExpandMaxDepth.value = null;
+      for (const p of saved.expanded) {
+        expandTo(p);
+      }
       return;
     }
     const persistent = (window as any)._xExpanded as string[] | undefined;

@@ -9,9 +9,10 @@ export function useSelection() {
     lastAddDir: saved?.lastAdd ?? "",
   });
 
-  // Persist selection on change
+  // Persist selection on change — watch serialized snapshot so
+  // composition changes (not just size changes) trigger persistence.
   watch(
-    () => state.selected.size,
+    () => JSON.stringify([...state.selected].sort()),
     () => {
       saveState({
         sel: [...state.selected],
@@ -21,18 +22,26 @@ export function useSelection() {
     },
   );
 
-  function toggle(path: string): void {
+  function toggle(path: string, isDir?: boolean): void {
     if (state.selected.has(path)) {
       state.selected.delete(path);
-      // If the deselected item is the one that set lastAddDir, clear it
+      // If the deselected item is the one that set lastAddDir, only clear it
+      // when no other selected items share the same parent directory.
       const normPath = path.endsWith("/") ? path.replace(/\/$/, "") : path;
       const addParent = !normPath.includes("/") ? "" : normPath.slice(0, normPath.lastIndexOf("/"));
       if (state.lastAddDir === addParent || state.lastAddDir === normPath) {
-        state.lastAddDir = "";
+        const otherSharesParent = [...state.selected].filter((p) => p !== path).some((p) => {
+          const np = p.endsWith("/") ? p.replace(/\/$/, "") : p;
+          const pParent = !np.includes("/") ? "" : np.slice(0, np.lastIndexOf("/"));
+          return pParent === addParent || np === addParent;
+        });
+        if (!otherSharesParent) state.lastAddDir = "";
       }
     } else {
       state.selected.add(path);
-      if (!path.endsWith("/")) {
+      if (isDir) {
+        state.lastAddDir = path.replace(/\/$/, "");
+      } else if (!path.endsWith("/")) {
         const idx = path.lastIndexOf("/");
         state.lastAddDir = idx > 0 ? path.substring(0, idx) : "";
       } else {

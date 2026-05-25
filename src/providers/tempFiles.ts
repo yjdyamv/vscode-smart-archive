@@ -55,14 +55,17 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
   });
 }
 
-const MAX_PREVIEW_FILES = 50;
+const MAX_PREVIEW_FILES = 100;
 
 function pruneOldPreviews(): void {
   try {
     if (!fs.existsSync(PREVIEW_TMP_DIR)) return;
-    const files = fs
-      .readdirSync(PREVIEW_TMP_DIR, { withFileTypes: true })
-      .filter((e) => e.isFile())
+    const entries = fs.readdirSync(PREVIEW_TMP_DIR, { withFileTypes: true });
+    const files = entries.filter((e) => e.isFile());
+    // Quick bail: only stat + sort when actually over the limit
+    if (files.length <= MAX_PREVIEW_FILES) return;
+
+    const withMtime = files
       .map((e) => ({
         name: e.name,
         mtime: fs.statSync(path.join(PREVIEW_TMP_DIR, e.name)).mtimeMs,
@@ -70,8 +73,8 @@ function pruneOldPreviews(): void {
       .sort((a, b) => a.mtime - b.mtime);
 
     let pruned = 0;
-    while (files.length > MAX_PREVIEW_FILES) {
-      const oldest = files.shift()!;
+    while (withMtime.length > MAX_PREVIEW_FILES) {
+      const oldest = withMtime.shift()!;
       try {
         fs.unlinkSync(path.join(PREVIEW_TMP_DIR, oldest.name));
         pruned++;
@@ -84,8 +87,8 @@ function pruneOldPreviews(): void {
     }
     if (pruned > 0) {
       logger.info(
-        { event: "tempFiles.pruned", pruned, remaining: files.length },
-        `Pruned ${pruned} old preview temp file(s), ${files.length} remaining`,
+        { event: "tempFiles.pruned", pruned, remaining: withMtime.length },
+        `Pruned ${pruned} old preview temp file(s), ${withMtime.length} remaining`,
       );
     }
   } catch (err) {

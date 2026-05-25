@@ -214,8 +214,9 @@ async function unwrapInnerTar(
       const tarPath = path.join(outputDir, tarFile);
       progress.report({ message: t("decompress.unwrapTar") });
 
+      // Only validate file size, not counting towards total — the extracted
+      // contents are counted below via copyDirFromFS to avoid double-counting.
       checkFileSize(fs.statSync(tarPath).size);
-      totalSize = checkTotalSize(totalSize, fs.statSync(tarPath).size);
       const js7z = await JS7z();
 
       try {
