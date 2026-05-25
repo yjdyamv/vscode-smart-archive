@@ -384,17 +384,11 @@ export async function compressWithSystem7z(
     const tarPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
     try {
       // Step 1: create tar with exclusions
-      const tarArgs = [
-        "a",
-        "-ttar",
-        "-mx0",
-        tarPath,
-        "--",
-        ...options.targets.map((tg) => tg.fsPath),
-      ];
+      const tarArgs = ["a", "-ttar", "-mx0", tarPath];
       if (excludePatterns && excludePatterns.length > 0) {
         for (const pat of excludePatterns) tarArgs.push(`-xr!${pat}`);
       }
+      tarArgs.push("--", ...options.targets.map((tg) => tg.fsPath));
       logger.info({ event: "system7z.compress.tar", argsPreview: tarArgs.join(" ") });
       progress.report({ message: t("compress.creatingTar") });
       await run7z(sz, tarArgs, progress, token);
@@ -603,7 +597,7 @@ interface CaptureResult {
   code: number | null;
 }
 
-function spawnCapture(binary: string, args: string[], timeoutMs = 30_000): Promise<CaptureResult> {
+export function spawnCapture(binary: string, args: string[], timeoutMs = 30_000): Promise<CaptureResult> {
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";

@@ -18,6 +18,7 @@ import {
   init as initExpandedState,
   dispose as disposeExpandedState,
 } from "./providers/webview/expandedState";
+import { initTempCleanup } from "./providers/tempFiles";
 
 /**
  * Called when the extension is activated.
@@ -29,6 +30,7 @@ export function activate(context: vscode.ExtensionContext): void {
   logger.info({ event: "extension.activate", vscode: vscode.version });
 
   initExpandedState(context.secrets);
+  initTempCleanup(context);
 
   // Register custom editor as default viewer for archive files (.7z, .zip, …)
   registerArchiveEditor(context);

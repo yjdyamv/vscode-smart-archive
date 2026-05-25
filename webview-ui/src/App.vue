@@ -105,6 +105,7 @@ function handleContextMenu(e: MouseEvent, path: string, dirPath: string) {
     selection.toggle(path);
     selection.state.anchorPath = path;
   }
+  selection.state.lastAddDir = dirPath;
   const { paths: selectedPaths } = getEffectivePaths();
   if (!selectedPaths.length) return;
 
@@ -338,10 +339,10 @@ function handleRowClick(path: string, _isDir: boolean, shift: boolean, ctrl: boo
       }
     }
   } else if (ctrl) {
-    selection.toggle(path);
+    selection.toggle(path, _isDir);
   } else {
     selection.clearAll();
-    selection.toggle(path);
+    selection.toggle(path, _isDir);
   }
   selection.state.anchorPath = path;
 }
@@ -437,6 +438,14 @@ onMounted(() => {
       treeData.value = sort.sortNodes(rawTree);
       viewState.value = "content";
       tree.initExpandedFromTree();
+      // Filter restored selection to only paths that still exist in the tree
+      const validPaths = new Set(tree.nodeMap.value.keys());
+      const filtered = new Set(
+        [...selection.state.selected].filter((p) => validPaths.has(p)),
+      );
+      if (filtered.size !== selection.state.selected.size) {
+        selection.state.selected = filtered;
+      }
       // Show toast from page reload (after delete/rename/add/folder operations)
       const toastMsg = window._xToast;
       if (toastMsg) showToast(toastMsg, true);
@@ -457,9 +466,11 @@ onMounted(() => {
     switch (msg.c) {
       case "ok":
         showToast(msg.t as string, true);
+        viewState.value = "content";
         break;
       case "err":
         showToast(msg.t as string, false);
+        viewState.value = "content";
         break;
       case "loading":
         if (typeof msg.t === "string") {
@@ -575,10 +586,11 @@ function navigateRows(delta: number, shift: boolean) {
   if (idx < 0) idx = delta > 0 ? -1 : flatList.length;
   idx = Math.max(0, Math.min(idx + delta, flatList.length - 1));
   const targetPath = flatList[idx].path;
+  const targetIsDir = flatList[idx].node.kind === "DIRECTORY";
   if (!shift) {
     selection.clearAll();
   }
-  selection.toggle(targetPath);
+  selection.toggle(targetPath, targetIsDir);
   selection.state.anchorPath = targetPath;
 }
 

@@ -618,6 +618,11 @@ const messages: Record<string, Record<Locale, string>> = {
   },
 
   // ---- Preview ----
+  "preview.opening": {
+    en: "Opening preview...",
+    "zh-cn": "正在打开预览...",
+    "zh-tw": "正在開啟預覽...",
+  },
   "preview.notFound": {
     en: "Preview file not found: {0}",
     "zh-cn": "预览文件未找到: {0}",

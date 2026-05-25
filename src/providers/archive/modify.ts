@@ -7,6 +7,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
 import { JS7z, tryCleanupJS7z, decompressLz4Frames, writeLargeVFS } from "../fileListing";
@@ -18,6 +19,11 @@ import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
 import { brotliDecompress } from "../../engines/brotli-codec";
+import {
+  hasSystem7zForFormat,
+  detectSystem7z,
+  spawnCapture,
+} from "../../engines/system7z";
 
 export async function createFolderInArchive(
   archivePath: string,
@@ -145,130 +151,244 @@ export async function previewFileFromArchive(
   const normalizedFile = filePath.replace(/\\/g, "/");
 
   let fileData: ArrayBuffer = new ArrayBuffer(0);
-  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
-  try {
-    let archiveFsPath: string;
 
-    // js7z WASM doesn't support LZ4. For .tar.lz4, decompress manually
-    // and feed the inner tar to 7z.
-    if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
-      const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-      const innerTar = decompressLz4Frames(Buffer.from(buf));
-      const tarName = path.basename(archivePath, archiveExt) + ".tar";
-      archiveFsPath = `/${tarName}`;
-      writeLargeVFS(js7z, archiveFsPath, innerTar);
-    } else if (archiveExt === ".tar.br" || archiveExt === ".tbr") {
-      // js7z WASM doesn't support Brotli. Decompress with brotli-wasm,
-      // then feed the inner tar to 7z for extraction.
-      const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-      const innerTar = brotliDecompress(new Uint8Array(buf));
-      const tarName = path.basename(archivePath, archiveExt) + ".tar";
-      archiveFsPath = `/${tarName}`;
-      writeLargeVFS(js7z, archiveFsPath, innerTar);
-    } else {
-      archiveFsPath = streamToVFS(js7z, archivePath);
+  // Fast path: use system 7z when available (no WASM overhead, no full-archive load).
+  // Brotli and LZ4 are not supported by system 7z — fall through to WASM below.
+  const useSystem7z = hasSystem7zForFormat(archiveExt, true);
+  if (useSystem7z) {
+    try {
+      fileData = await extractOneWithSystem7z(
+        archivePath,
+        normalizedFile,
+        archiveExt,
+        password,
+      );
+    } catch (err) {
+      logger.warn(
+        { event: "previewFile.system7z.failed", err },
+        "System 7z preview failed, falling back to WASM",
+      );
     }
+  }
 
-    js7z.FS.mkdir("/_pv");
+  if (fileData.byteLength === 0) {
+    const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+    try {
+      let archiveFsPath: string;
 
-    const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
-    if (password) {
-      validatePassword(password);
-      xArgs.splice(1, 0, `-p${password}`);
-    }
-    const doSelective = !isWrappedFormat(archiveExt);
-    if (doSelective) xArgs.push(sanitizeCliPath(normalizedFile));
-    await new Promise<void>((resolve, reject) => {
-      js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
-      js7z.callMain(xArgs);
-    });
+      // js7z WASM doesn't support LZ4. For .tar.lz4, decompress manually
+      // and feed the inner tar to 7z.
+      if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
+        const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+        const innerTar = decompressLz4Frames(Buffer.from(buf));
+        const tarName = path.basename(archivePath, archiveExt) + ".tar";
+        archiveFsPath = `/${tarName}`;
+        writeLargeVFS(js7z, archiveFsPath, innerTar);
+      } else if (archiveExt === ".tar.br" || archiveExt === ".tbr") {
+        // js7z WASM doesn't support Brotli. Decompress with brotli-wasm,
+        // then feed the inner tar to 7z for extraction.
+        const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+        const innerTar = brotliDecompress(new Uint8Array(buf));
+        const tarName = path.basename(archivePath, archiveExt) + ".tar";
+        archiveFsPath = `/${tarName}`;
+        writeLargeVFS(js7z, archiveFsPath, innerTar);
+      } else {
+        archiveFsPath = streamToVFS(js7z, archivePath);
+      }
 
-    let top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+      js7z.FS.mkdir("/_pv");
 
-    // If selective extraction produced nothing (e.g. ar archives like .deb),
-    // retry extracting everything then locate the requested file.
-    if (top.length === 0 && doSelective) {
-      const allArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
-      if (password) allArgs.splice(1, 0, `-p${password}`);
+      const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
+      if (password) {
+        validatePassword(password);
+        xArgs.splice(1, 0, `-p${password}`);
+      }
+      const doSelective = !isWrappedFormat(archiveExt);
+      if (doSelective) xArgs.push(sanitizeCliPath(normalizedFile));
       await new Promise<void>((resolve, reject) => {
         js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
-        js7z.callMain(allArgs);
+        js7z.callMain(xArgs);
       });
-      top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
-    }
 
-    // Try reading the requested file directly
-    const directPath = `/_pv/${normalizedFile}`;
-    try {
-      fileData = js7z.FS.readFile(directPath, { encoding: "binary" });
-    } catch {
-      logger.debug(
-        { event: "previewFile.directRead.failed" },
-        "Preview direct read failed, trying unwrap",
-      );
-      // File not found directly — try unwrapping inner tar archives
-      const tarPatterns = [
-        ".tar",
-        ".tar.gz",
-        ".tar.bz2",
-        ".tar.xz",
-        ".tar.zst",
-        ".tar.lz",
-        ".tar.lzma",
-        ".tar.lz4",
-        ".tar.br",
-        ".tgz",
-        ".tbz2",
-        ".tbz",
-        ".txz",
-        ".tzst",
-        ".tlz",
-        ".tlz4",
-        ".tbr",
-      ];
-      const tarEntries = top.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
-      let found = false;
-      for (const tarEntry of tarEntries) {
-        try {
-          fileData = await unwrapArchives(js7z, `/_pv/${tarEntry}`, normalizedFile, password);
-          found = true;
-          break;
-        } catch {
-          logger.warn(
-            { event: "previewFile.unwrap.failed" },
-            "Preview unwrap failed for tar entry",
+      let top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+
+      // If selective extraction produced nothing (e.g. ar archives like .deb),
+      // retry extracting everything then locate the requested file.
+      if (top.length === 0 && doSelective) {
+        const allArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
+        if (password) allArgs.splice(1, 0, `-p${password}`);
+        await new Promise<void>((resolve, reject) => {
+          js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
+          js7z.callMain(allArgs);
+        });
+        top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+      }
+
+      // Try reading the requested file directly
+      const directPath = `/_pv/${normalizedFile}`;
+      try {
+        fileData = js7z.FS.readFile(directPath, { encoding: "binary" });
+      } catch {
+        logger.debug(
+          { event: "previewFile.directRead.failed" },
+          "Preview direct read failed, trying unwrap",
+        );
+        // File not found directly — try unwrapping inner tar archives
+        const tarPatterns = [
+          ".tar",
+          ".tar.gz",
+          ".tar.bz2",
+          ".tar.xz",
+          ".tar.zst",
+          ".tar.lz",
+          ".tar.lzma",
+          ".tar.lz4",
+          ".tar.br",
+          ".tgz",
+          ".tbz2",
+          ".tbz",
+          ".txz",
+          ".tzst",
+          ".tlz",
+          ".tlz4",
+          ".tbr",
+        ];
+        const tarEntries = top.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
+        let found = false;
+        for (const tarEntry of tarEntries) {
+          try {
+            fileData = await unwrapArchives(js7z, `/_pv/${tarEntry}`, normalizedFile, password);
+            found = true;
+            break;
+          } catch {
+            logger.warn(
+              { event: "previewFile.unwrap.failed" },
+              "Preview unwrap failed for tar entry",
+            );
+            continue;
+          }
+        }
+        if (!found) {
+          logger.error(
+            { event: "previewFile.notFound", path: normalizedFile },
+            "Preview file not found in extracted content",
           );
-          continue;
+          throw new Error(t("preview.notFound", normalizedFile));
         }
       }
-      if (!found) {
-        logger.error(
-          { event: "previewFile.notFound", path: normalizedFile },
-          "Preview file not found in extracted content",
-        );
-        throw new Error(t("preview.notFound", normalizedFile));
+    } finally {
+      tryCleanupJS7z(js7z);
+    }
+  }
+
+  const buf = Buffer.from(fileData);
+  fs.mkdirSync(PREVIEW_TMP_DIR, { recursive: true });
+  const hash = crypto
+    .createHash("sha256")
+    .update(`${archivePath}|${normalizedFile}`)
+    .digest("hex")
+    .slice(0, 16);
+  const ext = getFullExt(normalizedFile) || path.extname(normalizedFile);
+  const tmpPath = path.join(PREVIEW_TMP_DIR, `${hash}${ext}`);
+  if (!fs.existsSync(tmpPath)) {
+    pruneOldPreviews();
+    fs.writeFileSync(tmpPath, buf);
+  }
+  const uri = vscode.Uri.file(tmpPath);
+  await vscode.commands.executeCommand("vscode.open", uri, {
+    preview: true,
+    preserveFocus: false,
+    viewColumn: vscode.ViewColumn.Beside,
+  });
+  logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
+}
+
+/**
+ * System 7z fast path: extract a single file from an archive using the
+ * locally-installed 7-Zip binary. Avoids WASM init + full archive VFS copy.
+ *
+ * Non-wrapped formats (7z, zip, tar): one-step selective extraction.
+ * Wrapped formats (tar.gz, tar.bz2, tar.xz, tar.zst): two-step.
+ */
+async function extractOneWithSystem7z(
+  archivePath: string,
+  normalizedFile: string,
+  archiveExt: string,
+  password?: string,
+): Promise<ArrayBuffer> {
+  const sz = detectSystem7z();
+  if (!sz) throw new Error("System 7z not found");
+
+  const wrapped = isWrappedFormat(archiveExt);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sap_"));
+
+  try {
+    if (!wrapped) {
+      // One step: 7z x archive -o<tmp> -aoa -y -- file
+      const args: string[] = ["x", archivePath, `-o${tmpDir}`, "-aoa", "-y"];
+      if (password) {
+        validatePassword(password);
+        args.splice(1, 0, `-p${password}`);
       }
+      args.push("--", normalizedFile);
+      const { code } = await spawnCapture(sz, args);
+      if (code !== 0) throw new Error(`7z x non-wrapped exit ${code}`);
+    } else {
+      // Two step: first extract outer layer, then inner tar
+      const tmpOuter = path.join(tmpDir, "_outer");
+      fs.mkdirSync(tmpOuter);
+      const args1: string[] = ["x", archivePath, `-o${tmpOuter}`, "-y"];
+      if (password) {
+        validatePassword(password);
+        args1.splice(1, 0, `-p${password}`);
+      }
+      const r1 = await spawnCapture(sz, args1);
+      if (r1.code !== 0) throw new Error(`7z x outer exit ${r1.code}`);
+
+      // Find the inner tar
+      const entries = fs.readdirSync(tmpOuter);
+      const innerTar = entries.find((e) => e.endsWith(".tar"));
+      if (!innerTar) throw new Error("No inner tar found in wrapped archive");
+      const innerPath = path.join(tmpOuter, innerTar);
+
+      const tmpInner = path.join(tmpDir, "_inner");
+      fs.mkdirSync(tmpInner);
+      const args2: string[] = [
+        "x",
+        innerPath,
+        `-o${tmpInner}`,
+        "-aoa",
+        "-y",
+        "--",
+        normalizedFile,
+      ];
+      const r2 = await spawnCapture(sz, args2);
+      if (r2.code !== 0) throw new Error(`7z x inner exit ${r2.code}`);
     }
 
-    const buf = Buffer.from(fileData);
-    fs.mkdirSync(PREVIEW_TMP_DIR, { recursive: true });
-    const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 16);
-    // Use full extension (e.g. .tar.gz) so the viewer knows it's wrapped
-    const ext = getFullExt(normalizedFile) || path.extname(normalizedFile);
-    const tmpPath = path.join(PREVIEW_TMP_DIR, `${hash}${ext}`);
-    if (!fs.existsSync(tmpPath)) {
-      pruneOldPreviews();
-      fs.writeFileSync(tmpPath, buf);
-    }
-    const uri = vscode.Uri.file(tmpPath);
-    await vscode.commands.executeCommand("vscode.open", uri, {
-      preview: true,
-      preserveFocus: false,
-      viewColumn: vscode.ViewColumn.Beside,
-    });
-    logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
+    // Locate the extracted file — walk through subdirs if present
+    const findFile = (dir: string): string | null => {
+      const ents = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of ents) {
+        const full = path.join(dir, e.name);
+        if (e.isFile()) return full;
+        if (e.isDirectory()) {
+          const found = findFile(full);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const filePath = findFile(tmpDir);
+    if (!filePath) throw new Error("Extracted file not found");
+
+    return new Uint8Array(fs.readFileSync(filePath)).buffer;
   } finally {
-    tryCleanupJS7z(js7z);
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // best effort
+    }
   }
 }
 
@@ -383,7 +503,7 @@ export async function renameInArchive(
   try {
     const fsPath = streamToVFS(js7z, archivePath);
     const rnArgs = ["rn", fsPath, sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
-    if (password) rnArgs.splice(1, 0, `-p${password}`);
+    if (password) { validatePassword(password); rnArgs.splice(1, 0, `-p${password}`); }
     logger.debug({ event: "rename.7zArgs", args: rnArgs.join(" ") });
 
     await new Promise<void>((resolve, reject) => {
@@ -410,7 +530,7 @@ async function renameInWrappedArchive(
   const newNorm = newPath.replace(/\\/g, "/");
   await withWrappedArchive(archivePath, password, async (js7z2) => {
     const rnArgs = ["rn", "/inner.tar", sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
-    if (password) rnArgs.splice(1, 0, `-p${password}`);
+    if (password) { validatePassword(password); rnArgs.splice(1, 0, `-p${password}`); }
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z rn inner: ${c}`)));
       js7z2.callMain(rnArgs);

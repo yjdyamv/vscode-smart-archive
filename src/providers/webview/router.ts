@@ -42,6 +42,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { decompressWith7z, compressWith7z } from "../../engines/js7z-engine";
+import { detectSystem7z, spawnCapture } from "../../engines/system7z";
 import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix } from "../../constants";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
@@ -53,7 +54,8 @@ import {
   countAllStats,
 } from "../treeBuilder";
 import { contentHtml } from "../htmlRenderer";
-import { fetchFileList } from "../fileListing";
+import { fetchFileList, JS7z, tryCleanupJS7z } from "../fileListing";
+import { streamToVFS } from "../../engines/vfs-io";
 import { extractSelected } from "../extraction";
 import {
   createFolderInArchive,
@@ -220,6 +222,51 @@ async function convertArchive(
 
 // ── Message handlers ──
 
+/**
+ * Verify an archive password using 7z `t` (test) command.
+ * System 7z first, falls back to WASM.
+ *
+ * Using 7z t rather than 7z l because listing succeeds for non-header-encrypted
+ * 7z archives even with a wrong password (file table is not encrypted).
+ */
+async function verifyArchivePassword(
+  archivePath: string,
+  password: string,
+): Promise<boolean> {
+  // Try system 7z first
+  const sz = detectSystem7z();
+  if (sz) {
+    try {
+      const { code } = await spawnCapture(sz, ["t", `-p${password}`, archivePath], 15_000);
+      return code === 0;
+    } catch {
+      // fall through to WASM
+    }
+  }
+
+  // Fall back to WASM 7z
+  try {
+    const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+    try {
+      const archiveFsPath = streamToVFS(js7z, archivePath);
+      let ok = false;
+      await new Promise<void>((resolve) => {
+        js7z.onExit = (c: number) => {
+          ok = c === 0;
+          resolve();
+        };
+        js7z.callMain(["t", archiveFsPath, `-p${password}`]);
+      });
+      return ok;
+    } finally {
+      tryCleanupJS7z(js7z);
+    }
+  } catch {
+    // Can't even instantiate WASM — let the password through
+    return true;
+  }
+}
+
 async function handlePassword(
   webview: vscode.Webview,
   s: HandlerState,
@@ -244,6 +291,17 @@ async function handlePassword(
     // caused false rejections on Windows due to stdin pipe race conditions.
     logger.info({ event: "webview.password.ok", count: pwEntries.length });
     s.password = msg.pw;
+
+    // Verify password is actually correct for non-header-encrypted formats
+    // (7z listing succeeds with wrong password when only content is encrypted).
+    if (pwEntries.length > 0) {
+      const valid = await verifyArchivePassword(s.filePath, msg.pw);
+      if (!valid) {
+        webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
+        return;
+      }
+    }
+
     s.entries = pwEntries;
     s.entryIndex = buildEntryIndex(pwEntries);
     const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
@@ -290,7 +348,12 @@ async function handlePassword(
     }
   } catch (err) {
     logger.error({ event: "webview.password.error", err });
-    webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
+    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+    if (msg.includes("password") || msg.includes("encrypt") || msg.includes("cannot open") || msg.includes("wrong")) {
+      webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
+    } else {
+      webview.postMessage({ c: "err", t: (err instanceof Error ? err.message : String(err)) });
+    }
   }
 }
 
@@ -576,8 +639,9 @@ async function handlePreview(
     await previewFileFromArchive(s.filePath, msg.path, s.password);
     logger.info({ event: "webview.preview.complete", path: msg.path });
   } catch (err) {
-    logger.error({ event: "webview.preview.failed", err }, (err as Error).message);
-    showErrorWithCopy(t("decompress.failed") + (err as Error).message);
+    const msg = err instanceof Error ? err.message : String(err ?? "");
+    logger.error({ event: "webview.preview.failed", err }, msg);
+    showErrorWithCopy(t("decompress.failed") + " " + msg);
   }
 }
 
@@ -828,6 +892,14 @@ export function registerHandler(webview: vscode.Webview): void {
       }
     })().catch((err) => {
       logger.error({ event: "webview.msg.unhandled", err }, "Unhandled webview message error");
+      try {
+        webview.postMessage({
+          c: "err",
+          t: err instanceof Error ? err.message : String(err),
+        });
+      } catch {
+        // webview may already be disposed
+      }
     });
   });
 }

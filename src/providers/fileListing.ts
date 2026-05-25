@@ -108,9 +108,13 @@ async function fetchFileList(
     if (f && f.length > 0) return f;
   } catch (err) {
     if (isNotAnArchiveError(err)) {
-      const wrapped = new Error(t("decompress.missingVolumes"));
-      (wrapped as any).cause = err;
-      throw wrapped;
+      // When a password is provided, `can not open` is almost always
+      // a wrong-password / encryption issue, not a split-volume issue.
+      if (!password) {
+        const wrapped = new Error(t("decompress.missingVolumes"));
+        (wrapped as any).cause = err;
+        throw wrapped;
+      }
     }
     logger.warn({ event: "fetchFileList.listFiles.failed", err, filePath }, "js7z listing failed");
   }
