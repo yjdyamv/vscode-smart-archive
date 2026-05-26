@@ -111,6 +111,7 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
   function expandAll(): void {
     function collect(nodes: TreeNodeData[]) {
       for (const node of nodes) {
+        if (node.collapsed) continue;
         const hasKids = !!(
           node.kind === "DIRECTORY" &&
           ((node.children && node.children.length > 0) || node.hasMore)
