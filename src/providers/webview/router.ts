@@ -43,7 +43,7 @@ import * as fs from "fs";
 import * as os from "os";
 import { decompressWith7z, compressWith7z } from "../../engines/js7z-engine";
 import { detectSystem7z, spawnCapture } from "../../engines/system7z";
-import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix } from "../../constants";
+import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt } from "../../constants";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
 import {
@@ -336,6 +336,7 @@ async function handlePassword(
       scripts.push("window._xCanSplit=true");
     }
     scripts.push("window._xIsEncrypted=true");
+    if (isEncryptableExt(ext)) scripts.push("window._xCanEncrypt=true");
     const persisted = await loadExpandedPaths(s.archiveUri, true);
     if (persisted.length > 0) {
       scripts.push(`window._xExpanded=${JSON.stringify(persisted)}`);
@@ -767,26 +768,15 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
     }
     const ext = getFullExt(s.filePath);
     const fmt = ext.slice(1);
-    let volSize: string | undefined;
     let dst: string;
     if (isSplitVolume(s.filePath)) {
-      volSize = await promptVolumeSize();
-      if (!volSize) return;
       const base = removeVolumeSuffix(s.filePath);
-      const baseName = path.basename(base, ext);
-      const dir = path.dirname(s.filePath);
-      let folder = path.join(dir, baseName + "_decrypted");
-      if (fs.existsSync(folder)) {
-        let i = 1;
-        while (fs.existsSync(path.join(dir, `${baseName}_decrypted_${i}`))) i++;
-        folder = path.join(dir, `${baseName}_decrypted_${i}`);
-      }
-      dst = path.join(folder, path.basename(base));
+      dst = uniquePath(base.slice(0, -ext.length) + "_decrypted" + ext);
     } else {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted" + ext);
     }
     webview.postMessage({ c: "loading", t: t("archive.decrypting") });
-    await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
+    await convertArchive(s.filePath, fmt, dst, pw, undefined, "");
     logger.info({ event: "webview.decrypt.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: false });
