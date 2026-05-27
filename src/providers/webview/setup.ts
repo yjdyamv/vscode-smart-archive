@@ -141,6 +141,7 @@ export async function setupWebview(
         flags.push("window._xCanSplit=true");
       }
       flags.push("window._xIsEncrypted=true");
+      if (isEncryptableExt(resolvedExt)) flags.push("window._xCanEncrypt=true");
       webview.html = webview.html.replace("</body>", `<script>${flags.join(";")}</script></body>`);
       if (!handlerRegistered.has(webview)) {
         handlerRegistered.add(webview);
