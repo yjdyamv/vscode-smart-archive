@@ -207,6 +207,27 @@ export function getSplitVolumeBase(filePath: string): string {
  * and returns it as a volume-size string (e.g. "100m", "1g"),
  * or undefined if detection fails.
  */
+/**
+ * Builds the output path for a split volume operation (encrypt/decrypt/merge).
+ * Creates a `baseName+suffix` folder to hold the split files.
+ */
+export function getSplitOutputPath(
+  filePath: string,
+  fmt: string,
+  suffix: string,
+): { dst: string; folder: string } {
+  const base = getSplitVolumeBase(filePath);
+  const baseName = path.basename(base);
+  const dir = path.dirname(filePath);
+  let folder = path.join(dir, baseName + suffix);
+  if (fs.existsSync(folder)) {
+    let i = 1;
+    while (fs.existsSync(path.join(dir, `${baseName}${suffix}_${i}`))) i++;
+    folder = path.join(dir, `${baseName}${suffix}_${i}`);
+  }
+  return { dst: path.join(folder, baseName + "." + fmt), folder };
+}
+
 export function detectVolumeSize(filePath: string): string | undefined {
   const ext = getFullExt(filePath);
   const base = getSplitVolumeBase(filePath);
@@ -804,16 +825,8 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
     let dst: string;
     if (isSplitVolume(s.filePath)) {
       volSize = detectVolumeSize(s.filePath);
-      const base = getSplitVolumeBase(s.filePath);
-      const baseName = path.basename(base);
-      const dir = path.dirname(s.filePath);
-      let folder = path.join(dir, baseName + "_encrypted");
-      if (fs.existsSync(folder)) {
-        let i = 1;
-        while (fs.existsSync(path.join(dir, `${baseName}_encrypted_${i}`))) i++;
-        folder = path.join(dir, `${baseName}_encrypted_${i}`);
-      }
-      dst = path.join(folder, baseName + "." + fmt);
+      const out = getSplitOutputPath(s.filePath, fmt, "_encrypted");
+      dst = out.dst;
     } else {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_encrypted." + fmt);
     }
@@ -846,16 +859,8 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
     let dst: string;
     if (isSplitVolume(s.filePath)) {
       volSize = detectVolumeSize(s.filePath);
-      const base = getSplitVolumeBase(s.filePath);
-      const baseName = path.basename(base);
-      const dir = path.dirname(s.filePath);
-      let folder = path.join(dir, baseName + "_decrypted");
-      if (fs.existsSync(folder)) {
-        let i = 1;
-        while (fs.existsSync(path.join(dir, `${baseName}_decrypted_${i}`))) i++;
-        folder = path.join(dir, `${baseName}_decrypted_${i}`);
-      }
-      dst = path.join(folder, baseName + "." + fmt);
+      const out = getSplitOutputPath(s.filePath, fmt, "_decrypted");
+      dst = out.dst;
     } else {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted." + fmt);
     }
