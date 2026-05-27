@@ -846,7 +846,16 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
     let dst: string;
     if (isSplitVolume(s.filePath)) {
       volSize = detectVolumeSize(s.filePath);
-      dst = uniquePath(getSplitVolumeBase(s.filePath) + "_decrypted." + fmt);
+      const base = getSplitVolumeBase(s.filePath);
+      const baseName = path.basename(base);
+      const dir = path.dirname(s.filePath);
+      let folder = path.join(dir, baseName + "_decrypted");
+      if (fs.existsSync(folder)) {
+        let i = 1;
+        while (fs.existsSync(path.join(dir, `${baseName}_decrypted_${i}`))) i++;
+        folder = path.join(dir, `${baseName}_decrypted_${i}`);
+      }
+      dst = path.join(folder, baseName + "." + fmt);
     } else {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted." + fmt);
     }
