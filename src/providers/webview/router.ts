@@ -173,6 +173,35 @@ async function promptConvertFormat(): Promise<string | undefined> {
   return chosen?.label;
 }
 
+/**
+ * If the output format cannot be created (e.g. RAR), shows a modal warning
+ * and lets the user pick 7z or ZIP. Returns the (possibly changed) format,
+ * or undefined if cancelled.
+ */
+async function resolveWritableFormat(fmt: string): Promise<string | undefined> {
+  if (COMPRESS_FORMATS.some((f) => f.label === fmt)) return fmt;
+  const choice = await vscode.window.showWarningMessage(
+    t("compress.rarUnsupported"),
+    { modal: true },
+    "7z",
+    "zip",
+  );
+  return choice;
+}
+
+/**
+ * Extracts the base path (without extension) from a split volume path.
+ * Works for RAR (.partN.rar, .rNN) and standard (7z.001, zip.002) styles.
+ */
+function getSplitVolumeBase(filePath: string): string {
+  const m = filePath.match(/^(.+)\.part\d+\.rar$/i);
+  if (m) return m[1];
+  const m2 = filePath.match(/^(.+)\.r\d{2}$/i);
+  if (m2) return m2[1];
+  const ext = getFullExt(filePath);
+  return removeVolumeSuffix(filePath).replace(ext + "$", "");
+}
+
 async function convertArchive(
   srcPath: string,
   dstFormat: string,
@@ -669,8 +698,11 @@ async function handleMerge(webview: vscode.Webview, s: HandlerState): Promise<vo
   logger.info({ event: "webview.merge", path: s.filePath });
   try {
     const ext = getFullExt(s.filePath);
-    const fmt = ext.slice(1);
-    const dst = removeVolumeSuffix(s.filePath);
+    let fmt = ext.slice(1);
+    fmt = (await resolveWritableFormat(fmt)) ?? "";
+    if (!fmt) return;
+    const base = getSplitVolumeBase(s.filePath);
+    const dst = base + "." + fmt;
     webview.postMessage({ c: "loading", t: t("archive.merging") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "");
     logger.info({ event: "webview.merge.complete", dst });
@@ -767,13 +799,14 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
       if (!pw) return;
     }
     const ext = getFullExt(s.filePath);
-    const fmt = ext.slice(1);
+    let fmt = ext.slice(1);
+    fmt = (await resolveWritableFormat(fmt)) ?? "";
+    if (!fmt) return;
     let dst: string;
     if (isSplitVolume(s.filePath)) {
-      const base = removeVolumeSuffix(s.filePath);
-      dst = uniquePath(base.slice(0, -ext.length) + "_decrypted" + ext);
+      dst = uniquePath(getSplitVolumeBase(s.filePath) + "_decrypted." + fmt);
     } else {
-      dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted" + ext);
+      dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted." + fmt);
     }
     webview.postMessage({ c: "loading", t: t("archive.decrypting") });
     await convertArchive(s.filePath, fmt, dst, pw, undefined, "");
