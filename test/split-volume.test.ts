@@ -1,0 +1,118 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as path from "path";
+import * as fs from "fs";
+import * as os from "os";
+
+import { getSplitVolumeBase, detectVolumeSize } from "../src/providers/webview/router";
+
+let tmpDir: string;
+
+beforeAll(() => {
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "svt_"));
+});
+
+afterAll(() => {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+function touch(filePath: string, size: number): void {
+  const buf = Buffer.alloc(size, 0x61);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, buf);
+}
+
+describe("getSplitVolumeBase", () => {
+  it("strips .7z.001 suffix", () => {
+    expect(getSplitVolumeBase("/dir/archive.7z.001")).toBe("/dir/archive");
+  });
+
+  it("strips .zip.002 suffix", () => {
+    expect(getSplitVolumeBase("/dir/archive.zip.002")).toBe("/dir/archive");
+  });
+
+  it("strips .part1.rar suffix", () => {
+    expect(getSplitVolumeBase("/dir/archive.part1.rar")).toBe("/dir/archive");
+  });
+
+  it("strips .part5.rar suffix", () => {
+    expect(getSplitVolumeBase("/dir/archive.part5.rar")).toBe("/dir/archive");
+  });
+
+  it("strips .r00 suffix", () => {
+    expect(getSplitVolumeBase("/dir/archive.r00")).toBe("/dir/archive");
+  });
+
+  it("strips .r01 suffix", () => {
+    expect(getSplitVolumeBase("/dir/archive.r01")).toBe("/dir/archive");
+  });
+
+  it("handles paths with dots in directory names", () => {
+    expect(getSplitVolumeBase("/some.dir/archive.7z.001")).toBe("/some.dir/archive");
+  });
+
+  it("handles paths with spaces", () => {
+    expect(getSplitVolumeBase("/my files/archive.7z.001")).toBe("/my files/archive");
+  });
+
+  it("handles windows backslash paths", () => {
+    const result = getSplitVolumeBase("C:\\data\\archive.7z.001");
+    expect(result).toBe("C:\\data\\archive");
+  });
+});
+
+describe("detectVolumeSize", () => {
+  it("detects 100m preset from first volume size", () => {
+    const firstVol = path.join(tmpDir, "detect_100m.7z.001");
+    touch(firstVol, 100 * 1024 * 1024); // exactly 100m
+    expect(detectVolumeSize(firstVol)).toBe("100m");
+  });
+
+  it("detects 10m preset (within 10% tolerance)", () => {
+    const firstVol = path.join(tmpDir, "detect_10m.7z.001");
+    // 7z headers may add overhead; 10m + 200k is within 10%
+    touch(firstVol, 10 * 1024 * 1024 + 200 * 1024);
+    expect(detectVolumeSize(firstVol)).toBe("10m");
+  });
+
+  it("detects 1g preset", () => {
+    const firstVol = path.join(tmpDir, "detect_1g.7z.001");
+    touch(firstVol, 1 * 1024 * 1024 * 1024);
+    expect(detectVolumeSize(firstVol)).toBe("1g");
+  });
+
+  it("falls back to approximate size for non-standard volumes", () => {
+    const firstVol = path.join(tmpDir, "detect_custom.7z.001");
+    touch(firstVol, 55 * 1024 * 1024); // 55m — no exact preset
+    const result = detectVolumeSize(firstVol);
+    expect(result).toMatch(/^\d+m$/);
+  });
+
+  it("returns undefined when first volume file does not exist", () => {
+    expect(detectVolumeSize(path.join(tmpDir, "nonexistent.7z.001"))).toBeUndefined();
+  });
+
+  it("works with zip split volumes", () => {
+    const firstVol = path.join(tmpDir, "detect_zip.zip.001");
+    touch(firstVol, 50 * 1024 * 1024); // 50m
+    expect(detectVolumeSize(firstVol)).toBe("50m");
+  });
+
+  it("handles RAR .part1.rar volumes", () => {
+    const firstVol = path.join(tmpDir, "archive.part1.rar");
+    touch(firstVol, 100 * 1024 * 1024);
+    expect(detectVolumeSize(firstVol)).toBe("100m");
+  });
+
+  it("handles RAR .r00 volumes", () => {
+    const firstVol = path.join(tmpDir, "archive.r00");
+    touch(firstVol, 200 * 1024 * 1024);
+    expect(detectVolumeSize(firstVol)).toBe("200m");
+  });
+
+  it("detects small volumes in kilobytes", () => {
+    const firstVol = path.join(tmpDir, "small.7z.001");
+    touch(firstVol, 500 * 1024); // 500k — below 1m
+    const result = detectVolumeSize(firstVol);
+    expect(result).toBe("500k");
+  });
+});

@@ -193,13 +193,13 @@ async function resolveWritableFormat(fmt: string): Promise<string | undefined> {
  * Extracts the base path (without extension) from a split volume path.
  * Works for RAR (.partN.rar, .rNN) and standard (7z.001, zip.002) styles.
  */
-function getSplitVolumeBase(filePath: string): string {
+export function getSplitVolumeBase(filePath: string): string {
   const m = filePath.match(/^(.+)\.part\d+\.rar$/i);
   if (m) return m[1];
   const m2 = filePath.match(/^(.+)\.r\d{2}$/i);
   if (m2) return m2[1];
   const ext = getFullExt(filePath);
-  return removeVolumeSuffix(filePath).replace(ext + "$", "");
+  return removeVolumeSuffix(filePath).slice(0, -ext.length);
 }
 
 /**
@@ -207,18 +207,17 @@ function getSplitVolumeBase(filePath: string): string {
  * and returns it as a volume-size string (e.g. "100m", "1g"),
  * or undefined if detection fails.
  */
-function detectVolumeSize(filePath: string): string | undefined {
+export function detectVolumeSize(filePath: string): string | undefined {
   const ext = getFullExt(filePath);
-  const dir = path.dirname(filePath);
   const base = getSplitVolumeBase(filePath);
 
   let firstVol: string;
   if (/\.part\d+\.rar$/i.test(filePath)) {
-    firstVol = path.join(dir, base + ".part1" + ext);
+    firstVol = base + ".part1" + ext;
   } else if (/\.r\d{2}$/i.test(filePath)) {
-    firstVol = path.join(dir, base + ".r00");
+    firstVol = base + ".r00";
   } else {
-    firstVol = path.join(dir, base + ext + ".001");
+    firstVol = base + ext + ".001";
   }
 
   if (!fs.existsSync(firstVol)) return undefined;
