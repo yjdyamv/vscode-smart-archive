@@ -3,7 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 
-import { getSplitVolumeBase, detectVolumeSize } from "../src/providers/webview/router";
+import { getSplitVolumeBase, detectVolumeSize, getSplitOutputPath } from "../src/providers/webview/router";
 
 let tmpDir: string;
 
@@ -114,5 +114,51 @@ describe("detectVolumeSize", () => {
     touch(firstVol, 500 * 1024); // 500k — below 1m
     const result = detectVolumeSize(firstVol);
     expect(result).toBe("500k");
+  });
+});
+
+describe("getSplitOutputPath", () => {
+  it("creates _encrypted folder for encrypt", () => {
+    const vol = path.join(tmpDir, "enc_test.7z.001");
+    touch(vol, 100);
+    const { dst, folder } = getSplitOutputPath(vol, "7z", "_encrypted");
+    expect(folder).toBe(path.join(tmpDir, "enc_test_encrypted"));
+    expect(dst).toBe(path.join(folder, "enc_test.7z"));
+  });
+
+  it("creates _decrypted folder for decrypt", () => {
+    const vol = path.join(tmpDir, "dec_test.7z.001");
+    touch(vol, 100);
+    const { dst, folder } = getSplitOutputPath(vol, "zip", "_decrypted");
+    expect(folder).toBe(path.join(tmpDir, "dec_test_decrypted"));
+    expect(dst).toBe(path.join(folder, "dec_test.zip"));
+  });
+
+  it("appends _1 _2 etc when target folder already exists", () => {
+    const vol = path.join(tmpDir, "dup_test.7z.001");
+    touch(vol, 100);
+    // Create the first output folder
+    fs.mkdirSync(path.join(tmpDir, "dup_test_encrypted"));
+    const r1 = getSplitOutputPath(vol, "7z", "_encrypted");
+    expect(r1.folder).toBe(path.join(tmpDir, "dup_test_encrypted_1"));
+
+    fs.mkdirSync(path.join(tmpDir, "dup_test_encrypted_1"));
+    const r2 = getSplitOutputPath(vol, "7z", "_encrypted");
+    expect(r2.folder).toBe(path.join(tmpDir, "dup_test_encrypted_2"));
+  });
+
+  it("works with RAR .part1.rar paths", () => {
+    const vol = path.join(tmpDir, "rar_test.part1.rar");
+    touch(vol, 100);
+    const { dst, folder } = getSplitOutputPath(vol, "7z", "_decrypted");
+    expect(folder).toBe(path.join(tmpDir, "rar_test_decrypted"));
+    expect(dst).toBe(path.join(folder, "rar_test.7z"));
+  });
+
+  it("uses the resolved format extension in dst", () => {
+    const vol = path.join(tmpDir, "fmt_test.7z.001");
+    touch(vol, 100);
+    const { dst } = getSplitOutputPath(vol, "zip", "_encrypted");
+    expect(dst).toMatch(/\.zip$/);
   });
 });
