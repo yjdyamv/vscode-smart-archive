@@ -43,7 +43,7 @@ import * as fs from "fs";
 import * as os from "os";
 import { decompressWith7z, compressWith7z } from "../../engines/js7z-engine";
 import { detectSystem7z, spawnCapture } from "../../engines/system7z";
-import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt } from "../../constants";
+import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt, VOLUME_SIZES } from "../../constants";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
 import {
@@ -200,6 +200,46 @@ function getSplitVolumeBase(filePath: string): string {
   if (m2) return m2[1];
   const ext = getFullExt(filePath);
   return removeVolumeSuffix(filePath).replace(ext + "$", "");
+}
+
+/**
+ * Detects the volume size from the first volume file of a split archive
+ * and returns it as a volume-size string (e.g. "100m", "1g"),
+ * or undefined if detection fails.
+ */
+function detectVolumeSize(filePath: string): string | undefined {
+  const ext = getFullExt(filePath);
+  const dir = path.dirname(filePath);
+  const base = getSplitVolumeBase(filePath);
+
+  let firstVol: string;
+  if (/\.part\d+\.rar$/i.test(filePath)) {
+    firstVol = path.join(dir, base + ".part1" + ext);
+  } else if (/\.r\d{2}$/i.test(filePath)) {
+    firstVol = path.join(dir, base + ".r00");
+  } else {
+    firstVol = path.join(dir, base + ext + ".001");
+  }
+
+  if (!fs.existsSync(firstVol)) return undefined;
+
+  const bytes = fs.statSync(firstVol).size;
+  const UNIT_BYTES = { g: 1073741824, m: 1048576, k: 1024 } as const;
+
+  // Match against presets (allow 10% tolerance)
+  for (const preset of VOLUME_SIZES) {
+    const v = preset.value;
+    const unit = v.slice(-1).toLowerCase() as keyof typeof UNIT_BYTES;
+    const num = parseInt(v.slice(0, -1), 10);
+    const targetBytes = num * (UNIT_BYTES[unit] || 1);
+    const ratio = bytes / targetBytes;
+    if (ratio > 0.90 && ratio < 1.10) return preset.value;
+  }
+
+  // Fallback: approximate to nearest unit
+  if (bytes >= UNIT_BYTES.g * 0.8) return Math.round(bytes / UNIT_BYTES.g) + "g";
+  if (bytes >= UNIT_BYTES.m * 0.8) return Math.round(bytes / UNIT_BYTES.m) + "m";
+  return Math.round(bytes / UNIT_BYTES.k) + "k";
 }
 
 async function convertArchive(
@@ -758,14 +798,15 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
       return;
     }
     const ext = getFullExt(s.filePath);
-    const fmt = ext.slice(1);
+    let fmt = ext.slice(1);
+    fmt = (await resolveWritableFormat(fmt)) ?? "";
+    if (!fmt) return;
     let volSize: string | undefined;
     let dst: string;
     if (isSplitVolume(s.filePath)) {
-      volSize = await promptVolumeSize();
-      if (!volSize) return;
-      const base = removeVolumeSuffix(s.filePath);
-      const baseName = path.basename(base, ext);
+      volSize = detectVolumeSize(s.filePath);
+      const base = getSplitVolumeBase(s.filePath);
+      const baseName = path.basename(base);
       const dir = path.dirname(s.filePath);
       let folder = path.join(dir, baseName + "_encrypted");
       if (fs.existsSync(folder)) {
@@ -773,9 +814,9 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
         while (fs.existsSync(path.join(dir, `${baseName}_encrypted_${i}`))) i++;
         folder = path.join(dir, `${baseName}_encrypted_${i}`);
       }
-      dst = path.join(folder, path.basename(base));
+      dst = path.join(folder, baseName + "." + fmt);
     } else {
-      dst = uniquePath(s.filePath.slice(0, -ext.length) + "_encrypted" + ext);
+      dst = uniquePath(s.filePath.slice(0, -ext.length) + "_encrypted." + fmt);
     }
     webview.postMessage({ c: "loading", t: t("archive.encrypting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
@@ -802,14 +843,16 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
     let fmt = ext.slice(1);
     fmt = (await resolveWritableFormat(fmt)) ?? "";
     if (!fmt) return;
+    let volSize: string | undefined;
     let dst: string;
     if (isSplitVolume(s.filePath)) {
+      volSize = detectVolumeSize(s.filePath);
       dst = uniquePath(getSplitVolumeBase(s.filePath) + "_decrypted." + fmt);
     } else {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted." + fmt);
     }
     webview.postMessage({ c: "loading", t: t("archive.decrypting") });
-    await convertArchive(s.filePath, fmt, dst, pw, undefined, "");
+    await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
     logger.info({ event: "webview.decrypt.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: false });
