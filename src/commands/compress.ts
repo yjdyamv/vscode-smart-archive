@@ -150,7 +150,14 @@ function promptInputBox(opts: {
 const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
 
 async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
+  const config = vscode.workspace.getConfiguration("smart-archive");
+  const defaultFormat = config.get<string>("defaultFormat", "7z");
   const items = COMPRESS_FORMATS.map((f) => ({ label: f.label, description: f.description }));
+  const defaultIdx = items.findIndex((i) => i.label === defaultFormat);
+  if (defaultIdx > 0) {
+    const [def] = items.splice(defaultIdx, 1);
+    items.unshift(def);
+  }
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectFormat"),
     withBack: false,
