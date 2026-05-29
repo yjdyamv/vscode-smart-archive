@@ -184,22 +184,11 @@ async function promptLevelWizard(): Promise<StepResult<number>> {
 }
 
 async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
-  const config = vscode.workspace.getConfiguration("smart-archive");
-  const defaultSize = config.get<string>("defaultVolumeSize") || "";
   const items: { label: string; value: string | undefined }[] = [
     { label: t("compress.volume.none"), value: undefined },
     ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
-  if (defaultSize) {
-    const defaultIdx = items.findIndex((i) => i.value === defaultSize);
-    if (defaultIdx > 0) {
-      const [def] = items.splice(defaultIdx, 1);
-      items.splice(1, 0, def);
-    } else if (defaultIdx < 0) {
-      items.splice(1, 0, { label: `${defaultSize} (custom)`, value: defaultSize });
-    }
-  }
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectVolume"),
     title: t("wizard.step.volume"),
