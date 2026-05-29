@@ -76,7 +76,7 @@ all 7zip support and zstd.
 | `smart-archive.useSystemZstd` | `"auto"` | System zstd: `auto` (detect + fallback), `always`, `never` |
 | `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory name patterns kept collapsed by default in archive preview |
 | `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Glob patterns for files/dirs to exclude when compressing |
-| `smart-archive.defaultVolumeSize` | `""` | Default split volume size (e.g. `100m`, `1g`). Leave empty to skip. |
+| `smart-archive.volumeSizes` | `{…}` | Custom split volume size presets (label→value map). Leave `{}` to use built-in defaults. |
 
 ## Requirements
 

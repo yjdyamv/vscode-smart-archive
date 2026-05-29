@@ -114,30 +114,11 @@ export async function promptSavePath(
 }
 
 export async function promptVolumeSize(): Promise<string | undefined> {
-  const config = vscode.workspace.getConfiguration("smart-archive");
-  const defaultSize = config.get<string>("defaultVolumeSize") || "";
-
   const items = [
     { label: t("compress.volume.none"), value: undefined as string | undefined },
     ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
-
-  // Place the configured default at the top so it's highlighted and
-  // selected by default when the user presses Enter.
-  if (defaultSize) {
-    const defaultIdx = items.findIndex((i) => i.value === defaultSize);
-    if (defaultIdx > 0) {
-      const [def] = items.splice(defaultIdx, 1);
-      items.splice(1, 0, def);
-    } else if (defaultIdx < 0) {
-      // Custom default not in preset list — insert after "Don't split"
-      items.splice(1, 0, {
-        label: `${defaultSize} (custom)`,
-        value: defaultSize,
-      });
-    }
-  }
 
   const chosen = await vscode.window.showQuickPick(items, {
     placeHolder: t("compress.selectVolume"),

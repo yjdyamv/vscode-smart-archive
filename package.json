@@ -468,11 +468,6 @@
           },
           "description": "%config.volumeSizes.description%"
         },
-        "smart-archive.defaultVolumeSize": {
-          "type": "string",
-          "default": "",
-          "description": "%config.defaultVolumeSize.description%"
-        },
         "smart-archive.useSystem7z": {
           "type": "string",
           "default": "auto",
