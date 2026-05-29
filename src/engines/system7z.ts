@@ -29,6 +29,7 @@ import { logger } from "../utils/logger";
 import { validatePassword, checkFileSize } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
+import { toBinaryVolumeSize } from "../constants";
 
 // ── Detection (cached) ───────────────────────────────────────────────
 
@@ -425,7 +426,7 @@ export async function compressWithSystem7z(
     args.push(`-p${options.password}`);
     if (options.format.label === "7z") args.push("-mhe=on");
   }
-  if (options.volumeSize) args.push(`-v${options.volumeSize}`);
+  if (options.volumeSize) args.push(`-v${toBinaryVolumeSize(options.volumeSize)}`);
 
   if (excludePatterns && excludePatterns.length > 0) {
     for (const pat of excludePatterns) {

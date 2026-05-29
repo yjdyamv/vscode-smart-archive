@@ -191,9 +191,9 @@ async function promptLevelWizard(): Promise<StepResult<number>> {
 }
 
 async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
-  const items: { label: string; value: string | undefined }[] = [
+  const items: ({ label: string; value: string | undefined; description?: string })[] = [
     { label: t("compress.volume.none"), value: undefined },
-    ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value })),
+    ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value, description: v.description })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
   const res = await promptQuickPick(items, {
