@@ -24,7 +24,7 @@
   "config.maxTotalSize.description": "Maximum total decompressed size across all files. Supports units: k/m/g (e.g. '10g', '1g', '500m'). Integer values treated as MiB for backward compatibility. Default: '10g' (= 10 GiB).",
   "config.collapsedDirPatterns.description": "Directory name patterns to keep collapsed by default in the archive preview.",
   "config.compressExcludePatterns.description": "Glob patterns (gitignore syntax) for files/directories to exclude when compressing.",
-  "config.defaultVolumeSize.description": "Default split volume size (number + k/m/g suffix, e.g. 100m, 1g). Leave empty to skip splitting by default.",
+  "config.volumeSizes.description": "Custom split volume size presets (label → value).\n\n**Keys**: display labels shown in the size picker (e.g. `\"650M\"`, `\"1.44M\"`).\n\n**Values**: must be a **positive integer** followed by a **unit**:\n- `k` — KiB (e.g. `\"1440k\"`)\n- `m` — MiB (e.g. `\"25m\"`, `\"100m\"`)\n- `g` — GiB (e.g. `\"1g\"`, `\"2g\"`)\n\nDecimals and negative numbers are not valid (e.g. `\"1.5m\"`, `\"-100m\"` ✗).\n\nLeave empty `{}` to use the built-in presets.",
   "config.useSystem7z.description": "Whether to use a system-installed 7-Zip binary for compress/decompress operations. System 7-Zip is significantly faster and uses less memory, but requires a local installation.",
   "config.useSystem7z.auto": "Detect system 7-Zip automatically. If found and version >= 21, use it for faster compression; otherwise fall back to bundled WASM engine.",
   "config.useSystem7z.always": "Always use system 7-Zip. Show an error if 7-Zip is not installed or too old.",

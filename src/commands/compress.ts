@@ -17,7 +17,7 @@ import { compressWith7z } from "../engines/js7z-engine";
 import {
   COMPRESS_EXCLUDE_DEFAULTS,
   COMPRESS_FORMATS,
-  VOLUME_SIZES,
+  getVolumeSizes,
   getFullExt,
 } from "../constants";
 import { promptSavePath } from "../ui/prompts";
@@ -150,7 +150,14 @@ function promptInputBox(opts: {
 const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
 
 async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
+  const config = vscode.workspace.getConfiguration("smart-archive");
+  const defaultFormat = config.get<string>("defaultFormat", "7z");
   const items = COMPRESS_FORMATS.map((f) => ({ label: f.label, description: f.description }));
+  const defaultIdx = items.findIndex((i) => i.label === defaultFormat);
+  if (defaultIdx > 0) {
+    const [def] = items.splice(defaultIdx, 1);
+    items.unshift(def);
+  }
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectFormat"),
     withBack: false,
@@ -184,22 +191,11 @@ async function promptLevelWizard(): Promise<StepResult<number>> {
 }
 
 async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
-  const config = vscode.workspace.getConfiguration("smart-archive");
-  const defaultSize = config.get<string>("defaultVolumeSize") || "";
-  const items: { label: string; value: string | undefined }[] = [
+  const items: ({ label: string; value: string | undefined; description?: string })[] = [
     { label: t("compress.volume.none"), value: undefined },
-    ...VOLUME_SIZES.map((v) => ({ label: v.label, value: v.value })),
+    ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value, description: v.description })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
-  if (defaultSize) {
-    const defaultIdx = items.findIndex((i) => i.value === defaultSize);
-    if (defaultIdx > 0) {
-      const [def] = items.splice(defaultIdx, 1);
-      items.splice(1, 0, def);
-    } else if (defaultIdx < 0) {
-      items.splice(1, 0, { label: `${defaultSize} (custom)`, value: defaultSize });
-    }
-  }
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectVolume"),
     title: t("wizard.step.volume"),

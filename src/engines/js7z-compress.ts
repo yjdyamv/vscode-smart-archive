@@ -18,7 +18,7 @@ import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z } from "./js7z
 import { streamToVFS } from "./vfs-io";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
-import { isWrappedFormat, getWrapExtension } from "../constants";
+import { isWrappedFormat, getWrapExtension, toBinaryVolumeSize } from "../constants";
 import { zstdCompressFile } from "./zstd-codec";
 import { lz4CompressFile } from "./lz4-codec";
 import { brotliCompressFile } from "./brotli-codec";
@@ -49,7 +49,7 @@ function buildCompressArgs(
   args.push(`-mx${level}`);
   args.push("-mmt=on");
   if (volumeSize) {
-    args.push(`-v${volumeSize}`);
+    args.push(`-v${toBinaryVolumeSize(volumeSize)}`);
   }
   args.push(...inputPaths);
   return args;
