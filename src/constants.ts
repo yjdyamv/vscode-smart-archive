@@ -470,13 +470,42 @@ export const VOLUME_SIZES = [
 ];
 
 /**
+ * Convert a volume size from decimal-advertised units to safe binary units
+ * for use with 7z `-v`. Storage media (CD-R, DVD-R, HDD) use 1 MB = 1,000,000
+ * bytes while 7z uses 1 m = 1 MiB = 1,048,576 bytes.  Rounds down (floor) so
+ * the archive always fits inside the advertised media capacity.
+ *
+ * - `"1440k"` → `"1440k"` (k is identical in both systems)
+ * - `"650m"`  → `"619m"`  (650 MB decimal ≈ 619 MiB binary)
+ * - `"1g"`    → `"953m"`  (1 GB decimal ≈ 953 MiB binary, not an integer GiB)
+ */
+export function toBinaryVolumeSize(value: string): string {
+  const m = value.match(/^(\d+)(k|m|g)$/i);
+  if (!m) return value;
+  if (m[2].toLowerCase() === "k") return value;
+  const num = parseInt(m[1], 10);
+  const decimalBytes =
+    m[2].toLowerCase() === "g" ? num * 1_000_000_000 : num * 1_000_000;
+  const binaryMib = Math.floor(decimalBytes / 1_048_576);
+  return binaryMib > 0 ? `${binaryMib}m` : value;
+}
+
+function describeVolume(label: string, value: string): string | undefined {
+  const actual = toBinaryVolumeSize(value);
+  if (actual === value) return undefined;
+  return `actual: ${actual}`;
+}
+
+type VolumeSizeItem = { label: string; value: string; description?: string };
+
+/**
  * Returns the user-configured volume size presets, falling back to the
  * built-in VOLUME_SIZES when no explicit user config is set.
  *
  * Uses `inspect` so we only return values the user explicitly wrote,
  * avoiding unwanted merging with the package.json default.
  */
-export function getVolumeSizes(): { label: string; value: string }[] {
+export function getVolumeSizes(): VolumeSizeItem[] {
   const config = vscode.workspace.getConfiguration("smart-archive");
   const inspected = config.inspect<Record<string, string>>("volumeSizes");
   const userValue =
@@ -484,7 +513,14 @@ export function getVolumeSizes(): { label: string; value: string }[] {
     inspected?.workspaceValue ??
     inspected?.globalValue;
   if (userValue && Object.keys(userValue).length > 0) {
-    return Object.entries(userValue).map(([label, value]) => ({ label, value }));
+    return Object.entries(userValue).map(([label, value]) => ({
+      label,
+      value,
+      description: describeVolume(label, value),
+    }));
   }
-  return VOLUME_SIZES;
+  return VOLUME_SIZES.map((v) => ({
+    ...v,
+    description: describeVolume(v.label, v.value),
+  }));
 }
