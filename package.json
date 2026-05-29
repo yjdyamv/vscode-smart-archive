@@ -447,6 +447,27 @@
           ],
           "description": "%config.compressExcludePatterns.description%"
         },
+        "smart-archive.volumeSizes": {
+          "type": "object",
+          "default": {
+            "1.44M": "1440k",
+            "10M": "10m",
+            "25M": "25m",
+            "50M": "50m",
+            "100M": "100m",
+            "200M": "200m",
+            "650M": "650m",
+            "700M": "700m",
+            "1G": "1g",
+            "2G": "2g",
+            "4.7G": "4700m"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^\\d+[kmg]$"
+          },
+          "description": "%config.volumeSizes.description%"
+        },
         "smart-archive.defaultVolumeSize": {
           "type": "string",
           "default": "",

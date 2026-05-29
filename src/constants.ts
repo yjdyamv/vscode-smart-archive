@@ -12,6 +12,7 @@
 import type { FormatInfo } from "./types";
 import * as path from "path";
 import * as fs from "fs";
+import * as vscode from "vscode";
 import { isRarExt } from "./utils/rar";
 
 // ════════════════════════════════════════════════════════════════════
@@ -457,6 +458,7 @@ export const COMPRESS_EXCLUDE_DEFAULTS = NOISY_DIR_PATTERNS;
 export const VOLUME_SIZES = [
   { label: "1.44M", value: "1440k" },
   { label: "10M", value: "10m" },
+  { label: "25M", value: "25m" },
   { label: "50M", value: "50m" },
   { label: "100M", value: "100m" },
   { label: "200M", value: "200m" },
@@ -466,3 +468,23 @@ export const VOLUME_SIZES = [
   { label: "2G", value: "2g" },
   { label: "4.7G", value: "4700m" },
 ];
+
+/**
+ * Returns the user-configured volume size presets, falling back to the
+ * built-in VOLUME_SIZES when no explicit user config is set.
+ *
+ * Uses `inspect` so we only return values the user explicitly wrote,
+ * avoiding unwanted merging with the package.json default.
+ */
+export function getVolumeSizes(): { label: string; value: string }[] {
+  const config = vscode.workspace.getConfiguration("smart-archive");
+  const inspected = config.inspect<Record<string, string>>("volumeSizes");
+  const userValue =
+    inspected?.workspaceFolderValue ??
+    inspected?.workspaceValue ??
+    inspected?.globalValue;
+  if (userValue && Object.keys(userValue).length > 0) {
+    return Object.entries(userValue).map(([label, value]) => ({ label, value }));
+  }
+  return VOLUME_SIZES;
+}

@@ -17,7 +17,7 @@ import { compressWith7z } from "../engines/js7z-engine";
 import {
   COMPRESS_EXCLUDE_DEFAULTS,
   COMPRESS_FORMATS,
-  VOLUME_SIZES,
+  getVolumeSizes,
   getFullExt,
 } from "../constants";
 import { promptSavePath } from "../ui/prompts";
@@ -188,7 +188,7 @@ async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
   const defaultSize = config.get<string>("defaultVolumeSize") || "";
   const items: { label: string; value: string | undefined }[] = [
     { label: t("compress.volume.none"), value: undefined },
-    ...VOLUME_SIZES.map((v) => ({ label: v.label, value: v.value })),
+    ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
   if (defaultSize) {
