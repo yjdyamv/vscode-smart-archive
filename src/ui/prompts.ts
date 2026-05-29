@@ -14,7 +14,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import type { PasswordResult } from "../types";
-import { VOLUME_SIZES } from "../constants";
+import { getVolumeSizes } from "../constants";
 import { t } from "../i18n";
 
 /**
@@ -119,7 +119,7 @@ export async function promptVolumeSize(): Promise<string | undefined> {
 
   const items = [
     { label: t("compress.volume.none"), value: undefined as string | undefined },
-    ...VOLUME_SIZES.map((v) => ({ label: v.label, value: v.value })),
+    ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
 

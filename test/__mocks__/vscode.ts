@@ -17,6 +17,7 @@ export const window = {
 export const workspace = {
   getConfiguration: () => ({
     get: () => "auto",
+    inspect: () => undefined,
   }),
 };
 
