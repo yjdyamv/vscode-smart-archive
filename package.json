@@ -466,7 +466,7 @@
             "type": "string",
             "pattern": "^\\d+[kmg]$"
           },
-          "description": "%config.volumeSizes.description%"
+          "markdownDescription": "%config.volumeSizes.description%"
         },
         "smart-archive.useSystem7z": {
           "type": "string",
