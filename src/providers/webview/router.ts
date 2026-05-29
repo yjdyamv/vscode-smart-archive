@@ -43,7 +43,7 @@ import * as fs from "fs";
 import * as os from "os";
 import { decompressWith7z, compressWith7z } from "../../engines/js7z-engine";
 import { detectSystem7z, spawnCapture } from "../../engines/system7z";
-import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt, VOLUME_SIZES } from "../../constants";
+import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt, getVolumeSizes, toBinaryVolumeSize } from "../../constants";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
 import {
@@ -247,8 +247,8 @@ export function detectVolumeSize(filePath: string): string | undefined {
   const UNIT_BYTES = { g: 1073741824, m: 1048576, k: 1024 } as const;
 
   // Match against presets (allow 10% tolerance)
-  for (const preset of VOLUME_SIZES) {
-    const v = preset.value;
+  for (const preset of getVolumeSizes()) {
+    const v = toBinaryVolumeSize(preset.value);
     const unit = v.slice(-1).toLowerCase() as keyof typeof UNIT_BYTES;
     const num = parseInt(v.slice(0, -1), 10);
     const targetBytes = num * (UNIT_BYTES[unit] || 1);
