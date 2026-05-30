@@ -500,6 +500,27 @@ onMounted(() => {
       if (filtered.size !== selection.state.selected.size) {
         selection.state.selected = filtered;
       }
+      if (selection.state.lastAddDir) {
+        const dir = selection.state.lastAddDir;
+        if (!validPaths.has(dir)) {
+          let stillValid = false;
+          const prefix = dir + "/";
+          for (const p of validPaths) {
+            if (p.startsWith(prefix)) { stillValid = true; break; }
+          }
+          if (!stillValid) {
+            let idx = dir.lastIndexOf("/");
+            while (idx > 0) {
+              if (validPaths.has(dir.substring(0, idx))) {
+                stillValid = true;
+                break;
+              }
+              idx = dir.lastIndexOf("/", idx - 1);
+            }
+          }
+          if (!stillValid) selection.state.lastAddDir = "";
+        }
+      }
       const toastMsg = window._xToast;
       if (toastMsg) showToast(toastMsg, true);
       loadExpandedPaths();
@@ -510,6 +531,9 @@ onMounted(() => {
         totalDirs.value = dirs;
       }
       viewState.value = "empty";
+      if (selection.state.lastAddDir) {
+        selection.state.lastAddDir = "";
+      }
     }
   } catch (err) {
     viewState.value = "empty";
@@ -619,7 +643,7 @@ provide(
       :archive-name="archiveProps?.name ?? ''"
       @submit="submitPassword"
     />
-    <template v-else-if="viewState === 'content'">
+    <template v-else>
       <Toolbar
         :read-only="readOnly"
         :selected-count="selection.state.selected.size"
@@ -649,28 +673,49 @@ provide(
         @toggle-regex="onToggleRegex"
         @convert="convertFormat"
       />
+      <template v-if="viewState === 'content'">
+        <div
+          v-if="search.query.value.trim() && visibleFlatNodes.length === 0"
+          class="flex-1 flex flex-col items-center justify-center gap-2 text-[var(--vscode-descriptionForeground)] text-sm"
+        >
+          <div>No matching files</div>
+          <div class="text-xs opacity-50">Try adjusting your search terms or clear the query</div>
+        </div>
+        <FileTree
+          v-else
+          :flat-nodes="visibleFlatNodes"
+          :tree-data="treeData"
+          :selected="selection.state.selected"
+          :expanded="tree.expandedPaths.value"
+          :search-query="search.query.value"
+          :match-set="search.matchSet.value"
+          :loading-paths="tree.loadingPaths.value"
+          @row-click="handleRowClick"
+          @row-dblclick="handleRowDblClick"
+          @check-click="handleCheckClick"
+          @expand-click="handleExpandClick"
+          @context-menu="handleContextMenu"
+        />
+      </template>
       <div
-        v-if="search.query.value.trim() && visibleFlatNodes.length === 0"
-        class="flex-1 flex flex-col items-center justify-center gap-2 text-[var(--vscode-descriptionForeground)] text-sm"
-      >
-        <div>No matching files</div>
-        <div class="text-xs opacity-50">Try adjusting your search terms or clear the query</div>
-      </div>
-      <FileTree
         v-else
-        :flat-nodes="visibleFlatNodes"
-        :tree-data="treeData"
-        :selected="selection.state.selected"
-        :expanded="tree.expandedPaths.value"
-        :search-query="search.query.value"
-        :match-set="search.matchSet.value"
-        :loading-paths="tree.loadingPaths.value"
-        @row-click="handleRowClick"
-        @row-dblclick="handleRowDblClick"
-        @check-click="handleCheckClick"
-        @expand-click="handleExpandClick"
-        @context-menu="handleContextMenu"
-      />
+        class="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--vscode-descriptionForeground)]"
+      >
+        <template v-if="search.query.value.trim()">
+          <div class="empty-icon"><span class="codicon codicon-search"></span></div>
+          <div class="text-sm opacity-70">No matching files</div>
+          <div class="text-xs opacity-50 mt-1">
+            Try adjusting your search terms or clear the query
+          </div>
+        </template>
+        <template v-else>
+          <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
+          <div class="text-[1.1em] text-[var(--vscode-foreground)]">
+            {{ archiveProps?.name ?? "Archive" }}
+          </div>
+          <div class="text-sm opacity-70">No files to display</div>
+        </template>
+      </div>
       <StatusBar
         v-if="archiveProps"
         :name="archiveProps.name"
@@ -690,28 +735,6 @@ provide(
         @decrypt="decryptArchive"
       />
     </template>
-    <div
-      v-else
-      class="flex flex-col items-center justify-center h-full gap-3 text-[var(--vscode-descriptionForeground)]"
-    >
-      <template v-if="search.query.value.trim()">
-        <div class="empty-icon"><span class="codicon codicon-search"></span></div>
-        <div class="text-sm opacity-70">No matching files</div>
-        <div class="text-xs opacity-50 mt-1">
-          Try adjusting your search terms or clear the query
-        </div>
-      </template>
-      <template v-else>
-        <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
-        <div class="text-[1.1em] text-[var(--vscode-foreground)]">
-          {{ archiveProps?.name ?? "Archive" }}
-        </div>
-        <div class="text-sm opacity-70">No files to display</div>
-        <div v-if="!readOnly" class="text-xs opacity-50 mt-1">
-          Add files with the + button or extract existing content
-        </div>
-      </template>
-    </div>
 
     <Toast :msg="toast.msg" :ok="toast.ok" :visible="toast.show" />
     <ContextMenu
