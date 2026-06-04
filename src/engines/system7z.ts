@@ -387,7 +387,10 @@ export async function compressWithSystem7z(
       // Step 1: create tar with exclusions
       const tarArgs = ["a", "-ttar", "-mx0", tarPath];
       if (excludePatterns && excludePatterns.length > 0) {
-        for (const pat of excludePatterns) tarArgs.push(`-xr!${pat}`);
+        const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
+        for (const pat of excludePatterns) {
+          if (!targetNames.has(pat)) tarArgs.push(`-xr!${pat}`);
+        }
       }
       tarArgs.push("--", ...options.targets.map((tg) => tg.fsPath));
       logger.info({ event: "system7z.compress.tar", argsPreview: tarArgs.join(" ") });
@@ -429,8 +432,11 @@ export async function compressWithSystem7z(
   if (options.volumeSize) args.push(`-v${toBinaryVolumeSize(options.volumeSize)}`);
 
   if (excludePatterns && excludePatterns.length > 0) {
+    const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
     for (const pat of excludePatterns) {
-      args.push(`-xr!${pat}`);
+      if (!targetNames.has(pat)) {
+        args.push(`-xr!${pat}`);
+      }
     }
   }
 
