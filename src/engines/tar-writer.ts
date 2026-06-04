@@ -10,7 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { prepareExclusions, isPathExcluded, isTargetExcluded } from "../utils/exclude";
+import { prepareExclusions, isPathExcluded } from "../utils/exclude";
 import { logger } from "../utils/logger";
 
 const BLOCK = 512;
@@ -112,8 +112,6 @@ export async function createTarFile(
 
     for (const loc of localPaths) {
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
-
-      if (isTargetExcluded(loc, exclusions)) continue;
 
       const stat = fs.statSync(loc);
       const rel = path.relative(rootDir, loc).replace(/\\/g, "/");
