@@ -80,6 +80,7 @@ export async function decompressWith7z(
         fs.rmSync(tmpDir, { recursive: true, force: true });
       } catch {}
     }
+    await unwrapInnerTar(options.outputDir, progress);
     return;
   }
 
@@ -118,6 +119,7 @@ export async function decompressWith7z(
         fs.rmSync(tmpDir, { recursive: true, force: true });
       } catch {}
     }
+    await unwrapInnerTar(options.outputDir, progress);
     return;
   }
 
@@ -158,6 +160,7 @@ export async function decompressWith7z(
         fs.rmSync(tmpDir, { recursive: true, force: true });
       } catch {}
     }
+    await unwrapInnerTar(options.outputDir, progress);
     return;
   }
 
