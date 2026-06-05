@@ -139,11 +139,21 @@ export async function compressWith7z(
 
       try {
         prog.report({ message: t("compress.creatingTar") });
+        // Apply single-target exclusion filter for wrapped formats (tar.gz, etc.).
+        // Single target: skip patterns matching the target's basename to prevent
+        // excluding the only item the user selected (e.g. a folder named "node_modules").
+        // Multiple targets: keep all patterns — they filter noisy co-selected targets.
+        const filteredExcludes = singleTarget
+          ? (excludePatterns ?? []).filter((p) => {
+              const stripped = p.replace(/^(\*\*\/)+/, "");
+              return !targetNames.has(stripped);
+            })
+          : (excludePatterns ?? []);
         await createTarFile(
           tarDiskPath,
           options.targets.map((target) => target.fsPath),
           token,
-          excludePatterns,
+          filteredExcludes,
         );
         if (token?.isCancellationRequested) throw new vscode.CancellationError();
 

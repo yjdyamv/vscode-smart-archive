@@ -172,6 +172,12 @@ export function validateArchive(inputPath: string): string[] {
  *   });
  */
 export async function decompress(params: DecompressParams): Promise<string> {
+  // Early validation for clear error messages before entering the engine
+  const warnings = validateArchive(params.inputPath);
+  if (warnings.length > 0) {
+    throw new Error(warnings.join("\n"));
+  }
+
   const effectiveInput = resolveEffectiveInput(params.inputPath);
   const outputDir = params.outputDir ?? deriveOutputDir(effectiveInput);
 

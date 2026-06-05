@@ -360,8 +360,15 @@ export function isSplitVolume(filePath: string): boolean {
  * name "archive.7z". Returns null if not a recognised split-volume pattern.
  */
 export function getSplitVolumeBase(fileName: string): string | null {
+  // Standard split volumes: archive.7z.001, archive.zip.001, archive.wim.001
   const m = fileName.match(/(.+\.(?:7z|zip|wim))\.\d+$/i);
   if (m) return m[1];
+  // RAR split volumes: archive.part1.rar
+  const rarPart = fileName.match(/^(.+)\.part\d+\.rar$/i);
+  if (rarPart) return rarPart[1];
+  // RAR old-style: archive.r00
+  const rarOld = fileName.match(/^(.+)\.r\d{2}$/i);
+  if (rarOld) return rarOld[1];
   return null;
 }
 
