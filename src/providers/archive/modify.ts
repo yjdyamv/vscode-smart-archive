@@ -300,19 +300,17 @@ export async function previewFileFromArchive(
     fs.writeFileSync(tmpPath, buf);
   }
   const uri = vscode.Uri.file(tmpPath);
-  const doc = await vscode.workspace.openTextDocument(uri);
-  const cleanupDisposable = registerPreviewCleanup(tmpPath, doc.uri);
-  await vscode.window.showTextDocument(doc, {
+  await vscode.commands.executeCommand("vscode.open", uri, {
     preview: true,
     preserveFocus: false,
     viewColumn: vscode.ViewColumn.Beside,
   });
-  // Cleanup the listener after the tab is closed — the disposable is
-  // self-cleaning via onDidCloseTextDocument, but we also dispose it
-  // after a delay to avoid leaking listeners for files kept open.
+  // Best-effort cleanup when tab closes (works for text files; binary
+  // files are handled by pruneOldPreviews which caps at 100 files).
+  const cleanupDisposable = registerPreviewCleanup(tmpPath, uri);
   setTimeout(() => {
     try { cleanupDisposable.dispose(); } catch {}
-  }, 600_000); // 10 min safety timeout
+  }, 600_000);
   logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
 }
 
