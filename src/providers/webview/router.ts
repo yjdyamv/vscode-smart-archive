@@ -54,7 +54,7 @@ import {
   countAllStats,
 } from "../treeBuilder";
 import { contentHtml } from "../htmlRenderer";
-import { fetchFileList, JS7z, tryCleanupJS7z } from "../fileListing";
+import { fetchFileList, JS7z, disposeJS7z } from "../fileListing";
 import { streamToVFS } from "../../engines/vfs-io";
 import { extractSelected } from "../extraction";
 import {
@@ -302,7 +302,7 @@ async function verifyArchivePassword(
       });
       return ok;
     } finally {
-      tryCleanupJS7z(js7z);
+      disposeJS7z(js7z);
     }
   } catch {
     // Can't even instantiate WASM — let the password through

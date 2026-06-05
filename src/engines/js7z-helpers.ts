@@ -16,14 +16,8 @@ import { t } from "../i18n";
 import { logger } from "../utils/logger";
 import { streamToVFS } from "./vfs-io";
 
-function tryCleanup(instance: JS7zInstance): void {
-  try {
-    if (typeof instance.destroy === "function") instance.destroy();
-    else if (typeof instance._cleanup === "function") instance._cleanup();
-  } catch {
-    logger.warn({ event: "js7z.cleanup.failed" }, "Failed to clean up JS7z instance");
-  }
-}
+// Canonical cleanup re-exported from the pool module for convenience
+export { disposeJS7z } from "./js7z-pool";
 
 const INPUT_DIR = "/in";
 const OUTPUT_DIR = "/out";
@@ -118,4 +112,4 @@ function run7z(
   });
 }
 
-export { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z };
+export { INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z };

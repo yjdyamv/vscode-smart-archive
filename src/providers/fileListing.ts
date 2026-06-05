@@ -13,7 +13,7 @@ import type { JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { logger } from "../utils/logger";
-import { tryCleanup } from "../engines/js7z-helpers";
+import { disposeJS7z } from "../engines/js7z-pool";
 import { parse7zListing } from "../utils/parse7z";
 import { validatePassword, checkFileSize, checkTotalSize } from "../utils/security";
 import { t } from "../i18n";
@@ -163,14 +163,14 @@ async function listViaExtract(
         });
         return parse7zListing(stdout, innerName);
       } finally {
-        tryCleanup(js7z2);
+        disposeJS7z(js7z2);
       }
     }
 
     // js7z WASM doesn't support Brotli decompression. Decompress manually,
     // then feed the inner tar to 7z for listing.
     if (ext === ".tar.br" || ext === ".tbr") {
-      tryCleanup(js7z);
+      disposeJS7z(js7z);
       const innerTar = brotliDecompress(new Uint8Array(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.brotliDecompressed", size: innerTar.length });
@@ -197,7 +197,7 @@ async function listViaExtract(
         });
         return parse7zListing(stdout, innerName);
       } finally {
-        tryCleanup(js7z2);
+        disposeJS7z(js7z2);
       }
     }
 
@@ -248,7 +248,7 @@ async function listViaExtract(
         });
         return parse7zListing(stdout, innerTar);
       } finally {
-        tryCleanup(js7z2);
+        disposeJS7z(js7z2);
       }
     }
 
@@ -256,7 +256,7 @@ async function listViaExtract(
     const entries = nonTar.length > 0 ? nonTar : tarEntries;
     return readDirEntries(js7z, "/_ls", "", entries);
   } finally {
-    tryCleanup(js7z);
+    disposeJS7z(js7z);
   }
 }
 
@@ -291,7 +291,7 @@ function readDirEntries(
 
 export {
   JS7z,
-  tryCleanup as tryCleanupJS7z,
+  disposeJS7z,
   fetchFileList,
   listViaExtract,
   readDirEntries,

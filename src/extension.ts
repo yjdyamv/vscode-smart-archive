@@ -19,7 +19,6 @@ import {
   dispose as disposeExpandedState,
 } from "./providers/webview/expandedState";
 import { initTempCleanup } from "./providers/tempFiles";
-import { drainPool } from "./engines/js7z-pool";
 
 /**
  * Called when the extension is activated.
@@ -82,7 +81,6 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export function deactivate(): void {
   disposeExpandedState();
-  drainPool();
   logger.info({ event: "extension.deactivate" });
   logger.dispose();
 }

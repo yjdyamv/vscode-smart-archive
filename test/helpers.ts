@@ -82,6 +82,14 @@ export function run7z(j: JS7zInstance, args: string[]): Promise<void> {
 }
 
 export function disposeJS7z(j: JS7zInstance): void {
+  // Release WASM memory — same logic as the production disposeJS7z
+  try {
+    if (typeof j.destroy === "function") j.destroy();
+    else if (typeof (j as any)._cleanup === "function") (j as any)._cleanup();
+  } catch {
+    // best effort
+  }
+  // Null callbacks to prevent stale handlers from firing
   j.onExit = null;
   j.print = undefined;
   j.printErr = undefined;

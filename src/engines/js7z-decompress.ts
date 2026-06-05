@@ -12,7 +12,7 @@ import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
 import type { DecompressOptions } from "../types";
-import { tryCleanup, OUTPUT_DIR, run7z } from "./js7z-helpers";
+import { disposeJS7z, OUTPUT_DIR, run7z } from "./js7z-helpers";
 import { streamToVFS, checkArchiveInputSize } from "./vfs-io";
 import { copyDirFromFS } from "../utils/fs";
 import { t } from "../i18n";
@@ -24,7 +24,6 @@ import { getFullExt, getWrapExtension } from "../constants";
 import { brotliDecompressFile } from "./brotli-codec";
 import { lz4DecompressFile } from "./lz4-codec";
 import { zstdDecompress } from "./zstd-codec";
-import { acquirePooled, releasePooled } from "./js7z-pool";
 
 export async function decompressWith7z(
   options: DecompressOptions,
@@ -73,7 +72,7 @@ export async function decompressWith7z(
           copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
         }
       } finally {
-        tryCleanup(js7z);
+        disposeJS7z(js7z);
       }
       logger.info({ event: "decompress.complete", outputDir: options.outputDir });
     } finally {
@@ -111,7 +110,7 @@ export async function decompressWith7z(
           copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
         }
       } finally {
-        tryCleanup(js7z);
+        disposeJS7z(js7z);
       }
       logger.info({ event: "decompress.complete", outputDir: options.outputDir });
     } finally {
@@ -151,7 +150,7 @@ export async function decompressWith7z(
           copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
         }
       } finally {
-        tryCleanup(js7z);
+        disposeJS7z(js7z);
       }
       logger.info({ event: "decompress.complete", outputDir: options.outputDir });
     } finally {
@@ -198,9 +197,9 @@ export async function decompressWith7z(
 
     await unwrapInnerTar(options.outputDir, progress);
     logger.info({ event: "decompress.complete", outputDir: options.outputDir });
-        } finally {
-          releasePooled(js7z);
-        }
+  } finally {
+    disposeJS7z(js7z);
+  }
 }
 
 async function unwrapInnerTar(
@@ -264,7 +263,7 @@ async function unwrapInnerTar(
       // Only validate file size, not counting towards total — the extracted
       // contents are counted below via copyDirFromFS to avoid double-counting.
       checkFileSize(fs.statSync(tarPath).size);
-      const js7z = await acquirePooled();
+      const js7z = await JS7z();
 
       try {
         const innerFsPath = streamToVFS(js7z, tarPath);
@@ -293,7 +292,7 @@ async function unwrapInnerTar(
           );
         }
       } finally {
-        tryCleanup(js7z);
+        disposeJS7z(js7z);
       }
     }
 

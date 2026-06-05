@@ -14,7 +14,7 @@ import * as os from "os";
 import * as vscode from "vscode";
 import type { CompressOptions, FormatInfo, JS7zInstance } from "../types";
 import { JS7z } from "./js7z-factory";
-import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z } from "./js7z-helpers";
+import { disposeJS7z, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z } from "./js7z-helpers";
 import { streamToVFS } from "./vfs-io";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
@@ -173,7 +173,7 @@ export async function compressWith7z(
               js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }),
             );
           } finally {
-            tryCleanup(js7z2);
+            disposeJS7z(js7z2);
           }
         }
 
@@ -232,6 +232,6 @@ export async function compressWith7z(
 
     logger.info({ event: "compress.wasm.complete", outputPath: options.outputPath });
   } finally {
-    tryCleanup(js7z);
+    disposeJS7z(js7z);
   }
 }

@@ -9,7 +9,7 @@
  */
 
 import * as fs from "fs";
-import { tryCleanup } from "./js7z-helpers";
+import { disposeJS7z } from "./js7z-helpers";
 import { streamToVFS } from "./vfs-io";
 import { getBaseName } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
@@ -71,7 +71,7 @@ export async function listFiles(
     logger.debug({ event: "listFiles.done", count: results.length });
     return results;
   } finally {
-    tryCleanup(js7z);
+    disposeJS7z(js7z);
   }
 }
 
@@ -113,6 +113,6 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
       return msg.includes("encrypted") || msg.includes("wrong password");
     }
   } finally {
-    tryCleanup(js7z);
+    disposeJS7z(js7z);
   }
 }
