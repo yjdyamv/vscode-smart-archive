@@ -202,6 +202,21 @@ export async function decompressWith7z(
   }
 }
 
+/** Recursively sum file sizes in a directory. */
+function dirSize(dirPath: string): number {
+  let total = 0;
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      total += dirSize(full);
+    } else if (entry.isFile()) {
+      total += fs.statSync(full).size;
+    }
+  }
+  return total;
+}
+
 async function unwrapInnerTar(
   outputDir: string,
   progress?: vscode.Progress<{ message?: string }>,
@@ -262,12 +277,18 @@ async function unwrapInnerTar(
 
       // Only validate file size, not counting towards total — the extracted
       // contents are counted below via copyDirFromFS to avoid double-counting.
-      checkFileSize(fs.statSync(tarPath).size);
+      const tarStat = fs.statSync(tarPath);
+      checkFileSize(tarStat.size);
       const js7z = await JS7z();
 
       try {
         const innerFsPath = streamToVFS(js7z, tarPath);
         const usesMount = innerFsPath.startsWith("/mnt_");
+        // Snapshot existing entries before NODEFS extraction so we can
+        // measure newly extracted bytes for totalSize tracking.
+        const beforeEntries = usesMount
+          ? new Set(fs.readdirSync(outputDir).filter((e) => e !== "." && e !== ".."))
+          : null;
         let outPath: string;
         if (usesMount) {
           outPath = "/out_mnt_tar";
@@ -279,7 +300,25 @@ async function unwrapInnerTar(
         }
 
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
-        if (!usesMount) {
+        if (usesMount && beforeEntries) {
+          // Sum sizes of newly extracted entries to enforce maxTotalSize.
+          const afterEntries = fs.readdirSync(outputDir).filter(
+            (e) => e !== "." && e !== "..",
+          );
+          let extractedBytes = 0;
+          for (const name of afterEntries) {
+            if (beforeEntries.has(name) || name === tarFile) continue;
+            try {
+              extractedBytes += dirSize(path.join(outputDir, name));
+            } catch {
+              // best-effort — individual file validation guards against
+              // oversized files; this is a cumulative check.
+            }
+          }
+          if (extractedBytes > 0) {
+            totalSize = checkTotalSize(totalSize, extractedBytes);
+          }
+        } else if (!usesMount) {
           totalSize = checkTotalSize(totalSize, copyDirFromFS(js7z, "/_inner_out", outputDir));
         }
 

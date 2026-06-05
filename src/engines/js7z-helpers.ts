@@ -82,6 +82,8 @@ function run7z(
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
+        js7z.print = prevPrint;
+        js7z.printErr = prevPrintErr;
         logger.warn({ event: "run7z.timeout", timeoutMs }, "WASM 7z operation timed out");
         reject(new Error(`7z operation timed out after ${Math.round(timeoutMs / 1000)}s`));
       }
