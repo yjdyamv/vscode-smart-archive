@@ -760,9 +760,8 @@ describe("API wrapped format round-trips", () => {
   });
 
   // ── tar.gz / tar.bz2 / tar.xz / tar.zst —
-  //     system 7z decompression only unwraps outer layer,
-  //     producing a .tar instead of final files.
-  //     Verify that at least a .tar is produced. ─
+  //     system 7z decompresses outer layer + unwrapInnerTar extracts
+  //     inner tar → full round-trip now works. ─
 
   const PARTIAL_FORMATS: { label: string }[] = [
     { label: "tar.gz" },
@@ -772,10 +771,10 @@ describe("API wrapped format round-trips", () => {
   ];
 
   for (const fmt of PARTIAL_FORMATS) {
-    describe(`${fmt.label} (system 7z path — partial verification)`, () => {
-      it(`compresses and decompresses to .tar file for "${fmt.label}"`, async () => {
+    describe(`${fmt.label} (full round-trip)`, () => {
+      it(`single file round-trip for "${fmt.label}"`, async () => {
         const filePath = path.join(tmpDir, "data.txt");
-        fs.writeFileSync(filePath, "wrapped decompress test");
+        fs.writeFileSync(filePath, "wrapped round-trip test");
 
         const archivePath = path.join(tmpDir, `archive.${fmt.label}`);
         await compress({ targets: [filePath], format: fmt.label, outputPath: archivePath });
@@ -783,16 +782,10 @@ describe("API wrapped format round-trips", () => {
         expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
         const outDir = await decompress({ inputPath: archivePath });
-
-        // System 7z decompresses outer layer → produces .tar in output
-        // WASM path would unwrap the tar to final files
-        const entries = fs.readdirSync(outDir);
-        const tarFiles = entries.filter((e) => e.endsWith(".tar"));
-        const hasFiles = entries.some((e) => e !== ".smartarchive" && !e.endsWith(".tar"));
-        expect(tarFiles.length > 0 || hasFiles).toBe(true);
+        expect(fs.readFileSync(path.join(outDir, "data.txt"), "utf-8")).toBe("wrapped round-trip test");
       });
 
-      it(`multi-file "${fmt.label}" compress → decompress produces output`, async () => {
+      it(`multi-file directory round-trip for "${fmt.label}"`, async () => {
         const projDir = path.join(tmpDir, "proj");
         const srcDir = path.join(projDir, "src");
         fs.mkdirSync(srcDir, { recursive: true });
@@ -809,7 +802,8 @@ describe("API wrapped format round-trips", () => {
 
         const outDir = await decompress({ inputPath: archivePath });
         expect(fs.existsSync(outDir)).toBe(true);
-        expect(fs.readdirSync(outDir).length).toBeGreaterThan(0);
+        expect(fs.readFileSync(path.join(outDir, "proj", "readme.md"), "utf-8")).toBe("hello");
+        expect(fs.readFileSync(path.join(outDir, "proj", "src", "app.ts"), "utf-8")).toBe("type X = 1;");
       });
     });
   }
