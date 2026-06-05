@@ -17,8 +17,8 @@ import { compressWith7z } from "../engines/js7z-engine";
 import {
   COMPRESS_EXCLUDE_DEFAULTS,
   COMPRESS_FORMATS,
-  getVolumeSizes,
 } from "../constants";
+import { getVolumeSizes } from "../utils/volume-sizes";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
 import { t, compressLevels, formatDuration } from "../i18n";

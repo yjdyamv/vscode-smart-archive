@@ -39,6 +39,10 @@ export interface DecompressParams {
   password?: string;
   /** File extension override for format detection (e.g. "tar.gz"). Rarely needed. */
   ext?: string;
+  /** Optional progress callback. Receives progress messages (e.g. "45%"). */
+  onProgress?: (message: string) => void;
+  /** Optional AbortSignal to cancel a long-running operation. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -160,12 +164,30 @@ export function validateArchive(inputPath: string): string[] {
  * @example
  *   const outDir = await decompress({
  *     inputPath: "/downloads/archive.7z",
+ * @example
+ *   const outDir = await decompress({
+ *     inputPath: "/downloads/archive.7z",
  *     password: "secret",
+ *     onProgress: (msg) => console.log(msg),
  *   });
  */
 export async function decompress(params: DecompressParams): Promise<string> {
   const effectiveInput = resolveEffectiveInput(params.inputPath);
   const outputDir = params.outputDir ?? deriveOutputDir(effectiveInput);
+
+  // Adapt VSCode-agnostic callbacks to engine-compatible shapes
+  const progress = params.onProgress
+    ? ({ report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") } as any)
+    : undefined;
+
+  let token: any = undefined;
+  if (params.signal) {
+    const signal = params.signal;
+    token = {
+      get isCancellationRequested() { return signal.aborted; },
+      onCancellationRequested(cb: () => void) { signal.addEventListener("abort", cb, { once: true }); },
+    };
+  }
 
   logger.info({
     event: "api.decompress.start",
@@ -179,7 +201,7 @@ export async function decompress(params: DecompressParams): Promise<string> {
     password: params.password ?? "",
   };
 
-  await decompressWith7z(decompressOpts, undefined);
+  await decompressWith7z(decompressOpts, progress, token);
 
   logger.info({
     event: "api.decompress.done",

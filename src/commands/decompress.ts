@@ -22,7 +22,6 @@ import {
   DECOMPRESS_EXTENSIONS,
   getFullExt,
   isEncryptableExt,
-  isSplitVolume,
   resolveSplitVolume,
 } from "../constants";
 import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../utils/rar";
@@ -30,7 +29,7 @@ import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 import { promptOversizeFile } from "../utils/security";
-import { resolveEffectiveInput, validateArchive } from "../api/decompress";
+import { resolveEffectiveInput } from "../api/decompress";
 
 export async function decompressCommand(
   uri: vscode.Uri | undefined,
@@ -71,13 +70,11 @@ async function decompressSingleFile(
     return;
   }
 
-  // Redirect 7z/zip/wim .002+ → .001
-  if (isSplitVolume(inputPath) && !isRarVolume(ext)) {
-    const resolved = resolveSplitVolume(inputPath);
-    if (resolved) {
-      logger.info({ event: "decompress.splitVolume.redirect", from: inputPath, to: resolved });
-      return decompressSingleFile(vscode.Uri.file(resolved), batchIdx, batchTotal, knownPassword);
-    }
+  // Redirect 7z/zip/wim .002+ → .001 using API
+  const effectiveInput = resolveEffectiveInput(inputPath);
+  if (effectiveInput !== inputPath) {
+    logger.info({ event: "decompress.splitVolume.redirect", from: inputPath, to: effectiveInput });
+    return decompressSingleFile(vscode.Uri.file(effectiveInput), batchIdx, batchTotal, knownPassword);
   }
 
   if (isRarExt(ext)) {
