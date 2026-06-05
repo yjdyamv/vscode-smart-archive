@@ -13,6 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { JS7z, tryCleanupJS7z } from "./fileListing";
+import { acquirePooled, releasePooled } from "../engines/js7z-pool";
 import { streamToVFS } from "../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../constants";
 import { t } from "../i18n";
@@ -219,7 +220,7 @@ async function extractSelected(
       const innerTar = top.find((e: string) => e.endsWith(".tar"));
       if (!innerTar) throw new Error("Wrapped archive: no inner .tar found");
       const innerData = js7z.FS.readFile(`/_x1/${innerTar}`, { encoding: "binary" });
-      const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+      const js7z2 = await acquirePooled();
       try {
         js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
         js7z2.FS.mkdir("/_x2");
@@ -250,7 +251,7 @@ async function extractSelected(
         }
         vscode.window.showInformationMessage(t("decompress.done") + outputDir);
       } finally {
-        tryCleanupJS7z(js7z2);
+        releasePooled(js7z2);
       }
     } finally {
       tryCleanupJS7z(js7z);

@@ -41,7 +41,6 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { decompressWith7z, compressWith7z } from "../../engines/js7z-engine";
 import { detectSystem7z, spawnCapture } from "../../engines/system7z";
 import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt } from "../../constants";
 import { getVolumeSizes, toBinaryVolumeSize } from "../../utils/volume-sizes";
@@ -71,7 +70,7 @@ import { setCopiedPaths } from "../copyPaste";
 import { sanitizeTargetDir } from "../../utils/security";
 import { decompressWithKnownPassword } from "../../commands/decompress";
 import { promptVolumeSize } from "../../ui/prompts";
-import { handlerStates, type HandlerState } from "./state";
+import { handlerStates, type HandlerState, startOperation, endOperation } from "./state";
 import {
   getNoisyPatterns,
   isReadOnlyExt,
@@ -81,6 +80,7 @@ import {
 } from "./helpers";
 import { setupWebview } from "./setup";
 import { saveExpandedPaths, loadExpandedPaths } from "./expandedState";
+import { ArchiveService } from "../../services/archiveService";
 
 // ── Message type ──
 
@@ -263,53 +263,6 @@ export function detectVolumeSize(filePath: string): string | undefined {
   return Math.round(bytes / UNIT_BYTES.k) + "k";
 }
 
-async function convertArchive(
-  srcPath: string,
-  dstFormat: string,
-  dstPath: string,
-  password: string,
-  volumeSize?: string,
-  outputPassword?: string,
-): Promise<void> {
-  logger.info({ event: "convertArchive.start", srcPath, dstFormat, dstPath });
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_cvt_"));
-  try {
-    await decompressWith7z({ inputPath: srcPath, outputDir: tmp, password }, { report: () => {} });
-    if (volumeSize) {
-      fs.mkdirSync(path.dirname(dstPath), { recursive: true });
-    }
-    const entries = fs.readdirSync(tmp).map((e) => ({ fsPath: path.join(tmp, e) }));
-    const fmtInfo = COMPRESS_FORMATS.find((f) => f.label === dstFormat);
-    await compressWith7z(
-      {
-        targets: entries.length ? entries : [{ fsPath: tmp }],
-        format: fmtInfo ?? {
-          label: dstFormat,
-          description: "",
-          canCreate: true,
-          supportsEncryption: false,
-        },
-        outputPath: dstPath,
-        password: outputPassword ?? password,
-        level: vscode.workspace
-          .getConfiguration("smart-archive")
-          .get<number>("defaultCompressionLevel", 5),
-        volumeSize,
-      },
-      { report: () => {} },
-    );
-  } finally {
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    } catch (err) {
-      logger.warn(
-        { event: "convertArchive.cleanupFailed", err },
-        "Failed to cleanup temp directory",
-      );
-    }
-  }
-}
-
 // ── Message handlers ──
 
 /**
@@ -375,16 +328,15 @@ async function handlePassword(
     }
 
     // Listing succeeded — password is valid.
-    // For 7z, listing decrypts file headers so success proves the password.
-    // For zip, listing with wrong password still shows entries, but extraction
-    // will fail with a clear error if needed. The previous `7z t` second-pass
-    // caused false rejections on Windows due to stdin pipe race conditions.
+    // For 7z with header encryption (-mhe=on), listing decrypts file headers
+    // so success proves the password. For zip and other formats, listing may
+    // succeed with a wrong password (file table is not encrypted), so verify
+    // via 7z t for those formats only.
     logger.info({ event: "webview.password.ok", count: pwEntries.length });
     s.password = msg.pw;
 
-    // Verify password is actually correct for non-header-encrypted formats
-    // (7z listing succeeds with wrong password when only content is encrypted).
-    if (pwEntries.length > 0) {
+    const resolvedExt = getFullExt(s.filePath);
+    if (resolvedExt !== ".7z") {
       const valid = await verifyArchivePassword(s.filePath, msg.pw);
       if (!valid) {
         webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
@@ -738,49 +690,59 @@ async function handlePreview(
 
 async function handleConvert(webview: vscode.Webview, s: HandlerState): Promise<void> {
   logger.info({ event: "webview.convert", path: s.filePath });
+  const token = startOperation(s);
   try {
     const fmt = await promptConvertFormat();
-    if (!fmt) return;
+    if (!fmt) { endOperation(s); return; }
+    if (token.isCancellationRequested) throw new vscode.CancellationError();
     const oldExt = getFullExt(s.filePath);
     const dst = s.filePath.slice(0, -oldExt.length) + `.${fmt}`;
     webview.postMessage({ c: "loading", t: t("archive.converting") });
-    await convertArchive(s.filePath, fmt, dst, s.password ?? "");
+    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
     logger.info({ event: "webview.convert.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
+    if (err instanceof vscode.CancellationError) return;
     logger.error({ event: "webview.convert.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {
     webview.postMessage({ c: "loading", t: false });
+    endOperation(s);
   }
 }
 
 async function handleMerge(webview: vscode.Webview, s: HandlerState): Promise<void> {
   logger.info({ event: "webview.merge", path: s.filePath });
+  const token = startOperation(s);
   try {
     const ext = getFullExt(s.filePath);
     let fmt = ext.slice(1);
     fmt = (await resolveWritableFormat(fmt)) ?? "";
-    if (!fmt) return;
+    if (!fmt) { endOperation(s); return; }
+    if (token.isCancellationRequested) throw new vscode.CancellationError();
     const base = getSplitVolumeBase(s.filePath);
     const dst = base + "." + fmt;
     webview.postMessage({ c: "loading", t: t("archive.merging") });
-    await convertArchive(s.filePath, fmt, dst, s.password ?? "");
+    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
     logger.info({ event: "webview.merge.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
+    if (err instanceof vscode.CancellationError) return;
     logger.error({ event: "webview.merge.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {
     webview.postMessage({ c: "loading", t: false });
+    endOperation(s);
   }
 }
 
 async function handleSplit(webview: vscode.Webview, s: HandlerState): Promise<void> {
   logger.info({ event: "webview.split", path: s.filePath });
+  const token = startOperation(s);
   try {
     const volSize = await promptVolumeSize();
-    if (!volSize) return;
+    if (!volSize) { endOperation(s); return; }
+    if (token.isCancellationRequested) throw new vscode.CancellationError();
     const ext = getFullExt(s.filePath);
     const fmt = ext.slice(1);
     const dir = path.dirname(s.filePath);
@@ -794,34 +756,39 @@ async function handleSplit(webview: vscode.Webview, s: HandlerState): Promise<vo
     }
     const dst = path.join(folderPath, base);
     webview.postMessage({ c: "loading", t: t("archive.splitting") });
-    await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize);
+    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", volSize, undefined, token);
     logger.info({ event: "webview.split.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
   } catch (err) {
+    if (err instanceof vscode.CancellationError) return;
     logger.error({ event: "webview.split.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {
     webview.postMessage({ c: "loading", t: false });
+    endOperation(s);
   }
 }
 
 async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<void> {
   logger.info({ event: "webview.encrypt", path: s.filePath });
+  const token = startOperation(s);
   try {
     const newPw = await pwInputBox(t("archive.encryptPrompt"), (v) =>
       v ? undefined : t("security.passwordEmpty"),
     );
-    if (!newPw) return;
+    if (!newPw) { endOperation(s); return; }
     const confirmPw = await pwInputBox(t("archive.encryptConfirm"));
-    if (!confirmPw) return;
+    if (!confirmPw) { endOperation(s); return; }
     if (confirmPw !== newPw) {
       vscode.window.showErrorMessage(t("validation.passwordMismatch"));
+      endOperation(s);
       return;
     }
+    if (token.isCancellationRequested) throw new vscode.CancellationError();
     const ext = getFullExt(s.filePath);
     let fmt = ext.slice(1);
     fmt = (await resolveWritableFormat(fmt)) ?? "";
-    if (!fmt) return;
+    if (!fmt) { endOperation(s); return; }
     let volSize: string | undefined;
     let dst: string;
     if (isSplitVolume(s.filePath)) {
@@ -832,30 +799,34 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_encrypted." + fmt);
     }
     webview.postMessage({ c: "loading", t: t("archive.encrypting") });
-    await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw);
+    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", volSize, newPw, token);
     logger.info({ event: "webview.encrypt.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: true });
   } catch (err) {
+    if (err instanceof vscode.CancellationError) return;
     logger.error({ event: "webview.encrypt.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {
     webview.postMessage({ c: "loading", t: false });
+    endOperation(s);
   }
 }
 
 async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<void> {
   logger.info({ event: "webview.decrypt", path: s.filePath });
+  const token = startOperation(s);
   try {
     let pw = s.password;
     if (!pw) {
       pw = await pwInputBox(t("archive.decryptPrompt"));
-      if (!pw) return;
+      if (!pw) { endOperation(s); return; }
     }
+    if (token.isCancellationRequested) throw new vscode.CancellationError();
     const ext = getFullExt(s.filePath);
     let fmt = ext.slice(1);
     fmt = (await resolveWritableFormat(fmt)) ?? "";
-    if (!fmt) return;
+    if (!fmt) { endOperation(s); return; }
     let volSize: string | undefined;
     let dst: string;
     if (isSplitVolume(s.filePath)) {
@@ -866,15 +837,17 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_decrypted." + fmt);
     }
     webview.postMessage({ c: "loading", t: t("archive.decrypting") });
-    await convertArchive(s.filePath, fmt, dst, pw, volSize, "");
+    await ArchiveService.convert(s.filePath, fmt, dst, pw, volSize, "", token);
     logger.info({ event: "webview.decrypt.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: false });
   } catch (err) {
+    if (err instanceof vscode.CancellationError) return;
     logger.error({ event: "webview.decrypt.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {
     webview.postMessage({ c: "loading", t: false });
+    endOperation(s);
   }
 }
 

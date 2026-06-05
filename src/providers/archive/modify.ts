@@ -15,8 +15,10 @@ import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
 import { t } from "../../i18n";
-import { PREVIEW_TMP_DIR, pruneOldPreviews } from "../tempFiles";
+import { PREVIEW_TMP_DIR, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
 import { logger } from "../../utils/logger";
+
+const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024; // 100 MB hard limit for preview
 import { withWrappedArchive } from "./wrappedHelper";
 import { brotliDecompress } from "../../engines/brotli-codec";
 import {
@@ -282,6 +284,9 @@ export async function previewFileFromArchive(
   }
 
   const buf = Buffer.from(fileData);
+  if (buf.length > MAX_PREVIEW_FILE_SIZE) {
+    throw new Error(t("preview.fileTooLarge", String(buf.length), String(MAX_PREVIEW_FILE_SIZE)));
+  }
   fs.mkdirSync(PREVIEW_TMP_DIR, { recursive: true });
   const hash = crypto
     .createHash("sha256")
@@ -295,11 +300,19 @@ export async function previewFileFromArchive(
     fs.writeFileSync(tmpPath, buf);
   }
   const uri = vscode.Uri.file(tmpPath);
-  await vscode.commands.executeCommand("vscode.open", uri, {
+  const doc = await vscode.workspace.openTextDocument(uri);
+  const cleanupDisposable = registerPreviewCleanup(tmpPath, doc.uri);
+  await vscode.window.showTextDocument(doc, {
     preview: true,
     preserveFocus: false,
     viewColumn: vscode.ViewColumn.Beside,
   });
+  // Cleanup the listener after the tab is closed — the disposable is
+  // self-cleaning via onDidCloseTextDocument, but we also dispose it
+  // after a delay to avoid leaking listeners for files kept open.
+  setTimeout(() => {
+    try { cleanupDisposable.dispose(); } catch {}
+  }, 600_000); // 10 min safety timeout
   logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
 }
 
@@ -366,20 +379,42 @@ async function extractOneWithSystem7z(
       if (r2.code !== 0) throw new Error(`7z x inner exit ${r2.code}`);
     }
 
-    // Locate the extracted file — walk through subdirs if present
-    const findFile = (dir: string): string | null => {
-      const ents = fs.readdirSync(dir, { withFileTypes: true });
-      for (const e of ents) {
-        const full = path.join(dir, e.name);
-        if (e.isFile()) return full;
-        if (e.isDirectory()) {
-          const found = findFile(full);
-          if (found) return found;
+    // Locate the extracted file — try exact expected path first, then walk
+    const expectedPath = path.join(tmpDir, ...normalizedFile.split("/"));
+    let filePath: string | null = null;
+    if (fs.existsSync(expectedPath)) {
+      const st = fs.statSync(expectedPath);
+      if (st.isFile()) filePath = expectedPath;
+    }
+    if (!filePath) {
+      // Check inside single-subdirectory (e.g. _inner for wrapped formats)
+      const topDirs = fs.readdirSync(tmpDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory());
+      for (const d of topDirs) {
+        const candidate = path.join(tmpDir, d.name, ...normalizedFile.split("/"));
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+          filePath = candidate;
+          break;
         }
       }
-      return null;
-    };
-    const filePath = findFile(tmpDir);
+    }
+    if (!filePath) {
+      // Last resort: recursive walk
+      const findFile = (dir: string): string | null => {
+        const ents = fs.readdirSync(dir, { withFileTypes: true });
+        for (const e of ents) {
+          const full = path.join(dir, e.name);
+          if (e.name.endsWith(".tar")) continue; // skip inner tar artifacts
+          if (e.isFile()) return full;
+          if (e.isDirectory()) {
+            const found = findFile(full);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      filePath = findFile(tmpDir);
+    }
     if (!filePath) throw new Error("Extracted file not found");
 
     return new Uint8Array(fs.readFileSync(filePath)).buffer;

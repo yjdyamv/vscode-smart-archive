@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
-import { j7zCompressDir } from "./helpers";
+import { j7zCompressDir, disposeJS7z } from "./helpers";
 import type { JS7zInstance } from "./helpers";
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
@@ -55,14 +55,18 @@ describe("workspace compress save path", () => {
       print: (t: string) => (listing += t + "\n"),
       printErr: () => {},
     });
-    const raw = fs.readFileSync(insidePath);
-    j2.FS.writeFile("/_check.7z", new Uint8Array(raw));
-    await new Promise<void>((resolve, reject) => {
-      j2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
-      j2.callMain(["l", "-sccUTF-8", "/_check.7z"]);
-    });
-    expect(listing).toContain("index.ts");
-    expect(listing).toContain("README.md");
+    try {
+      const raw = fs.readFileSync(insidePath);
+      j2.FS.writeFile("/_check.7z", new Uint8Array(raw));
+      await new Promise<void>((resolve, reject) => {
+        j2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
+        j2.callMain(["l", "-sccUTF-8", "/_check.7z"]);
+      });
+      expect(listing).toContain("index.ts");
+      expect(listing).toContain("README.md");
+    } finally {
+      disposeJS7z(j2);
+    }
 
     fs.unlinkSync(insidePath);
     fs.rmSync(wsDir, { recursive: true, force: true });

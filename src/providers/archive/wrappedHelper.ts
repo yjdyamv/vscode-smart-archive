@@ -17,6 +17,13 @@ import { brotliCompress, brotliDecompress } from "../../engines/brotli-codec";
 import { lz4Compress, lz4Decompress } from "../../engines/lz4-codec";
 import { validatePassword } from "../../utils/security";
 import { t } from "../../i18n";
+import { acquirePooled, releasePooled } from "../../engines/js7z-pool";
+
+function getUserCompressionLevel(): number {
+  return vscode.workspace
+    .getConfiguration("smart-archive")
+    .get<number>("defaultCompressionLevel", 5);
+}
 
 /**
  * Run a mutation on a wrapped archive (tar.gz, tar.xz, etc.).
@@ -72,7 +79,7 @@ export async function withWrappedArchive(
     }
 
     const innerData = js7z.FS.readFile(`${tmpDir}/${innerTarName}`, { encoding: "binary" });
-    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
+    const js7z2 = await acquirePooled();
     try {
       js7z2.FS.writeFile("/inner.tar", new Uint8Array(innerData));
 
@@ -83,34 +90,31 @@ export async function withWrappedArchive(
 
       let compressedData: Uint8Array;
       if (wrapExt === "zst") {
-        compressedData = await zstdCompress(new Uint8Array(modifiedTar), 5);
+        compressedData = await zstdCompress(new Uint8Array(modifiedTar), getUserCompressionLevel());
       } else if (wrapExt === "lz4") {
         compressedData = await lz4Compress(new Uint8Array(modifiedTar));
       } else if (wrapExt === "br") {
-        compressedData = brotliCompress(new Uint8Array(modifiedTar), 5);
+        compressedData = brotliCompress(new Uint8Array(modifiedTar), getUserCompressionLevel());
       } else {
-        const js7z3 = await JS7z({ print: () => {}, printErr: () => {} });
-        try {
-          js7z3.FS.writeFile("/_re.tar", new Uint8Array(modifiedTar));
-          const compOut = `/_re.${wrapExt}`;
-          const compArgs = ["a", compOut, "/_re.tar"];
-          if (password) {
-            validatePassword(password);
-            compArgs.splice(1, 0, `-p${password}`);
-          }
-          await new Promise<void>((resolve, reject) => {
-            js7z3.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
-            js7z3.callMain(compArgs);
-          });
-          compressedData = new Uint8Array(js7z3.FS.readFile(compOut, { encoding: "binary" }));
-        } finally {
-          tryCleanupJS7z(js7z3);
+        // Reuse js7z2 for recompression — its VFS already has the modified
+        // inner tar, so run 7z a directly instead of creating a third instance.
+        js7z2.FS.writeFile("/_re.tar", new Uint8Array(modifiedTar));
+        const compOut = `/_re.${wrapExt}`;
+        const compArgs = ["a", compOut, "/_re.tar"];
+        if (password) {
+          validatePassword(password);
+          compArgs.splice(1, 0, `-p${password}`);
         }
+        await new Promise<void>((resolve, reject) => {
+          js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
+          js7z2.callMain(compArgs);
+        });
+        compressedData = new Uint8Array(js7z2.FS.readFile(compOut, { encoding: "binary" }));
       }
 
       await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), compressedData);
     } finally {
-      tryCleanupJS7z(js7z2);
+      releasePooled(js7z2);
     }
   } finally {
     tryCleanupJS7z(js7z);

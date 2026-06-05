@@ -13,6 +13,8 @@ import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { getBaseName } from "../utils/path";
 import { t } from "../i18n";
+import { checkFileSize } from "../utils/security";
+import { logger } from "../utils/logger";
 
 const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
 const CHUNK = 100 * 1024 * 1024;
@@ -91,6 +93,79 @@ function streamSplitVolumes(
 
   const firstNum = matchPartNum(parts[0], pattern.pattern);
   return pattern.targetForPart(vfsPath, parts[0], firstNum);
+}
+
+/**
+ * Calculate the total size of all parts in a split volume archive.
+ * Returns 0 when the file is not a split volume (caller uses fs.statSync).
+ */
+export function calcSplitVolumeTotalSize(filePath: string): number {
+  const dir = path.dirname(filePath);
+
+  // 7z/zip/wim split volumes
+  const splitMatch = filePath.match(/^(.+\.(?:7z|zip|wim))\.(\d+)$/i);
+  if (splitMatch) {
+    const base = path.basename(splitMatch[1]);
+    const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^${escaped}\\.(\\d+)$`, "i");
+    let total = 0;
+    for (const f of fs.readdirSync(dir)) {
+      if (re.test(f)) {
+        total += fs.statSync(path.join(dir, f)).size;
+      }
+    }
+    if (total > 0) return total;
+  }
+
+  // RAR .partN.rar volumes
+  const rarPart = filePath.match(/^(.+)\.part(\d+)\.rar$/i);
+  if (rarPart) {
+    const base = path.basename(rarPart[1]);
+    const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^${escaped}\\.part(\\d+)\\.rar$`, "i");
+    let total = 0;
+    for (const f of fs.readdirSync(dir)) {
+      if (re.test(f)) {
+        total += fs.statSync(path.join(dir, f)).size;
+      }
+    }
+    const rarBase = path.join(dir, `${path.basename(rarPart[1])}.rar`);
+    if (fs.existsSync(rarBase)) total += fs.statSync(rarBase).size;
+    if (total > 0) return total;
+  }
+
+  // RAR .rNN volumes
+  const rarVol = filePath.match(/^(.+)\.(r(?:ar|\d{2}))$/i);
+  if (rarVol && /^r\d{2}$/i.test(rarVol[2])) {
+    const base = path.basename(rarVol[1]);
+    const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^${escaped}\\.r(\\d{2})$`, "i");
+    let total = 0;
+    for (const f of fs.readdirSync(dir)) {
+      if (re.test(f)) {
+        total += fs.statSync(path.join(dir, f)).size;
+      }
+    }
+    const rarBase = path.join(dir, `${path.basename(rarVol[1])}.rar`);
+    if (fs.existsSync(rarBase)) total += fs.statSync(rarBase).size;
+    if (total > 0) return total;
+  }
+
+  return 0;
+}
+
+/**
+ * Check that the archive input (including all split volume parts) does not
+ * exceed the configured maximum file size. Call before starting decompression.
+ */
+export function checkArchiveInputSize(filePath: string): void {
+  const totalSplit = calcSplitVolumeTotalSize(filePath);
+  if (totalSplit > 0) {
+    logger.info({ event: "vfsio.checkArchiveInputSize", totalBytes: totalSplit, filePath });
+    checkFileSize(totalSplit);
+  } else {
+    checkFileSize(fs.statSync(filePath).size);
+  }
 }
 
 export function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): string {

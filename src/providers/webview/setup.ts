@@ -86,24 +86,30 @@ export async function setupWebview(
   // For encryptable formats, detect encryption before listing files
   // to avoid leaking file structure from unencrypted ZIP headers.
   let isEnc = false;
+  let encryptionDetectionFailed = false;
   if (isEncryptableExt(getFullExt(filePath))) {
     let encrypted = false;
     try {
       encrypted = await isEncrypted(filePath);
     } catch {
+      encryptionDetectionFailed = true;
       logger.warn(
         { event: "setupWebview.isEncrypted.failed" },
         "isEncrypted failed, may be multi-volume archive",
       );
+      // For encryptable formats where detection failed (e.g. split volumes),
+      // try with the cached password first; if no password, treat as encrypted
+      // to show the password prompt (safer than leaking unencrypted content).
     }
     if (encrypted) isEnc = true;
 
-    if (encrypted && password) {
+    if ((encrypted || encryptionDetectionFailed) && password) {
       logger.info({ event: "setupWebview.password.retry" });
       try {
         const pwEntries = await fetchFileList(filePath, password);
         if (pwEntries.length > 0) {
           encrypted = false;
+          isEnc = false;
           logger.info({ event: "setupWebview.password.retrySuccess", count: pwEntries.length });
         }
       } catch {
@@ -111,7 +117,7 @@ export async function setupWebview(
       }
     }
 
-    if (encrypted) {
+    if (encrypted || (encryptionDetectionFailed && !password)) {
       logger.info({ event: "setupWebview.passwordRequired" });
       handlerStates.set(webview, {
         archiveUri,
@@ -121,6 +127,7 @@ export async function setupWebview(
         entries: [],
         entryIndex: new Map(),
         isEncrypted: true,
+        cancelSource: null,
       });
       webview.html = contentHtml(
         [],
@@ -175,6 +182,7 @@ export async function setupWebview(
     entries,
     entryIndex,
     isEncrypted: isEnc,
+    cancelSource: null,
   });
   // Lazy root-only build for fast initial load.
   // Noisy dirs (node_modules etc.) stay collapsed — no loading triggered.
@@ -189,7 +197,8 @@ export async function setupWebview(
   const itemCount = stats.total;
   const roExt = resolvedExt;
   const roToast =
-    [".deb", ".rpm"].includes(roExt) || isSplitVolume(filePath) ? t("archive.readOnly") : toast;
+    [".deb", ".rpm"].includes(roExt) || isSplitVolume(filePath) ? t("archive.readOnly") : undefined;
+  const finalToast = toast ?? roToast;
   webview.html = contentHtml(
     tree,
     fileCount,
@@ -204,7 +213,7 @@ export async function setupWebview(
       size: formatCompactSize(totalSize),
     },
     patterns,
-    roToast,
+    finalToast,
   );
 
   // Collect window flags for a single script injection

@@ -31,6 +31,7 @@ import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded } from "../utils/exclude";
+import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
 
 // ── Detection (cached) ───────────────────────────────────────────────
 
@@ -495,7 +496,7 @@ export async function decompressWithSystem7z(
   const sz = getSystem7zOrNull();
   if (!sz) throw new Error("System 7-Zip not available");
 
-  checkFileSize(fs.statSync(options.inputPath).size);
+  checkArchiveInputSize(options.inputPath);
   fs.mkdirSync(options.outputDir, { recursive: true });
 
   const args: string[] = ["x", `-o${options.outputDir}`, "-mmt=on"];
@@ -511,7 +512,7 @@ export async function decompressWithSystem7z(
     event: "system7z.decompress.start",
     input: options.inputPath,
     output: options.outputDir,
-    sizeBytes: fs.statSync(options.inputPath).size,
+    sizeBytes: calcSplitVolumeTotalSize(options.inputPath) || fs.statSync(options.inputPath).size,
     encrypted: !!options.password,
     argsPreview: args.filter((a) => !a.startsWith("-p")).join(" "),
   });
