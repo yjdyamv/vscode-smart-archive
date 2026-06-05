@@ -39,6 +39,10 @@ export interface CompressParams {
   volumeSize?: string;
   /** Glob/name patterns to exclude (defaults to COMPRESS_EXCLUDE_DEFAULTS) */
   excludePatterns?: string[];
+  /** Optional progress callback. Receives progress messages (e.g. "45%"). */
+  onProgress?: (message: string) => void;
+  /** Optional AbortSignal to cancel a long-running operation. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -147,12 +151,38 @@ export function buildCompressOptions(params: CompressParams): CompressOptions {
  *     format: "7z",
  *     password: "secret",
  *     level: 9,
+ * @param signal - Optional AbortSignal to cancel a long-running operation.
+ *
+ * @returns The absolute path to the created archive file.
+ * @throws On format errors, password validation failures, or 7z errors.
+ *
+ * @example
+ *   const outPath = await compress({
+ *     targets: ["/home/user/project"],
+ *     format: "7z",
+ *     password: "secret",
+ *     level: 9,
  *     excludePatterns: ["node_modules", ".git"],
+ *     onProgress: (msg) => console.log(msg),
  *   });
  */
 export async function compress(params: CompressParams): Promise<string> {
   const compressOpts = buildCompressOptions(params);
   const excludePatterns = params.excludePatterns ?? COMPRESS_EXCLUDE_DEFAULTS;
+
+  // Adapt VSCode-agnostic callbacks to engine-compatible shapes
+  const progress = params.onProgress
+    ? ({ report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") } as any)
+    : undefined;
+
+  let token: any = undefined;
+  if (params.signal) {
+    const signal = params.signal;
+    token = {
+      get isCancellationRequested() { return signal.aborted; },
+      onCancellationRequested(cb: () => void) { signal.addEventListener("abort", cb, { once: true }); },
+    };
+  }
 
   logger.info({
     event: "api.compress.start",
@@ -162,7 +192,7 @@ export async function compress(params: CompressParams): Promise<string> {
     outputPath: compressOpts.outputPath,
   });
 
-  await compressWith7z(compressOpts, undefined, undefined, excludePatterns);
+  await compressWith7z(compressOpts, progress, token, excludePatterns);
 
   logger.info({
     event: "api.compress.done",

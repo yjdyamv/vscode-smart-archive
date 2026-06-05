@@ -14,7 +14,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import type { PasswordResult } from "../types";
-import { getVolumeSizes } from "../constants";
+import { getVolumeSizes } from "../utils/volume-sizes";
 import { t } from "../i18n";
 
 /**

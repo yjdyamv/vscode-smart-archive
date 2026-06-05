@@ -29,7 +29,7 @@ import { logger } from "../utils/logger";
 import { validatePassword, checkFileSize } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
-import { toBinaryVolumeSize } from "../constants";
+import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded } from "../utils/exclude";
 
 // ── Detection (cached) ───────────────────────────────────────────────

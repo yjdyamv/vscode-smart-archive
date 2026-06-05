@@ -43,7 +43,8 @@ import * as fs from "fs";
 import * as os from "os";
 import { decompressWith7z, compressWith7z } from "../../engines/js7z-engine";
 import { detectSystem7z, spawnCapture } from "../../engines/system7z";
-import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt, getVolumeSizes, toBinaryVolumeSize } from "../../constants";
+import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt } from "../../constants";
+import { getVolumeSizes, toBinaryVolumeSize } from "../../utils/volume-sizes";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
 import {

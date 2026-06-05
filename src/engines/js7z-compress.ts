@@ -18,7 +18,8 @@ import { tryCleanup, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z } from "./js7z
 import { streamToVFS } from "./vfs-io";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
-import { isWrappedFormat, getWrapExtension, toBinaryVolumeSize } from "../constants";
+import { isWrappedFormat, getWrapExtension } from "../constants";
+import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { zstdCompressFile } from "./zstd-codec";
 import { lz4CompressFile } from "./lz4-codec";
 import { brotliCompressFile } from "./brotli-codec";
