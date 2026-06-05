@@ -84,10 +84,12 @@ function writeVolumeFiles(js7z: JS7zInstance, vfsDir: string, outputPath: string
 
 export async function compressWith7z(
   options: CompressOptions,
-  progress: vscode.Progress<{ message?: string }>,
+  progress?: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
   excludePatterns?: string[],
 ): Promise<void> {
+  const prog = progress ?? { report: () => {} };
+
   if (hasSystem7zForFormat(options.format.label)) {
     logger.info({ event: "compress.usingSystem7z", format: options.format.label });
     await compressWithSystem7z(options, progress, token, excludePatterns);
@@ -96,12 +98,24 @@ export async function compressWith7z(
 
   logger.info({ event: "compress.wasm.fallback", format: options.format.label });
 
-  progress.report({ message: t("compress.initEngine") });
+  prog.report({ message: t("compress.initEngine") });
 
   const js7z = await JS7z();
 
-  // Convert gitignore patterns to 7z -xr! flags
-  const excludeArgs = (excludePatterns ?? []).map((p) => "-xr!" + p.replace(/^(\*\*\/)+/, ""));
+  // Convert gitignore patterns to 7z -xr! flags.
+  // Single target: skip patterns matching the target's basename (prevents
+  //   excluding the one item the user explicitly chose, e.g. a folder named "output").
+  // Multiple targets: keep ALL patterns — they filter noisy targets like
+  //   node_modules/.git that the user selected alongside real code.
+  const singleTarget = options.targets.length === 1;
+  const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
+  const excludeArgs = (excludePatterns ?? [])
+    .filter((p) => {
+      if (!singleTarget) return true;
+      const stripped = p.replace(/^(\*\*\/)+/, "");
+      return !targetNames.has(stripped);
+    })
+    .map((p) => "-xr!" + p.replace(/^(\*\*\/)+/, ""));
 
   try {
     const localPaths = options.targets.map((target) => target.fsPath);
@@ -123,7 +137,7 @@ export async function compressWith7z(
       const tarDiskPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
 
       try {
-        progress.report({ message: t("compress.creatingTar") });
+        prog.report({ message: t("compress.creatingTar") });
         await createTarFile(
           tarDiskPath,
           options.targets.map((target) => target.fsPath),
@@ -134,22 +148,22 @@ export async function compressWith7z(
 
         let compressedData: Uint8Array | undefined;
         if (wrapExt === "zst") {
-          progress.report({ message: t("compress.compressingTar", wrapExt) });
+          prog.report({ message: t("compress.compressingTar", wrapExt) });
           const zstOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.zst");
           await zstdCompressFile(tarDiskPath, zstOut, options.level);
           compressedData = new Uint8Array(fs.readFileSync(zstOut));
         } else if (wrapExt === "lz4") {
-          progress.report({ message: t("compress.compressingTar", wrapExt) });
+          prog.report({ message: t("compress.compressingTar", wrapExt) });
           const lz4Out = path.join(path.dirname(tarDiskPath), "_tmp.tar.lz4");
           await lz4CompressFile(tarDiskPath, lz4Out, options.level);
           compressedData = new Uint8Array(fs.readFileSync(lz4Out));
         } else if (wrapExt === "br") {
-          progress.report({ message: t("compress.compressingTar", wrapExt) });
+          prog.report({ message: t("compress.compressingTar", wrapExt) });
           const brOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.br");
           await brotliCompressFile(tarDiskPath, brOut, options.level);
           compressedData = new Uint8Array(fs.readFileSync(brOut));
         } else {
-          progress.report({ message: t("compress.compressingTar", wrapExt) });
+          prog.report({ message: t("compress.compressingTar", wrapExt) });
           const js7z2 = await JS7z();
           try {
             streamToVFS(js7z2, tarDiskPath, `/${innerName}`);
@@ -178,23 +192,22 @@ export async function compressWith7z(
     }
 
     // Non-wrapped formats: copy inputs to VFS for 7z
-    progress.report({ message: t("compress.readingFiles") });
+    prog.report({ message: t("compress.readingFiles") });
 
-    const exclusions = prepareExclusions(excludePatterns ?? []);
-    const filteredPaths = localPaths.filter((lp) => {
-      if (isTargetExcluded(lp, exclusions)) {
-        logger.info({ event: "compress.skipTarget", path: lp, name: path.basename(lp) });
-        return false;
-      }
-      return true;
-    });
+    // Multi-target: pre-filter targets matching exclusion patterns
+    // (e.g. node_modules, .git selected alongside src at project root)
+    let filteredPaths = localPaths;
+    if (!singleTarget && excludePatterns?.length) {
+      const exclusions = prepareExclusions(excludePatterns);
+      filteredPaths = localPaths.filter((lp) => !isTargetExcluded(lp, exclusions));
+    }
 
     js7z.FS.mkdir(INPUT_DIR);
     js7z.FS.mkdir(OUTPUT_DIR);
 
     const allInputPaths = copyInputsToFS(js7z, filteredPaths, token);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    progress.report({ message: t("compress.addedItems", String(localPaths.length)) });
+    prog.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
     const args = buildCompressArgs(
       archiveFsPath,

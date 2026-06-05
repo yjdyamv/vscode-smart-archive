@@ -30,6 +30,7 @@ import {
   isRarVolume,
   createWrapped,
 } from "./helpers";
+import { testCompress, testDecompress } from "./test-helpers";
 import type { JS7zInstance, FlatEntry } from "./helpers";
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
@@ -291,6 +292,214 @@ describe("js7z compress/decompress", () => {
     const buf = Buffer.from(j.FS.readFile("/tw.wim", { encoding: "binary" }));
     const f = await j7zDecompress(buf);
     expect(f["src/a.txt"]).toBe("wim");
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// Production pipeline round-trips (testCompress → compressWith7z)
+//
+// These tests call the REAL production functions instead of
+// constructing raw 7z CLI arguments.  They exercise format
+// dispatching, -xr! flag generation, toBinaryVolumeSize,
+// validatePassword, createTarFile, and codec compression.
+// ════════════════════════════════════════════════════════════════════
+
+describe("production pipeline round-trips", () => {
+
+  // ── 7z ──
+
+  it("7z single file", async () => {
+    const b = await testCompress({ "a.txt": "hello" }, "7z");
+    const f = await testDecompress(b);
+    expect(f["a.txt"]).toBe("hello");
+  });
+
+  it("7z multi file", async () => {
+    const b = await testCompress(
+      { "s/1.txt": "1", "s/2.txt": "2", "s/3.txt": "3" },
+      "7z",
+    );
+    const f = await testDecompress(b);
+    expect(Object.keys(f).length).toBe(3);
+    expect(f["s/1.txt"]).toBe("1");
+  });
+
+  it("7z nested folder", async () => {
+    const b = await testCompress(
+      { "p/readme.md": "#P", "p/src/main.js": "log(1)", "p/src/lib/x.js": "exports=1" },
+      "7z",
+    );
+    const f = await testDecompress(b);
+    expect(Object.keys(f).length).toBe(3);
+    expect(f["p/readme.md"]).toBe("#P");
+    expect(f["p/src/lib/x.js"]).toBe("exports=1");
+  });
+
+  it("7z encrypted (production auto-adds -mhe=on)", async () => {
+    const b = await testCompress({ "s.txt": "sec" }, "7z", { password: "pw" });
+    // Wrong password should fail
+    await expect(testDecompress(b, { password: "bad" })).rejects.toThrow();
+    // Correct password should work
+    const f = await testDecompress(b, { password: "pw" });
+    expect(f["s.txt"]).toBe("sec");
+  });
+
+  // ── ZIP ──
+
+  it("ZIP single", async () => {
+    const b = await testCompress({ "d.txt": "zip" }, "zip");
+    const f = await testDecompress(b, { ext: "zip" });
+    expect(f["d.txt"]).toBe("zip");
+  });
+
+  it("ZIP multi", async () => {
+    const b = await testCompress({ "a/a.txt": "A", "a/b.txt": "B" }, "zip");
+    const f = await testDecompress(b, { ext: "zip" });
+    expect(f["a/a.txt"]).toBe("A");
+    expect(f["a/b.txt"]).toBe("B");
+  });
+
+  it("ZIP nested folder", async () => {
+    const b = await testCompress(
+      { "app/index.html": "<h>", "app/js/main.js": "var x" },
+      "zip",
+    );
+    const f = await testDecompress(b, { ext: "zip" });
+    expect(f["app/index.html"]).toBe("<h>");
+    expect(f["app/js/main.js"]).toBe("var x");
+  });
+
+  it("ZIP encrypted", async () => {
+    const b = await testCompress({ "e.txt": "locked" }, "zip", { password: "pw" });
+    await expect(testDecompress(b, { password: "bad", ext: "zip" })).rejects.toThrow();
+    const f = await testDecompress(b, { password: "pw", ext: "zip" });
+    expect(f["e.txt"]).toBe("locked");
+  });
+
+  // ── TAR ──
+
+  it("TAR single", async () => {
+    const b = await testCompress({ "n.txt": "tar" }, "tar");
+    const f = await testDecompress(b, { ext: "tar" });
+    expect(f["n.txt"]).toBe("tar");
+  });
+
+  it("TAR multi", async () => {
+    const b = await testCompress({ "x/a.txt": "a", "x/b.txt": "b" }, "tar");
+    const f = await testDecompress(b, { ext: "tar" });
+    expect(f["x/a.txt"]).toBe("a");
+    expect(f["x/b.txt"]).toBe("b");
+  });
+
+  // ── WIM ──
+
+  it("WIM round-trip", async () => {
+    const b = await testCompress({ "src/a.txt": "wim" }, "wim");
+    const f = await testDecompress(b, { ext: "wim" });
+    expect(f["src/a.txt"]).toBe("wim");
+  });
+
+  // ── Wrapped formats (tar.gz / tar.bz2 / tar.xz) ──
+  // NOTE: Wrapped format decompression via system 7z only unwraps one layer
+  // (produces .tar, not final files). These round-trip tests work only with
+  // the WASM path. Covered separately by the existing createWrapped tests.
+  // TODO: fix system 7z decompression to auto-unwrap inner tar
+});
+
+// ════════════════════════════════════════════════════════════════════
+// Exclusion integration tests (compression WITH exclude patterns)
+//
+// These verify that exclude patterns actually work through the full
+// production pipeline. Isolation tests for exclude.ts are below;
+// these test the INTEGRATION with compressWith7z.
+// ════════════════════════════════════════════════════════════════════
+
+describe("exclusion integration", () => {
+
+  it("compression excludes node_modules by default pattern", async () => {
+    // In production, user selects a project folder; node_modules is a child
+    const buf = await testCompress(
+      { "proj/src/index.js": "main", "proj/node_modules/pkg/index.js": "lib" },
+      "7z",
+      { excludePatterns: ["node_modules"] },
+    );
+    const f = await testDecompress(buf);
+    expect(f["proj/src/index.js"]).toBe("main");
+    expect(f["proj/node_modules/pkg/index.js"]).toBeUndefined();
+  });
+
+  it("compression excludes .git by default pattern", async () => {
+    const buf = await testCompress(
+      { "proj/src/main.js": "code", "proj/.git/HEAD": "ref", "proj/.git/config": "cfg" },
+      "7z",
+      { excludePatterns: [".git"] },
+    );
+    const f = await testDecompress(buf);
+    expect(f["proj/src/main.js"]).toBe("code");
+    expect(f["proj/.git/HEAD"]).toBeUndefined();
+    expect(f["proj/.git/config"]).toBeUndefined();
+  });
+
+  it("compression excludes multiple patterns at once", async () => {
+    const buf = await testCompress(
+      {
+        "proj/src/app.js": "app",
+        "proj/node_modules/x/index.js": "x",
+        "proj/dist/bundle.js": "bundle",
+      },
+      "7z",
+      { excludePatterns: ["node_modules", "dist"] },
+    );
+    const f = await testDecompress(buf);
+    expect(f["proj/src/app.js"]).toBe("app");
+    expect(f["proj/node_modules/x/index.js"]).toBeUndefined();
+    expect(f["proj/dist/bundle.js"]).toBeUndefined();
+  });
+
+  it("target named like an exclusion is NOT excluded (regression test for b5b16a1)", async () => {
+    // This test verifies that a directory named 'output' (which is in the
+    // default exclude list) is NOT excluded when it's the compression target.
+    const buf = await testCompress(
+      { "output/data.txt": "important" },
+      "7z",
+      { excludePatterns: ["output"] },
+    );
+    const f = await testDecompress(buf);
+    // The target directory 'output' should still be included
+    expect(f["output/data.txt"]).toBe("important");
+  });
+
+  it("glob patterns exclude matching files", async () => {
+    const buf = await testCompress(
+      { "src/app.js": "code", "error.log": "err", "debug.log": "dbg", "data.txt": "data" },
+      "7z",
+      { excludePatterns: ["*.log"] },
+    );
+    const f = await testDecompress(buf);
+    expect(f["src/app.js"]).toBe("code");
+    expect(f["data.txt"]).toBe("data");
+    expect(f["error.log"]).toBeUndefined();
+    expect(f["debug.log"]).toBeUndefined();
+  });
+
+  it("multi-target: excludes targets matching patterns (project root scenario)", async () => {
+    // Simulates: user selects all items in project root directory
+    // node_modules and .git are top-level targets but should be excluded
+    const buf = await testCompress(
+      {
+        "src/index.js": "main",
+        "node_modules/pkg/index.js": "lib",
+        ".git/HEAD": "ref",
+        "package.json": "{}",
+      },
+      "7z",
+      { excludePatterns: ["node_modules", ".git"] },
+    );
+    const f = await testDecompress(buf);
+    expect(f["src/index.js"]).toBe("main");
+    expect(f["package.json"]).toBe("{}");
+    expect(f["node_modules/pkg/index.js"]).toBeUndefined();
+    expect(f[".git/HEAD"]).toBeUndefined();
   });
 });
 

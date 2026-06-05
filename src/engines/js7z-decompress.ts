@@ -26,9 +26,10 @@ import { lz4DecompressFile } from "./lz4-codec";
 
 export async function decompressWith7z(
   options: DecompressOptions,
-  progress: vscode.Progress<{ message?: string }>,
+  progress?: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
 ): Promise<void> {
+  const prog = progress ?? { report: () => {} };
   logger.info({
     event: "decompress.start",
     inputPath: options.inputPath,
@@ -43,7 +44,7 @@ export async function decompressWith7z(
 
   const ext = getFullExt(options.inputPath);
   if (getWrapExtension(ext) === "br") {
-    progress.report({ message: t("decompress.unwrapTar") });
+    prog.report({ message: t("decompress.unwrapTar") });
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sab_"));
     const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
     try {
@@ -61,7 +62,7 @@ export async function decompressWith7z(
           js7z.FS.mkdir(OUTPUT_DIR);
           outPath = OUTPUT_DIR;
         }
-        progress.report({ message: t("decompress.inProgress") });
+        prog.report({ message: t("decompress.inProgress") });
         await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
         if (token?.isCancellationRequested) throw new vscode.CancellationError();
         if (!usesMount) {
@@ -80,7 +81,7 @@ export async function decompressWith7z(
   }
 
   if (getWrapExtension(ext) === "lz4") {
-    progress.report({ message: t("decompress.unwrapTar") });
+    prog.report({ message: t("decompress.unwrapTar") });
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sal_"));
     const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
     try {
@@ -98,7 +99,7 @@ export async function decompressWith7z(
           js7z.FS.mkdir(OUTPUT_DIR);
           outPath = OUTPUT_DIR;
         }
-        progress.report({ message: t("decompress.inProgress") });
+        prog.report({ message: t("decompress.inProgress") });
         await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
         if (token?.isCancellationRequested) throw new vscode.CancellationError();
         if (!usesMount) {
@@ -116,7 +117,7 @@ export async function decompressWith7z(
     return;
   }
 
-  progress.report({ message: t("decompress.initEngine") });
+  prog.report({ message: t("decompress.initEngine") });
 
   const js7z = await JS7z();
 
@@ -142,7 +143,7 @@ export async function decompressWith7z(
       extractArgs.splice(1, 0, `-p${options.password}`);
     }
 
-    progress.report({ message: t("decompress.inProgress") });
+    prog.report({ message: t("decompress.inProgress") });
 
     await run7z(js7z, extractArgs, progress);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
@@ -159,8 +160,9 @@ export async function decompressWith7z(
 
 async function unwrapInnerTar(
   outputDir: string,
-  progress: vscode.Progress<{ message?: string }>,
+  progress?: vscode.Progress<{ message?: string }>,
 ): Promise<void> {
+  const prog = progress ?? { report: () => {} };
   const tarPatterns = [
     ".tar",
     ".tar.gz",
@@ -212,7 +214,7 @@ async function unwrapInnerTar(
         return;
       }
       const tarPath = path.join(outputDir, tarFile);
-      progress.report({ message: t("decompress.unwrapTar") });
+      prog.report({ message: t("decompress.unwrapTar") });
 
       // Only validate file size, not counting towards total — the extracted
       // contents are counted below via copyDirFromFS to avoid double-counting.
