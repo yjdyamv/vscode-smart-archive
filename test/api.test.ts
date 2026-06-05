@@ -828,29 +828,6 @@ describe("API decompress flows", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function makeArchive(files: Record<string, string>, format: string, password?: string): string {
-    const stageDir = path.join(tmpDir, "_src");
-    fs.mkdirSync(stageDir, { recursive: true });
-    for (const [relPath, content] of Object.entries(files)) {
-      const normalized = relPath.replace(/^\/+/, "").replace(/\\/g, "/");
-      const fullPath = path.join(stageDir, ...normalized.split("/"));
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, content);
-    }
-
-    // Get top-level entries as targets
-    const topLevel = new Set<string>();
-    for (const fp of Object.keys(files)) {
-      const normalized = fp.replace(/^\/+/, "").replace(/\\/g, "/");
-      topLevel.add(normalized.split("/")[0]);
-    }
-    const targets = [...topLevel].map((seg) => path.join(stageDir, seg));
-    const archivePath = path.join(tmpDir, `_test.${format}`);
-    fs.writeFileSync(archivePath, ""); // placeholder
-
-    return archivePath;
-  }
-
   it("resolves outputDir automatically", async () => {
     const archivePath = path.join(tmpDir, "test.7z");
     fs.writeFileSync(path.join(tmpDir, "a.txt"), "a");
