@@ -170,7 +170,6 @@ async function listViaExtract(
     // js7z WASM doesn't support Brotli decompression. Decompress manually,
     // then feed the inner tar to 7z for listing.
     if (ext === ".tar.br" || ext === ".tbr") {
-      disposeJS7z(js7z);
       const innerTar = brotliDecompress(new Uint8Array(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.brotliDecompressed", size: innerTar.length });

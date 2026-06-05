@@ -84,6 +84,25 @@ function streamSplitVolumes(
 
   if (parts.length === 0) return undefined;
 
+  // Copy the extra base file first (e.g. .rar for RAR .rNN split volumes).
+  // Must be done before the parts so 7z finds it when opening the first volume.
+  if (pattern.extraBaseFile) {
+    const firstPart = parts[0];
+    // Strip known split-volume suffixes to get the base name for the callback.
+    const baseName = firstPart
+      .replace(/\.r\d{2}$/i, "")
+      .replace(/\.part\d+\.rar$/i, "");
+    const basePath = pattern.extraBaseFile(dir, baseName);
+    if (basePath) {
+      // Place the base file in VFS alongside the split parts with the
+      // matching naming convention (e.g. archive.rar next to archive.r00).
+      const baseTarget = vfsPath
+        ? vfsPath.replace(/\.r\d{2}$/i, ".rar").replace(/\.part\d+\.rar$/i, ".rar")
+        : `/${path.basename(basePath)}`;
+      copyToVFS(js7z, basePath, baseTarget);
+    }
+  }
+
   for (const partName of parts) {
     const partPath = path.join(dir, partName);
     const partNum = matchPartNum(partName, pattern.pattern);

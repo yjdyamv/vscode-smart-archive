@@ -167,6 +167,7 @@ export async function compressWith7z(
           prog.report({ message: t("compress.compressingTar", wrapExt) });
           const js7z2 = await JS7z();
           try {
+            js7z2.FS.mkdir(OUTPUT_DIR);
             streamToVFS(js7z2, tarDiskPath, `/${innerName}`);
             await run7z(js7z2, ["a", archiveFsPath, `/${innerName}`, "-mmt=on"], progress);
             compressedData = new Uint8Array(
@@ -180,6 +181,8 @@ export async function compressWith7z(
         if (token?.isCancellationRequested) throw new vscode.CancellationError();
         if (compressedData) {
           fs.writeFileSync(options.outputPath, Buffer.from(compressedData));
+        } else {
+          throw new Error(t("compress.failed") + path.basename(options.outputPath));
         }
       } finally {
         try {
