@@ -30,6 +30,7 @@ import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 import { promptOversizeFile } from "../utils/security";
+import { resolveEffectiveInput, validateArchive } from "../api/decompress";
 
 export async function decompressCommand(
   uri: vscode.Uri | undefined,

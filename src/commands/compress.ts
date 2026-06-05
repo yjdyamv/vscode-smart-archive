@@ -18,12 +18,12 @@ import {
   COMPRESS_EXCLUDE_DEFAULTS,
   COMPRESS_FORMATS,
   getVolumeSizes,
-  getFullExt,
 } from "../constants";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
 import { t, compressLevels, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
+import { lookupFormat, resolveSaveName } from "../api/compress";
 
 // ── Shared helpers for back-navigable QuickPick / InputBox ──
 
@@ -166,7 +166,7 @@ async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
   if (res.kind !== "ok") return res;
   return {
     kind: "ok",
-    value: COMPRESS_FORMATS.find((f) => f.label === res.value.label)!,
+    value: lookupFormat(res.value.label),
   };
 }
 
@@ -253,17 +253,7 @@ async function promptSaveNameWizard(defaultName: string, ext: string): Promise<S
     },
   });
   if (res.kind !== "ok") return res;
-  // Strip ALL trailing compound extensions (e.g. .tar.lz4.tar.lz4 → clean),
-  // then re-append the format ext.
-  let clean = res.value.trim();
-  let prev = "";
-  while (prev !== clean) {
-    prev = clean;
-    const e = getFullExt(clean) || path.extname(clean);
-    if (!e) break;
-    clean = path.basename(clean, e);
-  }
-  return { kind: "ok", value: `${clean}.${ext}` };
+  return { kind: "ok", value: resolveSaveName(res.value, ext) };
 }
 
 // ── Main command ──
