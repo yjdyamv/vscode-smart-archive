@@ -43,6 +43,8 @@ export function initAddToArchive(
       { event: "addToArchive.init.overwritten", prevArchive: _pendingAdd.archivePath },
       "Pending add state overwritten — previous request was never executed",
     );
+    // Cancel the previous pending operation by clearing its state
+    _pendingAdd.webview?.postMessage({ c: "loading", t: false });
   }
   _pendingAdd = { archivePath, targetDir, password, webview, archiveUri, onComplete };
 }

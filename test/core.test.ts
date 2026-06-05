@@ -29,11 +29,32 @@ import {
   isRarExt,
   isRarVolume,
   createWrapped,
+  disposeJS7z,
 } from "./helpers";
 import { testCompress, testDecompress } from "./test-helpers";
 import type { JS7zInstance, FlatEntry } from "./helpers";
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
+
+// Track all WASM instances created in each test so they can be
+// cleaned up in afterEach, preventing vitest worker OOM crashes.
+const _activeInstances: JS7zInstance[] = [];
+const trackedJS7z = async (opts?: Record<string, unknown>): Promise<JS7zInstance> => {
+  const instance = await JS7z(opts);
+  _activeInstances.push(instance);
+  return instance;
+};
+
+beforeEach(() => {
+  _activeInstances.length = 0;
+});
+
+afterEach(() => {
+  for (const j of _activeInstances) {
+    disposeJS7z(j);
+  }
+  _activeInstances.length = 0;
+});
 
 const zstd: {
   init: () => Promise<void>;
@@ -285,7 +306,7 @@ describe("js7z compress/decompress", () => {
   // ── WIM ──
 
   it("WIM create + extract", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.mkdir("/src");
     j.FS.writeFile("/src/a.txt", new Uint8Array(Buffer.from("wim")));
     await run7z(j, ["a", "-twim", "/tw.wim", "/src"]);
@@ -600,7 +621,7 @@ describe("security", () => {
 
 describe("CJK encoding", () => {
   it("virtual FS preserves Chinese filenames", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.mkdir("/in");
     const cjkName = "中文文件.txt";
     j.FS.writeFile("/in/" + cjkName, new Uint8Array(Buffer.from("hello")));
@@ -611,12 +632,12 @@ describe("CJK encoding", () => {
   });
 
   it("archive round-trip via FS basename", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.mkdir("/in");
     const cjkName = "中文文件.txt";
     j.FS.writeFile("/in/" + cjkName, new Uint8Array(Buffer.from("world")));
     await run7z(j, ["a", "/cjk.7z", "/in/" + cjkName]);
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     const buf = Buffer.from(j.FS.readFile("/cjk.7z", { encoding: "binary" }));
     j2.FS.writeFile("/cjk.7z", new Uint8Array(buf));
     await run7z(j2, ["l", "-slt", "/cjk.7z"]);
@@ -641,7 +662,7 @@ describe("encryption detection", () => {
   it("listing succeeds with correct password", async () => {
     const b = await j7zCompressDir({ "/f.txt": "secret" }, "/enc2.7z", ["-pp4ss", "-mhe=on"]);
     let out = "";
-    const j = await JS7z({
+    const j = await trackedJS7z({
       print: (t: string) => (out += t + "\n"),
       printErr: () => {},
     });
@@ -744,7 +765,7 @@ describe("tree builder", () => {
 
 describe("add-to-archive", () => {
   it("individual file paths lose dir structure", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.mkdir("/subdir");
     j.FS.writeFile("/subdir/a.txt", new Uint8Array(Buffer.from("a")));
     j.FS.writeFile("/subdir/b.txt", new Uint8Array(Buffer.from("b")));
@@ -757,7 +778,7 @@ describe("add-to-archive", () => {
   });
 
   it("passing a directory preserves structure", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.mkdir("/subdir");
     j.FS.writeFile("/subdir/a.txt", new Uint8Array(Buffer.from("a")));
     j.FS.writeFile("/subdir/b.txt", new Uint8Array(Buffer.from("b")));
@@ -769,7 +790,7 @@ describe("add-to-archive", () => {
   });
 
   it("single file in directory preserves dir name", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.mkdir("/subdir");
     j.FS.writeFile("/subdir/a.txt", new Uint8Array(Buffer.from("a")));
     await run7z(j, ["a", "/test.7z", "-aot", "/subdir"]);
@@ -779,7 +800,7 @@ describe("add-to-archive", () => {
   });
 
   it("deeply nested dir via first-level directory", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     mkdirP(j, "/a/b/c");
     j.FS.writeFile("/a/b/c/d.txt", new Uint8Array(Buffer.from("deep")));
     j.FS.writeFile("/a/b/e.txt", new Uint8Array(Buffer.from("e")));
@@ -791,7 +812,7 @@ describe("add-to-archive", () => {
   });
 
   it("root-level files via individual paths", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/a.txt", new Uint8Array(Buffer.from("a")));
     j.FS.writeFile("/b.txt", new Uint8Array(Buffer.from("b")));
     await run7z(j, ["a", "/test.7z", "-aot", "/a.txt", "/b.txt"]);
@@ -802,12 +823,12 @@ describe("add-to-archive", () => {
   });
 
   it("createFolder: new directory with .smartarchive marker", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/f.txt", new Uint8Array(Buffer.from("x")));
     await run7z(j, ["a", "/test.7z", "/f.txt"]);
     let buf = Buffer.from(j.FS.readFile("/test.7z", { encoding: "binary" }));
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     j2.FS.writeFile("/test.7z", new Uint8Array(buf));
     mkdirP(j2, "/sub/newdir");
     j2.FS.writeFile("/sub/newdir/.smartarchive", new Uint8Array(Buffer.from(".")));
@@ -840,12 +861,12 @@ describe("add-to-archive", () => {
 
 describe("rename", () => {
   it("simple file rename via 7z rn", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/old.txt", new Uint8Array(Buffer.from("hello")));
     await run7z(j, ["a", "/test.7z", "/old.txt"]);
     let buf = Buffer.from(j.FS.readFile("/test.7z", { encoding: "binary" }));
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     j2.FS.writeFile("/test.7z", new Uint8Array(buf));
     await run7z(j2, ["rn", "/test.7z", "old.txt", "new.txt"]);
     buf = Buffer.from(j2.FS.readFile("/test.7z", { encoding: "binary" }));
@@ -856,13 +877,13 @@ describe("rename", () => {
   });
 
   it("file in subdirectory", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     mkdirP(j, "/sub");
     j.FS.writeFile("/sub/old.txt", new Uint8Array(Buffer.from("x")));
     await run7z(j, ["a", "/test.7z", "/sub"]);
     let buf = Buffer.from(j.FS.readFile("/test.7z", { encoding: "binary" }));
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     j2.FS.writeFile("/test.7z", new Uint8Array(buf));
     await run7z(j2, ["rn", "/test.7z", "sub/old.txt", "sub/new.txt"]);
     buf = Buffer.from(j2.FS.readFile("/test.7z", { encoding: "binary" }));
@@ -873,14 +894,14 @@ describe("rename", () => {
   });
 
   it("move to different directory", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     mkdirP(j, "/a");
     mkdirP(j, "/b");
     j.FS.writeFile("/a/file.txt", new Uint8Array(Buffer.from("move")));
     await run7z(j, ["a", "/test.7z", "/a", "/b"]);
     let buf = Buffer.from(j.FS.readFile("/test.7z", { encoding: "binary" }));
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     j2.FS.writeFile("/test.7z", new Uint8Array(buf));
     await run7z(j2, ["rn", "/test.7z", "a/file.txt", "b/file.txt"]);
     buf = Buffer.from(j2.FS.readFile("/test.7z", { encoding: "binary" }));
@@ -953,41 +974,57 @@ describe("wrapped format round-trips", () => {
   for (const ext of ["tar.gz", "tar.bz2", "tar.xz"] as const) {
     it(`${ext} round-trip`, async () => {
       const files = { "/d/a.txt": "hello", "/d/b.txt": "world", "/e/c.txt": "nested" };
-      const j = await JS7z();
-      for (const [fp, content] of Object.entries(files)) {
-        mkdirP(j, path.posix.dirname(fp));
-        j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
+      const j = await trackedJS7z();
+      try {
+        for (const [fp, content] of Object.entries(files)) {
+          mkdirP(j, path.posix.dirname(fp));
+          j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
+        }
+        const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
+
+        await run7z(j, ["a", "/_t.tar", ...tops]);
+        const tarBuf = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+
+        const j2 = await trackedJS7z();
+        try {
+          j2.FS.writeFile("/_t.tar", new Uint8Array(tarBuf));
+          await run7z(j2, ["a", "/_w." + ext, "/_t.tar"]);
+
+          const compBuf = Buffer.from(j2.FS.readFile("/_w." + ext, { encoding: "binary" }));
+          const j3 = await trackedJS7z();
+          try {
+            j3.FS.writeFile("/a." + ext, new Uint8Array(compBuf));
+            j3.FS.mkdir("/o1");
+            await run7z(j3, ["x", "/a." + ext, "-o/o1", "-y"]);
+
+            const top = j3.FS.readdir("/o1").filter((e: string) => e !== "." && e !== "..");
+            if (top.length === 0) throw new Error(ext + ": no files after outer decompress");
+            const innerTar = top[0];
+            const innerData = j3.FS.readFile("/o1/" + innerTar, { encoding: "binary" });
+
+            const j4 = await trackedJS7z();
+            try {
+              j4.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
+              j4.FS.mkdir("/o2");
+              await run7z(j4, ["x", "/_inner.tar", "-o/o2", "-y"]);
+
+              const result: Record<string, string> = {};
+              copyFS(j4, "/o2", "", result);
+              expect(result["d/a.txt"]).toBe("hello");
+              expect(result["d/b.txt"]).toBe("world");
+              expect(result["e/c.txt"]).toBe("nested");
+            } finally {
+              disposeJS7z(j4);
+            }
+          } finally {
+            disposeJS7z(j3);
+          }
+        } finally {
+          disposeJS7z(j2);
+        }
+      } finally {
+        disposeJS7z(j);
       }
-      const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
-
-      await run7z(j, ["a", "/_t.tar", ...tops]);
-      const tarBuf = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
-
-      const j2 = await JS7z();
-      j2.FS.writeFile("/_t.tar", new Uint8Array(tarBuf));
-      await run7z(j2, ["a", "/_w." + ext, "/_t.tar"]);
-
-      const compBuf = Buffer.from(j2.FS.readFile("/_w." + ext, { encoding: "binary" }));
-      const j3 = await JS7z();
-      j3.FS.writeFile("/a." + ext, new Uint8Array(compBuf));
-      j3.FS.mkdir("/o1");
-      await run7z(j3, ["x", "/a." + ext, "-o/o1", "-y"]);
-
-      const top = j3.FS.readdir("/o1").filter((e: string) => e !== "." && e !== "..");
-      if (top.length === 0) throw new Error(ext + ": no files after outer decompress");
-      const innerTar = top[0];
-      const innerData = j3.FS.readFile("/o1/" + innerTar, { encoding: "binary" });
-
-      const j4 = await JS7z();
-      j4.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
-      j4.FS.mkdir("/o2");
-      await run7z(j4, ["x", "/_inner.tar", "-o/o2", "-y"]);
-
-      const result: Record<string, string> = {};
-      copyFS(j4, "/o2", "", result);
-      expect(result["d/a.txt"]).toBe("hello");
-      expect(result["d/b.txt"]).toBe("world");
-      expect(result["e/c.txt"]).toBe("nested");
     });
   }
 });
@@ -1005,7 +1042,7 @@ describe("stream-to-VFS large files", () => {
     fs.writeFileSync(path.join(root, "lib", "util.js"), "B".repeat(30 * 1024 * 1024));
     fs.writeFileSync(path.join(root, "bin", "app.exe"), "C".repeat(20 * 1024 * 1024));
 
-    const j = await JS7z();
+    const j = await trackedJS7z();
     function streamDir(localDir: string, vfsDir: string, _token?: unknown) {
       const entries = fs.readdirSync(localDir, { withFileTypes: true });
       for (const e of entries) {
@@ -1050,7 +1087,7 @@ describe("stream-to-VFS large files", () => {
 
 describe("split volumes", () => {
   it("7z round-trip", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/a.txt", new Uint8Array(Buffer.from("hello")));
     j.FS.writeFile("/b.txt", new Uint8Array(Buffer.from("world")));
     await run7z(j, ["a", "/x.7z", "/a.txt", "/b.txt", "-v10m"]);
@@ -1058,7 +1095,7 @@ describe("split volumes", () => {
     const parts = j.FS.readdir("/").filter((e) => e.startsWith("x.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(1);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     for (const p of parts) {
       const data = j.FS.readFile("/" + p, { encoding: "binary" });
       j2.FS.writeFile("/" + p, new Uint8Array(data));
@@ -1072,7 +1109,7 @@ describe("split volumes", () => {
   });
 
   it("zip round-trip", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/a.txt", new Uint8Array(Buffer.from("hello")));
     j.FS.writeFile("/b.txt", new Uint8Array(Buffer.from("world")));
     await run7z(j, ["a", "/x.zip", "/a.txt", "/b.txt", "-v10m"]);
@@ -1080,7 +1117,7 @@ describe("split volumes", () => {
     const parts = j.FS.readdir("/").filter((e) => e.startsWith("x.zip."));
     expect(parts.length).toBeGreaterThanOrEqual(1);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     for (const p of parts) {
       const data = j.FS.readFile("/" + p, { encoding: "binary" });
       j2.FS.writeFile("/" + p, new Uint8Array(data));
@@ -1094,7 +1131,7 @@ describe("split volumes", () => {
   });
 
   it("multi-part 7z forces multiple parts", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
     await run7z(j, ["a", "/y.7z", "/big.txt", "-v100b"]);
 
@@ -1102,7 +1139,7 @@ describe("split volumes", () => {
     const count = parts.length;
     expect(count).toBeGreaterThanOrEqual(2);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     for (const p of parts) {
       const data = j.FS.readFile("/" + p, { encoding: "binary" });
       j2.FS.writeFile("/" + p, new Uint8Array(data));
@@ -1116,14 +1153,14 @@ describe("split volumes", () => {
   });
 
   it("encrypted 7z round-trip", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/a.txt", new Uint8Array(Buffer.from("secret")));
     await run7z(j, ["a", "/s.7z", "/a.txt", "-pp4ss", "-mhe=on", "-v10m"]);
 
     const parts = j.FS.readdir("/").filter((e) => e.startsWith("s.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(1);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     for (const p of parts) {
       const data = j.FS.readFile("/" + p, { encoding: "binary" });
       j2.FS.writeFile("/" + p, new Uint8Array(data));
@@ -1136,7 +1173,7 @@ describe("split volumes", () => {
   });
 
   it("missing middle part throws error", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
     await run7z(j, ["a", "/x.7z", "/big.txt", "-v100b"]);
 
@@ -1145,7 +1182,7 @@ describe("split volumes", () => {
       .sort();
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     const first = parts[0];
     j2.FS.writeFile("/" + first, new Uint8Array(j.FS.readFile("/" + first, { encoding: "binary" })));
 
@@ -1171,7 +1208,7 @@ describe("split volumes", () => {
   });
 
   it("readdir skips gaps when parts deleted", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
     await run7z(j, ["a", "/x.7z", "/big.txt", "-v100b"]);
 
@@ -1190,7 +1227,7 @@ describe("split volumes", () => {
       const toDelete = parts.length >= 3 ? parts[1] : parts[parts.length - 1];
       fs.unlinkSync(path.join(tmpDir, toDelete));
 
-      const j2 = await JS7z();
+      const j2 = await trackedJS7z();
       const name = "x.7z";
       const diskParts = fs
         .readdirSync(tmpDir)
@@ -1271,13 +1308,13 @@ describe("format conversion", () => {
 
 describe("merge/split operations", () => {
   it("merge: split 7z back to single", async () => {
-    const j1 = await JS7z();
+    const j1 = await trackedJS7z();
     j1.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
     await run7z(j1, ["a", "/_m.7z", "/big.txt", "-v100b"]);
     const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_m.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     for (const p of parts) {
       const data = j1.FS.readFile("/" + p, { encoding: "binary" });
       j2.FS.writeFile("/" + p, new Uint8Array(data));
@@ -1295,17 +1332,17 @@ describe("merge/split operations", () => {
   });
 
   it("split: single 7z to volumes", async () => {
-    const j1 = await JS7z();
+    const j1 = await trackedJS7z();
     j1.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
     await run7z(j1, ["a", "/_s.7z", "/big.txt"]);
     const srcBuf = Buffer.from(j1.FS.readFile("/_s.7z", { encoding: "binary" }));
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     j2.FS.writeFile("/_s.7z", new Uint8Array(srcBuf));
     j2.FS.mkdir("/_t");
     await run7z(j2, ["x", "/_s.7z", "-o/_t"]);
 
-    const j3 = await JS7z();
+    const j3 = await trackedJS7z();
     const files: Record<string, string> = {};
     copyFS(j2, "/_t", "", files);
     for (const [k, v] of Object.entries(files)) {
@@ -1320,7 +1357,7 @@ describe("merge/split operations", () => {
     const parts = j3.FS.readdir("/_o").filter((e) => e.startsWith("_d.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
-    const j4 = await JS7z();
+    const j4 = await trackedJS7z();
     for (const p of parts) {
       const data = j3.FS.readFile("/_o/" + p, { encoding: "binary" });
       j4.FS.writeFile("/" + p, new Uint8Array(data));
@@ -1391,13 +1428,13 @@ describe("encrypt/decrypt", () => {
 
   it("decrypt: encrypted split 7z → non-encrypted split", async () => {
     const pw = "splitpw";
-    const j1 = await JS7z();
+    const j1 = await trackedJS7z();
     j1.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("y".repeat(16384))));
     await run7z(j1, ["a", "/_es.7z", "/big.txt", `-p${pw}`, "-mhe=on", "-v100b"]);
     const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_es.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     for (const p of parts) {
       const d = j1.FS.readFile("/" + p, { encoding: "binary" });
       j2.FS.writeFile("/" + p, new Uint8Array(d));
@@ -1408,7 +1445,7 @@ describe("encrypt/decrypt", () => {
     copyFS(j2, "/o", "", files);
     expect(files["big.txt"]?.length).toBe(16384);
 
-    const j3 = await JS7z();
+    const j3 = await trackedJS7z();
     for (const [k, v] of Object.entries(files)) {
       const d = path.posix.dirname(k);
       if (d && d !== ".") mkdirP(j3, "/" + d);
@@ -1421,7 +1458,7 @@ describe("encrypt/decrypt", () => {
     const newParts = j3.FS.readdir("/oo").filter((e) => e.startsWith("_ds.7z."));
     expect(newParts.length).toBeGreaterThanOrEqual(2);
 
-    const j4 = await JS7z();
+    const j4 = await trackedJS7z();
     for (const p of newParts) {
       const d = j3.FS.readFile("/oo/" + p, { encoding: "binary" });
       j4.FS.writeFile("/" + p, new Uint8Array(d));
@@ -1435,13 +1472,13 @@ describe("encrypt/decrypt", () => {
 
   it("encrypt: non-encrypted split 7z → encrypted split", async () => {
     const pw = "encsplit";
-    const j1 = await JS7z();
+    const j1 = await trackedJS7z();
     j1.FS.writeFile("/med.txt", new Uint8Array(Buffer.from("z".repeat(16384))));
     await run7z(j1, ["a", "/_ps.7z", "/med.txt", "-v100b"]);
     const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_ps.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
-    const j2 = await JS7z();
+    const j2 = await trackedJS7z();
     for (const p of parts) {
       const d = j1.FS.readFile("/" + p, { encoding: "binary" });
       j2.FS.writeFile("/" + p, new Uint8Array(d));
@@ -1451,7 +1488,7 @@ describe("encrypt/decrypt", () => {
     const files: Record<string, string> = {};
     copyFS(j2, "/o2", "", files);
 
-    const j3 = await JS7z();
+    const j3 = await trackedJS7z();
     for (const [k, v] of Object.entries(files)) {
       const d = path.posix.dirname(k);
       if (d && d !== ".") mkdirP(j3, "/" + d);
@@ -1464,7 +1501,7 @@ describe("encrypt/decrypt", () => {
     const newParts = j3.FS.readdir("/oo2").filter((e) => e.startsWith("_es2.7z."));
     expect(newParts.length).toBeGreaterThanOrEqual(2);
 
-    const j4 = await JS7z();
+    const j4 = await trackedJS7z();
     for (const p of newParts) {
       const d = j3.FS.readFile("/oo2/" + p, { encoding: "binary" });
       j4.FS.writeFile("/" + p, new Uint8Array(d));
@@ -1472,7 +1509,7 @@ describe("encrypt/decrypt", () => {
     j4.FS.mkdir("/chk3");
     await expect(run7z(j4, ["x", "-p-", "/_es2.7z.001", "-o/chk3"])).rejects.toThrow(/7z exit/);
 
-    const j5 = await JS7z();
+    const j5 = await trackedJS7z();
     for (const p of newParts) {
       const d = j3.FS.readFile("/oo2/" + p, { encoding: "binary" });
       j5.FS.writeFile("/" + p, new Uint8Array(d));
@@ -1661,7 +1698,7 @@ describe("exclusion logic", () => {
 
 describe("smartarchive marker filtering", () => {
   it(".smartarchive markers are skipped in VFS-to-disk copy", async () => {
-    const j = await JS7z();
+    const j = await trackedJS7z();
     j.FS.mkdir("/_test");
     j.FS.writeFile("/_test/readme.txt", new Uint8Array(Buffer.from("hello")));
     j.FS.writeFile("/_test/.smartarchive", new Uint8Array(Buffer.from(".")));
@@ -1750,7 +1787,7 @@ for (const c of codecs) {
       const innerTar = c.decompress(wrapped);
       expect(innerTar.length).toBeGreaterThan(100);
 
-      const j = await JS7z();
+      const j = await trackedJS7z();
       j.FS.writeFile("/_t.tar", innerTar);
       j.FS.mkdir("/_out");
       await run7z(j, ["x", "/_t.tar", "-o/_out", "-y"]);
@@ -1764,7 +1801,7 @@ for (const c of codecs) {
       const wrapped = await createWrapped(stdFiles, c.shortAlias);
       const innerTar = c.decompress(wrapped);
 
-      const j = await JS7z();
+      const j = await trackedJS7z();
       j.FS.writeFile("/_t.tar", innerTar);
       j.FS.mkdir("/_out");
       await run7z(j, ["x", "/_t.tar", "-o/_out", "-y"]);
@@ -1779,7 +1816,7 @@ for (const c of codecs) {
       const innerTar = c.decompress(wrapped);
 
       // Selective extract just "src/lib" from the tar
-      const j = await JS7z();
+      const j = await trackedJS7z();
       j.FS.writeFile("/_t.tar", innerTar);
       j.FS.mkdir("/_sel");
       // 7z can't selectively extract from tar via path, so extract all and check
@@ -1795,7 +1832,7 @@ for (const c of codecs) {
       const innerTar = c.decompress(wrapped);
 
       // Convert the inner tar to 7z
-      const j = await JS7z();
+      const j = await trackedJS7z();
       j.FS.writeFile("/_t.tar", innerTar);
       await run7z(j, ["a", "/_out.7z", "/_t.tar"]);
       const conv = await j7zDecompress(Buffer.from(j.FS.readFile("/_out.7z", { encoding: "binary" })));
@@ -1807,7 +1844,7 @@ for (const c of codecs) {
       const innerTar = c.decompress(wrapped);
 
       // Add a new file to the tar
-      const j = await JS7z();
+      const j = await trackedJS7z();
       j.FS.writeFile("/_t.tar", innerTar);
       j.FS.mkdir("/newdir");
       j.FS.writeFile("/newdir/new.txt", new Uint8Array(Buffer.from("added")));
@@ -1819,7 +1856,7 @@ for (const c of codecs) {
 
       // Decompress and verify
       const finalTar = c.decompress(Buffer.from(recompressed));
-      const j2 = await JS7z();
+      const j2 = await trackedJS7z();
       j2.FS.writeFile("/_t.tar", finalTar);
       j2.FS.mkdir("/_out2");
       await run7z(j2, ["x", "/_t.tar", "-o/_out2", "-y"]);
@@ -1834,14 +1871,14 @@ for (const c of codecs) {
         const wrapped = await createWrapped(stdFiles, c.ext);
         const innerTar = c.decompress(wrapped);
 
-        const j = await JS7z();
+        const j = await trackedJS7z();
         j.FS.writeFile("/_t.tar", innerTar);
         await run7z(j, ["d", "/_t.tar", "d/b.txt"]);
         const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
         const recompressed = await c.compress(modifiedTar);
         const finalTar = c.decompress(Buffer.from(recompressed));
-        const j2 = await JS7z();
+        const j2 = await trackedJS7z();
         j2.FS.writeFile("/_t.tar", finalTar);
         j2.FS.mkdir("/_out3");
         await run7z(j2, ["x", "/_t.tar", "-o/_out3", "-y"]);
@@ -1855,14 +1892,14 @@ for (const c of codecs) {
         const wrapped = await createWrapped(stdFiles, c.ext);
         const innerTar = c.decompress(wrapped);
 
-        const j = await JS7z();
+        const j = await trackedJS7z();
         j.FS.writeFile("/_t.tar", innerTar);
         await run7z(j, ["rn", "/_t.tar", "d/a.txt", "d/renamed.txt"]);
         const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
         const recompressed = await c.compress(modifiedTar);
         const finalTar = c.decompress(Buffer.from(recompressed));
-        const j2 = await JS7z();
+        const j2 = await trackedJS7z();
         j2.FS.writeFile("/_t.tar", finalTar);
         j2.FS.mkdir("/_out4");
         await run7z(j2, ["x", "/_t.tar", "-o/_out4", "-y"]);
@@ -1877,7 +1914,7 @@ for (const c of codecs) {
         const wrapped = await createWrapped(stdFiles, c.ext);
         const innerTar = c.decompress(wrapped);
 
-        const j = await JS7z();
+        const j = await trackedJS7z();
         j.FS.writeFile("/_t.tar", innerTar);
         j.FS.mkdir("/newfolder");
         j.FS.writeFile("/newfolder/.smartarchive", new Uint8Array(Buffer.from(".")));
@@ -1886,7 +1923,7 @@ for (const c of codecs) {
 
         const recompressed = await c.compress(modifiedTar);
         const finalTar = c.decompress(Buffer.from(recompressed));
-        const j2 = await JS7z();
+        const j2 = await trackedJS7z();
         j2.FS.writeFile("/_t.tar", finalTar);
         j2.FS.mkdir("/_out5");
         await run7z(j2, ["x", "/_t.tar", "-o/_out5", "-y"]);

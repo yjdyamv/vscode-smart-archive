@@ -13,17 +13,18 @@ import * as os from "os";
 import * as vscode from "vscode";
 import type { DecompressOptions } from "../types";
 import { tryCleanup, OUTPUT_DIR, run7z } from "./js7z-helpers";
-import { streamToVFS } from "./vfs-io";
+import { streamToVFS, checkArchiveInputSize } from "./vfs-io";
 import { copyDirFromFS } from "../utils/fs";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
-import { checkFileSize, checkTotalSize, validatePassword } from "../utils/security";
+import { checkTotalSize, checkFileSize, validatePassword } from "../utils/security";
 import { JS7z } from "./js7z-factory";
 import { hasSystem7zForFormat, decompressWithSystem7z } from "./system7z";
 import { getFullExt, getWrapExtension } from "../constants";
 import { brotliDecompressFile } from "./brotli-codec";
 import { lz4DecompressFile } from "./lz4-codec";
 import { zstdDecompress } from "./zstd-codec";
+import { acquirePooled, releasePooled } from "./js7z-pool";
 
 export async function decompressWith7z(
   options: DecompressOptions,
@@ -46,6 +47,7 @@ export async function decompressWith7z(
 
   const ext = getFullExt(options.inputPath);
   if (getWrapExtension(ext) === "br") {
+    checkArchiveInputSize(options.inputPath);
     prog.report({ message: t("decompress.unwrapTar") });
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sab_"));
     const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
@@ -83,6 +85,7 @@ export async function decompressWith7z(
   }
 
   if (getWrapExtension(ext) === "lz4") {
+    checkArchiveInputSize(options.inputPath);
     prog.report({ message: t("decompress.unwrapTar") });
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sal_"));
     const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
@@ -120,6 +123,7 @@ export async function decompressWith7z(
   }
 
   if (getWrapExtension(ext) === "zst") {
+    checkArchiveInputSize(options.inputPath);
     prog.report({ message: t("decompress.unwrapTar") });
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "saz_"));
     const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
@@ -163,7 +167,7 @@ export async function decompressWith7z(
   const js7z = await JS7z();
 
   try {
-    checkFileSize(fs.statSync(options.inputPath).size);
+    checkArchiveInputSize(options.inputPath);
     const archiveFsPath = streamToVFS(js7z, options.inputPath);
     const usesMount = archiveFsPath.startsWith("/mnt_");
 
@@ -194,9 +198,9 @@ export async function decompressWith7z(
 
     await unwrapInnerTar(options.outputDir, progress);
     logger.info({ event: "decompress.complete", outputDir: options.outputDir });
-  } finally {
-    tryCleanup(js7z);
-  }
+        } finally {
+          releasePooled(js7z);
+        }
 }
 
 async function unwrapInnerTar(
@@ -260,7 +264,7 @@ async function unwrapInnerTar(
       // Only validate file size, not counting towards total — the extracted
       // contents are counted below via copyDirFromFS to avoid double-counting.
       checkFileSize(fs.statSync(tarPath).size);
-      const js7z = await JS7z();
+      const js7z = await acquirePooled();
 
       try {
         const innerFsPath = streamToVFS(js7z, tarPath);

@@ -18,6 +18,7 @@ import {
   j7zSelective,
   createWrapped,
   walkFS,
+  disposeJS7z,
 } from "./helpers";
 import type { JS7zInstance, TreeNode, FlatEntry } from "./helpers";
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
@@ -162,14 +163,18 @@ describe("selective extraction", () => {
 
   it("7z selective: WIM", async () => {
     const j = await JS7z();
-    mkdirP(j, "/src");
-    j.FS.writeFile("/src/a.txt", new Uint8Array(Buffer.from("wim")));
-    j.FS.writeFile("/src/b.txt", new Uint8Array(Buffer.from("no")));
-    await run7z(j, ["a", "-twim", "/t.wim", "/src"]);
-    const buf = Buffer.from(j.FS.readFile("/t.wim", { encoding: "binary" }));
-    const r = await j7zSelective(buf, ["src/a.txt"]);
-    expect(r["src/a.txt"]).toBe("wim");
-    expect(Object.keys(r).length).toBe(1);
+    try {
+      mkdirP(j, "/src");
+      j.FS.writeFile("/src/a.txt", new Uint8Array(Buffer.from("wim")));
+      j.FS.writeFile("/src/b.txt", new Uint8Array(Buffer.from("no")));
+      await run7z(j, ["a", "-twim", "/t.wim", "/src"]);
+      const buf = Buffer.from(j.FS.readFile("/t.wim", { encoding: "binary" }));
+      const r = await j7zSelective(buf, ["src/a.txt"]);
+      expect(r["src/a.txt"]).toBe("wim");
+      expect(Object.keys(r).length).toBe(1);
+    } finally {
+      disposeJS7z(j);
+    }
   });
 
   it("7z selective: nonexistent path", async () => {
@@ -220,36 +225,44 @@ describe("selective extraction", () => {
       const b = await createWrapped(stdFiles, ext);
 
       const j1 = await JS7z();
-      j1.FS.writeFile("/a." + ext, new Uint8Array(b));
-      j1.FS.mkdir("/_ls1");
-      await new Promise<void>((resolve, reject) => {
-        j1.onExit = (c: number) => {
-          if (c === 0) resolve();
-          else reject(new Error(`7z x outer: ${c}`));
-        };
-        j1.callMain(["x", "/a." + ext, "-o/_ls1", "-y"]);
-      });
+      try {
+        j1.FS.writeFile("/a." + ext, new Uint8Array(b));
+        j1.FS.mkdir("/_ls1");
+        await new Promise<void>((resolve, reject) => {
+          j1.onExit = (c: number) => {
+            if (c === 0) resolve();
+            else reject(new Error(`7z x outer: ${c}`));
+          };
+          j1.callMain(["x", "/a." + ext, "-o/_ls1", "-y"]);
+        });
 
-      const top = j1.FS.readdir("/_ls1").filter((e: string) => e !== "." && e !== "..");
-      expect(top.some((e: string) => e.endsWith(".tar"))).toBe(true);
+        const top = j1.FS.readdir("/_ls1").filter((e: string) => e !== "." && e !== "..");
+        expect(top.some((e: string) => e.endsWith(".tar"))).toBe(true);
 
-      const innerTar = top.find((e: string) => e.endsWith(".tar"))!;
-      const innerData = j1.FS.readFile(`/_ls1/${innerTar}`, { encoding: "binary" });
+        const innerTar = top.find((e: string) => e.endsWith(".tar"))!;
+        const innerData = j1.FS.readFile(`/_ls1/${innerTar}`, { encoding: "binary" });
 
-      const j2 = await JS7z();
-      j2.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
-      j2.FS.mkdir("/_ls2");
-      await new Promise<void>((resolve, reject) => {
-        j2.onExit = (c: number) => {
-          if (c === 0) resolve();
-          else reject(new Error(`7z x inner: ${c}`));
-        };
-        j2.callMain(["x", "/_inner.tar", "-o/_ls2", "-y"]);
-      });
+        const j2 = await JS7z();
+        try {
+          j2.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
+          j2.FS.mkdir("/_ls2");
+          await new Promise<void>((resolve, reject) => {
+            j2.onExit = (c: number) => {
+              if (c === 0) resolve();
+              else reject(new Error(`7z x inner: ${c}`));
+            };
+            j2.callMain(["x", "/_inner.tar", "-o/_ls2", "-y"]);
+          });
 
-      const paths = walkFS(j2, "/_ls2", "");
-      expect(paths.length).toBeGreaterThan(0);
-      expect(paths.some((p) => p.includes("d/a.txt"))).toBe(true);
+          const paths = walkFS(j2, "/_ls2", "");
+          expect(paths.length).toBeGreaterThan(0);
+          expect(paths.some((p) => p.includes("d/a.txt"))).toBe(true);
+        } finally {
+          disposeJS7z(j2);
+        }
+      } finally {
+        disposeJS7z(j1);
+      }
     });
   }
 
@@ -263,18 +276,22 @@ describe("selective extraction", () => {
     expect(dec.length).toBeGreaterThan(100);
 
     const j = await JS7z();
-    j.FS.writeFile("/_t.tar", dec);
-    j.FS.mkdir("/_out");
-    await new Promise<void>((resolve, reject) => {
-      j.onExit = (c: number) => {
-        if (c === 0) resolve();
-        else reject(new Error(`7z x tar: ${c}`));
-      };
-      j.callMain(["x", "/_t.tar", "-o/_out", "-y"]);
-    });
-    const paths = walkFS(j, "/_out", "");
-    expect(paths.includes("d/a.txt")).toBe(true);
-    expect(paths.includes("d/b.txt")).toBe(true);
+    try {
+      j.FS.writeFile("/_t.tar", dec);
+      j.FS.mkdir("/_out");
+      await new Promise<void>((resolve, reject) => {
+        j.onExit = (c: number) => {
+          if (c === 0) resolve();
+          else reject(new Error(`7z x tar: ${c}`));
+        };
+        j.callMain(["x", "/_t.tar", "-o/_out", "-y"]);
+      });
+      const paths = walkFS(j, "/_out", "");
+      expect(paths.includes("d/a.txt")).toBe(true);
+      expect(paths.includes("d/b.txt")).toBe(true);
+    } finally {
+      disposeJS7z(j);
+    }
   });
 
   // ── LZ4 compression roundtrip ──
@@ -313,18 +330,22 @@ describe("selective extraction", () => {
 
     // Extract the tar with 7z to verify contents
     const j = await JS7z();
-    j.FS.writeFile("/_t.tar", dec);
-    j.FS.mkdir("/_lz4out");
-    await new Promise<void>((resolve, reject) => {
-      j.onExit = (c: number) => {
-        if (c === 0) resolve();
-        else reject(new Error(`7z x tar: ${c}`));
-      };
-      j.callMain(["x", "/_t.tar", "-o/_lz4out", "-y"]);
-    });
+    try {
+      j.FS.writeFile("/_t.tar", dec);
+      j.FS.mkdir("/_lz4out");
+      await new Promise<void>((resolve, reject) => {
+        j.onExit = (c: number) => {
+          if (c === 0) resolve();
+          else reject(new Error(`7z x tar: ${c}`));
+        };
+        j.callMain(["x", "/_t.tar", "-o/_lz4out", "-y"]);
+      });
 
-    const extracted = j.FS.readFile("/_lz4out/hello.txt", { encoding: "utf8" });
-    expect(extracted).toBe("hello from lz4 test\n");
+      const extracted = j.FS.readFile("/_lz4out/hello.txt", { encoding: "utf8" });
+      expect(extracted).toBe("hello from lz4 test\n");
+    } finally {
+      disposeJS7z(j);
+    }
   });
 
   // ── Multi-frame LZ4 roundtrip (concatenated frames from chunked compress) ──
@@ -400,18 +421,22 @@ describe("brotli", () => {
     expect(dec.length).toBeGreaterThan(100);
 
     const j = await JS7z();
-    j.FS.writeFile("/_t.tar", dec);
-    j.FS.mkdir("/_out");
-    await new Promise<void>((resolve, reject) => {
-      j.onExit = (c: number) => {
-        if (c === 0) resolve();
-        else reject(new Error(`7z x tar: ${c}`));
-      };
-      j.callMain(["x", "/_t.tar", "-o/_out", "-y"]);
-    });
-    const paths = walkFS(j, "/_out", "");
-    expect(paths.includes("d/a.txt")).toBe(true);
-    expect(paths.includes("d/b.txt")).toBe(true);
+    try {
+      j.FS.writeFile("/_t.tar", dec);
+      j.FS.mkdir("/_out");
+      await new Promise<void>((resolve, reject) => {
+        j.onExit = (c: number) => {
+          if (c === 0) resolve();
+          else reject(new Error(`7z x tar: ${c}`));
+        };
+        j.callMain(["x", "/_t.tar", "-o/_out", "-y"]);
+      });
+      const paths = walkFS(j, "/_out", "");
+      expect(paths.includes("d/a.txt")).toBe(true);
+      expect(paths.includes("d/b.txt")).toBe(true);
+    } finally {
+      disposeJS7z(j);
+    }
   });
 
   it("brotli multi-frame roundtrip", () => {

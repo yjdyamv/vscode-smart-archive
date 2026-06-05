@@ -83,6 +83,10 @@ export function setCopiedPaths(
       prevArchive: clipboard.archivePath,
       newArchive: archivePath,
     });
+    // Don't silently overwrite — show a quick info
+    vscode.window.showInformationMessage(
+      t("archive.copyReplaced", path.basename(clipboard.archivePath), path.basename(archivePath)),
+    );
   }
   logger.info({ event: "setCopiedPaths", pathCount: paths.length, archivePath, flat });
   clipboard = { paths, archivePath, password, flat };

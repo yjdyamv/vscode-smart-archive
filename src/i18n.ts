@@ -323,6 +323,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "源压缩包文件已不存在: {0}",
     "zh-tw": "來源壓縮檔已不存在: {0}",
   },
+  "archive.copyReplaced": {
+    en: "Replaced copied items from \"{0}\" with \"{1}\"",
+    "zh-cn": "已将复制的项目从 \"{0}\" 替换为 \"{1}\"",
+    "zh-tw": "已將複製的項目從 \"{0}\" 替換為 \"{1}\"",
+  },
   "archive.addFilesLabel": {
     en: "Add to Archive",
     "zh-cn": "添加到压缩包",
@@ -632,6 +637,11 @@ const messages: Record<string, Record<Locale, string>> = {
     en: "Preview file not found in inner archive: {0}",
     "zh-cn": "在内层压缩包中未找到预览文件: {0}",
     "zh-tw": "在內層壓縮檔中未找到預覽檔案: {0}",
+  },
+  "preview.fileTooLarge": {
+    en: "File too large for preview ({0} bytes, max {1} bytes). Use Extract instead.",
+    "zh-cn": "文件过大，无法预览 ({0} 字节，最大 {1} 字节)。请使用提取功能。",
+    "zh-tw": "檔案過大，無法預覽 ({0} 位元組，最大 {1} 位元組)。請使用提取功能。",
   },
 
   // ---- Test ----

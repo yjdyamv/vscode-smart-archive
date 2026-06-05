@@ -21,6 +21,23 @@ const PREVIEW_TMP_DIR = path.join(os.tmpdir(), "vscode-7z-preview");
 
 let tempCleanupRegistered = false;
 
+/**
+ * Register a listener that cleans up a specific preview temp file when
+ * the VS Code text document showing it is closed.
+ */
+export function registerPreviewCleanup(tmpPath: string, docUri: vscode.Uri): vscode.Disposable {
+  return vscode.workspace.onDidCloseTextDocument((closed) => {
+    if (closed.uri.toString() === docUri.toString()) {
+      try {
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        logger.info({ event: "tempFiles.preview.closed", tmpPath });
+      } catch (err) {
+        logger.warn({ event: "tempFiles.preview.cleanupFailed", tmpPath, err });
+      }
+    }
+  });
+}
+
 function cleanupPreviewTemp(): void {
   try {
     fs.rmSync(PREVIEW_TMP_DIR, { recursive: true, force: true });

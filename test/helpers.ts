@@ -93,13 +93,17 @@ export async function j7zCompress(
   extra: string[] = [],
 ): Promise<Buffer> {
   const j = await JS7z();
-  for (const [fp, content] of Object.entries(files)) {
-    const dir = path.posix.dirname(fp);
-    if (dir && dir !== "/") mkdirP(j, dir);
-    j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
+  try {
+    for (const [fp, content] of Object.entries(files)) {
+      const dir = path.posix.dirname(fp);
+      if (dir && dir !== "/") mkdirP(j, dir);
+      j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
+    }
+    await run7z(j, ["a", archive, ...Object.keys(files), ...extra]);
+    return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
+  } finally {
+    disposeJS7z(j);
   }
-  await run7z(j, ["a", archive, ...Object.keys(files), ...extra]);
-  return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
 }
 
 export async function j7zCompressDir(
@@ -108,14 +112,18 @@ export async function j7zCompressDir(
   extra: string[] = [],
 ): Promise<Buffer> {
   const j = await JS7z();
-  for (const [fp, content] of Object.entries(files)) {
-    const dir = path.posix.dirname(fp);
-    if (dir && dir !== "/") mkdirP(j, dir);
-    j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
+  try {
+    for (const [fp, content] of Object.entries(files)) {
+      const dir = path.posix.dirname(fp);
+      if (dir && dir !== "/") mkdirP(j, dir);
+      j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
+    }
+    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
+    await run7z(j, ["a", archive, ...tops, ...extra]);
+    return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
+  } finally {
+    disposeJS7z(j);
   }
-  const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
-  await run7z(j, ["a", archive, ...tops, ...extra]);
-  return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
 }
 
 export function copyFS(j: JS7zInstance, dir: string, prefix: string, res: Record<string, string>): void {
@@ -148,27 +156,35 @@ export async function j7zSelective(
   pw = "",
 ): Promise<Record<string, string>> {
   const j = await JS7z();
-  j.FS.writeFile("/a", new Uint8Array(buf));
-  j.FS.mkdir("/o");
-  const args = ["x", "/a", "-o/o"];
-  if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
-  args.push(...paths);
-  const res: Record<string, string> = {};
-  await run7z(j, args);
-  copyFS(j, "/o", "", res);
-  return res;
+  try {
+    j.FS.writeFile("/a", new Uint8Array(buf));
+    j.FS.mkdir("/o");
+    const args = ["x", "/a", "-o/o"];
+    if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
+    args.push(...paths);
+    const res: Record<string, string> = {};
+    await run7z(j, args);
+    copyFS(j, "/o", "", res);
+    return res;
+  } finally {
+    disposeJS7z(j);
+  }
 }
 
 export async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string, string>> {
   const j = await JS7z();
-  j.FS.writeFile("/a", new Uint8Array(buf));
-  j.FS.mkdir("/o");
-  const args = ["x", "/a", "-o/o"];
-  if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
-  const res: Record<string, string> = {};
-  await run7z(j, args);
-  copyFS(j, "/o", "", res);
-  return res;
+  try {
+    j.FS.writeFile("/a", new Uint8Array(buf));
+    j.FS.mkdir("/o");
+    const args = ["x", "/a", "-o/o"];
+    if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
+    const res: Record<string, string> = {};
+    await run7z(j, args);
+    copyFS(j, "/o", "", res);
+    return res;
+  } finally {
+    disposeJS7z(j);
+  }
 }
 
 // ── Wrapped archive helpers ──
@@ -194,35 +210,43 @@ const brWasm: {
 
 export async function createWrapped(files: Record<string, string>, ext: string): Promise<Buffer> {
   const j1 = await JS7z();
-  for (const [fp, c] of Object.entries(files)) {
-    const d = path.posix.dirname(fp);
-    if (d && d !== "/") mkdirP(j1, d);
-    j1.FS.writeFile(fp, new Uint8Array(Buffer.from(c)));
-  }
-  const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
-  await run7z(j1, ["a", "/_t.tar", ...tops]);
-  const tb = Buffer.from(j1.FS.readFile("/_t.tar", { encoding: "binary" }));
-  if (ext === "tar.zst" || ext === "tzst") {
-    if (!zstdReady) {
-      await zstd.init();
-      zstdReady = true;
+  try {
+    for (const [fp, c] of Object.entries(files)) {
+      const d = path.posix.dirname(fp);
+      if (d && d !== "/") mkdirP(j1, d);
+      j1.FS.writeFile(fp, new Uint8Array(Buffer.from(c)));
     }
-    return Buffer.from(zstd.compress(new Uint8Array(tb), 3));
-  }
-  if (ext === "tar.lz4" || ext === "tlz4") {
-    if (!lz4Ready) {
-      await lz4.init();
-      lz4Ready = true;
+    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
+    await run7z(j1, ["a", "/_t.tar", ...tops]);
+    const tb = Buffer.from(j1.FS.readFile("/_t.tar", { encoding: "binary" }));
+    if (ext === "tar.zst" || ext === "tzst") {
+      if (!zstdReady) {
+        await zstd.init();
+        zstdReady = true;
+      }
+      return Buffer.from(zstd.compress(new Uint8Array(tb), 3));
     }
-    return Buffer.from(await lz4.compress(new Uint8Array(tb)));
+    if (ext === "tar.lz4" || ext === "tlz4") {
+      if (!lz4Ready) {
+        await lz4.init();
+        lz4Ready = true;
+      }
+      return Buffer.from(await lz4.compress(new Uint8Array(tb)));
+    }
+    if (ext === "tar.br" || ext === "tbr") {
+      return Buffer.from(brWasm.compress(new Uint8Array(tb), { quality: 6 }));
+    }
+    const j2 = await JS7z();
+    try {
+      j2.FS.writeFile("/_t.tar", new Uint8Array(tb));
+      await run7z(j2, ["a", "/_w." + ext, "/_t.tar"]);
+      return Buffer.from(j2.FS.readFile("/_w." + ext, { encoding: "binary" }));
+    } finally {
+      disposeJS7z(j2);
+    }
+  } finally {
+    disposeJS7z(j1);
   }
-  if (ext === "tar.br" || ext === "tbr") {
-    return Buffer.from(brWasm.compress(new Uint8Array(tb), { quality: 6 }));
-  }
-  const j2 = await JS7z();
-  j2.FS.writeFile("/_t.tar", new Uint8Array(tb));
-  await run7z(j2, ["a", "/_w." + ext, "/_t.tar"]);
-  return Buffer.from(j2.FS.readFile("/_w." + ext, { encoding: "binary" }));
 }
 
 export function walkFS(j: JS7zInstance, dir: string, prefix: string): string[] {
@@ -334,16 +358,20 @@ export async function isEncryptedInline(filePath: string): Promise<boolean> {
     print: (t: string) => (stdout += t + "\n"),
     printErr: (t: string) => (stderr += t + "\n"),
   });
-  j.FS.writeFile("/_ie", new Uint8Array(data));
   try {
-    await new Promise<void>((resolve, reject) => {
-      j.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
-      j.callMain(["l", "-slt", "-p-", "/_ie"]);
-    });
-    return stdout.includes("Encrypted = +");
-  } catch {
-    const msg = (stdout + stderr).toLowerCase();
-    return msg.includes("encrypted") || msg.includes("wrong password");
+    j.FS.writeFile("/_ie", new Uint8Array(data));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        j.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
+        j.callMain(["l", "-slt", "-p-", "/_ie"]);
+      });
+      return stdout.includes("Encrypted = +");
+    } catch {
+      const msg = (stdout + stderr).toLowerCase();
+      return msg.includes("encrypted") || msg.includes("wrong password");
+    }
+  } finally {
+    disposeJS7z(j);
   }
 }
 
