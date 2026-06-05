@@ -30,6 +30,7 @@ import { validatePassword, checkFileSize } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
 import { toBinaryVolumeSize } from "../constants";
+import { prepareExclusions, isTargetExcluded } from "../utils/exclude";
 
 // ── Detection (cached) ───────────────────────────────────────────────
 
@@ -363,10 +364,11 @@ function getSystem7zOrNull(): string | null {
 
 export async function compressWithSystem7z(
   options: CompressOptions,
-  progress: vscode.Progress<{ message?: string }>,
+  progress?: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
   excludePatterns?: string[],
 ): Promise<void> {
+  const prog = progress ?? { report: () => {} };
   const sz = getSystem7zOrNull();
   if (!sz) throw new Error("System 7-Zip not available");
 
@@ -387,14 +389,22 @@ export async function compressWithSystem7z(
       // Step 1: create tar with exclusions
       const tarArgs = ["a", "-ttar", "-mx0", tarPath];
       if (excludePatterns && excludePatterns.length > 0) {
+        const singleTarget = options.targets.length === 1;
         const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
         for (const pat of excludePatterns) {
-          if (!targetNames.has(pat)) tarArgs.push(`-xr!${pat}`);
+          if (singleTarget && targetNames.has(pat)) continue;
+          tarArgs.push(`-xr!${pat}`);
         }
       }
-      tarArgs.push("--", ...options.targets.map((tg) => tg.fsPath));
+      // Multi-target: pre-filter targets matching exclusion patterns
+      let wrappedTargets = options.targets;
+      if (options.targets.length > 1 && excludePatterns?.length) {
+        const exclusions = prepareExclusions(excludePatterns);
+        wrappedTargets = options.targets.filter((tg) => !isTargetExcluded(tg.fsPath, exclusions));
+      }
+      tarArgs.push("--", ...wrappedTargets.map((tg) => tg.fsPath));
       logger.info({ event: "system7z.compress.tar", argsPreview: tarArgs.join(" ") });
-      progress.report({ message: t("compress.creatingTar") });
+      prog.report({ message: t("compress.creatingTar") });
       await run7z(sz, tarArgs, progress, token);
 
       // Step 2: compress the tar
@@ -408,7 +418,7 @@ export async function compressWithSystem7z(
         output: options.outputPath,
         argsPreview: compressArgs.filter((a) => !a.startsWith("-p")).join(" "),
       });
-      progress.report({ message: t("compress.compressingTar", typeFlag) });
+      prog.report({ message: t("compress.compressingTar", typeFlag) });
       await run7z(sz, compressArgs, progress, token);
     } finally {
       try {
@@ -432,16 +442,23 @@ export async function compressWithSystem7z(
   if (options.volumeSize) args.push(`-v${toBinaryVolumeSize(options.volumeSize)}`);
 
   if (excludePatterns && excludePatterns.length > 0) {
+    const singleTarget = options.targets.length === 1;
     const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
     for (const pat of excludePatterns) {
-      if (!targetNames.has(pat)) {
-        args.push(`-xr!${pat}`);
-      }
+      if (singleTarget && targetNames.has(pat)) continue;
+      args.push(`-xr!${pat}`);
     }
   }
 
+  // Multi-target: pre-filter targets matching exclusion patterns
+  let targets = options.targets;
+  if (options.targets.length > 1 && excludePatterns?.length) {
+    const exclusions = prepareExclusions(excludePatterns);
+    targets = options.targets.filter((tg) => !isTargetExcluded(tg.fsPath, exclusions));
+  }
+
   args.push("--", options.outputPath);
-  for (const target of options.targets) args.push(target.fsPath);
+  for (const target of targets) args.push(target.fsPath);
 
   logger.info({
     event: "system7z.compress.start",
@@ -455,7 +472,7 @@ export async function compressWithSystem7z(
     argsPreview: args.filter((a) => !a.startsWith("-p")).join(" "),
   });
 
-  progress.report({ message: t("compress.inProgress") });
+  prog.report({ message: t("compress.inProgress") });
 
   try {
     await run7z(sz, args, progress, token);
@@ -469,9 +486,10 @@ export async function compressWithSystem7z(
 
 export async function decompressWithSystem7z(
   options: DecompressOptions,
-  progress: vscode.Progress<{ message?: string }>,
+  progress?: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
 ): Promise<void> {
+  const prog = progress ?? { report: () => {} };
   const sz = getSystem7zOrNull();
   if (!sz) throw new Error("System 7-Zip not available");
 
@@ -496,7 +514,7 @@ export async function decompressWithSystem7z(
     argsPreview: args.filter((a) => !a.startsWith("-p")).join(" "),
   });
 
-  progress.report({ message: t("decompress.inProgress") });
+  prog.report({ message: t("decompress.inProgress") });
 
   try {
     await run7z(sz, args, progress, token);
@@ -664,9 +682,10 @@ export function spawnCapture(binary: string, args: string[], timeoutMs = 30_000)
 function run7z(
   binary: string,
   args: string[],
-  progress: vscode.Progress<{ message?: string }>,
+  progress?: vscode.Progress<{ message?: string }>,
   token?: vscode.CancellationToken,
 ): Promise<void> {
+  const prog = progress ?? { report: () => {} };
   return new Promise<void>((resolve, reject) => {
     let combinedOutput = "";
     let lastPct = -1;
@@ -707,7 +726,7 @@ function run7z(
         const pct = parseInt(m[1], 10);
         if (pct !== lastPct) {
           lastPct = pct;
-          progress.report({ message: `${pct}%` });
+          prog.report({ message: `${pct}%` });
         }
       }
     });

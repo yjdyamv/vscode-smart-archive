@@ -375,7 +375,6 @@ function loadExpandedPaths() {
 function expandOrLoad(path: string) {
   const node = tree.findNode(path);
   if (!node || node.kind !== "DIRECTORY") return;
-  if (node.collapsed) return;
 
   // If already expanded, just toggle
   if (tree.expandedPaths.value.has(path)) {
