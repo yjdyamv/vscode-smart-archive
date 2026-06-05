@@ -10,14 +10,13 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import type { JS7zInstance } from "../../types";
-import { JS7z, tryCleanupJS7z } from "../fileListing";
+import { JS7z, disposeJS7z } from "../fileListing";
 import { getFullExt, getWrapExtension } from "../../constants";
 import { zstdCompress } from "../../engines/zstd-codec";
 import { brotliCompress, brotliDecompress } from "../../engines/brotli-codec";
 import { lz4Compress, lz4Decompress } from "../../engines/lz4-codec";
 import { validatePassword } from "../../utils/security";
 import { t } from "../../i18n";
-import { acquirePooled, releasePooled } from "../../engines/js7z-pool";
 
 function getUserCompressionLevel(): number {
   return vscode.workspace
@@ -79,7 +78,7 @@ export async function withWrappedArchive(
     }
 
     const innerData = js7z.FS.readFile(`${tmpDir}/${innerTarName}`, { encoding: "binary" });
-    const js7z2 = await acquirePooled();
+    const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
     try {
       js7z2.FS.writeFile("/inner.tar", new Uint8Array(innerData));
 
@@ -114,9 +113,9 @@ export async function withWrappedArchive(
 
       await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), compressedData);
     } finally {
-      releasePooled(js7z2);
+      disposeJS7z(js7z2);
     }
   } finally {
-    tryCleanupJS7z(js7z);
+    disposeJS7z(js7z);
   }
 }

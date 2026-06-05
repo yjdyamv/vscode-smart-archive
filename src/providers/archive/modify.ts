@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
-import { JS7z, tryCleanupJS7z, decompressLz4Frames, writeLargeVFS } from "../fileListing";
+import { JS7z, disposeJS7z, decompressLz4Frames, writeLargeVFS } from "../fileListing";
 import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
@@ -92,7 +92,7 @@ export async function createFolderInArchive(
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
-    tryCleanupJS7z(js7z);
+    disposeJS7z(js7z);
   }
 }
 
@@ -279,7 +279,7 @@ export async function previewFileFromArchive(
         }
       }
     } finally {
-      tryCleanupJS7z(js7z);
+      disposeJS7z(js7z);
     }
   }
 
@@ -478,7 +478,7 @@ async function unwrapArchives(
       throw new Error(t("preview.notFoundInner", target));
     }
   } finally {
-    tryCleanupJS7z(js7z2);
+    disposeJS7z(js7z2);
   }
 }
 
@@ -512,7 +512,7 @@ export async function testArchive(archivePath: string, password?: string): Promi
     logger.info({ event: "testArchive.ok", archivePath, passed: ok });
     return result;
   } finally {
-    tryCleanupJS7z(js7z);
+    disposeJS7z(js7z);
   }
 }
 
@@ -550,7 +550,7 @@ export async function renameInArchive(
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
     logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
   } finally {
-    tryCleanupJS7z(js7z);
+    disposeJS7z(js7z);
   }
 }
 

@@ -5,7 +5,7 @@
  */
 
 import * as vscode from "vscode";
-import { JS7z, tryCleanupJS7z } from "../fileListing";
+import { JS7z, disposeJS7z } from "../fileListing";
 import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { validatePassword, sanitizeCliPath } from "../../utils/security";
@@ -50,7 +50,7 @@ export async function deleteFromArchive(
     });
     await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), new Uint8Array(updated));
   } finally {
-    tryCleanupJS7z(js7z);
+    disposeJS7z(js7z);
   }
 }
 
