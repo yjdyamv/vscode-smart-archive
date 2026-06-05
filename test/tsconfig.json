@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "types": ["node", "vitest/globals"],
     "ignoreDeprecations": "6.0"
   },
   "include": ["*.ts", "../src/**/*.ts"],
