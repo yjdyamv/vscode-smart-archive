@@ -159,7 +159,8 @@ const BROTLI_EXTS = new Set([".tar.br", ".tbr"]);
 /**
  * Check whether system 7-Zip is usable for a given archive format.
  * tar.zst / tar.lz4 creation is impossible (7z only unpacks these),
- * tar.br is handled entirely by brotli-wasm (system 7z bypassed).
+ * tar.br and tar.lz4 are handled entirely by WASM codecs (system 7z bypassed).
+ * tar.zst decompression requires v24+.
  * everything else uses system 7z when available (wrapped formats use
  * outer type: gzip/bzip2/xz).
  */
@@ -186,14 +187,15 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
   const isBrotli =
     BROTLI_EXTS.has(extOrLabel.toLowerCase()) || BROTLI_EXTS.has("." + extOrLabel.toLowerCase());
 
-  // Brotli is handled entirely by brotli-wasm, bypass system 7z
-  if (isBrotli) {
-    logger.info({ event: "system7z.skipBrotli", ext: extOrLabel });
+  // Brotli and LZ4 are handled entirely by WASM codecs, bypass system 7z —
+  // system 7z cannot decompress these formats at all.
+  if (isBrotli || isLz4) {
+    logger.info({ event: "system7z.skipCodec", ext: extOrLabel, codec: isBrotli ? "brotli" : "lz4" });
     return false;
   }
 
-  // System 7z cannot create zstd / lz4 archives at all (only decompress)
-  if ((isZstd || isLz4) && !isDecompress) {
+  // System 7z cannot create zstd archives at all (only decompress)
+  if (isZstd && !isDecompress) {
     logger.info({ event: "system7z.skipCreate", ext: extOrLabel });
     return false;
   }
