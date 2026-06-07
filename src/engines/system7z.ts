@@ -426,10 +426,10 @@ export async function compressWithSystem7z(
     } finally {
       try {
         fs.unlinkSync(tarPath);
-      } catch {}
+      } catch { logger.warn({ event: "system7z.compress.unlink.failed" }, "Failed to remove temp tar file") }
       try {
         fs.rmSync(path.dirname(tarPath), { recursive: true, force: true });
-      } catch {}
+      } catch { logger.warn({ event: "system7z.compress.rmdir.failed" }, "Failed to remove temp directory") }
     }
     return;
   }
@@ -804,6 +804,16 @@ function run7z(
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Maps Smart Archive format labels to 7-Zip `-t` type flags.
+ *
+ * This map is intentionally limited — it only lists formats that system
+ * 7-Zip handles directly. Codec-based wrapped formats (tar.zst, tar.lz4,
+ * tar.br) are routed through WASM before this function is ever reached
+ * (see hasSystem7zForFormat). Adding a new format to FORMAT_TABLE does
+ * NOT automatically require an entry here; only add it if system 7-Zip
+ * can natively create/extract that format.
+ */
 const FORMAT_7Z_MAP: Record<string, string> = {
   "7z": "7z",
   zip: "zip",

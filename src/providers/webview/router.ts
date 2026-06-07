@@ -191,10 +191,15 @@ async function resolveWritableFormat(fmt: string): Promise<string | undefined> {
 }
 
 /**
- * Extracts the base path (without extension) from a split volume path.
+ * Extracts the path stem (without any extension) from a split volume path.
  * Works for RAR (.partN.rar, .rNN) and standard (7z.001, zip.002) styles.
+ *
+ * Unlike {@link getSplitVolumeBase} in constants.ts (which keeps the
+ * extension, e.g. "archive.7z"), this function strips the extension too,
+ * returning just the stem (e.g. "archive").  Callers in this module use
+ * the stem to build new output paths with a different extension.
  */
-export function getSplitVolumeBase(filePath: string): string {
+export function getSplitVolumeStem(filePath: string): string {
   const m = filePath.match(/^(.+)\.part\d+\.rar$/i);
   if (m) return m[1];
   const m2 = filePath.match(/^(.+)\.r\d{2}$/i);
@@ -217,7 +222,7 @@ export function getSplitOutputPath(
   fmt: string,
   suffix: string,
 ): { dst: string; folder: string } {
-  const base = getSplitVolumeBase(filePath);
+  const base = getSplitVolumeStem(filePath);
   const baseName = path.basename(base);
   const dir = path.dirname(filePath);
   let folder = path.join(dir, baseName + suffix);
@@ -231,7 +236,7 @@ export function getSplitOutputPath(
 
 export function detectVolumeSize(filePath: string): string | undefined {
   const ext = getFullExt(filePath);
-  const base = getSplitVolumeBase(filePath);
+  const base = getSplitVolumeStem(filePath);
 
   let firstVol: string;
   if (/\.part\d+\.rar$/i.test(filePath)) {
@@ -720,7 +725,7 @@ async function handleMerge(webview: vscode.Webview, s: HandlerState): Promise<vo
     fmt = (await resolveWritableFormat(fmt)) ?? "";
     if (!fmt) { endOperation(s); return; }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    const base = getSplitVolumeBase(s.filePath);
+    const base = getSplitVolumeStem(s.filePath);
     const dst = base + "." + fmt;
     webview.postMessage({ c: "loading", t: t("archive.merging") });
     await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);

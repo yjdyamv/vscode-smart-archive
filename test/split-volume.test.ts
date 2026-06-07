@@ -3,7 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 
-import { getSplitVolumeBase, detectVolumeSize, getSplitOutputPath } from "../src/providers/webview/router";
+import { getSplitVolumeStem, detectVolumeSize, getSplitOutputPath } from "../src/providers/webview/router";
 
 let tmpDir: string;
 
@@ -21,41 +21,41 @@ function touch(filePath: string, size: number): void {
   fs.writeFileSync(filePath, buf);
 }
 
-describe("getSplitVolumeBase", () => {
+describe("getSplitVolumeStem", () => {
   it("strips .7z.001 suffix", () => {
-    expect(getSplitVolumeBase("/dir/archive.7z.001")).toBe("/dir/archive");
+    expect(getSplitVolumeStem("/dir/archive.7z.001")).toBe("/dir/archive");
   });
 
   it("strips .zip.002 suffix", () => {
-    expect(getSplitVolumeBase("/dir/archive.zip.002")).toBe("/dir/archive");
+    expect(getSplitVolumeStem("/dir/archive.zip.002")).toBe("/dir/archive");
   });
 
   it("strips .part1.rar suffix", () => {
-    expect(getSplitVolumeBase("/dir/archive.part1.rar")).toBe("/dir/archive");
+    expect(getSplitVolumeStem("/dir/archive.part1.rar")).toBe("/dir/archive");
   });
 
   it("strips .part5.rar suffix", () => {
-    expect(getSplitVolumeBase("/dir/archive.part5.rar")).toBe("/dir/archive");
+    expect(getSplitVolumeStem("/dir/archive.part5.rar")).toBe("/dir/archive");
   });
 
   it("strips .r00 suffix", () => {
-    expect(getSplitVolumeBase("/dir/archive.r00")).toBe("/dir/archive");
+    expect(getSplitVolumeStem("/dir/archive.r00")).toBe("/dir/archive");
   });
 
   it("strips .r01 suffix", () => {
-    expect(getSplitVolumeBase("/dir/archive.r01")).toBe("/dir/archive");
+    expect(getSplitVolumeStem("/dir/archive.r01")).toBe("/dir/archive");
   });
 
   it("handles paths with dots in directory names", () => {
-    expect(getSplitVolumeBase("/some.dir/archive.7z.001")).toBe("/some.dir/archive");
+    expect(getSplitVolumeStem("/some.dir/archive.7z.001")).toBe("/some.dir/archive");
   });
 
   it("handles paths with spaces", () => {
-    expect(getSplitVolumeBase("/my files/archive.7z.001")).toBe("/my files/archive");
+    expect(getSplitVolumeStem("/my files/archive.7z.001")).toBe("/my files/archive");
   });
 
   it("handles windows backslash paths", () => {
-    const result = getSplitVolumeBase("C:\\data\\archive.7z.001");
+    const result = getSplitVolumeStem("C:\\data\\archive.7z.001");
     expect(result).toBe("C:\\data\\archive");
   });
 });

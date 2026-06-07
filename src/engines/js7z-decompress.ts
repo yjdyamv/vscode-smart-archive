@@ -25,6 +25,61 @@ import { brotliDecompressFile } from "./brotli-codec";
 import { lz4DecompressFile } from "./lz4-codec";
 import { zstdDecompress } from "./zstd-codec";
 
+/**
+ * Shared helper for codec-based wrapped formats (brotli, lz4, zstd).
+ * Decompresses the codec wrapper to a raw .tar temp file, then extracts
+ * the tar into the output directory via WASM 7z, and finally triggers
+ * inner-tar unwrapping.
+ *
+ * @param codecDecompress — callback that reads the archive input and
+ *   writes the decompressed tar to the given temp path
+ */
+async function decompressCodecWrapper(
+  options: DecompressOptions,
+  progress: vscode.Progress<{ message?: string }> | undefined,
+  token: vscode.CancellationToken | undefined,
+  tmpPrefix: string,
+  ext: string,
+  codecDecompress: (input: string, tmpTar: string) => Promise<void>,
+): Promise<void> {
+  const prog = progress ?? { report: () => {} };
+  checkArchiveInputSize(options.inputPath);
+  prog.report({ message: t("decompress.unwrapTar") });
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), tmpPrefix));
+  const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
+  try {
+    await codecDecompress(options.inputPath, tmpTar);
+    const js7z = await JS7z();
+    try {
+      const tarFsPath = streamToVFS(js7z, tmpTar);
+      const usesMount = tarFsPath.startsWith("/mnt_");
+      let outPath: string;
+      if (usesMount) {
+        outPath = "/out_mnt";
+        js7z.FS.mkdir(outPath);
+        js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outPath);
+      } else {
+        js7z.FS.mkdir(OUTPUT_DIR);
+        outPath = OUTPUT_DIR;
+      }
+      prog.report({ message: t("decompress.inProgress") });
+      await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
+      if (token?.isCancellationRequested) throw new vscode.CancellationError();
+      if (!usesMount) {
+        copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+      }
+    } finally {
+      disposeJS7z(js7z);
+    }
+    logger.info({ event: "decompress.complete", outputDir: options.outputDir });
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch { logger.warn({ event: "decompress.cleanup.failed" }, "Failed to clean up temp directory") }
+  }
+  await unwrapInnerTar(options.outputDir, progress);
+}
+
 export async function decompressWith7z(
   options: DecompressOptions,
   progress?: vscode.Progress<{ message?: string }>,
@@ -45,122 +100,35 @@ export async function decompressWith7z(
   }
 
   const ext = getFullExt(options.inputPath);
+
+  // ── Codec-based wrapped formats (brotli, lz4, zstd) ──
+  // Each must first decompress the codec wrapper to produce a raw
+  // .tar file, then extract that tar via WASM 7z.
   if (getWrapExtension(ext) === "br") {
-    checkArchiveInputSize(options.inputPath);
-    prog.report({ message: t("decompress.unwrapTar") });
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sab_"));
-    const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
-    try {
-      await brotliDecompressFile(options.inputPath, tmpTar);
-      const js7z = await JS7z();
-      try {
-        const tarFsPath = streamToVFS(js7z, tmpTar);
-        const usesMount = tarFsPath.startsWith("/mnt_");
-        let outPath: string;
-        if (usesMount) {
-          outPath = "/out_mnt";
-          js7z.FS.mkdir(outPath);
-          js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outPath);
-        } else {
-          js7z.FS.mkdir(OUTPUT_DIR);
-          outPath = OUTPUT_DIR;
-        }
-        prog.report({ message: t("decompress.inProgress") });
-        await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
-        if (token?.isCancellationRequested) throw new vscode.CancellationError();
-        if (!usesMount) {
-          copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
-        }
-      } finally {
-        disposeJS7z(js7z);
-      }
-      logger.info({ event: "decompress.complete", outputDir: options.outputDir });
-    } finally {
-      try {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-      } catch {}
-    }
-    await unwrapInnerTar(options.outputDir, progress);
+    await decompressCodecWrapper(
+      options, progress, token, "sab_", ext,
+      (input, tmpTar) => brotliDecompressFile(input, tmpTar),
+    );
     return;
   }
 
   if (getWrapExtension(ext) === "lz4") {
-    checkArchiveInputSize(options.inputPath);
-    prog.report({ message: t("decompress.unwrapTar") });
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sal_"));
-    const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
-    try {
-      await lz4DecompressFile(options.inputPath, tmpTar);
-      const js7z = await JS7z();
-      try {
-        const tarFsPath = streamToVFS(js7z, tmpTar);
-        const usesMount = tarFsPath.startsWith("/mnt_");
-        let outPath: string;
-        if (usesMount) {
-          outPath = "/out_mnt";
-          js7z.FS.mkdir(outPath);
-          js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outPath);
-        } else {
-          js7z.FS.mkdir(OUTPUT_DIR);
-          outPath = OUTPUT_DIR;
-        }
-        prog.report({ message: t("decompress.inProgress") });
-        await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
-        if (token?.isCancellationRequested) throw new vscode.CancellationError();
-        if (!usesMount) {
-          copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
-        }
-      } finally {
-        disposeJS7z(js7z);
-      }
-      logger.info({ event: "decompress.complete", outputDir: options.outputDir });
-    } finally {
-      try {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-      } catch {}
-    }
-    await unwrapInnerTar(options.outputDir, progress);
+    await decompressCodecWrapper(
+      options, progress, token, "sal_", ext,
+      (input, tmpTar) => lz4DecompressFile(input, tmpTar),
+    );
     return;
   }
 
   if (getWrapExtension(ext) === "zst") {
-    checkArchiveInputSize(options.inputPath);
-    prog.report({ message: t("decompress.unwrapTar") });
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "saz_"));
-    const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
-    try {
-      const compressedData = new Uint8Array(fs.readFileSync(options.inputPath));
-      const decompressed = await zstdDecompress(compressedData);
-      fs.writeFileSync(tmpTar, Buffer.from(decompressed));
-      const js7z = await JS7z();
-      try {
-        const tarFsPath = streamToVFS(js7z, tmpTar);
-        const usesMount = tarFsPath.startsWith("/mnt_");
-        let outPath: string;
-        if (usesMount) {
-          outPath = "/out_mnt";
-          js7z.FS.mkdir(outPath);
-          js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outPath);
-        } else {
-          js7z.FS.mkdir(OUTPUT_DIR);
-          outPath = OUTPUT_DIR;
-        }
-        prog.report({ message: t("decompress.inProgress") });
-        await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
-        if (token?.isCancellationRequested) throw new vscode.CancellationError();
-        if (!usesMount) {
-          copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
-        }
-      } finally {
-        disposeJS7z(js7z);
-      }
-      logger.info({ event: "decompress.complete", outputDir: options.outputDir });
-    } finally {
-      try {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-      } catch {}
-    }
-    await unwrapInnerTar(options.outputDir, progress);
+    await decompressCodecWrapper(
+      options, progress, token, "saz_", ext,
+      async (input, tmpTar) => {
+        const compressedData = new Uint8Array(fs.readFileSync(input));
+        const decompressed = await zstdDecompress(compressedData);
+        fs.writeFileSync(tmpTar, Buffer.from(decompressed));
+      },
+    );
     return;
   }
 

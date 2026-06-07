@@ -111,10 +111,10 @@ export function brotliCompressFile(input: string, output: string, level: number)
     } finally {
       try {
         fs.closeSync(rfd);
-      } catch {}
+      } catch { logger.warn({ event: "brotli.compress.closeFailed" }, "Failed to close file descriptor") }
       try {
         fs.closeSync(out);
-      } catch {}
+      } catch { logger.warn({ event: "brotli.compress.closeFailed" }, "Failed to close file descriptor") }
     }
   });
 }
@@ -185,10 +185,10 @@ export async function brotliDecompressFile(input: string, output: string): Promi
   } finally {
     try {
       fs.closeSync(rfd);
-    } catch {}
+    } catch { logger.warn({ event: "brotli.decompress.closeFailed" }, "Failed to close file descriptor") }
     try {
       fs.closeSync(wfd);
-    } catch {}
+    } catch { logger.warn({ event: "brotli.decompress.closeFailed" }, "Failed to close file descriptor") }
   }
 }
 
@@ -196,6 +196,6 @@ function cleanup(path: string): void {
   try {
     fs.unlinkSync(path);
   } catch {
-    /* ignore */
+    logger.warn({ event: "brotli.cleanup.failed", path }, "Failed to remove temp file");
   }
 }
