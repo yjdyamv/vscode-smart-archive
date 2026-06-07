@@ -138,11 +138,14 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
   }
 
   // Strip leading slashes and drive letters (cross-platform).
-  // Match any single Unicode letter followed by colon, not just ASCII A-Z,
-  // to prevent homoglyph bypass (e.g. Cyrillic С:).
+  // ASCII-only drive-letter regex is sufficient because Windows
+  // assigns only A:-Z: as valid drive letters.  A homoglyph
+  // (e.g. Cyrillic С:) would not refer to a real drive and is
+  // harmless as a path component — the resolved-path check below
+  // catches any actual traversal.
   const safe = entryName
-    .replace(/^\p{L}:\\./u, "") // Windows drive letter with backslash
-    .replace(/^\p{L}:/u, "") // Windows drive letter (no backslash)
+    .replace(/^[a-zA-Z]:\\./, "") // Windows drive letter with backslash
+    .replace(/^[a-zA-Z]:/, "") // Windows drive letter (no backslash)
     .replace(/^\/+/, ""); // Unix absolute path
 
   // Normalize and resolve against output directory

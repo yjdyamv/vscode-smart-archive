@@ -193,10 +193,10 @@ function wasmCompressFile(input: string, output: string, level: number): Promise
     } finally {
       try {
         fs.closeSync(rfd);
-      } catch {}
+      } catch { logger.warn({ event: "zstd.compress.closeFailed" }, "Failed to close file descriptor") }
       try {
         fs.closeSync(out);
-      } catch {}
+      } catch { logger.warn({ event: "zstd.compress.closeFailed" }, "Failed to close file descriptor") }
     }
   });
 }
@@ -205,6 +205,6 @@ function cleanup(path: string): void {
   try {
     fs.unlinkSync(path);
   } catch {
-    /* ignore */
+    logger.warn({ event: "zstd.cleanup.failed", path }, "Failed to remove temp file");
   }
 }

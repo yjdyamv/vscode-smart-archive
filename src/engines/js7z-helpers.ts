@@ -98,6 +98,14 @@ function run7z(
       logger.info({ event: "run7z.exit", exitCode });
       if (exitCode === 0) {
         resolve();
+      } else if (exitCode === 1) {
+        // 7-Zip exit code 1 = Warning (Non fatal error).
+        // Match system7z.ts behaviour: resolve rather than reject.
+        logger.warn(
+          { event: "run7z.warning", exitCode, stderrTail: stderr.slice(-200) },
+          "7z exited with warning (code 1)",
+        );
+        resolve();
       } else {
         reject(new Error(t("decompress.exitError", String(exitCode)) + "\n" + stderr));
       }

@@ -309,7 +309,7 @@ export async function previewFileFromArchive(
   // files are handled by pruneOldPreviews which caps at 100 files).
   const cleanupDisposable = registerPreviewCleanup(tmpPath, uri);
   setTimeout(() => {
-    try { cleanupDisposable.dispose(); } catch {}
+    try { cleanupDisposable.dispose(); } catch { logger.warn({ event: "preview.cleanup.failed" }, "Failed to dispose preview cleanup") }
   }, 600_000);
   logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
 }
