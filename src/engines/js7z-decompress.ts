@@ -75,7 +75,9 @@ async function decompressCodecWrapper(
   } finally {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch { logger.warn({ event: "decompress.cleanup.failed" }, "Failed to clean up temp directory") }
+    } catch {
+      logger.warn({ event: "decompress.cleanup.failed" }, "Failed to clean up temp directory");
+    }
   }
   await unwrapInnerTar(options.outputDir, progress);
 }
@@ -105,30 +107,25 @@ export async function decompressWith7z(
   // Each must first decompress the codec wrapper to produce a raw
   // .tar file, then extract that tar via WASM 7z.
   if (getWrapExtension(ext) === "br") {
-    await decompressCodecWrapper(
-      options, progress, token, "sab_", ext,
-      (input, tmpTar) => brotliDecompressFile(input, tmpTar),
+    await decompressCodecWrapper(options, progress, token, "sab_", ext, (input, tmpTar) =>
+      brotliDecompressFile(input, tmpTar),
     );
     return;
   }
 
   if (getWrapExtension(ext) === "lz4") {
-    await decompressCodecWrapper(
-      options, progress, token, "sal_", ext,
-      (input, tmpTar) => lz4DecompressFile(input, tmpTar),
+    await decompressCodecWrapper(options, progress, token, "sal_", ext, (input, tmpTar) =>
+      lz4DecompressFile(input, tmpTar),
     );
     return;
   }
 
   if (getWrapExtension(ext) === "zst") {
-    await decompressCodecWrapper(
-      options, progress, token, "saz_", ext,
-      async (input, tmpTar) => {
-        const compressedData = new Uint8Array(fs.readFileSync(input));
-        const decompressed = await zstdDecompress(compressedData);
-        fs.writeFileSync(tmpTar, Buffer.from(decompressed));
-      },
-    );
+    await decompressCodecWrapper(options, progress, token, "saz_", ext, async (input, tmpTar) => {
+      const compressedData = new Uint8Array(fs.readFileSync(input));
+      const decompressed = await zstdDecompress(compressedData);
+      fs.writeFileSync(tmpTar, Buffer.from(decompressed));
+    });
     return;
   }
 
@@ -273,9 +270,7 @@ async function unwrapInnerTar(
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
         if (usesMount && beforeEntries) {
           // Sum sizes of newly extracted entries to enforce maxTotalSize.
-          const afterEntries = fs.readdirSync(outputDir).filter(
-            (e) => e !== "." && e !== "..",
-          );
+          const afterEntries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
           let extractedBytes = 0;
           for (const name of afterEntries) {
             if (beforeEntries.has(name) || name === tarFile) continue;

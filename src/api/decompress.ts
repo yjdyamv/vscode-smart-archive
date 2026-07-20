@@ -190,8 +190,12 @@ export async function decompress(params: DecompressParams): Promise<string> {
   if (params.signal) {
     const signal = params.signal;
     token = {
-      get isCancellationRequested() { return signal.aborted; },
-      onCancellationRequested(cb: () => void) { signal.addEventListener("abort", cb, { once: true }); },
+      get isCancellationRequested() {
+        return signal.aborted;
+      },
+      onCancellationRequested(cb: () => void) {
+        signal.addEventListener("abort", cb, { once: true });
+      },
     };
   }
 

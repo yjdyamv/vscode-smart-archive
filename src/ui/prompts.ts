@@ -114,9 +114,13 @@ export async function promptSavePath(
 }
 
 export async function promptVolumeSize(): Promise<string | undefined> {
-  const items: ({ label: string; value: string | undefined; description?: string })[] = [
+  const items: { label: string; value: string | undefined; description?: string }[] = [
     { label: t("compress.volume.none"), value: undefined },
-    ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value, description: v.description })),
+    ...getVolumeSizes().map((v) => ({
+      label: v.label,
+      value: v.value,
+      description: v.description,
+    })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
 

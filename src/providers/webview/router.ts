@@ -42,7 +42,13 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { detectSystem7z, spawnCapture } from "../../engines/system7z";
-import { getFullExt, isSplitVolume, COMPRESS_FORMATS, removeVolumeSuffix, isEncryptableExt } from "../../constants";
+import {
+  getFullExt,
+  isSplitVolume,
+  COMPRESS_FORMATS,
+  removeVolumeSuffix,
+  isEncryptableExt,
+} from "../../constants";
 import { getVolumeSizes, toBinaryVolumeSize } from "../../utils/volume-sizes";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
@@ -259,7 +265,7 @@ export function detectVolumeSize(filePath: string): string | undefined {
     const num = parseInt(v.slice(0, -1), 10);
     const targetBytes = num * (UNIT_BYTES[unit] || 1);
     const ratio = bytes / targetBytes;
-    if (ratio > 0.90 && ratio < 1.10) return preset.value;
+    if (ratio > 0.9 && ratio < 1.1) return preset.value;
   }
 
   // Fallback: approximate to nearest unit
@@ -277,10 +283,7 @@ export function detectVolumeSize(filePath: string): string | undefined {
  * Using 7z t rather than 7z l because listing succeeds for non-header-encrypted
  * 7z archives even with a wrong password (file table is not encrypted).
  */
-async function verifyArchivePassword(
-  archivePath: string,
-  password: string,
-): Promise<boolean> {
+async function verifyArchivePassword(archivePath: string, password: string): Promise<boolean> {
   // Try system 7z first
   const sz = detectSystem7z();
   if (sz) {
@@ -397,10 +400,15 @@ async function handlePassword(
   } catch (err) {
     logger.error({ event: "webview.password.error", err });
     const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-    if (msg.includes("password") || msg.includes("encrypt") || msg.includes("cannot open") || msg.includes("wrong")) {
+    if (
+      msg.includes("password") ||
+      msg.includes("encrypt") ||
+      msg.includes("cannot open") ||
+      msg.includes("wrong")
+    ) {
       webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
     } else {
-      webview.postMessage({ c: "err", t: (err instanceof Error ? err.message : String(err)) });
+      webview.postMessage({ c: "err", t: err instanceof Error ? err.message : String(err) });
     }
   }
 }
@@ -698,12 +706,23 @@ async function handleConvert(webview: vscode.Webview, s: HandlerState): Promise<
   const token = startOperation(s);
   try {
     const fmt = await promptConvertFormat();
-    if (!fmt) { endOperation(s); return; }
+    if (!fmt) {
+      endOperation(s);
+      return;
+    }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     const oldExt = getFullExt(s.filePath);
     const dst = s.filePath.slice(0, -oldExt.length) + `.${fmt}`;
     webview.postMessage({ c: "loading", t: t("archive.converting") });
-    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
+    await ArchiveService.convert(
+      s.filePath,
+      fmt,
+      dst,
+      s.password ?? "",
+      undefined,
+      undefined,
+      token,
+    );
     logger.info({ event: "webview.convert.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
@@ -723,12 +742,23 @@ async function handleMerge(webview: vscode.Webview, s: HandlerState): Promise<vo
     const ext = getFullExt(s.filePath);
     let fmt = ext.slice(1);
     fmt = (await resolveWritableFormat(fmt)) ?? "";
-    if (!fmt) { endOperation(s); return; }
+    if (!fmt) {
+      endOperation(s);
+      return;
+    }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     const base = getSplitVolumeStem(s.filePath);
     const dst = base + "." + fmt;
     webview.postMessage({ c: "loading", t: t("archive.merging") });
-    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
+    await ArchiveService.convert(
+      s.filePath,
+      fmt,
+      dst,
+      s.password ?? "",
+      undefined,
+      undefined,
+      token,
+    );
     logger.info({ event: "webview.merge.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
@@ -746,7 +776,10 @@ async function handleSplit(webview: vscode.Webview, s: HandlerState): Promise<vo
   const token = startOperation(s);
   try {
     const volSize = await promptVolumeSize();
-    if (!volSize) { endOperation(s); return; }
+    if (!volSize) {
+      endOperation(s);
+      return;
+    }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     const ext = getFullExt(s.filePath);
     const fmt = ext.slice(1);
@@ -781,9 +814,15 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
     const newPw = await pwInputBox(t("archive.encryptPrompt"), (v) =>
       v ? undefined : t("security.passwordEmpty"),
     );
-    if (!newPw) { endOperation(s); return; }
+    if (!newPw) {
+      endOperation(s);
+      return;
+    }
     const confirmPw = await pwInputBox(t("archive.encryptConfirm"));
-    if (!confirmPw) { endOperation(s); return; }
+    if (!confirmPw) {
+      endOperation(s);
+      return;
+    }
     if (confirmPw !== newPw) {
       vscode.window.showErrorMessage(t("validation.passwordMismatch"));
       endOperation(s);
@@ -793,7 +832,10 @@ async function handleEncrypt(webview: vscode.Webview, s: HandlerState): Promise<
     const ext = getFullExt(s.filePath);
     let fmt = ext.slice(1);
     fmt = (await resolveWritableFormat(fmt)) ?? "";
-    if (!fmt) { endOperation(s); return; }
+    if (!fmt) {
+      endOperation(s);
+      return;
+    }
     let volSize: string | undefined;
     let dst: string;
     if (isSplitVolume(s.filePath)) {
@@ -825,13 +867,19 @@ async function handleDecrypt(webview: vscode.Webview, s: HandlerState): Promise<
     let pw = s.password;
     if (!pw) {
       pw = await pwInputBox(t("archive.decryptPrompt"));
-      if (!pw) { endOperation(s); return; }
+      if (!pw) {
+        endOperation(s);
+        return;
+      }
     }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     const ext = getFullExt(s.filePath);
     let fmt = ext.slice(1);
     fmt = (await resolveWritableFormat(fmt)) ?? "";
-    if (!fmt) { endOperation(s); return; }
+    if (!fmt) {
+      endOperation(s);
+      return;
+    }
     let volSize: string | undefined;
     let dst: string;
     if (isSplitVolume(s.filePath)) {

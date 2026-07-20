@@ -14,10 +14,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { compressWith7z } from "../engines/js7z-engine";
-import {
-  COMPRESS_EXCLUDE_DEFAULTS,
-  COMPRESS_FORMATS,
-} from "../constants";
+import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS } from "../constants";
 import { getVolumeSizes } from "../utils/volume-sizes";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
@@ -191,9 +188,13 @@ async function promptLevelWizard(): Promise<StepResult<number>> {
 }
 
 async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
-  const items: ({ label: string; value: string | undefined; description?: string })[] = [
+  const items: { label: string; value: string | undefined; description?: string }[] = [
     { label: t("compress.volume.none"), value: undefined },
-    ...getVolumeSizes().map((v) => ({ label: v.label, value: v.value, description: v.description })),
+    ...getVolumeSizes().map((v) => ({
+      label: v.label,
+      value: v.value,
+      description: v.description,
+    })),
     { label: t("compress.volume.custom"), value: "__custom__" },
   ];
   const res = await promptQuickPick(items, {

@@ -141,9 +141,13 @@ export async function lz4DecompressFile(input: string, output: string): Promise<
   } finally {
     try {
       fs.closeSync(rfd);
-    } catch { logger.warn({ event: "lz4.decompress.closeFailed" }, "Failed to close file descriptor") }
+    } catch {
+      logger.warn({ event: "lz4.decompress.closeFailed" }, "Failed to close file descriptor");
+    }
     try {
       fs.closeSync(wfd);
-    } catch { logger.warn({ event: "lz4.decompress.closeFailed" }, "Failed to close file descriptor") }
+    } catch {
+      logger.warn({ event: "lz4.decompress.closeFailed" }, "Failed to close file descriptor");
+    }
   }
 }

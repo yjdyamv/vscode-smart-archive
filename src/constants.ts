@@ -458,4 +458,3 @@ export const NOISY_DIR_PATTERNS = [
 // ── Default compression exclude patterns ────────────────────────────
 
 export const COMPRESS_EXCLUDE_DEFAULTS = NOISY_DIR_PATTERNS;
-

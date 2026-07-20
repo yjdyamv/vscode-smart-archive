@@ -191,7 +191,11 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
   // Brotli and LZ4 are handled entirely by WASM codecs, bypass system 7z —
   // system 7z cannot decompress these formats at all.
   if (isBrotli || isLz4) {
-    logger.info({ event: "system7z.skipCodec", ext: extOrLabel, codec: isBrotli ? "brotli" : "lz4" });
+    logger.info({
+      event: "system7z.skipCodec",
+      ext: extOrLabel,
+      codec: isBrotli ? "brotli" : "lz4",
+    });
     return false;
   }
 
@@ -426,10 +430,14 @@ export async function compressWithSystem7z(
     } finally {
       try {
         fs.unlinkSync(tarPath);
-      } catch { logger.warn({ event: "system7z.compress.unlink.failed" }, "Failed to remove temp tar file") }
+      } catch {
+        logger.warn({ event: "system7z.compress.unlink.failed" }, "Failed to remove temp tar file");
+      }
       try {
         fs.rmSync(path.dirname(tarPath), { recursive: true, force: true });
-      } catch { logger.warn({ event: "system7z.compress.rmdir.failed" }, "Failed to remove temp directory") }
+      } catch {
+        logger.warn({ event: "system7z.compress.rmdir.failed" }, "Failed to remove temp directory");
+      }
     }
     return;
   }
@@ -625,7 +633,11 @@ interface CaptureResult {
   code: number | null;
 }
 
-export function spawnCapture(binary: string, args: string[], timeoutMs = 30_000): Promise<CaptureResult> {
+export function spawnCapture(
+  binary: string,
+  args: string[],
+  timeoutMs = 30_000,
+): Promise<CaptureResult> {
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
