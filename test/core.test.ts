@@ -1942,6 +1942,92 @@ for (const c of codecs) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// Delete entries from archive (7z d) — tar.gz focus
+// ════════════════════════════════════════════════════════════════════
+
+describe("delete from archive (7z d on tar)", () => {
+  it("full tar.gz flow: decompress → 7z d → recompress does not hang", async () => {
+    const files = {
+      "/myDir/a.txt": "hello",
+      "/myDir/b.txt": "world",
+    };
+    // 1. Create tar.gz using createWrapped
+    const tarGz = await createWrapped(files, "tar.gz");
+
+    // 2. Decompress the outer layer to get inner.tar
+    const j1 = await trackedJS7z();
+    j1.FS.writeFile("/archive.tar.gz", new Uint8Array(tarGz));
+    j1.FS.mkdir("/_extract");
+    await run7z(j1, ["x", "/archive.tar.gz", "-o/_extract", "-y"]);
+    const top = j1.FS.readdir("/_extract").filter((e: string) => e !== "." && e !== "..");
+    const innerTarName = top.find((e: string) => e.endsWith(".tar"))!;
+    const innerTarData = new Uint8Array(
+      j1.FS.readFile(`/_extract/${innerTarName}`, { encoding: "binary" }),
+    );
+    disposeJS7z(j1);
+
+    // 3. Create second instance, write inner.tar, run 7z d
+    const j2 = await trackedJS7z();
+    j2.FS.writeFile("/inner.tar", innerTarData);
+
+    // Use expanded paths (the fix)
+    const deletePaths = ["myDir", "myDir/a.txt", "myDir/b.txt"];
+    await expect(
+      Promise.race([
+        run7z(j2, ["d", "/inner.tar", "-y", ...deletePaths]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT: 7z d hung in full flow")), 10_000)),
+      ]),
+    ).resolves.toBeUndefined();
+
+    // 4. Read modified tar
+    const modifiedTar = new Uint8Array(
+      j2.FS.readFile("/inner.tar", { encoding: "binary" }),
+    );
+
+    // 5. Recompress to gzip using a FRESH instance
+    // Reusing the same js7z2 instance after 7z d HANGS on 7z a!
+    const j2b = await trackedJS7z();
+    j2b.FS.writeFile("/_re.tar", modifiedTar);
+    await expect(
+      Promise.race([
+        run7z(j2b, ["a", "/_re.tar.gz", "/_re.tar"]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT: 7z a recompression hung")), 10_000)),
+      ]),
+    ).resolves.toBeUndefined();
+
+    const compressedData = new Uint8Array(
+      j2b.FS.readFile("/_re.tar.gz", { encoding: "binary" }),
+    );
+    disposeJS7z(j2);
+    disposeJS7z(j2b);
+
+    // 6. Extract and verify
+    const j3 = await trackedJS7z();
+    j3.FS.writeFile("/final.tar.gz", compressedData);
+    j3.FS.mkdir("/_final");
+    await run7z(j3, ["x", "/final.tar.gz", "-o/_final", "-y"]);
+    const finalTop = j3.FS.readdir("/_final").filter((e: string) => e !== "." && e !== "..");
+    const finalTarName = finalTop.find((e: string) => e.endsWith(".tar"))!;
+    const finalTarData = new Uint8Array(
+      j3.FS.readFile(`/_final/${finalTarName}`, { encoding: "binary" }),
+    );
+
+    const j4 = await trackedJS7z();
+    j4.FS.writeFile("/_t.tar", finalTarData);
+    let finalStdout = "";
+    j4.print = (t: string) => { finalStdout += t + "\n"; };
+    j4.printErr = () => {};
+    await new Promise<void>((resolve, reject) => {
+      j4.onExit = (c) => (c === 0 ? resolve() : reject(new Error(`l exit ${c}`)));
+      j4.callMain(["l", "-slt", "-sccUTF-8", "/_t.tar"]);
+    });
+
+    expect(finalStdout).not.toContain("myDir/a.txt");
+    expect(finalStdout).not.toContain("myDir/b.txt");
+  }, 30_000);
+});
+
+// ════════════════════════════════════════════════════════════════════
 // pruneOldPreviews (requires compiled module, may not be available)
 // ════════════════════════════════════════════════════════════════════
 

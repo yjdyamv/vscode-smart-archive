@@ -95,20 +95,25 @@ export async function withWrappedArchive(
       } else if (wrapExt === "br") {
         compressedData = brotliCompress(new Uint8Array(modifiedTar), getUserCompressionLevel());
       } else {
-        // Reuse js7z2 for recompression — its VFS already has the modified
-        // inner tar, so run 7z a directly instead of creating a third instance.
-        js7z2.FS.writeFile("/_re.tar", new Uint8Array(modifiedTar));
-        const compOut = `/_re.${wrapExt}`;
-        const compArgs = ["a", compOut, "/_re.tar"];
-        if (password) {
-          validatePassword(password);
-          compArgs.splice(1, 0, `-p${password}`);
+        // Use a fresh instance for recompression — reusing js7z2 after
+        // callMain (7z d/7z rn) causes the second callMain (7z a) to hang.
+        const js7z3 = await JS7z({ print: () => {}, printErr: () => {} });
+        try {
+          js7z3.FS.writeFile("/_re.tar", new Uint8Array(modifiedTar));
+          const compOut = `/_re.${wrapExt}`;
+          const compArgs = ["a", compOut, "/_re.tar"];
+          if (password) {
+            validatePassword(password);
+            compArgs.splice(1, 0, `-p${password}`);
+          }
+          await new Promise<void>((resolve, reject) => {
+            js7z3.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
+            js7z3.callMain(compArgs);
+          });
+          compressedData = new Uint8Array(js7z3.FS.readFile(compOut, { encoding: "binary" }));
+        } finally {
+          disposeJS7z(js7z3);
         }
-        await new Promise<void>((resolve, reject) => {
-          js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a: ${c}`)));
-          js7z2.callMain(compArgs);
-        });
-        compressedData = new Uint8Array(js7z2.FS.readFile(compOut, { encoding: "binary" }));
       }
 
       await vscode.workspace.fs.writeFile(vscode.Uri.file(archivePath), compressedData);

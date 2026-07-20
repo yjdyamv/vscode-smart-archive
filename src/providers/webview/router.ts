@@ -45,6 +45,7 @@ import { detectSystem7z, spawnCapture } from "../../engines/system7z";
 import {
   getFullExt,
   isSplitVolume,
+  isWrappedFormat,
   COMPRESS_FORMATS,
   removeVolumeSuffix,
   isEncryptableExt,
@@ -478,7 +479,28 @@ async function handleDelete(
 
   try {
     webview.postMessage({ c: "loading", t: t("archive.deleting") });
-    await deleteFromArchive(s.filePath, msg.paths, s.password);
+
+    const ext = getFullExt(s.filePath);
+    let pathsToDelete = msg.paths;
+    if (isWrappedFormat(ext)) {
+      const expanded = new Set(pathsToDelete);
+      for (const p of msg.paths) {
+        const prefix = p + "/";
+        for (const entry of s.entries) {
+          if (entry.path.startsWith(prefix)) {
+            expanded.add(entry.path);
+          }
+        }
+      }
+      pathsToDelete = [...expanded];
+      logger.debug({
+        event: "webview.delSel.expanded",
+        original: msg.paths.length,
+        expanded: pathsToDelete.length,
+      });
+    }
+
+    await deleteFromArchive(s.filePath, pathsToDelete, s.password);
     logger.info({ event: "webview.delSel.complete", count: msg.paths.length });
     try {
       await setupWebview(
