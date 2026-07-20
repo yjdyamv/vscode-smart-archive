@@ -27,8 +27,8 @@ const inheritCollapsed = computed(() => props.flatNode.inheritCollapsed);
 const icon = computed(() => getFileIcon(node.value.name, isDir.value));
 const indentPx = 16;
 
-function indentGuides(depth: number): number[] {
-  return Array.from({ length: depth }, (_, i) => i);
+function indentGuides(depth: number, hasChildren: boolean): number[] {
+  return Array.from({ length: depth + (hasChildren ? 1 : 0) }, (_, i) => i);
 }
 
 function getNameHtml(): string {
@@ -104,7 +104,7 @@ function onExpandClick(e: MouseEvent) {
     @contextmenu="emit('contextmenu', $event)"
   >
     <span
-      v-for="i in indentGuides(depth)"
+      v-for="i in indentGuides(depth, flatNode.hasChildren)"
       :key="'g' + i"
       class="guide"
       :style="{ left: i * indentPx + indentPx / 2 + 'px' }"
