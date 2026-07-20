@@ -533,7 +533,7 @@
     "@bokuweb/zstd-wasm": "^0.0.27",
     "@vscode/codicons": "^0.0.45",
     "brotli-wasm": "^3.0.1",
-    "iconv-lite": "^0.7.2",
+    "iconv-lite": "^0.7.3",
     "js7z-tools": "^2.5.0",
     "lz4js": "^0.2.0",
     "minimatch": "^10.2.5",
@@ -542,10 +542,10 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^3.9.1",
-    "oxfmt": "^0.47.0",
-    "oxlint": "^1.62.0",
+    "@vscode/vsce": "^3.9.2",
+    "oxfmt": "^0.59.0",
+    "oxlint": "^1.74.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.10"
   }
 }
