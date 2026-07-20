@@ -493,9 +493,7 @@ onMounted(() => {
       viewState.value = "content";
       tree.initExpandedFromTree();
       const validPaths = new Set(tree.nodeMap.value.keys());
-      const filtered = new Set(
-        [...selection.state.selected].filter((p) => validPaths.has(p)),
-      );
+      const filtered = new Set([...selection.state.selected].filter((p) => validPaths.has(p)));
       if (filtered.size !== selection.state.selected.size) {
         selection.state.selected = filtered;
       }
@@ -505,7 +503,10 @@ onMounted(() => {
           let stillValid = false;
           const prefix = dir + "/";
           for (const p of validPaths) {
-            if (p.startsWith(prefix)) { stillValid = true; break; }
+            if (p.startsWith(prefix)) {
+              stillValid = true;
+              break;
+            }
           }
           if (!stillValid) {
             let idx = dir.lastIndexOf("/");

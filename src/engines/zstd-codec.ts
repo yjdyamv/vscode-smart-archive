@@ -193,10 +193,14 @@ function wasmCompressFile(input: string, output: string, level: number): Promise
     } finally {
       try {
         fs.closeSync(rfd);
-      } catch { logger.warn({ event: "zstd.compress.closeFailed" }, "Failed to close file descriptor") }
+      } catch {
+        logger.warn({ event: "zstd.compress.closeFailed" }, "Failed to close file descriptor");
+      }
       try {
         fs.closeSync(out);
-      } catch { logger.warn({ event: "zstd.compress.closeFailed" }, "Failed to close file descriptor") }
+      } catch {
+        logger.warn({ event: "zstd.compress.closeFailed" }, "Failed to close file descriptor");
+      }
     }
   });
 }

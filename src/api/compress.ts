@@ -52,8 +52,10 @@ export interface CompressParams {
 export function lookupFormat(label: string): FormatInfo {
   const found = COMPRESS_FORMATS.find((f) => f.label === label);
   if (!found) {
-    throw new Error(`Unknown or non-creatable format: "${label}". ` +
-      `Available: ${COMPRESS_FORMATS.map((f) => f.label).join(", ")}`);
+    throw new Error(
+      `Unknown or non-creatable format: "${label}". ` +
+        `Available: ${COMPRESS_FORMATS.map((f) => f.label).join(", ")}`,
+    );
   }
   return {
     label: found.label,
@@ -73,11 +75,7 @@ export function lookupFormat(label: string): FormatInfo {
  * @param format - Format label (e.g. "7z", "zip")
  * @param outputDir - Directory for the archive (defaults to dir of first target)
  */
-export function resolveOutputPath(
-  targets: string[],
-  format: string,
-  outputDir?: string,
-): string {
+export function resolveOutputPath(targets: string[], format: string, outputDir?: string): string {
   const ext = format; // format label IS the extension (e.g. "7z", "tar.gz")
   const firstTarget = targets[0];
   const dir = outputDir ?? path.dirname(firstTarget);
@@ -179,8 +177,12 @@ export async function compress(params: CompressParams): Promise<string> {
   if (params.signal) {
     const signal = params.signal;
     token = {
-      get isCancellationRequested() { return signal.aborted; },
-      onCancellationRequested(cb: () => void) { signal.addEventListener("abort", cb, { once: true }); },
+      get isCancellationRequested() {
+        return signal.aborted;
+      },
+      onCancellationRequested(cb: () => void) {
+        signal.addEventListener("abort", cb, { once: true });
+      },
     };
   }
 

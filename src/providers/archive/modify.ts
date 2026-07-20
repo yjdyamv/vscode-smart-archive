@@ -21,11 +21,7 @@ import { logger } from "../../utils/logger";
 const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024; // 100 MB hard limit for preview
 import { withWrappedArchive } from "./wrappedHelper";
 import { brotliDecompress } from "../../engines/brotli-codec";
-import {
-  hasSystem7zForFormat,
-  detectSystem7z,
-  spawnCapture,
-} from "../../engines/system7z";
+import { hasSystem7zForFormat, detectSystem7z, spawnCapture } from "../../engines/system7z";
 
 export async function createFolderInArchive(
   archivePath: string,
@@ -127,7 +123,10 @@ async function createFolderInWrappedArchive(
     const aArgs = firstLevel
       ? ["a", "/inner.tar", "-aot", `/${firstLevel}`]
       : ["a", "/inner.tar", "-aot", dotfile];
-    if (password) { validatePassword(password); aArgs.splice(1, 0, `-p${password}`); }
+    if (password) {
+      validatePassword(password);
+      aArgs.splice(1, 0, `-p${password}`);
+    }
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z a inner: ${c}`)));
       js7z2.callMain(aArgs);
@@ -159,12 +158,7 @@ export async function previewFileFromArchive(
   const useSystem7z = hasSystem7zForFormat(archiveExt, true);
   if (useSystem7z) {
     try {
-      fileData = await extractOneWithSystem7z(
-        archivePath,
-        normalizedFile,
-        archiveExt,
-        password,
-      );
+      fileData = await extractOneWithSystem7z(archivePath, normalizedFile, archiveExt, password);
     } catch (err) {
       logger.warn(
         { event: "previewFile.system7z.failed", err },
@@ -309,7 +303,11 @@ export async function previewFileFromArchive(
   // files are handled by pruneOldPreviews which caps at 100 files).
   const cleanupDisposable = registerPreviewCleanup(tmpPath, uri);
   setTimeout(() => {
-    try { cleanupDisposable.dispose(); } catch { logger.warn({ event: "preview.cleanup.failed" }, "Failed to dispose preview cleanup") }
+    try {
+      cleanupDisposable.dispose();
+    } catch {
+      logger.warn({ event: "preview.cleanup.failed" }, "Failed to dispose preview cleanup");
+    }
   }, 600_000);
   logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
 }
@@ -364,15 +362,7 @@ async function extractOneWithSystem7z(
 
       const tmpInner = path.join(tmpDir, "_inner");
       fs.mkdirSync(tmpInner);
-      const args2: string[] = [
-        "x",
-        innerPath,
-        `-o${tmpInner}`,
-        "-aoa",
-        "-y",
-        "--",
-        normalizedFile,
-      ];
+      const args2: string[] = ["x", innerPath, `-o${tmpInner}`, "-aoa", "-y", "--", normalizedFile];
       const r2 = await spawnCapture(sz, args2);
       if (r2.code !== 0) throw new Error(`7z x inner exit ${r2.code}`);
     }
@@ -393,7 +383,8 @@ async function extractOneWithSystem7z(
     }
     if (!filePath) {
       // Check inside single-subdirectory (e.g. _inner for wrapped formats)
-      const topDirs = fs.readdirSync(tmpDir, { withFileTypes: true })
+      const topDirs = fs
+        .readdirSync(tmpDir, { withFileTypes: true })
         .filter((e) => e.isDirectory());
       for (const d of topDirs) {
         const candidate = path.join(tmpDir, d.name, ...pathSegments);
@@ -543,7 +534,10 @@ export async function renameInArchive(
   try {
     const fsPath = streamToVFS(js7z, archivePath);
     const rnArgs = ["rn", fsPath, sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
-    if (password) { validatePassword(password); rnArgs.splice(1, 0, `-p${password}`); }
+    if (password) {
+      validatePassword(password);
+      rnArgs.splice(1, 0, `-p${password}`);
+    }
     logger.debug({ event: "rename.7zArgs", args: rnArgs.join(" ") });
 
     await new Promise<void>((resolve, reject) => {
@@ -570,7 +564,10 @@ async function renameInWrappedArchive(
   const newNorm = newPath.replace(/\\/g, "/");
   await withWrappedArchive(archivePath, password, async (js7z2) => {
     const rnArgs = ["rn", "/inner.tar", sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
-    if (password) { validatePassword(password); rnArgs.splice(1, 0, `-p${password}`); }
+    if (password) {
+      validatePassword(password);
+      rnArgs.splice(1, 0, `-p${password}`);
+    }
     await new Promise<void>((resolve, reject) => {
       js7z2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z rn inner: ${c}`)));
       js7z2.callMain(rnArgs);

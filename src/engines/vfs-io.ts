@@ -89,9 +89,7 @@ function streamSplitVolumes(
   if (pattern.extraBaseFile) {
     const firstPart = parts[0];
     // Strip known split-volume suffixes to get the base name for the callback.
-    const baseName = firstPart
-      .replace(/\.r\d{2}$/i, "")
-      .replace(/\.part\d+\.rar$/i, "");
+    const baseName = firstPart.replace(/\.r\d{2}$/i, "").replace(/\.part\d+\.rar$/i, "");
     const basePath = pattern.extraBaseFile(dir, baseName);
     if (basePath) {
       // Place the base file in VFS alongside the split parts with the

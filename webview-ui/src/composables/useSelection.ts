@@ -30,11 +30,13 @@ export function useSelection() {
       const normPath = path.endsWith("/") ? path.replace(/\/$/, "") : path;
       const addParent = !normPath.includes("/") ? "" : normPath.slice(0, normPath.lastIndexOf("/"));
       if (state.lastAddDir === addParent || state.lastAddDir === normPath) {
-        const otherSharesParent = [...state.selected].filter((p) => p !== path).some((p) => {
-          const np = p.endsWith("/") ? p.replace(/\/$/, "") : p;
-          const pParent = !np.includes("/") ? "" : np.slice(0, np.lastIndexOf("/"));
-          return pParent === addParent || np === addParent;
-        });
+        const otherSharesParent = [...state.selected]
+          .filter((p) => p !== path)
+          .some((p) => {
+            const np = p.endsWith("/") ? p.replace(/\/$/, "") : p;
+            const pParent = !np.includes("/") ? "" : np.slice(0, np.lastIndexOf("/"));
+            return pParent === addParent || np === addParent;
+          });
         if (!otherSharesParent) state.lastAddDir = "";
       }
     } else {

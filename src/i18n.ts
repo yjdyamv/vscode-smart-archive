@@ -324,9 +324,9 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "來源壓縮檔已不存在: {0}",
   },
   "archive.copyReplaced": {
-    en: "Replaced copied items from \"{0}\" with \"{1}\"",
-    "zh-cn": "已将复制的项目从 \"{0}\" 替换为 \"{1}\"",
-    "zh-tw": "已將複製的項目從 \"{0}\" 替換為 \"{1}\"",
+    en: 'Replaced copied items from "{0}" with "{1}"',
+    "zh-cn": '已将复制的项目从 "{0}" 替换为 "{1}"',
+    "zh-tw": '已將複製的項目從 "{0}" 替換為 "{1}"',
   },
   "archive.addFilesLabel": {
     en: "Add to Archive",

@@ -13,14 +13,25 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { compressWith7z, decompressWith7z, listFiles, isEncrypted } from "../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isSplitVolume, COMPRESS_FORMATS, isEncryptableExt } from "../constants";
+import {
+  getFullExt,
+  isWrappedFormat,
+  isSplitVolume,
+  COMPRESS_FORMATS,
+  isEncryptableExt,
+} from "../constants";
 import { logger } from "../utils/logger";
 import { validatePassword } from "../utils/security";
 import { t } from "../i18n";
 import { fetchFileList } from "../providers/fileListing";
 import { extractSelected } from "../providers/extraction";
 import { previewFileFromArchive, testArchive } from "../providers/archive/modify";
-import { addToArchive, deleteFromArchive, renameInArchive, createFolderInArchive } from "../providers/archive";
+import {
+  addToArchive,
+  deleteFromArchive,
+  renameInArchive,
+  createFolderInArchive,
+} from "../providers/archive";
 import type { CompressOptions, DecompressOptions } from "../types";
 
 export interface ArchiveServiceContext {
@@ -49,7 +60,10 @@ export class ArchiveService {
   }
 
   /** List files in an archive */
-  static async list(filePath: string, password?: string): Promise<{ path: string; size: number; type: string }[]> {
+  static async list(
+    filePath: string,
+    password?: string,
+  ): Promise<{ path: string; size: number; type: string }[]> {
     return fetchFileList(filePath, password ?? "");
   }
 
@@ -71,11 +85,7 @@ export class ArchiveService {
   }
 
   /** Preview a single file from archive */
-  static async preview(
-    archivePath: string,
-    filePath: string,
-    password?: string,
-  ): Promise<void> {
+  static async preview(archivePath: string, filePath: string, password?: string): Promise<void> {
     return previewFileFromArchive(archivePath, filePath, password);
   }
 
@@ -95,11 +105,7 @@ export class ArchiveService {
   }
 
   /** Delete entries from archive */
-  static async delete(
-    archivePath: string,
-    paths: string[],
-    password?: string,
-  ): Promise<void> {
+  static async delete(archivePath: string, paths: string[], password?: string): Promise<void> {
     return deleteFromArchive(archivePath, paths, password);
   }
 
@@ -136,7 +142,11 @@ export class ArchiveService {
     logger.info({ event: "service.convert.start", srcPath, dstFormat, dstPath });
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_cvt_"));
     try {
-      await decompressWith7z({ inputPath: srcPath, outputDir: tmp, password }, { report: () => {} }, token);
+      await decompressWith7z(
+        { inputPath: srcPath, outputDir: tmp, password },
+        { report: () => {} },
+        token,
+      );
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
       if (volumeSize) {
         fs.mkdirSync(path.dirname(dstPath), { recursive: true });

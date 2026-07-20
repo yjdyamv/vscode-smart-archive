@@ -40,8 +40,7 @@ export function toBinaryVolumeSize(value: string): string {
   if (!m) return value;
   if (m[2].toLowerCase() === "k") return value;
   const num = parseInt(m[1], 10);
-  const decimalBytes =
-    m[2].toLowerCase() === "g" ? num * 1_000_000_000 : num * 1_000_000;
+  const decimalBytes = m[2].toLowerCase() === "g" ? num * 1_000_000_000 : num * 1_000_000;
   const binaryMib = Math.floor(decimalBytes / 1_048_576);
   return binaryMib > 0 ? `${binaryMib}m` : value;
 }
@@ -65,9 +64,7 @@ export function getVolumeSizes(): VolumeSizeItem[] {
   const config = vscode.workspace.getConfiguration("smart-archive");
   const inspected = config.inspect<Record<string, string>>("volumeSizes");
   const userValue =
-    inspected?.workspaceFolderValue ??
-    inspected?.workspaceValue ??
-    inspected?.globalValue;
+    inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
   if (userValue && Object.keys(userValue).length > 0) {
     return Object.entries(userValue).map(([label, value]) => ({
       label,

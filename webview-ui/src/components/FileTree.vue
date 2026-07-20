@@ -25,9 +25,10 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLElement | null>(null);
 const rowHeight = computed(() => {
-  const fontSize = parseFloat(
-    getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size")
-  ) || parseFloat(getComputedStyle(document.documentElement).fontSize) || 14;
+  const fontSize =
+    parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size")) ||
+    parseFloat(getComputedStyle(document.documentElement).fontSize) ||
+    14;
   return fontSize * 1.85;
 });
 

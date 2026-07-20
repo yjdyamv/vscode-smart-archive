@@ -74,7 +74,12 @@ async function decompressSingleFile(
   const effectiveInput = resolveEffectiveInput(inputPath);
   if (effectiveInput !== inputPath) {
     logger.info({ event: "decompress.splitVolume.redirect", from: inputPath, to: effectiveInput });
-    return decompressSingleFile(vscode.Uri.file(effectiveInput), batchIdx, batchTotal, knownPassword);
+    return decompressSingleFile(
+      vscode.Uri.file(effectiveInput),
+      batchIdx,
+      batchTotal,
+      knownPassword,
+    );
   }
 
   if (isRarExt(ext)) {
