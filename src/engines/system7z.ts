@@ -26,6 +26,7 @@ import * as iconv from "iconv-lite";
 import type { CompressOptions, DecompressOptions } from "../types";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
+import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { validatePassword, checkFileSize } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
@@ -591,7 +592,7 @@ export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
     }
     // Listing produced no entries — likely header-encrypted
     const msg = (stdout + stderr).toLowerCase();
-    if (msg.includes("encrypt") || msg.includes("wrong password") || msg.includes("cannot open")) {
+    if (isPasswordOrEncryptError(msg)) {
       logger.debug({
         event: "system7z.isEncrypted",
         encrypted: true,
@@ -615,10 +616,7 @@ export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
     );
     try {
       const { stderr } = await spawnCapture(sz, ["t", "-p", filePath]);
-      const msg = stderr.toLowerCase();
-      return (
-        msg.includes("encrypt") || msg.includes("wrong password") || msg.includes("cannot open")
-      );
+      return isPasswordOrEncryptError(stderr);
     } catch {
       return false;
     }

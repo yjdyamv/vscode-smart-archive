@@ -4,7 +4,7 @@
  * The ONLY JS7z cleanup function. Always frees the WASM heap via
  * destroy / _cleanup.
  *
- * @module engines/js7z-pool
+ * @module engines/js7z-lifecycle
  */
 
 import type { JS7zInstance } from "../types";
@@ -17,7 +17,7 @@ import { logger } from "../utils/logger";
 export function disposeJS7z(instance: JS7zInstance): void {
   try {
     if (typeof instance.destroy === "function") instance.destroy();
-    else if (typeof (instance as any)._cleanup === "function") (instance as any)._cleanup();
+    else if (typeof instance._cleanup === "function") instance._cleanup();
   } catch (err) {
     logger.warn({ event: "js7z.destroy.failed", err }, "Failed to dispose JS7z instance");
   }

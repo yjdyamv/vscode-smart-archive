@@ -19,16 +19,18 @@ import { withWrappedArchive } from "./wrappedHelper";
 import { prepareExclusions, isPathExcluded, type ExclusionSet } from "../../utils/exclude";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../../constants";
 
-// ── Module-level state for add-to-archive ──
+// ── Per-archive pending state for add-to-archive ──
 
-let _pendingAdd: {
+interface PendingAddState {
   archivePath: string;
   targetDir: string;
   password: string | undefined;
   webview: vscode.Webview | null;
   archiveUri: vscode.Uri | null;
   onComplete?: (webview: vscode.Webview, archiveUri: vscode.Uri, toast?: string) => Promise<void>;
-} | null = null;
+}
+
+const pendingAdds = new Map<string, PendingAddState>();
 
 export function initAddToArchive(
   archivePath: string,
@@ -38,27 +40,29 @@ export function initAddToArchive(
   archiveUri: vscode.Uri | null,
   onComplete?: (webview: vscode.Webview, archiveUri: vscode.Uri, toast?: string) => Promise<void>,
 ): void {
-  if (_pendingAdd) {
+  const prev = pendingAdds.get(archivePath);
+  if (prev) {
     logger.warn(
-      { event: "addToArchive.init.overwritten", prevArchive: _pendingAdd.archivePath },
+      { event: "addToArchive.init.overwritten", prevArchive: archivePath },
       "Pending add state overwritten — previous request was never executed",
     );
-    // Cancel the previous pending operation by clearing its state
-    _pendingAdd.webview?.postMessage({ c: "loading", t: false });
+    prev.webview?.postMessage({ c: "loading", t: false });
   }
-  _pendingAdd = { archivePath, targetDir, password, webview, archiveUri, onComplete };
+  pendingAdds.set(archivePath, { archivePath, targetDir, password, webview, archiveUri, onComplete });
 }
 
 export async function runAddToArchive(): Promise<void> {
-  const ctx = _pendingAdd;
-  _pendingAdd = null;
-  if (!ctx) {
+  const entries = [...pendingAdds.entries()];
+  if (entries.length === 0) {
     logger.warn(
       { event: "addToArchive.run.noCtx" },
       "runAddToArchive called without pending state",
     );
     return;
   }
+  const firstKey = entries[0][0];
+  const ctx = pendingAdds.get(firstKey)!;
+  pendingAdds.delete(firstKey);
 
   try {
     ctx.webview?.postMessage({ c: "loading", t: true });

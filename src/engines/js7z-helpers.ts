@@ -17,7 +17,7 @@ import { logger } from "../utils/logger";
 import { streamToVFS } from "./vfs-io";
 
 // Canonical cleanup re-exported from the pool module for convenience
-export { disposeJS7z } from "./js7z-pool";
+export { disposeJS7z } from "./js7z-lifecycle";
 
 const INPUT_DIR = "/in";
 const OUTPUT_DIR = "/out";

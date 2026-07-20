@@ -131,6 +131,10 @@ export function buildCompressOptions(params: CompressParams): CompressOptions {
   };
 }
 
+interface ProgressReporter {
+  report: (v: { message?: string }) => void;
+}
+
 /**
  * Execute a compression operation.
  *
@@ -168,9 +172,8 @@ export async function compress(params: CompressParams): Promise<string> {
   const compressOpts = buildCompressOptions(params);
   const excludePatterns = params.excludePatterns ?? COMPRESS_EXCLUDE_DEFAULTS;
 
-  // Adapt VSCode-agnostic callbacks to engine-compatible shapes
-  const progress = params.onProgress
-    ? ({ report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") } as any)
+  const progress: ProgressReporter | undefined = params.onProgress
+    ? { report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") }
     : undefined;
 
   let token: any = undefined;
