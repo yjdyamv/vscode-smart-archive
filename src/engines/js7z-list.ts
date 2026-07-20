@@ -14,6 +14,7 @@ import { streamToVFS } from "./vfs-io";
 import { getBaseName } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
+import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { JS7z } from "./js7z-factory";
 import { parse7zListing } from "../utils/parse7z";
 import { hasSystem7z, listWithSystem7z, isEncryptedSystem7z } from "./system7z";
@@ -110,7 +111,7 @@ export async function isEncrypted(filePath: string): Promise<boolean> {
         "Encryption detection via 7z test failed, checking stderr",
       );
       const msg = (stdout + stderr).toLowerCase();
-      return msg.includes("encrypted") || msg.includes("wrong password");
+      return isPasswordOrEncryptError(msg);
     }
   } finally {
     disposeJS7z(js7z);

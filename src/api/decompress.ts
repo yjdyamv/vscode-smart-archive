@@ -150,6 +150,10 @@ export function validateArchive(inputPath: string): string[] {
   return warnings;
 }
 
+interface ProgressReporter {
+  report: (v: { message?: string }) => void;
+}
+
 /**
  * Execute a decompression operation.
  *
@@ -182,8 +186,8 @@ export async function decompress(params: DecompressParams): Promise<string> {
   const outputDir = params.outputDir ?? deriveOutputDir(effectiveInput);
 
   // Adapt VSCode-agnostic callbacks to engine-compatible shapes
-  const progress = params.onProgress
-    ? ({ report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") } as any)
+  const progress: ProgressReporter | undefined = params.onProgress
+    ? { report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") }
     : undefined;
 
   let token: any = undefined;

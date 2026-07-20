@@ -13,7 +13,7 @@ import type { JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
 import { logger } from "../utils/logger";
-import { disposeJS7z } from "../engines/js7z-pool";
+import { disposeJS7z } from "../engines/js7z-lifecycle";
 import { parse7zListing } from "../utils/parse7z";
 import { validatePassword, checkFileSize, checkTotalSize } from "../utils/security";
 import { t } from "../i18n";
@@ -111,8 +111,7 @@ async function fetchFileList(
       // When a password is provided, `can not open` is almost always
       // a wrong-password / encryption issue, not a split-volume issue.
       if (!password) {
-        const wrapped = new Error(t("decompress.missingVolumes"));
-        (wrapped as any).cause = err;
+        const wrapped = new Error(t("decompress.missingVolumes"), { cause: err });
         throw wrapped;
       }
     }

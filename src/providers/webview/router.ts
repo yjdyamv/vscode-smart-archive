@@ -51,6 +51,7 @@ import {
 } from "../../constants";
 import { getVolumeSizes, toBinaryVolumeSize } from "../../utils/volume-sizes";
 import { logger } from "../../utils/logger";
+import { isPasswordOrEncryptError } from "../../utils/errorClassifier";
 import { t, formatCompactSize } from "../../i18n";
 import {
   buildTreeRootOnly,
@@ -399,16 +400,11 @@ async function handlePassword(
     }
   } catch (err) {
     logger.error({ event: "webview.password.error", err });
-    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-    if (
-      msg.includes("password") ||
-      msg.includes("encrypt") ||
-      msg.includes("cannot open") ||
-      msg.includes("wrong")
-    ) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (isPasswordOrEncryptError(msg)) {
       webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
     } else {
-      webview.postMessage({ c: "err", t: err instanceof Error ? err.message : String(err) });
+      webview.postMessage({ c: "err", t: msg });
     }
   }
 }
