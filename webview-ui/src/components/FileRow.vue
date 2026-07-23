@@ -25,6 +25,15 @@ const isDir = computed(() => node.value.kind === "DIRECTORY");
 const isCollapsedDir = computed(() => isDir.value && node.value.collapsed === true);
 const inheritCollapsed = computed(() => props.flatNode.inheritCollapsed);
 const icon = computed(() => getFileIcon(node.value.name, isDir.value));
+const descLabel = computed(() => {
+  if (!isDir.value) return "";
+  const counts = window._xDescCounts?.[node.value.path];
+  if (!counts) return "";
+  const parts: string[] = [];
+  if (counts.files > 0) parts.push(`${counts.files} file${counts.files > 1 ? "s" : ""}`);
+  if (counts.dirs > 0) parts.push(`${counts.dirs} dir${counts.dirs > 1 ? "s" : ""}`);
+  return parts.length > 0 ? `(${parts.join(", ")})` : "";
+});
 const indentPx = 16;
 
 function indentGuides(depth: number, showChildGuide: boolean): number[] {
@@ -129,6 +138,7 @@ function onExpandClick(e: MouseEvent) {
     </span>
     <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
     <span class="name" :title="node.path" v-html="nameHtml"></span>
+    <span v-if="isDir" class="desc-count">{{ descLabel }}</span>
     <span v-if="!isDir && node.size > 0" class="size">{{ formatSize(node.size) }}</span>
   </div>
 </template>
@@ -271,6 +281,13 @@ function onExpandClick(e: MouseEvent) {
   margin-left: 10px;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+.desc-count {
+  font-size: calc(var(--vscode-font-size) * 0.82);
+  color: var(--vscode-descriptionForeground);
+  margin-left: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 :deep(mark) {
   background: var(--vscode-editor-findMatchHighlightBackground, #d4d40066);

@@ -315,6 +315,16 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     ctx.scrollToIndex(idx);
   }
 
+  function getPageSize(): number {
+    const el = ctx.containerEl.value;
+    if (!el) return 15;
+    const fontSize =
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size")) ||
+      parseFloat(getComputedStyle(document.documentElement).fontSize) ||
+      14;
+    return Math.max(1, Math.floor(el.clientHeight / (fontSize * 1.85)));
+  }
+
   function handleKeyboard(e: KeyboardEvent) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if ((e.ctrlKey || e.metaKey) && e.key === "a") {
@@ -342,13 +352,15 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     if (e.key === "ArrowUp") { e.preventDefault(); navigateRows(-1, e.shiftKey); }
     if (e.key === "PageDown") {
       e.preventDefault();
-      const el = ctx.containerEl.value;
-      if (el) el.scrollBy({ top: el.clientHeight, behavior: "auto" });
+      const page = getPageSize();
+      ctx.containerEl.value?.scrollBy({ top: ctx.containerEl.value.clientHeight, behavior: "auto" });
+      navigateRows(page, e.shiftKey);
     }
     if (e.key === "PageUp") {
       e.preventDefault();
-      const el = ctx.containerEl.value;
-      if (el) el.scrollBy({ top: -el.clientHeight, behavior: "auto" });
+      const page = getPageSize();
+      ctx.containerEl.value?.scrollBy({ top: -ctx.containerEl.value.clientHeight, behavior: "auto" });
+      navigateRows(-page, e.shiftKey);
     }
     if (e.key === "Home") {
       e.preventDefault();
