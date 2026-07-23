@@ -35,22 +35,14 @@ const canEncrypt = ref(!!window._xCanEncrypt);
 const sort = useSort();
 const tree = useTreeFlatten(treeData);
 
-// Restore persisted sort/search preferences
-const prefs = loadState<{ sortKey?: string; sortAsc?: boolean; searchQuery?: string }>();
+// Restore persisted sort preference (search is archive-specific, don't persist)
+const prefs = loadState<{ sortKey?: string; sortAsc?: boolean }>();
 if (prefs?.sortKey) sort.setSort(prefs.sortKey as SortKey);
 if (prefs?.sortAsc === false) sort.setSort(sort.sortKey.value);
-if (prefs?.searchQuery) {
-  search.query.value = prefs.searchQuery;
-  search.isRegex.value = false;
-}
 
 watch([sort.sortKey, sort.sortAsc], () => {
   treeData.value = sort.sortNodes([...treeData.value]);
   saveState({ sortKey: sort.sortKey.value, sortAsc: sort.sortAsc.value });
-});
-
-watch(search.query, (v) => {
-  saveState({ searchQuery: v });
 });
 
 watch(

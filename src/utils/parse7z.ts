@@ -56,6 +56,21 @@ export function parse7zListing(
   }
   flush();
 
+  // Second pass: for entries without Attributes, infer directories
+  // by checking whether any other entry's path starts with this one + "/".
+  // TAR format listings omit the Attributes field entirely.
+  const pathSet = new Set(results.map((r) => r.path));
+  for (const r of results) {
+    if (r.type === "DIRECTORY") continue;
+    const prefix = r.path + "/";
+    for (const p of pathSet) {
+      if (p.startsWith(prefix)) {
+        r.type = "DIRECTORY";
+        break;
+      }
+    }
+  }
+
   const volBase = getSplitVolumeBase(archiveName);
   return results.filter((r) => {
     const p = r.path;

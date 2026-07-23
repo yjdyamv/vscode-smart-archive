@@ -15,16 +15,30 @@ import { logger } from "../utils/logger";
 
 const BLOCK = 512;
 
+export function writeLongLink(fd: number, fullName: string): void {
+  const nameBytes = Buffer.from(fullName);
+  // GNU tar long filename: type 'L' header with "././@LongLink" as name,
+  // followed by the full path padded to BLOCK boundary.
+  const header = tarHeader("././@LongLink", nameBytes.length, false);
+  header[156] = 0x4c; // type 'L'
+  // Recompute checksum after changing type
+  let sum = 0;
+  for (let i = 0; i < BLOCK; i++) {
+    sum += i >= 148 && i < 156 ? 32 : header[i];
+  }
+  const chk = sum.toString(8).padStart(6, "0") + "\0 ";
+  Buffer.from(chk).copy(header, 148);
+  fs.writeSync(fd, header);
+  fs.writeSync(fd, nameBytes);
+  const pad = padSize(nameBytes.length) - nameBytes.length;
+  if (pad > 0) fs.writeSync(fd, Buffer.alloc(pad));
+}
+
 function tarHeader(name: string, size: number, isDir: boolean): Buffer {
   const buf = Buffer.alloc(BLOCK);
-  // name (100) — zero-padded; warn if truncated
-  if (Buffer.byteLength(name) > 100) {
-    logger.warn(
-      { event: "tar.nameTruncated", name, originalLen: name.length },
-      "TAR header name truncated to 100 bytes",
-    );
-  }
-  Buffer.from(name.slice(0, 100)).copy(buf, 0);
+  // name (100) — zero-padded; caller handles long names via writeLongLink
+  const nameBuf = Buffer.from(name.slice(0, 100));
+  nameBuf.copy(buf, 0);
   // mode (8) — octal string, space-padded right
   const mode = isDir ? "000755 " : "000644 ";
   Buffer.from(mode).copy(buf, 100);
@@ -117,16 +131,21 @@ export async function createTarFile(
       const rel = path.relative(rootDir, loc).replace(/\\/g, "/");
 
       if (stat.isDirectory()) {
+        const dirName = rel + "/";
         // Write directory entry
-        fs.writeSync(fd, tarHeader(rel + "/", 0, true));
+        if (Buffer.byteLength(dirName) > 100) writeLongLink(fd, dirName);
+        fs.writeSync(fd, tarHeader(dirName, 0, true));
         const all = collectPaths(loc, exclusions, token);
         for (const full of all) {
           if (token?.isCancellationRequested) throw new vscode.CancellationError();
           const fstat = fs.statSync(full);
           const frel = path.relative(rootDir, full).replace(/\\/g, "/");
           if (fstat.isDirectory()) {
-            fs.writeSync(fd, tarHeader(frel + "/", 0, true));
+            const dname = frel + "/";
+            if (Buffer.byteLength(dname) > 100) writeLongLink(fd, dname);
+            fs.writeSync(fd, tarHeader(dname, 0, true));
           } else {
+            if (Buffer.byteLength(frel) > 100) writeLongLink(fd, frel);
             fs.writeSync(fd, tarHeader(frel, fstat.size, false));
             const rfd = fs.openSync(full, "r");
             try {
@@ -137,7 +156,6 @@ export async function createTarFile(
                 fs.writeSync(fd, buf, 0, bytesRead);
                 written += bytesRead;
               }
-              // Pad to 512-byte boundary
               const pad = padSize(written) - written;
               if (pad > 0) fs.writeSync(fd, Buffer.alloc(pad));
             } finally {
@@ -146,7 +164,7 @@ export async function createTarFile(
           }
         }
       } else {
-        // Write file entry
+        if (Buffer.byteLength(rel) > 100) writeLongLink(fd, rel);
         fs.writeSync(fd, tarHeader(rel, stat.size, false));
         const rfd = fs.openSync(loc, "r");
         try {

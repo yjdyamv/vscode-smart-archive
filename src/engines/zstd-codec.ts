@@ -119,9 +119,9 @@ export function zstdCompressFile(input: string, output: string, level: number): 
         { timeout: 120_000 },
       );
 
-      let stderr = "";
+      const stderrChunks: Buffer[] = [];
       proc.stderr?.on("data", (d: Buffer) => {
-        stderr += d.toString();
+        stderrChunks.push(d);
       });
 
       proc.on("close", (code) => {
@@ -132,6 +132,7 @@ export function zstdCompressFile(input: string, output: string, level: number): 
           resolve();
         } else {
           cleanup(output);
+          const stderr = Buffer.concat(stderrChunks).toString();
           logger.error({
             event: "zstd.compress.system.failed",
             code,
