@@ -679,8 +679,8 @@ export function spawnCapture(
       : { timeoutMs: SPAWN_CAPTURE_TIMEOUT, ...opts };
 
   return new Promise((resolve, reject) => {
-    let stdout = "";
-    let stderr = "";
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
     let settled = false;
     logger.debug({ event: "system7z.spawn", binary, args: args.join(" ") });
 
@@ -705,10 +705,10 @@ export function spawnCapture(
     }, timeoutMs);
 
     proc.stdout?.on("data", (d: Buffer) => {
-      stdout += decodeBuffer(d);
+      stdoutChunks.push(d);
     });
     proc.stderr?.on("data", (d: Buffer) => {
-      stderr += decodeBuffer(d);
+      stderrChunks.push(d);
     });
     proc.on("error", (err) => {
       if (settled) return;
@@ -721,6 +721,10 @@ export function spawnCapture(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      // Decode accumulated buffers at close to avoid splitting multi-byte
+      // UTF-8 characters across chunk boundaries in large listings.
+      const stdout = decodeBuffer(Buffer.concat(stdoutChunks));
+      const stderr = decodeBuffer(Buffer.concat(stderrChunks));
       logger.debug({ event: "system7z.spawn.close", binary, code, stderrLen: stderr.length });
       resolve({ stdout, stderr, code });
     });
@@ -747,7 +751,7 @@ function run7z(
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
   return new Promise<void>((resolve, reject) => {
-    let combinedOutput = "";
+    const combinedChunks: Buffer[] = [];
     let lastPct = -1;
     const startTime = Date.now();
 
@@ -773,12 +777,12 @@ function run7z(
     });
 
     proc.stdout?.on("data", (d: Buffer) => {
-      combinedOutput += decodeBuffer(d);
+      combinedChunks.push(d);
     });
 
     proc.stderr?.on("data", (d: Buffer) => {
       const text = decodeBuffer(d);
-      combinedOutput += text;
+      combinedChunks.push(d);
 
       // Parse progress: 7z outputs lines like " 45% 12 - file.txt" to stderr
       const m = text.match(/(\d{1,3})%/);
@@ -811,6 +815,7 @@ function run7z(
     proc.on("close", (code, signal) => {
       cancelSub?.dispose();
       const elapsed = Date.now() - startTime;
+      const combinedOutput = decodeBuffer(Buffer.concat(combinedChunks));
       const logMeta = {
         event: "system7z.run.close",
         code,
