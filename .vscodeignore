@@ -19,3 +19,12 @@ node_modules/**/*.d.ts
 node_modules/**/README.md
 out/**/*.map
 **/.gitignore
+**/.DS_Store
+.agents/**
+.claude/**
+skills-lock.json
+tsconfig.json
+vitest.config.ts
+webview-ui/__tests__/**
+test/__mocks__/**
+
