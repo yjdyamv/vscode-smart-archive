@@ -77,15 +77,18 @@ export function dedupPaths(s: Set<string>): string[] {
   const arr = [...s];
   const result: string[] = [];
   for (const p of arr) {
-    const parts = p.replace(/\\/g, "/").split("/");
-    let covered = false;
-    for (let j = parts.length - 2; j >= 0; j--) {
-      if (s.has(parts.slice(0, j + 1).join("/"))) {
-        covered = true;
-        break;
-      }
-    }
-    if (!covered) result.push(p);
+    if (!isCoveredByAncestor(p, s)) result.push(p);
   }
   return result;
+}
+
+/** Check whether any ancestor of `path` exists in the given Set. */
+export function isCoveredByAncestor(path: string, selected: Set<string>): boolean {
+  const parts = path.replace(/\\/g, "/").split("/");
+  for (let j = parts.length - 2; j >= 0; j--) {
+    if (selected.has(parts.slice(0, j + 1).join("/"))) {
+      return true;
+    }
+  }
+  return false;
 }
