@@ -64,12 +64,12 @@ const visibleFlatNodes = computed(() => {
 
 const fileTreeRef = ref<InstanceType<typeof FileTree> | null>(null);
 const containerEl = computed(() => fileTreeRef.value?.containerEl ?? null);
-const scrollToIndex = (idx: number) => fileTreeRef.value?.scrollToIndex(idx);
+const scrollToPath = (path: string) => fileTreeRef.value?.scrollToPath(path);
 
 const av = useArchiveView({
   post, onMessage, tree, treeData, selection, search, visibleFlatNodes,
   viewState, loadingMsg, archiveProps, totalFiles, totalDirs,
-  readOnly, isSplit, canSplit, isEncrypted, canEncrypt, containerEl, scrollToIndex,
+  readOnly, isSplit, canSplit, isEncrypted, canEncrypt, containerEl, scrollToPath,
 });
 
 onMounted(() => {

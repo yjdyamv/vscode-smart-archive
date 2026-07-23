@@ -26,7 +26,10 @@ const containerRef = ref<HTMLElement | null>(null);
 
 defineExpose({
   containerEl: containerRef,
-  scrollToIndex: (idx: number) => virtualizer.value.scrollToIndex(idx, { align: "auto" }),
+  scrollToPath: (path: string) => {
+    const el = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  },
 });
 const rowHeight = computed(() => {
   const fontSize =
