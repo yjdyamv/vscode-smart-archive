@@ -3,45 +3,57 @@
 [![Version](https://img.shields.io/visual-studio-marketplace/v/yjdyamv.smart-archive)](https://marketplace.visualstudio.com/items?itemName=yjdyamv.smart-archive)
 [![License](https://img.shields.io/github/license/yjdyamv/vscode-smart-archive)](LICENSE)
 
-VSCode extension for compressing and decompressing files using **7-Zip WebAssembly** and **zstd-wasm** — no native binaries required. Optionally uses a system-installed 7-Zip for faster performance.
+VSCode extension for creating, extracting, and browsing archives — powered by **7-Zip WebAssembly** and **zstd-wasm**. No native binaries required, yet faster than desktop tools when a system 7-Zip is available.
 
 ## Features
 
-- **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst
-- **Decompress** from 30+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
-- **System 7-Zip/zstd support** — auto-detects local 7-Zip/zstd installation (Windows/macOS/Linux) for significantly faster compression and decompression; falls back to WASM when not available
+- **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst, tar.lz4, tar.br
+- **Decompress** from 40+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
-- **Archive browser** — opens as default editor for archives; virtual-scrolled tree (Vue 3 + TanStack Virtual), search, sort, partial extract, add/delete/rename, integrity test
-- **File preview** — double-click any file in the archive to open it in VSCode
-- **Copy/paste** — select files in archive browser, paste to any local folder
-- **Multi-volume RAR** — auto-resolves `.r00`–`.r99` to the base `.rar`
-- **RAR support** — RAR4 + RAR5 extraction via 7-Zip
-- **Bilingual UI** — English / Chinese (auto-detected from VS Code locale); settings descriptions also localized via NLS files
-- **Large file support** — handles archives and files exceeding 2 GiB via chunked I/O; WASM supports files beyond 4 GiB (memory64)
-- **Security** — Zip Slip protection, configurable size limits (k/m/g units), path traversal blocking
+- **System 7-Zip detection** — auto-detects local 7-Zip (Windows/macOS/Linux) and zstd for significantly faster operations; falls back to WASM when unavailable
+- **Archive browser** — opens as the default editor for archives: virtual-scrolled tree, search with regex or fuzzy match, sort by name/size, multi-select for partial extract, add/delete/rename files right inside the view
+- **Keyboard navigation** — Arrow keys, PageUp/PageDown (scroll viewport), Home/End, Space to toggle selection, Enter to extract, Delete to remove, Ctrl+A to select all
+- **File preview** — double-click any file to open it in VS Code
+- **Copy/paste** — select files in the archive browser, paste them to any local folder
+- **Multi-volume support** — auto-resolves RAR `.r00`–`.r99` and split 7z/zip `.001`–`.N` volumes
+- **Bilingual UI** — English / Simplified Chinese / Traditional Chinese (auto-detected from VS Code locale)
+- **Large file handling** — archives and files beyond 2 GiB via chunked I/O and NODEFS mount
+- **Security** — Zip Slip protection, configurable size limits (k/m/g units), path traversal blocking, decompression bomb detection
 - **Smart exclude** — automatically skips `node_modules`, `.git`, `dist`, `.venv`, and 30+ other noisy directories when compressing; customizable via settings
-- **CJK filenames** — recovers GBK / Shift-JIS / EUC-KR encoded filenames in old archives
-- **Context menu** — right-click files/folders to compress, right-click archives to decompress or browse
-- **Workspace compress** — right-click empty space in explorer to compress entire workspace folder
+- **CJK filename recovery** — fixes GBK / Shift-JIS / EUC-KR encoded filenames in old archives
+- **Context menu integration** — right-click files to compress, right-click archives to decompress or browse
 
 ## Quick Start
 
 ```bash
-npm install               # installs root + webview-ui deps (postinstall hook)
-npm run build             # build Vue frontend + this extension
+npm install               # installs root + webview-ui deps
+npm run build             # build Vue frontend + extension
 ```
 
-Then press `F5` in VSCode to launch the Extension Development Host.
+Press `F5` in VS Code to launch the Extension Development Host.
 
 ## Usage
 
 | Action | How |
 |--------|-----|
 | Compress | Right-click file(s)/folder(s) → `Smart Archive: Compress` → pick format → optional password → save |
-| Decompress | Right-click archive → `Smart Archive: Decompress` → optional password → extracts to `*.extracted/` |
-| Browse | Right-click archive → `Smart Archive: Browse Contents` → interactive file tree with partial extract |
+| Decompress | Right-click archive → `Smart Archive: Decompress` → optional password → extracts to `<name>.extracted/` |
+| Browse | Right-click archive → `Smart Archive: Browse Contents`, or double-click the archive file |
 
-RAR files are auto-detected and processed by 7-Zip WASM.
+### Archive Browser Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `↑` `↓` | Move selection up/down (hold Shift to extend) |
+| `PageUp` `PageDown` | Scroll viewport by one page + move selection |
+| `Home` `End` | Jump to first/last item |
+| `Space` | Toggle checkbox on anchor item |
+| `Enter` | Extract selected items |
+| `Delete` | Delete selected items |
+| `F2` | Rename single selected item |
+| `Ctrl+A` | Select all visible items |
+| `Ctrl+C` | Copy selected paths |
+| `Escape` | Clear selection / close context menu |
 
 ## Supported Formats
 
@@ -52,74 +64,69 @@ RAR files are auto-detected and processed by 7-Zip WASM.
 | 7z | AES-256 | Best ratio, solid archive, header encryption |
 | zip | AES-256 | Universal compatibility |
 | tar | — | No compression, archive only |
-| tar.gz | — | TAR + GZip compressed archive |
-| tar.bz2 | — | TAR + BZip2 compressed archive |
-| tar.xz | — | TAR + XZ compressed archive |
-| tar.zst | — | TAR + Zstandard compressed archive |
+| tar.gz | — | TAR + GZip |
+| tar.bz2 | — | TAR + BZip2 |
+| tar.xz | — | TAR + XZ |
+| tar.zst | — | TAR + Zstandard |
+| tar.lz4 | — | TAR + LZ4 |
+| tar.br | — | TAR + Brotli |
 | wim | — | Windows Imaging Format |
-| rar | — | **Extraction only** — creation not supported by free tools |
 
 ### Decompression (extract)
 
-all 7zip support and zstd.
+All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, AR, DMG, FAT, NTFS, SquashFS, ...) — 40+ in total.
 
 ## Configuration
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `smart-archive.defaultFormat` | `7z` | Default archive format (7z, zip, tar, tar.gz, tar.bz2, tar.xz, tar.zst, wim) |
+| `smart-archive.defaultFormat` | `7z` | Default archive format |
 | `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
-| `smart-archive.defaultOutputDir` | `source` | Output location: `source` (next to archive) or `prompt` (always ask) |
-| `smart-archive.maxFileSize` | `"1g"` | Maximum single decompressed file size. Supports k/m/g units (e.g. `"500m"`, `"1g"`). Integer values treated as MiB for backward-compat. |
-| `smart-archive.maxTotalSize` | `"10g"` | Maximum total decompressed size across all files. Same format as `maxFileSize`. |
-| `smart-archive.useSystem7z` | `"auto"` | System 7-Zip: `auto` (detect + fallback), `always` (force, warn if missing), `never` (WASM only) |
-| `smart-archive.useSystemZstd` | `"auto"` | System zstd: `auto` (detect + fallback), `always`, `never` |
-| `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory name patterns kept collapsed by default in archive preview |
-| `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Glob patterns for files/dirs to exclude when compressing |
-| `smart-archive.volumeSizes` | `{…}` | Custom split volume size presets (label→value map). Leave `{}` to use built-in defaults. |
+| `smart-archive.defaultOutputDir` | `source` | Output location: `source` or `prompt` |
+| `smart-archive.maxFileSize` | `"1g"` | Max single decompressed file size (k/m/g units) |
+| `smart-archive.maxTotalSize` | `"10g"` | Max total decompressed size |
+| `smart-archive.useSystem7z` | `"auto"` | System 7-Zip: `auto`, `always`, `never` |
+| `smart-archive.useSystemZstd` | `"auto"` | System zstd: `auto`, `always`, `never` |
+| `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
+| `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Patterns excluded when compressing |
+| `smart-archive.volumeSizes` | `{}` | Custom split volume size presets |
 
 ## Requirements
 
 - VS Code 1.85.0 or later
-- System 7-Zip/zstd (**optional**, for faster compression):
-  - Windows: `winget install 7zip` `winget install zstd`
-  - macOS: `brew install sevenzip` `brew install zstd`
-  - Linux: `apt install 7zip` and so on
+- System 7-Zip/zstd (**optional**, for faster operations):
+  - Windows: `winget install 7zip zstd`
+  - macOS: `brew install sevenzip zstd`
+  - Linux: `apt install 7zip zstd` (or your package manager)
 
 ## Development
 
 ```bash
-npm install              # installs root + webview-ui deps (postinstall hook)
-npm run build:webview    # build Vue frontend → media/vue/
-npm run compile          # compile TypeScript → out/
+npm install              # installs root + webview-ui deps
 npm run build            # build webview + compile (one step)
 npm run watch            # watch mode (TS only)
-npm run dev:webview      # Vite dev server with HMR for webview
+npm run dev:webview      # Vite dev server with HMR
 npm run lint             # oxlint static analysis
 npm run typecheck        # TypeScript type checking
 npm run format           # oxfmt code formatting
 npm run check            # format + lint + typecheck
-npm run test             # vitest (extension + webview-ui)
-npm run test:watch       # vitest watch mode
-npm run test:ui          # vitest UI mode
+npm run test             # vitest (extension + webview)
 npm run clean            # remove build output
 npm run package          # create .vsix
 npm run release          # build + check + package
 ```
 
-> Quick Develop
->
-> 1. `npm install`
-> 2. `npm run build`
-> 3. Press `F5` in VS Code to launch the Extension Development Host.
+> Quick dev workflow: `npm install` → `npm run build` → `F5` in VS Code.
 
 ## Dependencies
 
 | Package | Purpose |
 |---------|---------|
-| [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly port (all compression & extraction) |
+| [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly (all compression & extraction) |
 | [@bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm) | Zstandard compression |
-| [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding fix |
+| [@addmaple/lz4](https://github.com/addmaple/lz4) | LZ4 compression |
+| [brotli-wasm](https://github.com/httptoolkit/brotli-wasm) | Brotli compression |
+| [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding recovery |
 | [Vue 3](https://vuejs.org/) | Archive browser UI |
 | [TanStack Virtual](https://tanstack.com/virtual) | Virtual scrolling for large archives |
 
