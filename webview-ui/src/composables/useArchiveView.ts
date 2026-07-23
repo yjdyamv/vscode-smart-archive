@@ -391,6 +391,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   function cleanup() {
     if (toastTimer) clearTimeout(toastTimer);
     if (searchDebounce) clearTimeout(searchDebounce);
+    ctx.selection.flushSave();
   }
 
   return {

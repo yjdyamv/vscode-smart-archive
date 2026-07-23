@@ -9,16 +9,31 @@ export function useSelection() {
     lastAddDir: saved?.lastAdd ?? "",
   });
 
-  // Persist selection on change — watch serialized snapshot so
-  // composition changes (not just size changes) trigger persistence.
+  // Persist selection on change with 300ms debounce — avoids
+  // O(n log n) serialization on every single toggle (e.g. Ctrl+A).
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function persistSelection() {
+    saveState({
+      sel: [...state.selected],
+      anchor: state.anchorPath,
+      lastAdd: state.lastAddDir,
+    });
+  }
+
+  function flushSave() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      persistSelection();
+    }
+  }
+
   watch(
     () => JSON.stringify([...state.selected].sort()),
     () => {
-      saveState({
-        sel: [...state.selected],
-        anchor: state.anchorPath,
-        lastAdd: state.lastAddDir,
-      });
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(persistSelection, 300);
     },
   );
 
@@ -70,7 +85,7 @@ export function useSelection() {
     return state.selected.size > 0;
   }
 
-  return { state, toggle, clearAll, isSelected, getSelectedPaths, hasSelected };
+  return { state, toggle, clearAll, isSelected, getSelectedPaths, hasSelected, flushSave };
 }
 
 export function dedupPaths(s: Set<string>): string[] {
