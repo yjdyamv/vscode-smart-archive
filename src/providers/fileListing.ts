@@ -10,6 +10,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
+import { fixArchiveEncoding } from "../utils/path";
 import { listFiles } from "../engines/js7z-engine";
 import { getFullExt, isWrappedFormat, isEncryptableExt, VFS_CHUNK } from "../constants";
 import { logger } from "../utils/logger";
@@ -271,17 +272,18 @@ function readDirEntries(
     if (name === "." || name === ".." || skip.has(name)) continue;
     const fp = dir === "/" ? `/${name}` : `${dir}/${name}`;
     const childPath = prefix ? `${prefix}/${name}` : name;
+    const fixedPath = fixArchiveEncoding(childPath);
     try {
       const st = js7z.FS.stat(fp);
       if (js7z.FS.isDir(st.mode)) {
-        results.push({ path: childPath, size: 0, type: "DIRECTORY" });
+        results.push({ path: fixedPath, size: 0, type: "DIRECTORY" });
         results.push(...readDirEntries(js7z, fp, childPath, skipNames));
       } else {
-        results.push({ path: childPath, size: st.size || 0, type: "REGULAR_FILE" });
+        results.push({ path: fixedPath, size: st.size || 0, type: "REGULAR_FILE" });
       }
     } catch {
       logger.warn({ event: "readDirEntries.stat.failed" }, "Failed to stat virtual FS entry");
-      results.push({ path: childPath, size: 0, type: "REGULAR_FILE" });
+      results.push({ path: fixedPath, size: 0, type: "REGULAR_FILE" });
     }
   }
   return results;
