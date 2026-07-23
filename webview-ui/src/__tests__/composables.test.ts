@@ -12,6 +12,7 @@ import type { TreeNodeData } from "../types";
 import { fuzzyMatch, isRedosSafe, collectMatches } from "../composables/useSearch";
 import { dedupPaths } from "../composables/useSelection";
 import { buildNodeMap } from "../composables/useTree";
+import { useSort } from "../composables/useSort";
 
 function node(name: string, children?: TreeNodeData[]): TreeNodeData {
   return {
@@ -256,5 +257,87 @@ describe("buildNodeMap", () => {
     expect(map.get("dir/a")).toBeDefined();
     expect(map.get("dir/b")).toBeDefined();
     expect(map.get("dir/c")).toBeDefined();
+  });
+});
+
+describe("useSort.sortNodes", () => {
+  const f = (name: string, size = 0): TreeNodeData => ({
+    name, path: name, size, kind: "REGULAR_FILE",
+  });
+  const d = (name: string, children?: TreeNodeData[]): TreeNodeData => ({
+    name, path: name, size: 0, kind: "DIRECTORY", children,
+  });
+
+  it("sorts by name ascending (default)", () => {
+    const sort = useSort();
+    const result = sort.sortNodes([f("c"), f("a"), f("b")]);
+    expect(result.map((n) => n.name)).toEqual(["a", "b", "c"]);
+  });
+
+  it("sorts by name descending", () => {
+    const sort = useSort();
+    sort.setSort("name"); // sortKey is already "name", so this toggles asc→desc
+    expect(sort.sortAsc.value).toBe(false);
+    const result = sort.sortNodes([f("a"), f("c"), f("b")]);
+    expect(result.map((n) => n.name)).toEqual(["c", "b", "a"]);
+  });
+
+  it("sorts by size ascending", () => {
+    const sort = useSort();
+    sort.setSort("size");
+    const result = sort.sortNodes([f("b", 300), f("a", 100), f("c", 200)]);
+    expect(result.map((n) => n.name)).toEqual(["a", "c", "b"]);
+  });
+
+  it("sorts by size descending", () => {
+    const sort = useSort();
+    sort.setSort("size");
+    sort.setSort("size"); // toggle to desc
+    expect(sort.sortAsc.value).toBe(false);
+    const result = sort.sortNodes([f("a", 100), f("c", 200), f("b", 300)]);
+    expect(result.map((n) => n.name)).toEqual(["b", "c", "a"]);
+  });
+
+  it("directories always come before files", () => {
+    const sort = useSort();
+    const result = sort.sortNodes([f("z"), d("a"), f("m")]);
+    expect(result.map((n) => n.name)).toEqual(["a", "m", "z"]);
+  });
+
+  it("directories sorted among themselves, then files", () => {
+    const sort = useSort();
+    const result = sort.sortNodes([
+      f("z"), d("c"), f("a"), d("b"),
+    ]);
+    expect(result.map((n) => n.name)).toEqual(["b", "c", "a", "z"]);
+  });
+
+  it("recursively sorts children", () => {
+    const sort = useSort();
+    const result = sort.sortNodes([
+      d("parent", [f("c"), f("a"), f("b")]),
+    ]);
+    expect(result[0].children?.map((n) => n.name)).toEqual(["a", "b", "c"]);
+  });
+
+  it("returns empty array for empty input", () => {
+    const sort = useSort();
+    expect(sort.sortNodes([])).toEqual([]);
+  });
+
+  it("does not mutate original array", () => {
+    const sort = useSort();
+    const original = [f("b"), f("a")];
+    const result = sort.sortNodes(original);
+    expect(original.map((n) => n.name)).toEqual(["b", "a"]);
+    expect(result.map((n) => n.name)).toEqual(["a", "b"]);
+  });
+
+  it("same-name items maintain stable order", () => {
+    const sort = useSort();
+    const result = sort.sortNodes([f("a"), f("a")]);
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe("a");
+    expect(result[1].name).toBe("a");
   });
 });
