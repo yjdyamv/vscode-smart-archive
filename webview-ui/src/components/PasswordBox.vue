@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import type { ExtensionMessage } from "../types";
+import { PW_ERROR_HIDE_MS } from "../constants";
 
 defineProps<{ archiveName: string }>();
 const emit = defineEmits<{ (e: "submit", pw: string): void }>();
@@ -13,7 +14,9 @@ function onMsg(e: MessageEvent) {
   if (data?.c === "pwerr") {
     hasError.value = true;
     password.value = "";
-    setTimeout(() => { hasError.value = false; }, 4000);
+    setTimeout(() => {
+      hasError.value = false;
+    }, PW_ERROR_HIDE_MS);
   }
 }
 onMounted(() => window.addEventListener("message", onMsg));
@@ -71,7 +74,7 @@ function onKeydown(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
-  border-radius: 4px;
+  border-radius: var(--sa-radius-md);
   background: var(--vscode-input-background);
   transition:
     border-color 0.15s,
@@ -81,8 +84,8 @@ function onKeydown(e: KeyboardEvent) {
   border-color: var(--vscode-focusBorder);
 }
 .pw-box.ring {
-  border-color: #e51400;
-  box-shadow: 0 0 0 1px #e5140033;
+  border-color: var(--sa-color-error);
+  box-shadow: var(--sa-shadow-error-ring);
 }
 .pw-btn {
   background: none;
@@ -92,7 +95,7 @@ function onKeydown(e: KeyboardEvent) {
   padding: 4px 8px;
   font-size: 14px;
   line-height: 1;
-  transition: color 0.12s;
+  transition: color var(--sa-transition-fast);
 }
 .pw-btn:hover {
   color: var(--vscode-foreground);
@@ -102,17 +105,17 @@ function onKeydown(e: KeyboardEvent) {
   color: var(--vscode-button-foreground);
   border: none;
   padding: 5px 20px;
-  border-radius: 3px;
+  border-radius: var(--sa-radius);
   cursor: pointer;
-  font-size: calc(var(--vscode-font-size) * 0.95);
-  transition: background 0.12s;
+  font-size: var(--sa-font-xl);
+  transition: var(--sa-transition-fast);
 }
 .unlock-btn:hover {
   background: var(--vscode-button-hoverBackground);
 }
 .pw-error {
-  color: #f14c4c;
-  font-size: calc(var(--vscode-font-size) * 0.88);
+  color: var(--sa-color-error);
+  font-size: var(--sa-font-md);
   min-height: 1.4em;
   opacity: 0;
   transition: opacity 0.2s;

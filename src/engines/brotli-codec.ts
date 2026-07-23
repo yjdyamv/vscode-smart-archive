@@ -17,6 +17,7 @@
 import { logger } from "../utils/logger";
 import { checkFileSize } from "../utils/security";
 import * as fs from "fs";
+import { CODEC_CHUNK } from "../constants";
 
 const brotli = require("brotli-wasm") as {
   compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
@@ -68,7 +69,7 @@ export function brotliDecompress(data: Uint8Array): Uint8Array {
   let offset = 0;
   while (offset < data.length) {
     const stream = new brotli.DecompressStream();
-    const r = stream.decompress(data.subarray(offset), 50 * 1024 * 1024);
+    const r = stream.decompress(data.subarray(offset), CODEC_CHUNK);
     if (r.buf.length > 0) allOut.push(r.buf);
     if (r.input_offset === 0) {
       stream.free();
@@ -90,7 +91,7 @@ export function brotliDecompress(data: Uint8Array): Uint8Array {
 
 export function brotliCompressFile(input: string, output: string, level: number): Promise<void> {
   return Promise.resolve().then(() => {
-    const CHUNK = 50 * 1024 * 1024;
+    const CHUNK = CODEC_CHUNK;
     const rfd = fs.openSync(input, "r");
     const out = fs.openSync(output, "w");
     try {
@@ -125,7 +126,7 @@ export function brotliCompressFile(input: string, output: string, level: number)
 
 export async function brotliDecompressFile(input: string, output: string): Promise<void> {
   const READ_CHUNK = 4 * 1024 * 1024;
-  const OUT_HINT = 50 * 1024 * 1024;
+  const OUT_HINT = CODEC_CHUNK;
 
   const rfd = fs.openSync(input, "r");
   const wfd = fs.openSync(output, "w");

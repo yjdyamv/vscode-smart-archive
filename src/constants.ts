@@ -458,3 +458,16 @@ export const NOISY_DIR_PATTERNS = [
 // ── Default compression exclude patterns ────────────────────────────
 
 export const COMPRESS_EXCLUDE_DEFAULTS = NOISY_DIR_PATTERNS;
+
+// ── Shared operational constants ────────────────────────────────────
+
+/** Codec compression/decompression chunk size (50 MB) */
+export const CODEC_CHUNK = 50 * 1024 * 1024;
+/** VFS I/O chunk size (100 MB) */
+export const VFS_CHUNK = 100 * 1024 * 1024;
+/** Max collision resolution retries for unique path generation */
+export const MAX_COLLISION_RETRIES = 999;
+/** spawnSync timeout for binary detection (ms) */
+export const BINARY_DETECT_TIMEOUT = 5000;
+/** default spawnCapture timeout (ms) */
+export const SPAWN_CAPTURE_TIMEOUT = 30_000;

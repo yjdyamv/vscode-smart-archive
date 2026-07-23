@@ -112,7 +112,7 @@ defineEmits<{
 
 <style scoped>
 .sep {
-  width: 1px;
+  width: var(--sa-sep-width);
   height: 18px;
   background: var(--vscode-sideBarSectionHeader-border);
   flex-shrink: 0;
@@ -122,14 +122,14 @@ defineEmits<{
   color: var(--vscode-button-foreground);
   border: none;
   padding: 3px 10px;
-  border-radius: 3px;
+  border-radius: var(--sa-radius);
   cursor: pointer;
-  font-size: calc(var(--vscode-font-size) * 0.9);
+  font-size: var(--sa-font-base);
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  transition: background 0.12s ease;
+  transition: var(--sa-transition-fast);
 }
 .btn:hover {
   background: var(--vscode-button-hoverBackground);
@@ -143,26 +143,26 @@ defineEmits<{
   color: var(--vscode-foreground);
   border: none;
   padding: 3px 5px;
-  border-radius: 3px;
+  border-radius: var(--sa-radius);
   cursor: pointer;
-  font-size: calc(var(--vscode-font-size) * 0.9);
+  font-size: var(--sa-font-base);
   line-height: 1;
   flex-shrink: 0;
-  transition: background 0.12s ease;
+  transition: var(--sa-transition-fast);
 }
 .btn-ico:hover {
   background: var(--vscode-toolbar-hoverBackground);
 }
 .btn-ico .codicon {
-  font-size: calc(var(--vscode-font-size) * 1.15);
+  font-size: var(--sa-font-3xl);
 }
 .search-input {
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
   border: 1px solid var(--vscode-input-border, transparent);
   padding: 3px 8px;
-  border-radius: 3px;
-  font-size: calc(var(--vscode-font-size) * 0.88);
+  border-radius: var(--sa-radius);
+  font-size: var(--sa-font-md);
   width: 120px;
   min-width: 80px;
   max-width: 200px;
@@ -173,30 +173,30 @@ defineEmits<{
   border-color: var(--vscode-focusBorder);
 }
 .search-input.search-error {
-  border-color: #e51400;
-  box-shadow: 0 0 0 1px #e5140033;
+  border-color: var(--sa-color-error);
+  box-shadow: var(--sa-shadow-error-ring);
 }
 .search-regex-btn.on {
   color: var(--vscode-focusBorder, #007acc);
   background: var(--vscode-toolbar-hoverBackground);
 }
 .search-match {
-  font-size: calc(var(--vscode-font-size) * 0.78);
+  font-size: var(--sa-font-2xs);
   color: var(--vscode-descriptionForeground);
   white-space: nowrap;
 }
 .sort-lbl {
   cursor: pointer;
-  font-size: calc(var(--vscode-font-size) * 0.85);
+  font-size: var(--sa-font-md-sm);
   color: var(--vscode-descriptionForeground);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--sa-radius);
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   transition:
-    color 0.12s,
-    background 0.12s;
+    color var(--sa-transition-medium),
+    background var(--sa-transition-medium);
 }
 .sort-lbl:hover {
   color: var(--vscode-foreground);
@@ -208,7 +208,7 @@ defineEmits<{
   background: var(--vscode-toolbar-hoverBackground);
 }
 .sel-count {
-  font-size: calc(var(--vscode-font-size) * 0.82);
+  font-size: var(--sa-font-sm);
   color: var(--vscode-descriptionForeground);
   white-space: nowrap;
 }

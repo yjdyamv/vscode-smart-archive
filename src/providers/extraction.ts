@@ -14,7 +14,7 @@ import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { JS7z, disposeJS7z } from "./fileListing";
 import { streamToVFS } from "../engines/vfs-io";
-import { getFullExt, isWrappedFormat } from "../constants";
+import { getFullExt, isWrappedFormat, MAX_COLLISION_RETRIES } from "../constants";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../utils/security";
@@ -149,7 +149,8 @@ function copyFromFSWithStrip(
       let counter = 1;
       // Use wx flag to avoid TOCTOU race — fails if file already exists
       while (true) {
-        if (counter > 999) throw new Error(`Failed to resolve collision for ${outPath}`);
+        if (counter > MAX_COLLISION_RETRIES)
+          throw new Error(`Failed to resolve collision for ${outPath}`);
         try {
           fs.writeFileSync(finalPath, Buffer.from(data), { flag: "wx" });
           break;

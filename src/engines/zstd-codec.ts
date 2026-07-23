@@ -13,6 +13,7 @@ import * as vscode from "vscode";
 import { t } from "../i18n";
 import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
+import { CODEC_CHUNK } from "../constants";
 
 const zstd = require("@bokuweb/zstd-wasm") as {
   init: () => Promise<void>;
@@ -170,7 +171,7 @@ export function zstdCompressFile(input: string, output: string, level: number): 
 
 function wasmCompressFile(input: string, output: string, level: number): Promise<void> {
   // WASM chunked: compress file in 50MB chunks, 7z handles multi-frame decompression
-  const CHUNK = 50 * 1024 * 1024;
+  const CHUNK = CODEC_CHUNK;
   return ensureInit().then(() => {
     const rfd = fs.openSync(input, "r");
     const out = fs.openSync(output, "w");

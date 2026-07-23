@@ -5,7 +5,7 @@ defineProps<{ msg: string; ok: boolean; visible: boolean }>();
   <Transition name="slide-fade">
     <div
       v-if="visible"
-      class="fixed top-3 left-1/2 px-5 py-2 rounded text-[0.92em] z-[999] pointer-events-none shadow-lg"
+      class="fixed top-3 left-1/2 px-5 py-2 rounded text-[0.92em] z-[var(--sa-z-toast)] pointer-events-none shadow-lg"
       :class="
         ok
           ? 'bg-[var(--vscode-terminal-ansiGreen)] text-[var(--vscode-editor-background)]'

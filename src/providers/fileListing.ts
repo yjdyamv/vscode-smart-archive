@@ -11,7 +11,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { listFiles } from "../engines/js7z-engine";
-import { getFullExt, isWrappedFormat, isEncryptableExt } from "../constants";
+import { getFullExt, isWrappedFormat, isEncryptableExt, VFS_CHUNK } from "../constants";
 import { logger } from "../utils/logger";
 import { disposeJS7z } from "../engines/js7z-lifecycle";
 import { parse7zListing } from "../utils/parse7z";
@@ -73,7 +73,7 @@ function decompressLz4Frames(compressed: Buffer): Uint8Array {
  * hitting WASM memory limits with a single FS.writeFile call.
  */
 function writeLargeVFS(js7z: JS7zInstance, vfsPath: string, data: Uint8Array): void {
-  const CHUNK = 100 * 1024 * 1024; // 100MB
+  const CHUNK = VFS_CHUNK;
   const name = vfsPath.replace(/^\//, "");
   js7z.FS.createDataFile("/", name, new Uint8Array(0), true, true, 0o777);
   const stream = js7z.FS.open(vfsPath, "w");

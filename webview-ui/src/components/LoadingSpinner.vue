@@ -11,12 +11,12 @@ defineProps<{ msg: string }>();
 
 <style scoped>
 .spinner {
-  width: 28px;
-  height: 28px;
+  width: var(--sa-spinner);
+  height: var(--sa-spinner);
   border: 3px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
   border-top-color: var(--vscode-progressBar-background, #007acc);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: spin var(--sa-spin) linear infinite;
 }
 @keyframes spin {
   to {

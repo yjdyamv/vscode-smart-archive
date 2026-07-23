@@ -76,7 +76,7 @@ defineEmits<{
 
 <style scoped>
 .sep {
-  width: 1px;
+  width: var(--sa-sep-width);
   height: 16px;
   background: var(--vscode-sideBarSectionHeader-border);
   flex-shrink: 0;
@@ -86,12 +86,12 @@ defineEmits<{
   color: var(--vscode-foreground);
   border: none;
   padding: 2px 4px;
-  border-radius: 3px;
+  border-radius: var(--sa-radius);
   cursor: pointer;
-  font-size: calc(var(--vscode-font-size) * 0.85);
+  font-size: var(--sa-font-md-sm);
   line-height: 1;
   flex-shrink: 0;
-  transition: background 0.12s;
+  transition: var(--sa-transition-fast);
 }
 .btn-ico:hover {
   background: var(--vscode-toolbar-hoverBackground);
@@ -101,21 +101,21 @@ defineEmits<{
   color: var(--vscode-button-foreground);
   border: none;
   padding: 3px 10px;
-  border-radius: 3px;
+  border-radius: var(--sa-radius);
   cursor: pointer;
-  font-size: calc(var(--vscode-font-size) * 0.82);
+  font-size: var(--sa-font-sm);
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  transition: background 0.12s;
+  transition: var(--sa-transition-fast);
 }
 .btn:hover {
   background: var(--vscode-button-hoverBackground);
 }
 .meta-name {
   color: var(--vscode-foreground);
-  font-size: calc(var(--vscode-font-size) * 0.95);
+  font-size: var(--sa-font-xl);
 }
 .meta-div {
   color: var(--vscode-descriptionForeground);

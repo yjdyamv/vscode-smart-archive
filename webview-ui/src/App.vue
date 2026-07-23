@@ -39,7 +39,10 @@ const tree = useTreeFlatten(treeData);
 const prefs = loadState<{ sortKey?: string; sortAsc?: boolean; searchQuery?: string }>();
 if (prefs?.sortKey) sort.setSort(prefs.sortKey as SortKey);
 if (prefs?.sortAsc === false) sort.setSort(sort.sortKey.value);
-if (prefs?.searchQuery) { search.query.value = prefs.searchQuery; search.isRegex.value = false; }
+if (prefs?.searchQuery) {
+  search.query.value = prefs.searchQuery;
+  search.isRegex.value = false;
+}
 
 watch([sort.sortKey, sort.sortAsc], () => {
   treeData.value = sort.sortNodes([...treeData.value]);
@@ -67,9 +70,25 @@ const containerEl = computed(() => fileTreeRef.value?.containerEl ?? null);
 const scrollToPath = (path: string) => fileTreeRef.value?.scrollToPath(path);
 
 const av = useArchiveView({
-  post, onMessage, tree, treeData, selection, search, visibleFlatNodes,
-  viewState, loadingMsg, archiveProps, totalFiles, totalDirs,
-  readOnly, isSplit, canSplit, isEncrypted, canEncrypt, containerEl, scrollToPath,
+  post,
+  onMessage,
+  tree,
+  treeData,
+  selection,
+  search,
+  visibleFlatNodes,
+  viewState,
+  loadingMsg,
+  archiveProps,
+  totalFiles,
+  totalDirs,
+  readOnly,
+  isSplit,
+  canSplit,
+  isEncrypted,
+  canEncrypt,
+  containerEl,
+  scrollToPath,
 });
 
 onMounted(() => {
@@ -104,11 +123,18 @@ onMounted(() => {
         if (!validPaths.has(dir)) {
           let stillValid = false;
           const prefix = dir + "/";
-          for (const p of validPaths) if (p.startsWith(prefix)) { stillValid = true; break; }
+          for (const p of validPaths)
+            if (p.startsWith(prefix)) {
+              stillValid = true;
+              break;
+            }
           if (!stillValid) {
             let idx = dir.lastIndexOf("/");
             while (idx > 0) {
-              if (validPaths.has(dir.substring(0, idx))) { stillValid = true; break; }
+              if (validPaths.has(dir.substring(0, idx))) {
+                stillValid = true;
+                break;
+              }
               idx = dir.lastIndexOf("/", idx - 1);
             }
           }
@@ -144,13 +170,51 @@ onMounted(() => {
   });
 });
 
-provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
+provide(
+  "lastAddDir",
+  computed(() => selection.state.lastAddDir || ""),
+);
 </script>
 
 <template>
   <div
     class="flex flex-col h-screen text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)] font-[var(--vscode-font-family)]"
-    style="font-size: var(--vscode-font-size)"
+    style="
+      font-size: var(--vscode-font-size);
+      --sa-radius: 3px;
+      --sa-radius-md: 4px;
+      --sa-radius-sm: 2px;
+      --sa-sep-width: 1px;
+      --sa-transition-fast: background 0.12s ease;
+      --sa-transition-fastest: 0.1s;
+      --sa-transition-hover: 0.08s;
+      --sa-transition-medium: 0.15s;
+      --sa-transition-normal: 0.2s;
+      --sa-transition-slow: 0.25s;
+      --sa-color-error: #e51400;
+      --sa-shadow-error-ring: 0 0 0 1px #e5140033;
+      --sa-shadow-menu: 0 4px 12px rgba(0, 0, 0, 0.25);
+      --sa-z-toast: 999;
+      --sa-z-menu: 1000;
+      --sa-spinner-sm: 8px;
+      --sa-spinner: 28px;
+      --sa-spin-sm: 0.6s;
+      --sa-spin: 0.7s;
+      --sa-font-2xs: calc(var(--vscode-font-size) * 0.78);
+      --sa-font-xs: calc(var(--vscode-font-size) * 0.8);
+      --sa-font-sm: calc(var(--vscode-font-size) * 0.82);
+      --sa-font-md-sm: calc(var(--vscode-font-size) * 0.85);
+      --sa-font-md: calc(var(--vscode-font-size) * 0.88);
+      --sa-font-base: calc(var(--vscode-font-size) * 0.9);
+      --sa-font-lg: calc(var(--vscode-font-size) * 0.92);
+      --sa-font-xl: calc(var(--vscode-font-size) * 0.95);
+      --sa-font-2xl: calc(var(--vscode-font-size) * 1.05);
+      --sa-font-3xl: calc(var(--vscode-font-size) * 1.15);
+      --sa-checkmark-size: calc(var(--vscode-font-size) * 1.25);
+      --sa-arrow-width: calc(var(--vscode-font-size) * 1.3);
+      --sa-icon-width: calc(var(--vscode-font-size) * 1.5);
+      --sa-row-height: calc(var(--vscode-font-size) * 1.85);
+    "
   >
     <LoadingSpinner v-if="viewState === 'loading'" :msg="loadingMsg" />
     <PasswordBox
@@ -178,7 +242,10 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         @delete-selected="av.delSel"
         @add-files="av.addFiles"
         @copy="av.copySel"
-        @expand-all="tree.expandAll(); av.loadExpandedPaths()"
+        @expand-all="
+          tree.expandAll();
+          av.loadExpandedPaths();
+        "
         @collapse-all="tree.collapseAll"
         @sort="(k: SortKey) => sort.setSort(k)"
         @search="av.onSearch"
@@ -217,11 +284,15 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
         <template v-if="search.query.value.trim()">
           <div class="empty-icon"><span class="codicon codicon-search"></span></div>
           <div class="text-sm opacity-70">No matching files</div>
-          <div class="text-xs opacity-50 mt-1">Try adjusting your search terms or clear the query</div>
+          <div class="text-xs opacity-50 mt-1">
+            Try adjusting your search terms or clear the query
+          </div>
         </template>
         <template v-else>
           <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
-          <div class="text-[1.1em] text-[var(--vscode-foreground)]">{{ archiveProps?.name ?? "Archive" }}</div>
+          <div class="text-[1.1em] text-[var(--vscode-foreground)]">
+            {{ archiveProps?.name ?? "Archive" }}
+          </div>
           <div class="text-sm opacity-70">No files to display</div>
         </template>
       </div>

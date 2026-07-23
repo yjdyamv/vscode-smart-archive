@@ -1,5 +1,6 @@
 import { reactive, watch } from "vue";
 import { saveState, loadState } from "./useMessage";
+import { SAVE_DEBOUNCE_MS } from "../constants";
 
 export function useSelection() {
   const saved = loadState<{ sel?: string[]; anchor?: string | null; lastAdd?: string }>();
@@ -33,7 +34,7 @@ export function useSelection() {
     () => JSON.stringify([...state.selected].sort()),
     () => {
       if (saveTimer) clearTimeout(saveTimer);
-      saveTimer = setTimeout(persistSelection, 300);
+      saveTimer = setTimeout(persistSelection, SAVE_DEBOUNCE_MS);
     },
   );
 
