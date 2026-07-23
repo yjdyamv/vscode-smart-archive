@@ -422,7 +422,7 @@ function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total
  */
 export function buildDescendantCounts(
   entries: FlatEntry[],
-): Map<string, { files: number; dirs: number }> {
+): Map<string, { files: number; dirs: number; size: number }> {
   const index = new Map<string, FlatEntry[]>();
   for (const e of entries) {
     const parts = e.path.replace(/\\/g, "/").split("/");
@@ -433,15 +433,16 @@ export function buildDescendantCounts(
     }
   }
 
-  const result = new Map<string, { files: number; dirs: number }>();
+  const result = new Map<string, { files: number; dirs: number; size: number }>();
   for (const [dir, children] of index) {
     let files = 0;
     let dirs = 0;
+    let size = 0;
     for (const c of children) {
       if (c.type === "DIRECTORY") dirs++;
-      else files++;
+      else { files++; size += c.size; }
     }
-    result.set(dir, { files, dirs });
+    result.set(dir, { files, dirs, size });
   }
   return result;
 }

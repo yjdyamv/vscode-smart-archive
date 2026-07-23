@@ -36,6 +36,13 @@ const descLabel = computed(() => {
   return parts.length > 0 ? `(${parts.join(", ")})` : "";
 });
 
+const dirSize = computed(() => {
+  if (!isDir.value) return "";
+  const counts = window._xDescCounts?.[node.value.path];
+  if (!counts?.size) return "";
+  return formatSize(counts.size);
+});
+
 function indentGuides(depth: number, showChildGuide: boolean): number[] {
   return Array.from({ length: depth + (showChildGuide ? 1 : 0) }, (_, i) => i);
 }
@@ -145,7 +152,8 @@ function onExpandClick(e: MouseEvent) {
     <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
     <span class="name" :title="node.path" v-html="nameHtml"></span>
     <span v-if="isDir" class="desc-count">{{ descLabel }}</span>
-    <span v-if="!isDir && node.size > 0" class="size">{{ formatSize(node.size) }}</span>
+    <span v-if="isDir && dirSize" class="size">{{ dirSize }}</span>
+    <span v-else-if="!isDir && node.size > 0" class="size">{{ formatSize(node.size) }}</span>
   </div>
 </template>
 
