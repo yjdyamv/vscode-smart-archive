@@ -416,6 +416,36 @@ function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total
   return { files, dirs, total: files + dirs };
 }
 
+/**
+ * Build a map of directory path → {descendant file count, descendant dir count}
+ * from the full flat entry list. Used by the frontend for accurate selection counts.
+ */
+export function buildDescendantCounts(
+  entries: FlatEntry[],
+): Map<string, { files: number; dirs: number }> {
+  const index = new Map<string, FlatEntry[]>();
+  for (const e of entries) {
+    const parts = e.path.replace(/\\/g, "/").split("/");
+    for (let i = 0; i < parts.length; i++) {
+      const dir = parts.slice(0, i).join("/");
+      if (!index.has(dir)) index.set(dir, []);
+      index.get(dir)!.push(e);
+    }
+  }
+
+  const result = new Map<string, { files: number; dirs: number }>();
+  for (const [dir, children] of index) {
+    let files = 0;
+    let dirs = 0;
+    for (const c of children) {
+      if (c.type === "DIRECTORY") dirs++;
+      else files++;
+    }
+    result.set(dir, { files, dirs });
+  }
+  return result;
+}
+
 export type { TreeNode, FlatEntry, EntryIndex };
 export {
   buildTree,

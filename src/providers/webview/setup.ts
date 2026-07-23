@@ -20,7 +20,7 @@ import {
 import { isRarVolume, resolveRarVolume } from "../../utils/rar";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
-import { buildTreeRootOnly, buildEntryIndex, markNoisyDirs, countAllStats } from "../treeBuilder";
+import { buildTreeRootOnly, buildEntryIndex, markNoisyDirs, countAllStats, buildDescendantCounts } from "../treeBuilder";
 import { loadingHtml, emptyHtml, contentHtml } from "../htmlRenderer";
 import { fetchFileList } from "../fileListing";
 import { handlerStates, handlerRegistered } from "./state";
@@ -189,6 +189,7 @@ export async function setupWebview(
   // Noisy dirs (node_modules etc.) stay collapsed — no loading triggered.
   // Non-noisy dirs are auto-expanded by the Vue app after mount.
   const tree = buildTreeRootOnly(entries, archiveName);
+  const descCounts = buildDescendantCounts(entries);
   const patterns = getNoisyPatterns();
   markNoisyDirs(tree, patterns);
   const stats = countAllStats(entries);
@@ -227,6 +228,10 @@ export async function setupWebview(
   }
   if (isEnc) flags.push("window._xIsEncrypted=true");
   if (isEncryptableExt(resolvedExt)) flags.push("window._xCanEncrypt=true");
+  // Precomputed descendant counts for accurate toolbar selection count
+  const descObj: Record<string, { files: number; dirs: number }> = {};
+  for (const [k, v] of descCounts) descObj[k] = v;
+  flags.push(`window._xDescCounts=${JSON.stringify(descObj)}`);
   const persisted = await loadExpandedPaths(archiveUri, isEnc);
   if (persisted.length > 0) flags.push(`window._xExpanded=${JSON.stringify(persisted)}`);
   if (flags.length > 0) {

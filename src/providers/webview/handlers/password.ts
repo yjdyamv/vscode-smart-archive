@@ -16,6 +16,7 @@ import {
   buildEntryIndex,
   markNoisyDirs,
   countAllStats,
+  buildDescendantCounts,
 } from "../../treeBuilder";
 import { contentHtml } from "../../htmlRenderer";
 import { loadExpandedPaths } from "../expandedState";
@@ -54,6 +55,7 @@ export const handlePassword: MessageHandler = async (ctx) => {
     s.entries = pwEntries;
     s.entryIndex = buildEntryIndex(pwEntries);
     const pwTree = buildTreeRootOnly(pwEntries, s.archiveName);
+    const descCounts = buildDescendantCounts(pwEntries);
     markNoisyDirs(pwTree, getNoisyPatterns());
     const pwStats = countAllStats(pwEntries);
     const ext = getFullExt(s.filePath);
@@ -87,6 +89,9 @@ export const handlePassword: MessageHandler = async (ctx) => {
     }
     scripts.push("window._xIsEncrypted=true");
     if (isEncryptableExt(ext)) scripts.push("window._xCanEncrypt=true");
+    const descObj: Record<string, { files: number; dirs: number }> = {};
+    for (const [k, v] of descCounts) descObj[k] = v;
+    scripts.push(`window._xDescCounts=${JSON.stringify(descObj)}`);
     const persisted = await loadExpandedPaths(s.archiveUri, true);
     if (persisted.length > 0) {
       scripts.push(`window._xExpanded=${JSON.stringify(persisted)}`);
