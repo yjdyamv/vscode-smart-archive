@@ -99,6 +99,11 @@ function onExpandClick(e: MouseEvent) {
     :class="{ dir: isDir, sel: selected, noisy: inheritCollapsed }"
     :style="{ paddingLeft: depth * indentPx + 'px' }"
     :data-path="node.path"
+    role="treeitem"
+    :aria-expanded="isDir ? flatNode.expanded : undefined"
+    :aria-selected="selected || undefined"
+    :aria-level="depth + 1"
+    tabindex="-1"
     @click="onRowClick"
     @dblclick="emit('dblclick')"
     @contextmenu="emit('contextmenu', $event)"
@@ -109,12 +114,15 @@ function onExpandClick(e: MouseEvent) {
       class="guide"
       :style="{ left: i * indentPx + indentPx / 2 + 'px' }"
     ></span>
-    <span class="cb" @click="onCheckClick">
+    <span class="cb" @click="onCheckClick" role="checkbox" :aria-checked="selected || undefined" :aria-label="'Select ' + node.name">
       <span class="ck" :class="{ on: selected }"></span>
     </span>
     <span
       class="ar"
       :class="{ rot: flatNode.expanded, empty: isDir && !flatNode.hasChildren }"
+      role="button"
+      :aria-label="flatNode.expanded ? 'Collapse ' + node.name : 'Expand ' + node.name"
+      :tabindex="isDir && flatNode.hasChildren ? 0 : -1"
       @click="isDir ? onExpandClick($event) : undefined"
     >
       <span v-if="isLoading" class="ar-loading"></span>
