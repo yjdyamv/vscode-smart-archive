@@ -23,6 +23,8 @@ export interface ArchiveViewContext {
   canSplit: Ref<boolean>;
   isEncrypted: Ref<boolean>;
   canEncrypt: Ref<boolean>;
+  containerEl: Ref<HTMLElement | null>;
+  scrollToIndex: (idx: number) => void;
 }
 
 export function useArchiveView(ctx: ArchiveViewContext) {
@@ -310,6 +312,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     if (!shift) selection.clearAll();
     selection.toggle(targetPath, targetIsDir);
     selection.state.anchorPath = targetPath;
+    ctx.scrollToIndex(idx);
   }
 
   function handleKeyboard(e: KeyboardEvent) {
@@ -337,6 +340,35 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     if (e.key === "Delete" && selection.hasSelected()) { e.preventDefault(); delSel(); }
     if (e.key === "ArrowDown") { e.preventDefault(); navigateRows(1, e.shiftKey); }
     if (e.key === "ArrowUp") { e.preventDefault(); navigateRows(-1, e.shiftKey); }
+    if (e.key === "PageDown") {
+      e.preventDefault();
+      const el = ctx.containerEl.value;
+      if (el) el.scrollBy({ top: el.clientHeight, behavior: "auto" });
+    }
+    if (e.key === "PageUp") {
+      e.preventDefault();
+      const el = ctx.containerEl.value;
+      if (el) el.scrollBy({ top: -el.clientHeight, behavior: "auto" });
+    }
+    if (e.key === "Home") {
+      e.preventDefault();
+      const flatList = visibleFlatNodes.value;
+      if (!flatList.length) return;
+      if (!e.shiftKey) selection.clearAll();
+      selection.toggle(flatList[0].path, flatList[0].node.kind === "DIRECTORY");
+      selection.state.anchorPath = flatList[0].path;
+      ctx.scrollToIndex(0);
+    }
+    if (e.key === "End") {
+      e.preventDefault();
+      const flatList = visibleFlatNodes.value;
+      if (!flatList.length) return;
+      const last = flatList[flatList.length - 1];
+      if (!e.shiftKey) selection.clearAll();
+      selection.toggle(last.path, last.node.kind === "DIRECTORY");
+      selection.state.anchorPath = last.path;
+      ctx.scrollToIndex(flatList.length - 1);
+    }
   }
 
   // ── Message handler ────────────────────────────────────────────────
