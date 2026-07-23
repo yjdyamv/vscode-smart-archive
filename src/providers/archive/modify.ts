@@ -21,7 +21,12 @@ import { logger } from "../../utils/logger";
 const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024; // 100 MB hard limit for preview
 import { withWrappedArchive } from "./wrappedHelper";
 import { brotliDecompress } from "../../engines/brotli-codec";
-import { hasSystem7zForFormat, detectSystem7z, spawnCapture } from "../../engines/system7z";
+import {
+  hasSystem7zForFormat,
+  detectSystem7z,
+  spawnCapture,
+  renameInArchiveSystem7z,
+} from "../../engines/system7z";
 
 export async function createFolderInArchive(
   archivePath: string,
@@ -523,6 +528,15 @@ export async function renameInArchive(
   const ext = getFullExt(archivePath);
   if (isWrappedFormat(ext)) {
     return renameInWrappedArchive(archivePath, oldPath, newPath, password);
+  }
+
+  // System 7z passes passwords via -p<password> on the command line,
+  // visible in process listings. For encrypted archives, fall back to
+  // WASM to avoid CLI password leakage.
+  if (hasSystem7zForFormat(ext) && !password) {
+    logger.info({ event: "rename.system7z", archivePath, ext });
+    await renameInArchiveSystem7z(archivePath, oldPath, newPath, password);
+    return;
   }
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));

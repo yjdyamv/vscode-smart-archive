@@ -94,6 +94,11 @@ export async function decompressWith7z(
     outputDir: options.outputDir,
   });
 
+  // Note: unlike compress, we don't skip system 7z for encrypted
+  // archives here. WASM decompression of password-protected files has
+  // a known copyDirFromFS issue (separate bug). The password risk on
+  // decompress is the same (CLI exposure), but the user already knows
+  // the password — it was just entered — so the window is narrow.
   if (hasSystem7zForFormat(getFullExt(options.inputPath), true)) {
     logger.info({ event: "decompress.usingSystem7z" });
     await decompressWithSystem7z(options, progress, token);

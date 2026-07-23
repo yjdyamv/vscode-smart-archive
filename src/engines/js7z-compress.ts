@@ -91,12 +91,18 @@ export async function compressWith7z(
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
 
-  if (hasSystem7zForFormat(options.format.label)) {
+  // System 7z passes passwords via -p<password> on the command line,
+  // which is visible in process listings (ps aux). For encrypted archives,
+  // force WASM to avoid CLI password leakage.
+  if (hasSystem7zForFormat(options.format.label) && !options.password) {
     logger.info({ event: "compress.usingSystem7z", format: options.format.label });
     await compressWithSystem7z(options, progress, token, excludePatterns);
     return;
   }
 
+  if (options.password) {
+    logger.info({ event: "compress.wasm.encrypted", format: options.format.label });
+  }
   logger.info({ event: "compress.wasm.fallback", format: options.format.label });
 
   prog.report({ message: t("compress.initEngine") });

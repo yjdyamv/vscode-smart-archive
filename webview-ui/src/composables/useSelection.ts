@@ -73,7 +73,7 @@ export function useSelection() {
   return { state, toggle, clearAll, isSelected, getSelectedPaths, hasSelected };
 }
 
-function dedupPaths(s: Set<string>): string[] {
+export function dedupPaths(s: Set<string>): string[] {
   const arr = [...s];
   const result: string[] = [];
   for (const p of arr) {

@@ -11,6 +11,33 @@ import * as path from "path";
 // js7z-tools is a CommonJS module
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
 
+// Track all WASM instances created in each test so they can be
+// cleaned up in afterEach, preventing vitest worker OOM crashes.
+let _activeInstances: JS7zInstance[] = [];
+
+export function getActiveInstances(): JS7zInstance[] {
+  return _activeInstances;
+}
+
+export function resetActiveInstances(): void {
+  _activeInstances = [];
+}
+
+export async function trackedJS7z(
+  opts?: Record<string, unknown>,
+): Promise<JS7zInstance> {
+  const instance = await JS7z(opts);
+  _activeInstances.push(instance);
+  return instance;
+}
+
+export function disposeAllTracked(): void {
+  for (const j of _activeInstances) {
+    disposeJS7z(j);
+  }
+  _activeInstances = [];
+}
+
 // ── Types ──
 
 export interface JS7zInstance {

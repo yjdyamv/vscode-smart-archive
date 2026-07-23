@@ -12,7 +12,7 @@ export interface FlatNode {
   inheritCollapsed: boolean;
 }
 
-function buildNodeMap(nodes: TreeNodeData[]): Map<string, TreeNodeData> {
+export function buildNodeMap(nodes: TreeNodeData[]): Map<string, TreeNodeData> {
   const map = new Map<string, TreeNodeData>();
   function walk(ns: TreeNodeData[]) {
     for (const node of ns) {

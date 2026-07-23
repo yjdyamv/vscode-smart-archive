@@ -9,7 +9,7 @@ const REDOS_PATTERNS = [
   /\\[bBdwWsSD]?\+\s*\+/, // a++ patterns
 ];
 
-function isRedosSafe(pattern: string): boolean {
+export function isRedosSafe(pattern: string): boolean {
   for (const re of REDOS_PATTERNS) {
     if (re.test(pattern)) return false;
   }
@@ -17,12 +17,44 @@ function isRedosSafe(pattern: string): boolean {
   return true;
 }
 
-function fuzzyMatch(s: string, q: string): boolean {
+export function fuzzyMatch(s: string, q: string): boolean {
   let qi = 0;
   for (let i = 0; i < s.length && qi < q.length; i++) {
     if (s[i] === q[qi]) qi++;
   }
   return qi === q.length;
+}
+
+export function collectMatches(
+  nodes: TreeNodeData[],
+  re: RegExp | null,
+  fuzzy: string | null,
+  out: Set<string>,
+  directOut: Set<string>,
+): boolean {
+  let any = false;
+  for (const node of nodes) {
+    let hit = false;
+    if (re) {
+      hit = re.test(node.name) || re.test(node.path);
+    } else if (fuzzy) {
+      hit =
+        fuzzyMatch(node.name.toLowerCase(), fuzzy) || fuzzyMatch(node.path.toLowerCase(), fuzzy);
+    }
+    if (hit) {
+      directOut.add(node.path);
+      out.add(node.path);
+      any = true;
+    }
+    if (node.children && node.children.length > 0) {
+      const childHit = collectMatches(node.children, re, fuzzy, out, directOut);
+      if (childHit) {
+        out.add(node.path);
+        any = true;
+      }
+    }
+  }
+  return any;
 }
 
 export function useSearch() {
@@ -63,38 +95,6 @@ export function useSearch() {
 
     matchSet.value = matched;
     directMatchSet.value = directMatched;
-  }
-
-  function collectMatches(
-    nodes: TreeNodeData[],
-    re: RegExp | null,
-    fuzzy: string | null,
-    out: Set<string>,
-    directOut: Set<string>,
-  ): boolean {
-    let any = false;
-    for (const node of nodes) {
-      let hit = false;
-      if (re) {
-        hit = re.test(node.name) || re.test(node.path);
-      } else if (fuzzy) {
-        hit =
-          fuzzyMatch(node.name.toLowerCase(), fuzzy) || fuzzyMatch(node.path.toLowerCase(), fuzzy);
-      }
-      if (hit) {
-        directOut.add(node.path);
-        out.add(node.path);
-        any = true;
-      }
-      if (node.children && node.children.length > 0) {
-        const childHit = collectMatches(node.children, re, fuzzy, out, directOut);
-        if (childHit) {
-          out.add(node.path);
-          any = true;
-        }
-      }
-    }
-    return any;
   }
 
   function isVisible(path: string): boolean {

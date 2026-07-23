@@ -176,7 +176,12 @@ export async function compress(params: CompressParams): Promise<string> {
     ? { report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") }
     : undefined;
 
-  let token: any = undefined;
+  let token:
+    | {
+        readonly isCancellationRequested: boolean;
+        onCancellationRequested(cb: () => void): { dispose(): void };
+      }
+    | undefined = undefined;
   if (params.signal) {
     const signal = params.signal;
     token = {
@@ -185,6 +190,7 @@ export async function compress(params: CompressParams): Promise<string> {
       },
       onCancellationRequested(cb: () => void) {
         signal.addEventListener("abort", cb, { once: true });
+        return { dispose: () => signal.removeEventListener("abort", cb) };
       },
     };
   }
@@ -197,7 +203,8 @@ export async function compress(params: CompressParams): Promise<string> {
     outputPath: compressOpts.outputPath,
   });
 
-  await compressWith7z(compressOpts, progress, token, excludePatterns);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await compressWith7z(compressOpts, progress, token as any, excludePatterns);
 
   logger.info({
     event: "api.compress.done",

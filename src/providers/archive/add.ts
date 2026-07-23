@@ -18,6 +18,7 @@ import { t } from "../../i18n";
 import { withWrappedArchive } from "./wrappedHelper";
 import { prepareExclusions, isPathExcluded, type ExclusionSet } from "../../utils/exclude";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../../constants";
+import { hasSystem7zForFormat, addToArchiveSystem7z } from "../../engines/system7z";
 
 // ── Per-archive pending state for add-to-archive ──
 
@@ -48,7 +49,14 @@ export function initAddToArchive(
     );
     prev.webview?.postMessage({ c: "loading", t: false });
   }
-  pendingAdds.set(archivePath, { archivePath, targetDir, password, webview, archiveUri, onComplete });
+  pendingAdds.set(archivePath, {
+    archivePath,
+    targetDir,
+    password,
+    webview,
+    archiveUri,
+    onComplete,
+  });
 }
 
 export async function runAddToArchive(): Promise<void> {
@@ -167,6 +175,15 @@ export async function addToArchive(
   if (isWrappedFormat(ext)) {
     logger.info({ event: "addToArchive.wrapped", archivePath, ext });
     return addToWrappedArchive(archivePath, localPaths, targetDir, password, exclusions);
+  }
+
+  // System 7z passes passwords via -p<password> on the command line,
+  // visible in process listings. For encrypted archives, fall back to
+  // WASM to avoid CLI password leakage.
+  if (hasSystem7zForFormat(ext) && !password) {
+    logger.info({ event: "addToArchive.system7z", archivePath, ext });
+    await addToArchiveSystem7z(archivePath, localPaths, targetDir, exclusions, password);
+    return;
   }
 
   const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
