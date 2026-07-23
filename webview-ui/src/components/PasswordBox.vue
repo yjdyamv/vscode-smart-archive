@@ -1,26 +1,19 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
+import type { ExtensionMessage } from "../types";
 
-const props = defineProps<{ archiveName: string; wrong?: boolean }>();
+defineProps<{ archiveName: string }>();
 const emit = defineEmits<{ (e: "submit", pw: string): void }>();
 const password = ref("");
 const showPassword = ref(false);
 const hasError = ref(false);
-watch(
-  () => props.wrong,
-  (v) => {
-    hasError.value = !!v;
-    if (v) password.value = "";
-  },
-);
 
 function onMsg(e: MessageEvent) {
-  if (e.data?.c === "pwerr") {
+  const data = e.data as ExtensionMessage;
+  if (data?.c === "pwerr") {
     hasError.value = true;
     password.value = "";
-    setTimeout(() => {
-      hasError.value = false;
-    }, 4000);
+    setTimeout(() => { hasError.value = false; }, 4000);
   }
 }
 onMounted(() => window.addEventListener("message", onMsg));

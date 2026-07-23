@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import type { FlatNode } from "../composables/useTree";
-import type { TreeNodeData } from "../types";
+import type { FlatNode, TreeNodeData } from "../types";
 import FileRow from "./FileRow.vue";
 
 const props = defineProps<{

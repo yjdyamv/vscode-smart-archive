@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { FlatNode } from "../composables/useTree";
+import type { FlatNode } from "../types";
 import { getFileIcon, formatSize, escapeHtml } from "../utils/icons";
 
 const props = defineProps<{
@@ -77,7 +77,7 @@ const nameHtml = computed(() => {
 });
 
 function onRowClick(e: MouseEvent) {
-  if ((e.target as HTMLElement).closest(".cb")) return;
+  if ((e.target as HTMLElement).closest(".checkbox")) return;
   emit("click", e.shiftKey, e.ctrlKey || e.metaKey);
 }
 
@@ -124,12 +124,12 @@ function onExpandClick(e: MouseEvent) {
       :tabindex="isDir && flatNode.hasChildren ? 0 : -1"
       @click="isDir ? onExpandClick($event) : undefined"
     >
-      <span v-if="isLoading" class="ar-loading"></span>
+      <span v-if="isLoading" class="arrow-loading"></span>
       <span v-else-if="isDir" class="codicon codicon-chevron-right ar-icon"></span>
     </span>
     <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
-    <span class="nm" :title="node.path" v-html="nameHtml"></span>
-    <span v-if="!isDir && node.size > 0" class="sz">{{ formatSize(node.size) }}</span>
+    <span class="name" :title="node.path" v-html="nameHtml"></span>
+    <span v-if="!isDir && node.size > 0" class="size">{{ formatSize(node.size) }}</span>
   </div>
 </template>
 
@@ -175,18 +175,18 @@ function onExpandClick(e: MouseEvent) {
   opacity: 0.5;
   pointer-events: none;
 }
-.cb {
+.checkbox {
   width: 22px;
   flex-shrink: 0;
   text-align: center;
   cursor: pointer;
   padding: 2px 0;
 }
-.cb:hover .ck {
+.checkbox:hover .checkmark {
   border-color: var(--vscode-focusBorder, #007acc);
   box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc44);
 }
-.ck {
+.checkmark {
   display: inline-block;
   width: calc(var(--vscode-font-size) * 1.25);
   height: calc(var(--vscode-font-size) * 1.25);
@@ -197,11 +197,11 @@ function onExpandClick(e: MouseEvent) {
   position: relative;
   transition: all 0.12s;
 }
-.ck.on {
+.checkmark.on {
   background: var(--vscode-checkbox-selectBackground, #0e639c);
   border-color: var(--vscode-checkbox-selectBorder, #007acc);
 }
-.ck.on::after {
+.checkmark.on::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -212,7 +212,7 @@ function onExpandClick(e: MouseEvent) {
   border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
 }
-.ar {
+.arrow {
   width: calc(var(--vscode-font-size) * 1.3);
   flex-shrink: 0;
   text-align: center;
@@ -220,24 +220,24 @@ function onExpandClick(e: MouseEvent) {
   opacity: 0.7;
   transition: opacity 0.1s;
 }
-.ar:hover {
+.arrow:hover {
   opacity: 1;
 }
-.ar-icon {
+.arrow-icon {
   font-size: 12px;
   transition: transform 0.15s ease;
 }
-.ar.rot .ar-icon {
+.arrow.rot .arrow-icon {
   transform: rotate(90deg);
 }
-.ar.empty {
+.arrow.empty {
   opacity: 0.25;
   cursor: default;
 }
-.ar.empty:hover {
+.arrow.empty:hover {
   opacity: 0.25;
 }
-.ar-loading {
+.arrow-loading {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -252,20 +252,20 @@ function onExpandClick(e: MouseEvent) {
     transform: rotate(360deg);
   }
 }
-.ic {
+.icon {
   width: calc(var(--vscode-font-size) * 1.5);
   text-align: center;
   flex-shrink: 0;
   line-height: calc(var(--vscode-font-size) * 1.85);
   font-size: calc(var(--vscode-font-size) * 1.05);
 }
-.nm {
+.name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
 }
-.sz {
+.size {
   font-size: calc(var(--vscode-font-size) * 0.82);
   color: var(--vscode-descriptionForeground);
   margin-left: 10px;
