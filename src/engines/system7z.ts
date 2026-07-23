@@ -27,11 +27,12 @@ import type { CompressOptions, DecompressOptions } from "../types";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
-import { validatePassword, checkFileSize } from "../utils/security";
+import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
-import { prepareExclusions, isTargetExcluded } from "../utils/exclude";
+import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
+import type { ExclusionSet } from "../utils/exclude";
 import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
 
 // ── Detection (cached) ───────────────────────────────────────────────
@@ -222,7 +223,11 @@ function testBinary(binaryPath: string): boolean {
   try {
     const result = spawnSync(binaryPath, [], { stdio: "pipe", timeout: 5000, windowsHide: true });
     return result.status === 0;
-  } catch {
+  } catch (err) {
+    logger.warn(
+      { event: "system7z.testBinary.failed", path: binaryPath, err },
+      "Failed to test 7z binary",
+    );
     return false;
   }
 }
@@ -273,7 +278,17 @@ function resolveFromPath(name: string): string | null {
       const found = result.stdout.toString().trim().split("\n")[0].trim();
       if (fs.existsSync(found) && testBinary(found)) return found;
     }
-  } catch {
+  } catch (err) {
+    logger.warn(
+      {
+        event: "system7z.resolveFromPath.failed",
+        cmd: whichCmd,
+        name,
+        platform: process.platform,
+        err,
+      },
+      `${whichCmd} command failed, falling back to manual PATH search`,
+    );
     if (process.platform === "win32") {
       const pathExt = (process.env.PATHEXT || ".EXE;.CMD;.BAT").split(";");
       const pathDirs = (process.env.PATH || "").split(";");
@@ -631,18 +646,31 @@ interface CaptureResult {
   code: number | null;
 }
 
+interface SpawnCaptureOpts {
+  cwd?: string;
+  timeoutMs?: number;
+}
+
 export function spawnCapture(
   binary: string,
   args: string[],
-  timeoutMs = 30_000,
+  opts?: number | SpawnCaptureOpts,
 ): Promise<CaptureResult> {
+  const { cwd, timeoutMs } =
+    typeof opts === "number" ? { timeoutMs: opts, cwd: undefined } : { timeoutMs: 30_000, ...opts };
+
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
     let settled = false;
     logger.debug({ event: "system7z.spawn", binary, args: args.join(" ") });
 
-    const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true, timeout: timeoutMs });
+    const proc = spawn(binary, args, {
+      stdio: "pipe",
+      cwd,
+      windowsHide: true,
+      timeout: timeoutMs,
+    });
 
     // Close stdin immediately — prevents 7z from hanging when -p (prompt)
     // is used without a value, e.g. in encryption detection.
@@ -712,7 +740,7 @@ function run7z(
     // are passed on the command line via -p<password> flag.
     proc.stdin?.end();
 
-    token?.onCancellationRequested(() => {
+    const cancelSub = token?.onCancellationRequested(() => {
       logger.info({ event: "system7z.run.cancelled", elapsedMs: Date.now() - startTime });
       proc.kill("SIGTERM");
       // On Windows SIGTERM may not work, try taskkill
@@ -745,6 +773,7 @@ function run7z(
     });
 
     proc.on("error", (err) => {
+      cancelSub?.dispose();
       const elapsed = Date.now() - startTime;
       logger.error(
         {
@@ -761,6 +790,7 @@ function run7z(
     });
 
     proc.on("close", (code, signal) => {
+      cancelSub?.dispose();
       const elapsed = Date.now() - startTime;
       const logMeta = {
         event: "system7z.run.close",
@@ -836,4 +866,162 @@ const FORMAT_7Z_MAP: Record<string, string> = {
 
 function formatTo7zType(label: string): string {
   return FORMAT_7Z_MAP[label] || label;
+}
+
+// ── Archive modification (direct on disk, no VFS) ───────────────────
+
+function copyDirRecursive(srcDir: string, destDir: string, exclusions?: ExclusionSet): void {
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const name = entry.name;
+    if (exclusions && isPathExcluded(name, exclusions)) {
+      logger.info({
+        event: "system7z.add.skipExcludedRecursive",
+        name,
+        dir: srcDir,
+      });
+      continue;
+    }
+    const srcPath = path.join(srcDir, name);
+    const destPath = path.join(destDir, name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(destPath, { recursive: true });
+      copyDirRecursive(srcPath, destPath, exclusions);
+    } else if (entry.isFile()) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+export async function addToArchiveSystem7z(
+  archivePath: string,
+  localPaths: string[],
+  targetDir: string,
+  exclusions?: ExclusionSet,
+  password?: string,
+): Promise<void> {
+  const sz = getSystem7zOrNull();
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  const normDir = targetDir.replace(/\\/g, "/").replace(/^\/+/, "");
+
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "saa_"));
+  let addedCount = 0;
+
+  try {
+    for (const localPath of localPaths) {
+      const name = getBaseName(localPath);
+      if (exclusions && isPathExcluded(name, exclusions)) {
+        logger.info({ event: "system7z.add.skipExcluded", path: localPath, name });
+        continue;
+      }
+
+      const stat = fs.statSync(localPath);
+      const destRel = normDir ? path.join(normDir, name) : name;
+      const destAbs = path.join(tmpRoot, destRel);
+
+      if (stat.isDirectory()) {
+        fs.mkdirSync(destAbs, { recursive: true });
+        copyDirRecursive(localPath, destAbs, exclusions);
+      } else {
+        fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+        fs.copyFileSync(localPath, destAbs);
+      }
+      addedCount++;
+    }
+
+    if (addedCount === 0) {
+      logger.info({ event: "system7z.add.nothingToAdd", archivePath });
+      return;
+    }
+
+    const args: string[] = ["a", archivePath, "-aot", "-r"];
+    if (password) {
+      validatePassword(password);
+      args.splice(1, 0, `-p${password}`);
+    }
+    args.push("*");
+
+    logger.info({
+      event: "system7z.add.start",
+      archivePath,
+      files: addedCount,
+      targetDir: normDir || "(root)",
+      encrypted: !!password,
+    });
+
+    await spawnCaptureInCwd(sz, args, tmpRoot);
+
+    logger.info({ event: "system7z.add.ok", archivePath, files: addedCount });
+  } finally {
+    try {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    } catch {
+      logger.warn({ event: "system7z.add.cleanup.failed" }, "Failed to clean up temp dir");
+    }
+  }
+}
+
+function spawnCaptureInCwd(
+  binary: string,
+  args: string[],
+  cwd: string,
+  timeoutMs = 30_000,
+): Promise<CaptureResult> {
+  return spawnCapture(binary, args, { cwd, timeoutMs });
+}
+
+export async function deleteFromArchiveSystem7z(
+  archivePath: string,
+  selectedPaths: string[],
+  password?: string,
+): Promise<void> {
+  const sz = getSystem7zOrNull();
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  const dArgs = ["d", archivePath, "-y"];
+  if (password) {
+    validatePassword(password);
+    dArgs.splice(1, 0, `-p${password}`);
+  }
+  dArgs.push(...selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/"))));
+
+  logger.info({
+    event: "system7z.delete.start",
+    archivePath,
+    entries: selectedPaths.length,
+    encrypted: !!password,
+  });
+
+  await spawnCaptureInCwd(sz, dArgs, path.dirname(archivePath));
+
+  logger.info({ event: "system7z.delete.ok", archivePath, entries: selectedPaths.length });
+}
+
+export async function renameInArchiveSystem7z(
+  archivePath: string,
+  oldPath: string,
+  newPath: string,
+  password?: string,
+): Promise<void> {
+  const sz = getSystem7zOrNull();
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  const rnArgs = ["rn", archivePath, sanitizeCliPath(oldPath), sanitizeCliPath(newPath)];
+  if (password) {
+    validatePassword(password);
+    rnArgs.splice(1, 0, `-p${password}`);
+  }
+
+  logger.info({
+    event: "system7z.rename.start",
+    archivePath,
+    oldPath,
+    newPath,
+    encrypted: !!password,
+  });
+
+  await spawnCaptureInCwd(sz, rnArgs, path.dirname(archivePath));
+
+  logger.info({ event: "system7z.rename.ok", archivePath, oldPath, newPath });
 }

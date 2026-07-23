@@ -11,6 +11,7 @@ import { getFullExt, isWrappedFormat } from "../../constants";
 import { validatePassword, sanitizeCliPath } from "../../utils/security";
 import { logger } from "../../utils/logger";
 import { withWrappedArchive } from "./wrappedHelper";
+import { hasSystem7zForFormat, deleteFromArchiveSystem7z } from "../../engines/system7z";
 
 export async function deleteFromArchive(
   archivePath: string,
@@ -22,6 +23,15 @@ export async function deleteFromArchive(
   if (isWrappedFormat(ext)) {
     logger.info({ event: "deleteFromArchive.wrapped", archivePath, ext });
     return deleteFromWrappedArchive(archivePath, selectedPaths, password);
+  }
+
+  // System 7z passes passwords via -p<password> on the command line,
+  // visible in process listings. For encrypted archives, fall back to
+  // WASM to avoid CLI password leakage.
+  if (hasSystem7zForFormat(ext) && !password) {
+    logger.info({ event: "deleteFromArchive.system7z", archivePath, ext });
+    await deleteFromArchiveSystem7z(archivePath, selectedPaths, password);
+    return;
   }
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });

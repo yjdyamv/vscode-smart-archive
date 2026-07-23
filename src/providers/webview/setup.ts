@@ -110,6 +110,7 @@ export async function setupWebview(
         if (pwEntries.length > 0) {
           encrypted = false;
           isEnc = false;
+          encryptionDetectionFailed = false;
           logger.info({ event: "setupWebview.password.retrySuccess", count: pwEntries.length });
         }
       } catch {

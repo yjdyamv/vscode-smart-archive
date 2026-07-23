@@ -24,7 +24,9 @@ class ArchiveEditorProvider implements vscode.CustomReadonlyEditorProvider {
     webviewPanel: vscode.WebviewPanel,
   ): Promise<void> {
     try {
-      const extUri = vscode.extensions.getExtension(EXT_ID)!.extensionUri;
+      const ext = vscode.extensions.getExtension(EXT_ID);
+      if (!ext) throw new Error(`Extension ${EXT_ID} not found`);
+      const extUri = ext.extensionUri;
       webviewPanel.webview.options = {
         enableScripts: true,
         enableCommandUris: true,
@@ -50,6 +52,8 @@ export function registerArchiveEditor(context: vscode.ExtensionContext): void {
 
 export async function openArchivePreview(archiveUri: vscode.Uri): Promise<void> {
   try {
+    const ext = vscode.extensions.getExtension(EXT_ID);
+    if (!ext) throw new Error(`Extension ${EXT_ID} not found`);
     const panel = vscode.window.createWebviewPanel(
       "archiveViewer",
       t("decompress.previewTitle"),
@@ -57,7 +61,7 @@ export async function openArchivePreview(archiveUri: vscode.Uri): Promise<void> 
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [vscode.extensions.getExtension(EXT_ID)!.extensionUri],
+        localResourceRoots: [ext.extensionUri],
       },
     );
     await setupWebview(panel.webview, archiveUri);

@@ -190,7 +190,12 @@ export async function decompress(params: DecompressParams): Promise<string> {
     ? { report: (v: { message?: string }) => params.onProgress?.(v.message ?? "") }
     : undefined;
 
-  let token: any = undefined;
+  let token:
+    | {
+        readonly isCancellationRequested: boolean;
+        onCancellationRequested(cb: () => void): { dispose(): void };
+      }
+    | undefined = undefined;
   if (params.signal) {
     const signal = params.signal;
     token = {
@@ -199,6 +204,7 @@ export async function decompress(params: DecompressParams): Promise<string> {
       },
       onCancellationRequested(cb: () => void) {
         signal.addEventListener("abort", cb, { once: true });
+        return { dispose: () => signal.removeEventListener("abort", cb) };
       },
     };
   }
@@ -215,7 +221,8 @@ export async function decompress(params: DecompressParams): Promise<string> {
     password: params.password ?? "",
   };
 
-  await decompressWith7z(decompressOpts, progress, token);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await decompressWith7z(decompressOpts, progress, token as any);
 
   logger.info({
     event: "api.decompress.done",
