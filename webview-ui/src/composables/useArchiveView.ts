@@ -1,5 +1,6 @@
 import { ref, reactive, computed, type Ref, type ComputedRef } from "vue";
 import type { TreeNodeData } from "../types";
+import { isCoveredByAncestor } from "./useSelection";
 
 export interface ArchiveViewContext {
   post: (msg: Record<string, unknown>) => void;
@@ -131,12 +132,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
           paths.add(p);
         }
       } else {
-        const parts = p.replace(/\\/g, "/").split("/");
-        let covered = false;
-        for (let j = parts.length - 2; j >= 0; j--) {
-          if (selection.state.selected.has(parts.slice(0, j + 1).join("/"))) { covered = true; break; }
-        }
-        if (!covered) paths.add(p);
+        if (!isCoveredByAncestor(p, selection.state.selected)) paths.add(p);
       }
     }
     return { paths: [...paths], excludes: [...excludes] };
@@ -152,12 +148,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     let dirs = 0;
     let files = 0;
     for (const p of selection.state.selected) {
-      const parts = p.replace(/\\/g, "/").split("/");
-      let covered = false;
-      for (let j = parts.length - 2; j >= 0; j--) {
-        if (selection.state.selected.has(parts.slice(0, j + 1).join("/"))) { covered = true; break; }
-      }
-      if (covered) continue;
+      if (isCoveredByAncestor(p, selection.state.selected)) continue;
       const node = tree.nodeMap.value.get(p);
       if (!node) continue;
       if (node.kind === "DIRECTORY") {
