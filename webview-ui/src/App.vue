@@ -39,7 +39,7 @@ watch([sort.sortKey, sort.sortAsc], () => {
 });
 
 watch(
-  () => tree.expandedPaths.value.size,
+  () => JSON.stringify([...tree.expandedPaths.value].sort()),
   () => post({ c: "saveExpanded", paths: [...tree.expandedPaths.value] }),
 );
 
