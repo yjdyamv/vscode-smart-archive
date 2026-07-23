@@ -24,7 +24,7 @@ export interface ArchiveViewContext {
   isEncrypted: Ref<boolean>;
   canEncrypt: Ref<boolean>;
   containerEl: Ref<HTMLElement | null>;
-  scrollToIndex: (idx: number) => void;
+  scrollToPath: (path: string) => void;
 }
 
 export function useArchiveView(ctx: ArchiveViewContext) {
@@ -312,7 +312,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     if (!shift) selection.clearAll();
     selection.toggle(targetPath, targetIsDir);
     selection.state.anchorPath = targetPath;
-    ctx.scrollToIndex(idx);
+    ctx.scrollToPath(targetPath);
   }
 
   function getPageSize(): number {
@@ -369,7 +369,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
       if (!e.shiftKey) selection.clearAll();
       selection.toggle(flatList[0].path, flatList[0].node.kind === "DIRECTORY");
       selection.state.anchorPath = flatList[0].path;
-      ctx.scrollToIndex(0);
+      ctx.scrollToPath(flatList[0].path);
     }
     if (e.key === "End") {
       e.preventDefault();
@@ -379,7 +379,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
       if (!e.shiftKey) selection.clearAll();
       selection.toggle(last.path, last.node.kind === "DIRECTORY");
       selection.state.anchorPath = last.path;
-      ctx.scrollToIndex(flatList.length - 1);
+      ctx.scrollToPath(last.path);
     }
   }
 
