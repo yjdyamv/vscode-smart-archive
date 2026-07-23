@@ -123,16 +123,16 @@ function onExpandClick(e: MouseEvent) {
       :style="{ left: i * INDENT_PX + INDENT_PX / 2 + 'px' }"
     ></span>
     <span
-      class="cb"
+      class="checkbox"
       @click="onCheckClick"
       role="checkbox"
       :aria-checked="selected || undefined"
       :aria-label="'Select ' + node.name"
     >
-      <span class="ck" :class="{ on: selected }"></span>
+      <span class="checkmark" :class="{ on: selected }"></span>
     </span>
     <span
-      class="ar"
+      class="arrow"
       :class="{ rot: flatNode.expanded, empty: isDir && !flatNode.hasChildren }"
       role="button"
       :aria-label="flatNode.expanded ? 'Collapse ' + node.name : 'Expand ' + node.name"
@@ -140,7 +140,7 @@ function onExpandClick(e: MouseEvent) {
       @click="isDir ? onExpandClick($event) : undefined"
     >
       <span v-if="isLoading" class="arrow-loading"></span>
-      <span v-else-if="isDir" class="codicon codicon-chevron-right ar-icon"></span>
+      <span v-else-if="isDir" class="codicon codicon-chevron-right arrow-icon"></span>
     </span>
     <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
     <span class="name" :title="node.path" v-html="nameHtml"></span>
@@ -241,6 +241,9 @@ function onExpandClick(e: MouseEvent) {
 }
 .arrow-icon {
   font-size: 12px;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
   transition: transform var(--sa-transition-medium) ease;
 }
 .arrow.rot .arrow-icon {
