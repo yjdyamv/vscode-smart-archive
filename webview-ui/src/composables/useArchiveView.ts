@@ -140,9 +140,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
 
   // ── Selection counts ───────────────────────────────────────────────
 
-  const descCounts = (
-    (window as any)._xDescCounts as Record<string, { files: number; dirs: number }> | undefined
-  ) ?? {};
+  const descCounts = window._xDescCounts ?? {};
 
   const selectionBreakdown = computed(() => {
     let dirs = 0;

@@ -25,11 +25,11 @@ const archiveProps = ref<ArchiveProps | null>(null);
 const totalFiles = ref(0);
 const totalDirs = ref(0);
 const loadingMsg = ref("Reading archive...");
-const readOnly = ref(!!(window as any)._xReadOnly);
-const isSplit = ref(!!(window as any)._xIsSplit);
-const canSplit = ref(!!(window as any)._xCanSplit);
-const isEncrypted = ref(!!(window as any)._xIsEncrypted);
-const canEncrypt = ref(!!(window as any)._xCanEncrypt);
+const readOnly = ref(!!window._xReadOnly);
+const isSplit = ref(!!window._xIsSplit);
+const canSplit = ref(!!window._xCanSplit);
+const isEncrypted = ref(!!window._xIsEncrypted);
+const canEncrypt = ref(!!window._xCanEncrypt);
 
 const sort = useSort();
 const tree = useTreeFlatten(treeData);

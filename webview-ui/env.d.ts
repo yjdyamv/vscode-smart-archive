@@ -27,4 +27,6 @@ interface Window {
   _xIsSplit?: boolean;
   _xCanSplit?: boolean;
   _xIsEncrypted?: boolean;
+  _xCanEncrypt?: boolean;
+  _xDescCounts?: Record<string, { files: number; dirs: number }>;
 }
