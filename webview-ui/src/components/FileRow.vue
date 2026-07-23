@@ -31,7 +31,7 @@ function indentGuides(depth: number, hasChildren: boolean): number[] {
   return Array.from({ length: depth + (hasChildren ? 1 : 0) }, (_, i) => i);
 }
 
-function getNameHtml(): string {
+const nameHtml = computed(() => {
   const name = node.value.name;
   if (!props.searchQuery.trim()) return escapeHtml(name);
 
@@ -39,7 +39,6 @@ function getNameHtml(): string {
   if (raw.length > 2 && raw[0] === "/" && raw.lastIndexOf("/") === raw.length - 1) {
     try {
       const pattern = raw.slice(1, -1);
-      // ReDoS safety check — reject patterns with nested quantifiers
       if (
         /\((?!\?[:!=]).*\)(\+|\*|\{\d+,\})\s*(\+|\*|\{\d+,\})/.test(pattern) ||
         /(\+|\*)\s*(\+|\*)/.test(pattern) ||
@@ -75,7 +74,7 @@ function getNameHtml(): string {
   }
   result += escapeHtml(name.substring(last));
   return result;
-}
+});
 
 function onRowClick(e: MouseEvent) {
   if ((e.target as HTMLElement).closest(".cb")) return;
@@ -129,7 +128,7 @@ function onExpandClick(e: MouseEvent) {
       <span v-else-if="isDir" class="codicon codicon-chevron-right ar-icon"></span>
     </span>
     <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
-    <span class="nm" :title="node.path" v-html="getNameHtml()"></span>
+    <span class="nm" :title="node.path" v-html="nameHtml"></span>
     <span v-if="!isDir && node.size > 0" class="sz">{{ formatSize(node.size) }}</span>
   </div>
 </template>
