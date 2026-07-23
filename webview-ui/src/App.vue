@@ -7,6 +7,7 @@ import { useSort, type SortKey } from "./composables/useSort";
 import { useSearch } from "./composables/useSearch";
 import { useTreeFlatten } from "./composables/useTree";
 import { useArchiveView } from "./composables/useArchiveView";
+import { saveState, loadState } from "./composables/useMessage";
 import LoadingSpinner from "./components/LoadingSpinner.vue";
 import PasswordBox from "./components/PasswordBox.vue";
 import Toolbar from "./components/Toolbar.vue";
@@ -34,8 +35,19 @@ const canEncrypt = ref(!!window._xCanEncrypt);
 const sort = useSort();
 const tree = useTreeFlatten(treeData);
 
+// Restore persisted sort/search preferences
+const prefs = loadState<{ sortKey?: string; sortAsc?: boolean; searchQuery?: string }>();
+if (prefs?.sortKey) sort.setSort(prefs.sortKey as SortKey);
+if (prefs?.sortAsc === false) sort.setSort(sort.sortKey.value);
+if (prefs?.searchQuery) { search.query.value = prefs.searchQuery; search.isRegex.value = false; }
+
 watch([sort.sortKey, sort.sortAsc], () => {
   treeData.value = sort.sortNodes([...treeData.value]);
+  saveState({ sortKey: sort.sortKey.value, sortAsc: sort.sortAsc.value });
+});
+
+watch(search.query, (v) => {
+  saveState({ searchQuery: v });
 });
 
 watch(

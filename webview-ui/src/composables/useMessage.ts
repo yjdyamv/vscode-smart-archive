@@ -1,3 +1,5 @@
+import type { ExtensionMessage } from "../types";
+
 const vscode = acquireVsCodeApi();
 
 export function useMessage() {
@@ -8,8 +10,8 @@ export function useMessage() {
   return { post, onMessage };
 }
 
-function onMessage(handler: (msg: Record<string, unknown>) => void): () => void {
-  const listener = (e: MessageEvent) => handler(e.data as Record<string, unknown>);
+function onMessage(handler: (msg: ExtensionMessage) => void): () => void {
+  const listener = (e: MessageEvent) => handler(e.data as ExtensionMessage);
   window.addEventListener("message", listener);
   return () => window.removeEventListener("message", listener);
 }

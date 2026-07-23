@@ -1,10 +1,11 @@
 import { ref, reactive, computed, type Ref, type ComputedRef } from "vue";
 import type { TreeNodeData } from "../types";
+import type { ExtensionMessage } from "../types";
 import { isCoveredByAncestor } from "./useSelection";
 
 export interface ArchiveViewContext {
   post: (msg: Record<string, unknown>) => void;
-  onMessage: (handler: (msg: Record<string, unknown>) => void) => () => void;
+  onMessage: (handler: (msg: ExtensionMessage) => void) => () => void;
   tree: ReturnType<typeof import("./useTree").useTreeFlatten>;
   treeData: Ref<TreeNodeData[]>;
   selection: ReturnType<typeof import("./useSelection").useSelection>;
@@ -341,14 +342,14 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   // ── Message handler ────────────────────────────────────────────────
 
   function setupMessageHandler() {
-    return ctx.onMessage((msg: Record<string, unknown>) => {
+    return ctx.onMessage((msg: ExtensionMessage) => {
       switch (msg.c) {
         case "ok":
-          showToast(msg.t as string, true);
+          showToast(msg.t, true);
           viewState.value = "content";
           break;
         case "err":
-          showToast(msg.t as string, false);
+          showToast(msg.t, false);
           viewState.value = "content";
           break;
         case "loading":
@@ -356,14 +357,14 @@ export function useArchiveView(ctx: ArchiveViewContext) {
           else { viewState.value = msg.t ? "loading" : "content"; }
           break;
         case "pwerr":
-          showToast((msg.t as string) || "Wrong password", false);
+          showToast(msg.t || "Wrong password", false);
           break;
         case "encState":
-          ctx.isEncrypted.value = !!(msg.v as boolean);
+          ctx.isEncrypted.value = !!msg.v;
           break;
         case "dirChildren": {
-          const parentPath = msg.path as string;
-          const children = msg.children as TreeNodeData[];
+          const parentPath = msg.path;
+          const children = msg.children;
           if (parentPath && Array.isArray(children)) {
             const childPaths = tree.insertChildren(parentPath, children);
             for (const c of children) {

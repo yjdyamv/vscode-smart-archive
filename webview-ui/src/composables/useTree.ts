@@ -1,16 +1,8 @@
 import { ref, computed, type Ref } from "vue";
-import type { TreeNodeData } from "../types";
+import type { TreeNodeData, FlatNode } from "../types";
 import { loadState } from "./useMessage";
 
-export interface FlatNode {
-  node: TreeNodeData;
-  depth: number;
-  path: string;
-  expanded: boolean;
-  hasChildren: boolean;
-  visible: boolean;
-  inheritCollapsed: boolean;
-}
+export type { FlatNode };
 
 export function buildNodeMap(nodes: TreeNodeData[]): Map<string, TreeNodeData> {
   const map = new Map<string, TreeNodeData>();
