@@ -1,7 +1,14 @@
 import { ref, reactive, computed, type Ref, type ComputedRef } from "vue";
-import type { TreeNodeData } from "../types";
-import type { ExtensionMessage } from "../types";
+import type { TreeNodeData, ExtensionMessage } from "../types";
 import { isCoveredByAncestor } from "./useSelection";
+import {
+  ROW_HEIGHT_MULTIPLIER,
+  DEFAULT_FONT_SIZE,
+  TOAST_SUCCESS_MS,
+  TOAST_ERROR_MS,
+  SEARCH_DEBOUNCE_MS,
+  DEFAULT_PAGE_SIZE,
+} from "../constants";
 
 export interface ArchiveViewContext {
   post: (msg: Record<string, unknown>) => void;
@@ -40,7 +47,12 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     toast.ok = ok;
     toast.show = true;
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { toast.show = false; }, ok ? 1800 : 4000);
+    toastTimer = setTimeout(
+      () => {
+        toast.show = false;
+      },
+      ok ? TOAST_SUCCESS_MS : TOAST_ERROR_MS,
+    );
   }
 
   // ── Search debounce ────────────────────────────────────────────────
@@ -60,23 +72,27 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     search.query.value = q;
     if (!q.trim()) search.matchSet.value = new Set();
     if (searchDebounce) clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => search.updateSearch(q, treeData.value), 150);
+    searchDebounce = setTimeout(() => search.updateSearch(q, treeData.value), SEARCH_DEBOUNCE_MS);
   }
 
   // ── Tree helpers ───────────────────────────────────────────────────
 
   function getVisibleDescendants(node: TreeNodeData): string[] {
     const prefix = node.path + "/";
-    return tree.flatNodes.value
-      .filter((fn) => fn.path.startsWith(prefix))
-      .map((fn) => fn.path);
+    return tree.flatNodes.value.filter((fn) => fn.path.startsWith(prefix)).map((fn) => fn.path);
   }
 
   function expandOrLoad(path: string) {
     const node = tree.findNode(path);
     if (!node || node.kind !== "DIRECTORY") return;
-    if (tree.expandedPaths.value.has(path)) { tree.toggleExpand(path); return; }
-    if (node.children && node.children.length > 0) { tree.toggleExpand(path); return; }
+    if (tree.expandedPaths.value.has(path)) {
+      tree.toggleExpand(path);
+      return;
+    }
+    if (node.children && node.children.length > 0) {
+      tree.toggleExpand(path);
+      return;
+    }
     if (node.hasMore && (!node.children || node.children.length === 0)) {
       if (tree.loadingPaths.value.has(path)) return;
       tree.toggleExpand(path);
@@ -155,7 +171,10 @@ export function useArchiveView(ctx: ArchiveViewContext) {
       if (node.kind === "DIRECTORY") {
         dirs += 1;
         const dc = descCounts[p];
-        if (dc) { files += dc.files; dirs += dc.dirs; }
+        if (dc) {
+          files += dc.files;
+          dirs += dc.dirs;
+        }
       } else {
         files += 1;
       }
@@ -163,7 +182,9 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     return { dirs, files };
   });
 
-  const selectedCount = computed(() => selectionBreakdown.value.dirs + selectionBreakdown.value.files);
+  const selectedCount = computed(
+    () => selectionBreakdown.value.dirs + selectionBreakdown.value.files,
+  );
 
   // ── Row click / toggle ─────────────────────────────────────────────
 
@@ -224,7 +245,10 @@ export function useArchiveView(ctx: ArchiveViewContext) {
 
   // ── Operations ─────────────────────────────────────────────────────
 
-  function extAll() { post({ c: "extAll" }); showToast("Extracting all files...", true); }
+  function extAll() {
+    post({ c: "extAll" });
+    showToast("Extracting all files...", true);
+  }
 
   function extSel() {
     const { paths, excludes } = getEffectivePaths();
@@ -254,21 +278,43 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     showToast("Adding to " + (dir || "archive root"), true);
   }
 
-  function previewFile(path: string) { post({ c: "preview", path }); }
-  function renameFile(path: string) { post({ c: "renamePrompt", path }); }
+  function previewFile(path: string) {
+    post({ c: "preview", path });
+  }
+  function renameFile(path: string) {
+    post({ c: "renamePrompt", path });
+  }
 
   function newFolder() {
     const dir = selection.state.lastAddDir || ctxMenu.dirPath || "";
     post({ c: "newFolderPrompt", dir });
   }
 
-  function testArchive() { post({ c: "test" }); showToast("Testing archive integrity...", true); }
-  function convertFormat() { post({ c: "convert" }); }
-  function mergeVolumes() { post({ c: "merge" }); showToast("Merging split volumes...", true); }
-  function splitVolumes() { post({ c: "split" }); }
-  function encryptArchive() { post({ c: "encrypt" }); showToast("Adding encryption...", true); }
-  function decryptArchive() { post({ c: "decrypt" }); showToast("Removing encryption...", true); }
-  function submitPassword(pw: string) { post({ c: "pw", pw }); }
+  function testArchive() {
+    post({ c: "test" });
+    showToast("Testing archive integrity...", true);
+  }
+  function convertFormat() {
+    post({ c: "convert" });
+  }
+  function mergeVolumes() {
+    post({ c: "merge" });
+    showToast("Merging split volumes...", true);
+  }
+  function splitVolumes() {
+    post({ c: "split" });
+  }
+  function encryptArchive() {
+    post({ c: "encrypt" });
+    showToast("Adding encryption...", true);
+  }
+  function decryptArchive() {
+    post({ c: "decrypt" });
+    showToast("Removing encryption...", true);
+  }
+  function submitPassword(pw: string) {
+    post({ c: "pw", pw });
+  }
 
   // ── Context menu ───────────────────────────────────────────────────
 
@@ -291,20 +337,42 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     e.preventDefault();
   }
 
-  function closeContextMenu() { ctxMenu.show = false; }
-  function ctxExtract() { extSel(); closeContextMenu(); }
-  function ctxDelete() { delSel(); closeContextMenu(); }
-  function ctxCopy() { copySel(); closeContextMenu(); }
-  function ctxAddHere() { post({ c: "addFiles", dir: ctxMenu.dirPath }); closeContextMenu(); }
-  function ctxNewFolder() { post({ c: "newFolderPrompt", dir: ctxMenu.dirPath }); closeContextMenu(); }
-  function ctxRename() { if (ctxMenu.paths.length === 1) renameFile(ctxMenu.paths[0]); closeContextMenu(); }
+  function closeContextMenu() {
+    ctxMenu.show = false;
+  }
+  function ctxExtract() {
+    extSel();
+    closeContextMenu();
+  }
+  function ctxDelete() {
+    delSel();
+    closeContextMenu();
+  }
+  function ctxCopy() {
+    copySel();
+    closeContextMenu();
+  }
+  function ctxAddHere() {
+    post({ c: "addFiles", dir: ctxMenu.dirPath });
+    closeContextMenu();
+  }
+  function ctxNewFolder() {
+    post({ c: "newFolderPrompt", dir: ctxMenu.dirPath });
+    closeContextMenu();
+  }
+  function ctxRename() {
+    if (ctxMenu.paths.length === 1) renameFile(ctxMenu.paths[0]);
+    closeContextMenu();
+  }
 
   // ── Keyboard ───────────────────────────────────────────────────────
 
   function navigateRows(delta: number, shift: boolean) {
     const flatList = visibleFlatNodes.value;
     if (!flatList.length) return;
-    let idx = selection.state.anchorPath ? flatList.findIndex((f) => f.path === selection.state.anchorPath) : -1;
+    let idx = selection.state.anchorPath
+      ? flatList.findIndex((f) => f.path === selection.state.anchorPath)
+      : -1;
     if (idx < 0) idx = delta > 0 ? -1 : flatList.length;
     idx = Math.max(0, Math.min(idx + delta, flatList.length - 1));
     const targetPath = flatList[idx].path;
@@ -317,12 +385,14 @@ export function useArchiveView(ctx: ArchiveViewContext) {
 
   function getPageSize(): number {
     const el = ctx.containerEl.value;
-    if (!el) return 15;
+    if (!el) return DEFAULT_PAGE_SIZE;
     const fontSize =
-      parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size")) ||
+      parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size"),
+      ) ||
       parseFloat(getComputedStyle(document.documentElement).fontSize) ||
-      14;
-    return Math.max(1, Math.floor(el.clientHeight / (fontSize * 1.85)));
+      DEFAULT_FONT_SIZE;
+    return Math.max(1, Math.floor(el.clientHeight / (fontSize * ROW_HEIGHT_MULTIPLIER)));
   }
 
   function handleKeyboard(e: KeyboardEvent) {
@@ -344,22 +414,46 @@ export function useArchiveView(ctx: ArchiveViewContext) {
       const paths = selection.getSelectedPaths();
       if (paths.length === 1) post({ c: "renamePrompt", path: paths[0] });
     }
-    if (e.key === "Enter" && selection.hasSelected()) { e.preventDefault(); extSel(); }
-    if (e.key === "Escape") { selection.clearAll(); ctxMenu.show = false; }
-    if (e.key === " " && selection.state.anchorPath) { e.preventDefault(); selection.toggle(selection.state.anchorPath); }
-    if (e.key === "Delete" && selection.hasSelected()) { e.preventDefault(); delSel(); }
-    if (e.key === "ArrowDown") { e.preventDefault(); navigateRows(1, e.shiftKey); }
-    if (e.key === "ArrowUp") { e.preventDefault(); navigateRows(-1, e.shiftKey); }
+    if (e.key === "Enter" && selection.hasSelected()) {
+      e.preventDefault();
+      extSel();
+    }
+    if (e.key === "Escape") {
+      selection.clearAll();
+      ctxMenu.show = false;
+    }
+    if (e.key === " " && selection.state.anchorPath) {
+      e.preventDefault();
+      selection.toggle(selection.state.anchorPath);
+    }
+    if (e.key === "Delete" && selection.hasSelected()) {
+      e.preventDefault();
+      delSel();
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      navigateRows(1, e.shiftKey);
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      navigateRows(-1, e.shiftKey);
+    }
     if (e.key === "PageDown") {
       e.preventDefault();
       const page = getPageSize();
-      ctx.containerEl.value?.scrollBy({ top: ctx.containerEl.value.clientHeight, behavior: "auto" });
+      ctx.containerEl.value?.scrollBy({
+        top: ctx.containerEl.value.clientHeight,
+        behavior: "auto",
+      });
       navigateRows(page, e.shiftKey);
     }
     if (e.key === "PageUp") {
       e.preventDefault();
       const page = getPageSize();
-      ctx.containerEl.value?.scrollBy({ top: -ctx.containerEl.value.clientHeight, behavior: "auto" });
+      ctx.containerEl.value?.scrollBy({
+        top: -ctx.containerEl.value.clientHeight,
+        behavior: "auto",
+      });
       navigateRows(-page, e.shiftKey);
     }
     if (e.key === "Home") {
@@ -397,8 +491,12 @@ export function useArchiveView(ctx: ArchiveViewContext) {
           viewState.value = "content";
           break;
         case "loading":
-          if (typeof msg.t === "string") { loadingMsg.value = msg.t; viewState.value = "loading"; }
-          else { viewState.value = msg.t ? "loading" : "content"; }
+          if (typeof msg.t === "string") {
+            loadingMsg.value = msg.t;
+            viewState.value = "loading";
+          } else {
+            viewState.value = msg.t ? "loading" : "content";
+          }
           break;
         case "pwerr":
           showToast(msg.t || "Wrong password", false);

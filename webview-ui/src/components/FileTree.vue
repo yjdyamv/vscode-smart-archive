@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import type { FlatNode, TreeNodeData } from "../types";
+import { ROW_HEIGHT_MULTIPLIER, DEFAULT_FONT_SIZE, VIRTUAL_OVERSCAN } from "../constants";
 import FileRow from "./FileRow.vue";
 
 const props = defineProps<{
@@ -35,8 +36,8 @@ const rowHeight = computed(() => {
   const fontSize =
     parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size")) ||
     parseFloat(getComputedStyle(document.documentElement).fontSize) ||
-    14;
-  return fontSize * 1.85;
+    DEFAULT_FONT_SIZE;
+  return fontSize * ROW_HEIGHT_MULTIPLIER;
 });
 
 const virtualizer = useVirtualizer(
@@ -44,7 +45,7 @@ const virtualizer = useVirtualizer(
     count: props.flatNodes.length,
     getScrollElement: () => containerRef.value,
     estimateSize: () => rowHeight.value,
-    overscan: 10,
+    overscan: VIRTUAL_OVERSCAN,
   })),
 );
 
@@ -62,7 +63,11 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
 </script>
 
 <template>
-  <div ref="containerRef" class="flex-1 overflow-y-auto overflow-x-hidden relative pb-[50vh]" role="tree">
+  <div
+    ref="containerRef"
+    class="flex-1 overflow-y-auto overflow-x-hidden relative pb-[50vh]"
+    role="tree"
+  >
     <div class="relative w-full" :style="{ height: virtualizer.getTotalSize() + 'px' }">
       <div
         v-for="item in virtualItems"

@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import type { TreeNodeData } from "../types";
+import { MAX_REGEX_LENGTH } from "../constants";
 
 // Patterns with nested quantifiers or excessive repetition are potential ReDoS vectors
 const REDOS_PATTERNS = [
@@ -13,7 +14,7 @@ export function isRedosSafe(pattern: string): boolean {
   for (const re of REDOS_PATTERNS) {
     if (re.test(pattern)) return false;
   }
-  if (pattern.length > 200) return false;
+  if (pattern.length > MAX_REGEX_LENGTH) return false;
   return true;
 }
 

@@ -15,9 +15,10 @@ import { getBaseName } from "../utils/path";
 import { t } from "../i18n";
 import { checkFileSize } from "../utils/security";
 import { logger } from "../utils/logger";
+import { VFS_CHUNK } from "../constants";
 
 const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
-const CHUNK = 100 * 1024 * 1024;
+const CHUNK = VFS_CHUNK;
 
 function matchPartNum(name: string, pattern: RegExp): string {
   const m = name.match(pattern);

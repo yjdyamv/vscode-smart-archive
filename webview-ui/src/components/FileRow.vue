@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import type { FlatNode } from "../types";
 import { getFileIcon, formatSize, escapeHtml } from "../utils/icons";
+import { INDENT_PX } from "../constants";
 
 const props = defineProps<{
   flatNode: FlatNode;
@@ -34,7 +35,6 @@ const descLabel = computed(() => {
   if (counts.dirs > 0) parts.push(`${counts.dirs} dir${counts.dirs > 1 ? "s" : ""}`);
   return parts.length > 0 ? `(${parts.join(", ")})` : "";
 });
-const indentPx = 16;
 
 function indentGuides(depth: number, showChildGuide: boolean): number[] {
   return Array.from({ length: depth + (showChildGuide ? 1 : 0) }, (_, i) => i);
@@ -105,7 +105,7 @@ function onExpandClick(e: MouseEvent) {
   <div
     class="row"
     :class="{ dir: isDir, sel: selected, noisy: inheritCollapsed }"
-    :style="{ paddingLeft: depth * indentPx + 'px' }"
+    :style="{ paddingLeft: depth * INDENT_PX + 'px' }"
     :data-path="node.path"
     role="treeitem"
     :aria-expanded="isDir ? flatNode.expanded : undefined"
@@ -120,9 +120,15 @@ function onExpandClick(e: MouseEvent) {
       v-for="i in indentGuides(depth, flatNode.hasChildren && flatNode.expanded && !isDir)"
       :key="'g' + i"
       class="guide"
-      :style="{ left: i * indentPx + indentPx / 2 + 'px' }"
+      :style="{ left: i * INDENT_PX + INDENT_PX / 2 + 'px' }"
     ></span>
-    <span class="cb" @click="onCheckClick" role="checkbox" :aria-checked="selected || undefined" :aria-label="'Select ' + node.name">
+    <span
+      class="cb"
+      @click="onCheckClick"
+      role="checkbox"
+      :aria-checked="selected || undefined"
+      :aria-label="'Select ' + node.name"
+    >
       <span class="ck" :class="{ on: selected }"></span>
     </span>
     <span
@@ -146,15 +152,15 @@ function onExpandClick(e: MouseEvent) {
 <style scoped>
 .row {
   position: relative;
-  height: calc(var(--vscode-font-size) * 1.85);
-  line-height: calc(var(--vscode-font-size) * 1.85);
+  height: var(--sa-row-height);
+  line-height: var(--sa-row-height);
   display: flex;
   align-items: center;
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
   padding-right: 8px;
-  transition: background 0.08s ease;
+  transition: var(--sa-transition-hover);
 }
 .row:hover {
   background: var(--vscode-list-hoverBackground);
@@ -180,7 +186,7 @@ function onExpandClick(e: MouseEvent) {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: var(--sa-sep-width);
   background: var(--vscode-tree-indentGuidesStroke);
   opacity: 0.5;
   pointer-events: none;
@@ -198,14 +204,14 @@ function onExpandClick(e: MouseEvent) {
 }
 .checkmark {
   display: inline-block;
-  width: calc(var(--vscode-font-size) * 1.25);
-  height: calc(var(--vscode-font-size) * 1.25);
+  width: var(--sa-checkmark-size);
+  height: var(--sa-checkmark-size);
   border: 1.5px solid var(--vscode-checkbox-border, #6e7681);
-  border-radius: 3px;
+  border-radius: var(--sa-radius);
   background: var(--vscode-checkbox-background, transparent);
   vertical-align: middle;
   position: relative;
-  transition: all 0.12s;
+  transition: all var(--sa-transition-fast);
 }
 .checkmark.on {
   background: var(--vscode-checkbox-selectBackground, #0e639c);
@@ -223,19 +229,19 @@ function onExpandClick(e: MouseEvent) {
   transform: translate(-50%, -50%) rotate(45deg);
 }
 .arrow {
-  width: calc(var(--vscode-font-size) * 1.3);
+  width: var(--sa-arrow-width);
   flex-shrink: 0;
   text-align: center;
   cursor: pointer;
   opacity: 0.7;
-  transition: opacity 0.1s;
+  transition: opacity var(--sa-transition-fastest);
 }
 .arrow:hover {
   opacity: 1;
 }
 .arrow-icon {
   font-size: 12px;
-  transition: transform 0.15s ease;
+  transition: transform var(--sa-transition-medium) ease;
 }
 .arrow.rot .arrow-icon {
   transform: rotate(90deg);
@@ -249,12 +255,12 @@ function onExpandClick(e: MouseEvent) {
 }
 .arrow-loading {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: var(--sa-spinner-sm);
+  height: var(--sa-spinner-sm);
   border: 1.5px solid var(--vscode-descriptionForeground);
   border-top-color: transparent;
   border-radius: 50%;
-  animation: ar-spin 0.6s linear infinite;
+  animation: ar-spin var(--sa-spin-sm) linear infinite;
   vertical-align: middle;
 }
 @keyframes ar-spin {
@@ -263,11 +269,11 @@ function onExpandClick(e: MouseEvent) {
   }
 }
 .icon {
-  width: calc(var(--vscode-font-size) * 1.5);
+  width: var(--sa-icon-width);
   text-align: center;
   flex-shrink: 0;
-  line-height: calc(var(--vscode-font-size) * 1.85);
-  font-size: calc(var(--vscode-font-size) * 1.05);
+  line-height: var(--sa-row-height);
+  font-size: var(--sa-font-2xl);
 }
 .name {
   overflow: hidden;
@@ -276,14 +282,14 @@ function onExpandClick(e: MouseEvent) {
   flex: 1;
 }
 .size {
-  font-size: calc(var(--vscode-font-size) * 0.82);
+  font-size: var(--sa-font-sm);
   color: var(--vscode-descriptionForeground);
   margin-left: 10px;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
 .desc-count {
-  font-size: calc(var(--vscode-font-size) * 0.82);
+  font-size: var(--sa-font-sm);
   color: var(--vscode-descriptionForeground);
   margin-left: 6px;
   flex-shrink: 0;
@@ -292,7 +298,7 @@ function onExpandClick(e: MouseEvent) {
 :deep(mark) {
   background: var(--vscode-editor-findMatchHighlightBackground, #d4d40066);
   color: inherit;
-  border-radius: 2px;
+  border-radius: var(--sa-radius-sm);
   padding: 0 1px;
 }
 </style>

@@ -22,6 +22,7 @@ import {
   isEncryptableExt,
   isSplitVolume,
   resolveSplitVolume,
+  MAX_COLLISION_RETRIES,
 } from "../constants";
 import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../utils/rar";
 import { logger } from "../utils/logger";
@@ -60,7 +61,7 @@ export function deriveOutputDir(inputPath: string): string {
   let output = path.join(dir, `${base}.${suffix}`);
   let counter = 1;
   while (fs.existsSync(output)) {
-    if (counter > 999) {
+    if (counter > MAX_COLLISION_RETRIES) {
       throw new Error(`Failed to find unique output path after ${counter} attempts`);
     }
     output = path.join(dir, `${base}_${counter}.${suffix}`);

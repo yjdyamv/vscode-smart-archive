@@ -1,6 +1,7 @@
 import { ref, computed, type Ref } from "vue";
 import type { TreeNodeData, FlatNode } from "../types";
 import { loadState } from "./useMessage";
+import { DEFAULT_EXPAND_DEPTH } from "../constants";
 
 export type { FlatNode };
 
@@ -29,7 +30,7 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     return nodeMap.value.get(path) ?? null;
   }
 
-  function initExpandedFromTree(maxDepth = 2) {
+  function initExpandedFromTree(maxDepth = DEFAULT_EXPAND_DEPTH) {
     const saved = loadState<{ expanded?: string[] }>();
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);

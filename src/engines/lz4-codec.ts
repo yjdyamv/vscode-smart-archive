@@ -14,6 +14,7 @@
 import { logger } from "../utils/logger";
 import { checkFileSize, checkTotalSize } from "../utils/security";
 import * as fs from "fs";
+import { CODEC_CHUNK } from "../constants";
 
 const lz4 = require("@addmaple/lz4") as {
   init: () => Promise<void>;
@@ -56,7 +57,7 @@ export async function lz4CompressFile(
 ): Promise<void> {
   await ensureInit();
 
-  const CHUNK = 50 * 1024 * 1024; // 50MB
+  const CHUNK = CODEC_CHUNK;
   const rfd = fs.openSync(input, "r");
   const out = fs.openSync(output, "w");
   try {

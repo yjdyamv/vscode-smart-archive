@@ -16,7 +16,7 @@ import * as path from "path";
 import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
 import { safeJoinPath, checkFileSize, checkTotalSize } from "./security";
-import { getFullExt } from "../constants";
+import { getFullExt, MAX_COLLISION_RETRIES } from "../constants";
 import { logger } from "./logger";
 import { streamToVFS } from "../engines/vfs-io";
 
@@ -41,7 +41,7 @@ export function getOutputPath(inputPath: string, extension: string): string {
   let output = path.join(dir, name);
   let counter = 1;
   while (fs.existsSync(output)) {
-    if (counter > 999) {
+    if (counter > MAX_COLLISION_RETRIES) {
       throw new Error(`Failed to find unique output path after ${counter} attempts`);
     }
     output = path.join(dir, `${base}_${counter}.${extension}`);

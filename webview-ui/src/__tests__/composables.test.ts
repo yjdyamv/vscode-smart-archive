@@ -262,10 +262,17 @@ describe("buildNodeMap", () => {
 
 describe("useSort.sortNodes", () => {
   const f = (name: string, size = 0): TreeNodeData => ({
-    name, path: name, size, kind: "REGULAR_FILE",
+    name,
+    path: name,
+    size,
+    kind: "REGULAR_FILE",
   });
   const d = (name: string, children?: TreeNodeData[]): TreeNodeData => ({
-    name, path: name, size: 0, kind: "DIRECTORY", children,
+    name,
+    path: name,
+    size: 0,
+    kind: "DIRECTORY",
+    children,
   });
 
   it("sorts by name ascending (default)", () => {
@@ -306,17 +313,13 @@ describe("useSort.sortNodes", () => {
 
   it("directories sorted among themselves, then files", () => {
     const sort = useSort();
-    const result = sort.sortNodes([
-      f("z"), d("c"), f("a"), d("b"),
-    ]);
+    const result = sort.sortNodes([f("z"), d("c"), f("a"), d("b")]);
     expect(result.map((n) => n.name)).toEqual(["b", "c", "a", "z"]);
   });
 
   it("recursively sorts children", () => {
     const sort = useSort();
-    const result = sort.sortNodes([
-      d("parent", [f("c"), f("a"), f("b")]),
-    ]);
+    const result = sort.sortNodes([d("parent", [f("c"), f("a"), f("b")])]);
     expect(result[0].children?.map((n) => n.name)).toEqual(["a", "b", "c"]);
   });
 

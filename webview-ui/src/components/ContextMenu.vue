@@ -81,14 +81,14 @@ const isReadOnly = computed(() => props.readOnly);
 <style scoped>
 .ctxmenu {
   position: fixed;
-  z-index: 1000;
+  z-index: var(--sa-z-menu);
   background: var(--vscode-menu-background, var(--vscode-sideBar-background));
   border: 1px solid var(--vscode-menu-border, var(--vscode-sideBarSectionHeader-border));
-  border-radius: 4px;
+  border-radius: var(--sa-radius-md);
   padding: 4px 0;
   min-width: 180px;
-  font-size: calc(var(--vscode-font-size) * 0.92);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  font-size: var(--sa-font-lg);
+  box-shadow: var(--sa-shadow-menu);
 }
 .cmi {
   padding: 5px 16px;
@@ -111,7 +111,7 @@ const isReadOnly = computed(() => props.readOnly);
   height: 0;
 }
 .cmi-icon {
-  font-size: calc(var(--vscode-font-size) * 1.05);
+  font-size: var(--sa-font-2xl);
   width: 18px;
   text-align: center;
   flex-shrink: 0;
@@ -123,12 +123,12 @@ const isReadOnly = computed(() => props.readOnly);
 }
 .cmi-shortcut {
   margin-left: auto;
-  font-size: calc(var(--vscode-font-size) * 0.8);
+  font-size: var(--sa-font-xs);
   opacity: 0.6;
 }
 .cmi-foot {
   padding: 3px 16px;
-  font-size: calc(var(--vscode-font-size) * 0.82);
+  font-size: var(--sa-font-sm);
   color: var(--vscode-descriptionForeground);
   cursor: default;
 }

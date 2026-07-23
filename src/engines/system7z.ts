@@ -30,6 +30,7 @@ import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
+import { BINARY_DETECT_TIMEOUT, SPAWN_CAPTURE_TIMEOUT } from "../constants";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
@@ -129,7 +130,11 @@ function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
   if (_cachedVersion !== undefined) return _cachedVersion >= minVersion;
 
   try {
-    const result = spawnSync(binaryPath, [], { stdio: "pipe", timeout: 5000, windowsHide: true });
+    const result = spawnSync(binaryPath, [], {
+      stdio: "pipe",
+      timeout: BINARY_DETECT_TIMEOUT,
+      windowsHide: true,
+    });
     const output = result.stdout.toString();
     const m = output.match(/7-Zip\s+(?:\(z\)\s+)?(\d+)\.(\d+)/i);
     if (m) {
@@ -221,7 +226,11 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
 
 function testBinary(binaryPath: string): boolean {
   try {
-    const result = spawnSync(binaryPath, [], { stdio: "pipe", timeout: 5000, windowsHide: true });
+    const result = spawnSync(binaryPath, [], {
+      stdio: "pipe",
+      timeout: BINARY_DETECT_TIMEOUT,
+      windowsHide: true,
+    });
     return result.status === 0;
   } catch (err) {
     logger.warn(
@@ -235,7 +244,11 @@ function testBinary(binaryPath: string): boolean {
 /** Quick version check during detection — no shared cache pollution */
 function versionOk(binaryPath: string): boolean {
   try {
-    const result = spawnSync(binaryPath, [], { stdio: "pipe", timeout: 5000, windowsHide: true });
+    const result = spawnSync(binaryPath, [], {
+      stdio: "pipe",
+      timeout: BINARY_DETECT_TIMEOUT,
+      windowsHide: true,
+    });
     const output = result.stdout.toString();
     const m = output.match(/7-Zip\s+(?:\(z\)\s+)?(\d+)\.(\d+)/i);
     if (m) {
@@ -273,7 +286,11 @@ function versionOk(binaryPath: string): boolean {
 function resolveFromPath(name: string): string | null {
   const whichCmd = process.platform === "win32" ? "where" : "which";
   try {
-    const result = spawnSync(whichCmd, [name], { stdio: "pipe", timeout: 5000, windowsHide: true });
+    const result = spawnSync(whichCmd, [name], {
+      stdio: "pipe",
+      timeout: BINARY_DETECT_TIMEOUT,
+      windowsHide: true,
+    });
     if (result.status === 0 && result.stdout.length > 0) {
       const found = result.stdout.toString().trim().split("\n")[0].trim();
       if (fs.existsSync(found) && testBinary(found)) return found;
@@ -657,7 +674,9 @@ export function spawnCapture(
   opts?: number | SpawnCaptureOpts,
 ): Promise<CaptureResult> {
   const { cwd, timeoutMs } =
-    typeof opts === "number" ? { timeoutMs: opts, cwd: undefined } : { timeoutMs: 30_000, ...opts };
+    typeof opts === "number"
+      ? { timeoutMs: opts, cwd: undefined }
+      : { timeoutMs: SPAWN_CAPTURE_TIMEOUT, ...opts };
 
   return new Promise((resolve, reject) => {
     let stdout = "";
@@ -966,7 +985,7 @@ function spawnCaptureInCwd(
   binary: string,
   args: string[],
   cwd: string,
-  timeoutMs = 30_000,
+  timeoutMs = SPAWN_CAPTURE_TIMEOUT,
 ): Promise<CaptureResult> {
   return spawnCapture(binary, args, { cwd, timeoutMs });
 }

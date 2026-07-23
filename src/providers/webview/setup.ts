@@ -20,7 +20,13 @@ import {
 import { isRarVolume, resolveRarVolume } from "../../utils/rar";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
-import { buildTreeRootOnly, buildEntryIndex, markNoisyDirs, countAllStats, buildDescendantCounts } from "../treeBuilder";
+import {
+  buildTreeRootOnly,
+  buildEntryIndex,
+  markNoisyDirs,
+  countAllStats,
+  buildDescendantCounts,
+} from "../treeBuilder";
 import { loadingHtml, emptyHtml, contentHtml } from "../htmlRenderer";
 import { fetchFileList } from "../fileListing";
 import { handlerStates, handlerRegistered } from "./state";
