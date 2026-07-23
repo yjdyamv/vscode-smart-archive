@@ -174,12 +174,20 @@ function getEffectivePaths(): { paths: string[]; excludes: string[] } {
   for (const p of raw) {
     const node = tree.findNode(p);
     if (node && node.kind === "DIRECTORY" && node.children && node.children.length > 0) {
-      // Directory with children: keep dir, exclude only deselected children
-      paths.add(p);
-      for (const child of node.children) {
-        if (!selection.state.selected.has(child.path)) {
-          excludes.add(child.path);
+      const hasAnyChildSelected = node.children.some((c) =>
+        selection.state.selected.has(c.path),
+      );
+      if (hasAnyChildSelected) {
+        // User explicitly selected some children — exclude only deselected ones
+        paths.add(p);
+        for (const child of node.children) {
+          if (!selection.state.selected.has(child.path)) {
+            excludes.add(child.path);
+          }
         }
+      } else {
+        // No children touched: directory selection means "extract everything inside"
+        paths.add(p);
       }
     } else {
       // File or empty dir: check if covered by a parent
@@ -274,26 +282,21 @@ function submitPassword(pw: string) {
   post({ c: "pw", pw });
 }
 
-function collectDescendantPaths(node: TreeNodeData): string[] {
-  const result: string[] = [];
-  if (!node.children) return result;
-  function walk(n: TreeNodeData) {
-    if (!n.children) return;
-    for (const child of n.children) {
-      result.push(child.path);
-      walk(child);
-    }
-  }
-  walk(node);
-  return result;
+/** Return all visible (expanded) descendant paths of a directory node. */
+function getVisibleDescendants(node: TreeNodeData): string[] {
+  const prefix = node.path + "/";
+  return tree.flatNodes.value
+    .filter((fn) => fn.path.startsWith(prefix))
+    .map((fn) => fn.path);
 }
 
 function toggleWithDescendants(path: string) {
-  if (selection.state.selected.has(path)) {
+  const wasSelected = selection.state.selected.has(path);
+  if (wasSelected) {
     selection.state.selected.delete(path);
     const node = tree.findNode(path);
     if (node) {
-      for (const childPath of collectDescendantPaths(node)) {
+      for (const childPath of getVisibleDescendants(node)) {
         selection.state.selected.delete(childPath);
       }
     }
@@ -301,11 +304,9 @@ function toggleWithDescendants(path: string) {
     selection.state.selected.add(path);
     const node = tree.findNode(path);
     if (node) {
-      for (const childPath of collectDescendantPaths(node)) {
+      for (const childPath of getVisibleDescendants(node)) {
         selection.state.selected.add(childPath);
       }
-      // If dir has unloaded children, trigger lazy load
-      // (children will be auto-selected via dirChildren handler)
       if (node.hasMore && (!node.children || node.children.length === 0)) {
         tree.toggleExpand(path);
         tree.setLoading(path);
@@ -330,8 +331,8 @@ function handleRowClick(path: string, _isDir: boolean, shift: boolean, ctrl: boo
         if (!selection.state.selected.has(nodePath)) {
           selection.state.selected.add(nodePath);
           const node = tree.findNode(nodePath);
-          if (node) {
-            for (const childPath of collectDescendantPaths(node)) {
+          if (node && node.kind === "DIRECTORY") {
+            for (const childPath of getVisibleDescendants(node)) {
               selection.state.selected.add(childPath);
             }
           }
@@ -401,18 +402,47 @@ function expandOrLoad(path: string) {
   tree.toggleExpand(path);
 }
 
-// Selection counts for toolbar
+// Selection counts — use precomputed descendant counts from the extension.
+// The map is injected as window._xDescCounts during webview setup and
+// covers ALL directories regardless of lazy-load state.
+const descCounts = (
+  (window as any)._xDescCounts as Record<string, { files: number; dirs: number }> | undefined
+) ?? {};
+
 const selectionBreakdown = computed(() => {
   let dirs = 0;
   let files = 0;
-  const map = tree.nodeMap.value;
+
   for (const p of selection.state.selected) {
-    const kind = map.get(p)?.kind;
-    if (kind === "DIRECTORY") dirs++;
-    else if (kind === "REGULAR_FILE") files++;
+    // Deduplicate: skip nodes covered by a selected ancestor
+    const parts = p.replace(/\\/g, "/").split("/");
+    let covered = false;
+    for (let j = parts.length - 2; j >= 0; j--) {
+      if (selection.state.selected.has(parts.slice(0, j + 1).join("/"))) {
+        covered = true;
+        break;
+      }
+    }
+    if (covered) continue;
+
+    const node = tree.nodeMap.value.get(p);
+    if (!node) continue;
+
+    if (node.kind === "DIRECTORY") {
+      dirs += 1;
+      const dc = descCounts[p];
+      if (dc) {
+        files += dc.files;
+        dirs += dc.dirs;
+      }
+    } else {
+      files += 1;
+    }
   }
   return { dirs, files };
 });
+
+const selectedCount = computed(() => selectionBreakdown.value.dirs + selectionBreakdown.value.files);
 
 onMounted(() => {
   // Register message handler first — must run for all view states
@@ -446,9 +476,7 @@ onMounted(() => {
         const children = msg.children as TreeNodeData[];
         if (parentPath && Array.isArray(children)) {
           const childPaths = tree.insertChildren(parentPath, children);
-          // Expand newly arrived child dirs that should be auto-expanded
-          // Noisy dirs (node_modules, .venv, etc.) are marked collapsed
-          // and must never be auto-expanded regardless of depth.
+          // Auto-expand non-collapsed child directories within depth limit
           for (const c of children) {
             if (c.kind === "DIRECTORY" && (c.hasMore || (c.children?.length ?? 0) > 0)) {
               if (!c.collapsed && tree.shouldAutoExpandChild(c.path)) {
@@ -456,6 +484,7 @@ onMounted(() => {
               }
             }
           }
+          // Auto-select newly visible children if parent is selected
           if (selection.state.selected.has(parentPath)) {
             for (const childPath of childPaths) {
               selection.state.selected.add(childPath);
@@ -646,7 +675,7 @@ provide(
     <template v-else>
       <Toolbar
         :read-only="readOnly"
-        :selected-count="selection.state.selected.size"
+        :selected-count="selectedCount"
         :selected-files="selectionBreakdown.files"
         :selected-dirs="selectionBreakdown.dirs"
         :total-files="totalFiles"
