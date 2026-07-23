@@ -23,6 +23,11 @@ const emit = defineEmits<{
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
+
+defineExpose({
+  containerEl: containerRef,
+  scrollToIndex: (idx: number) => virtualizer.value.scrollToIndex(idx, { align: "auto" }),
+});
 const rowHeight = computed(() => {
   const fontSize =
     parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size")) ||

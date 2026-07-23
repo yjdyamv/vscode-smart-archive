@@ -62,10 +62,14 @@ const visibleFlatNodes = computed(() => {
   });
 });
 
+const fileTreeRef = ref<InstanceType<typeof FileTree> | null>(null);
+const containerEl = computed(() => fileTreeRef.value?.containerEl ?? null);
+const scrollToIndex = (idx: number) => fileTreeRef.value?.scrollToIndex(idx);
+
 const av = useArchiveView({
   post, onMessage, tree, treeData, selection, search, visibleFlatNodes,
   viewState, loadingMsg, archiveProps, totalFiles, totalDirs,
-  readOnly, isSplit, canSplit, isEncrypted, canEncrypt,
+  readOnly, isSplit, canSplit, isEncrypted, canEncrypt, containerEl, scrollToIndex,
 });
 
 onMounted(() => {
@@ -190,6 +194,7 @@ provide("lastAddDir", computed(() => selection.state.lastAddDir || ""));
           <div class="text-xs opacity-50">Try adjusting your search terms or clear the query</div>
         </div>
         <FileTree
+          ref="fileTreeRef"
           v-else
           :flat-nodes="visibleFlatNodes"
           :tree-data="treeData"
