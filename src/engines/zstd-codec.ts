@@ -1,8 +1,12 @@
 /**
  * Zstd codec wrapper — Smart Archive VSCode Extension
  *
- * Uses @bokuweb/zstd-wasm for lightweight zstd compression.
- * Decompression is handled by js7z-tools (7z v24.01+ supports zstd decompression).
+ * Uses zstd-napi (C++ Node-API, static zstd 1.5.7) for zstd compression.
+ * Prioritises system zstd CLI for file compression; falls back to
+ * zstd-napi when the system zstd binary is unavailable.
+ *
+ * Decompression (in-memory) is handled by zstd-napi; archive-level
+ * decompression goes through js7z-tools (7z v24.01+).
  *
  * @module engines/zstd-codec
  */
@@ -15,31 +19,10 @@ import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import { CODEC_CHUNK } from "../constants";
 
-const zstd = require("@bokuweb/zstd-wasm") as {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array, level?: number) => Uint8Array;
-  decompress: (data: Uint8Array) => Uint8Array;
+const { compress: zstdCompressRaw, decompress: zstdDecompressRaw } = require("zstd-napi") as {
+  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
+  decompress: (data: Buffer) => Buffer;
 };
-
-let initP: Promise<void> | null = null;
-let initFailed = false;
-
-function ensureInit(): Promise<void> {
-  if (initFailed) {
-    return Promise.reject(
-      new Error("Zstd WASM initialization previously failed — restart may be required"),
-    );
-  }
-  if (!initP) {
-    initP = zstd.init().catch((err) => {
-      logger.error({ event: "zstd.init.failed", err }, "Zstd initialization failed");
-      initFailed = true;
-      initP = null;
-      throw err;
-    });
-  }
-  return initP;
-}
 
 /**
  * Map VSCode 0-9 compression level to zstd's 0-22 range.
@@ -54,14 +37,12 @@ function mapZstdLevel(uiLevel: number): number {
 }
 
 export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Array> {
-  await ensureInit();
-  return zstd.compress(data, mapZstdLevel(level));
+  return zstdCompressRaw(Buffer.from(data), { compressionLevel: mapZstdLevel(level) });
 }
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
-  await ensureInit();
   checkFileSize(data.byteLength);
-  const result = zstd.decompress(data);
+  const result = zstdDecompressRaw(Buffer.from(data));
   checkFileSize(result.byteLength);
   return result;
 }
@@ -106,18 +87,9 @@ export function zstdCompressFile(input: string, output: string, level: number): 
     logger.info({ event: "zstd.compress.system", path: zstdPath });
     return new Promise((resolve, reject) => {
       let settled = false;
-      const proc = spawn(
-        zstdPath,
-        [
-          "-o",
-          output,
-          "-f",
-          `-${mapZstdLevel(level)}`,
-          "-T0", // auto threads
-          input,
-        ],
-        { timeout: 120_000 },
-      );
+      const proc = spawn(zstdPath, ["-o", output, "-f", `-${mapZstdLevel(level)}`, "-T0", input], {
+        timeout: 120_000,
+      });
 
       const stderrChunks: Buffer[] = [];
       proc.stderr?.on("data", (d: Buffer) => {
@@ -144,15 +116,14 @@ export function zstdCompressFile(input: string, output: string, level: number): 
         }
       });
 
-      proc.on("error", (err) => {
+      proc.on("error", () => {
         if (settled) return;
         cleanup(output);
         logger.warn(
-          { event: "zstd.system.failed", err, path: zstdPath },
-          "System zstd failed, falling back to WASM",
+          { event: "zstd.system.failed", path: zstdPath },
+          "System zstd failed, falling back to native",
         );
-        // Fall through to WASM — resolve the outer promise via WASM result
-        wasmCompressFile(input, output, level).then(
+        nativeCompressFile(input, output, level).then(
           () => {
             settled = true;
             resolve();
@@ -166,27 +137,27 @@ export function zstdCompressFile(input: string, output: string, level: number): 
     });
   }
 
-  logger.info({ event: "zstd.compress.wasm" });
-  return wasmCompressFile(input, output, level);
+  logger.info({ event: "zstd.compress.native" });
+  return nativeCompressFile(input, output, level);
 }
 
-function wasmCompressFile(input: string, output: string, level: number): Promise<void> {
-  // WASM chunked: compress file in 50MB chunks, 7z handles multi-frame decompression
-  const CHUNK = CODEC_CHUNK;
-  return ensureInit().then(() => {
+function nativeCompressFile(input: string, output: string, level: number): Promise<void> {
+  return Promise.resolve().then(() => {
+    const CHUNK = CODEC_CHUNK;
     const rfd = fs.openSync(input, "r");
     const out = fs.openSync(output, "w");
     try {
       const buf = Buffer.alloc(CHUNK);
       let pos = 0;
+      const zlevel = mapZstdLevel(level);
       while (true) {
         const n = fs.readSync(rfd, buf, 0, buf.length, pos);
         if (n === 0) break;
-        const frame = zstd.compress(new Uint8Array(buf.slice(0, n)), mapZstdLevel(level));
-        fs.writeSync(out, Buffer.from(frame));
+        const frame = zstdCompressRaw(Buffer.from(buf.slice(0, n)), { compressionLevel: zlevel });
+        fs.writeSync(out, frame);
         pos += n;
       }
-      logger.info({ event: "zstd.compress.wasm.ok", input, output, level });
+      logger.info({ event: "zstd.compress.native.ok", input, output, level });
     } catch (err) {
       fs.closeSync(rfd);
       fs.closeSync(out);

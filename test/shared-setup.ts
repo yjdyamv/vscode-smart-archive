@@ -37,11 +37,10 @@ export type { JS7zInstance, FlatEntry } from "./helpers";
 
 // ── Codec modules (lazy init) ──
 
-export const zstd: {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array, level?: number) => Uint8Array;
-  decompress: (data: Uint8Array) => Uint8Array;
-} = require("@bokuweb/zstd-wasm");
+export const zstd = require("zstd-napi") as {
+  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
+  decompress: (data: Buffer) => Buffer;
+};
 
 export const lz4 = require("lz4-napi") as {
   compressFrame: (data: Uint8Array) => Promise<Buffer>;
