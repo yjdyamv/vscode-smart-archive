@@ -54,7 +54,7 @@ export async function withWrappedArchive(
       js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       js7z.FS.writeFile(`${tmpDir}/${innerTarName}`, innerTar);
     } else if (ext === ".tar.lz4" || ext === ".tlz4") {
-      const innerTar = lz4Decompress(new Uint8Array(data));
+      const innerTar = await lz4Decompress(new Uint8Array(data));
       innerTarName = path.basename(archivePath, ext) + ".tar";
       js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       js7z.FS.writeFile(`${tmpDir}/${innerTarName}`, innerTar);
