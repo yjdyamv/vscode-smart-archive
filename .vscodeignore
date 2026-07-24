@@ -1,3 +1,4 @@
+# ── 项目源文件（不打包） ──
 .github/**
 src/**
 test/**
@@ -11,16 +12,37 @@ webview-ui/index.html
 webview-ui/tsconfig.tsbuildinfo
 webview-ui/package.json
 webview-ui/package-lock.json
+webview-ui/__tests__/**
+test/__mocks__/**
 .oxfmtrc.json
 .oxlintrc.json
 .vscode/**
+tsconfig.json
+vitest.config.ts
+.agents/**
+.claude/**
+skills-lock.json
+
+# ── node_modules 通用冗余 ──
 node_modules/**/*.map
 node_modules/**/*.d.ts
 node_modules/**/README.md
+
+# ── zstd-napi: Linux / macOS (gcc / clang) 构建产物 ──
 node_modules/zstd-napi/build/Release/.deps/**
 node_modules/zstd-napi/build/Release/obj.target/**
 node_modules/zstd-napi/build/**/*.a
 node_modules/zstd-napi/build/**/*.o
+node_modules/zstd-napi/build/Makefile
+node_modules/zstd-napi/build/*.target.mk
+
+# ── zstd-napi: macOS (Xcode) 构建产物 ──
+node_modules/zstd-napi/build/gyp-mac-tool
+node_modules/zstd-napi/build/*.xcodeproj/**
+node_modules/zstd-napi/build/*.xcworkspace/**
+node_modules/zstd-napi/build/*.xcconfig
+
+# ── zstd-napi: Windows (MSVC) 构建产物 ──
 node_modules/zstd-napi/build/**/*.lib
 node_modules/zstd-napi/build/**/*.pdb
 node_modules/zstd-napi/build/**/*.exp
@@ -31,17 +53,21 @@ node_modules/zstd-napi/build/**/*.recipe
 node_modules/zstd-napi/build/**/*.sln
 node_modules/zstd-napi/build/**/*.vcxproj
 node_modules/zstd-napi/build/**/*.filters
+node_modules/zstd-napi/build/**/*.iobj
+node_modules/zstd-napi/build/**/*.ipdb
+node_modules/zstd-napi/build/**/*.lastbuildstate
 node_modules/zstd-napi/build/**/*.tlog
+
+# ── zstd-napi: 跨平台 & 重复文件 ──
+node_modules/zstd-napi/build/**/*.gypi
+node_modules/zstd-napi/build/deps/**
+node_modules/zstd-napi/build/Release/binding.node
+
+# ── lz4-napi ──
 node_modules/lz4-napi/build/**
 node_modules/@antoniomuso/**/*.node
+
+# ── 输出 & 杂项 ──
 out/**/*.map
 **/.gitignore
 **/.DS_Store
-.agents/**
-.claude/**
-skills-lock.json
-tsconfig.json
-vitest.config.ts
-webview-ui/__tests__/**
-test/__mocks__/**
-
