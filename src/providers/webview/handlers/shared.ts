@@ -8,11 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { spawnCapture, detectSystem7z } from "../../../engines/system7z";
-import {
-  getFullExt,
-  COMPRESS_FORMATS,
-  removeVolumeSuffix,
-} from "../../../constants";
+import { getFullExt, COMPRESS_FORMATS, removeVolumeSuffix } from "../../../constants";
 import { getVolumeSizes, toBinaryVolumeSize } from "../../../utils/volume-sizes";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";

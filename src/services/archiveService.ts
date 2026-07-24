@@ -13,9 +13,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { compressWith7z, decompressWith7z, isEncrypted } from "../engines/js7z-engine";
-import {
-  COMPRESS_FORMATS,
-} from "../constants";
+import { COMPRESS_FORMATS } from "../constants";
 import { logger } from "../utils/logger";
 import { fetchFileList } from "../providers/fileListing";
 import { extractSelected } from "../providers/extraction";

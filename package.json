@@ -520,6 +520,7 @@
     "check": "npm run format:check && npm run lint && npm run typecheck",
     "release": "npm run build && npm run check && npm run package",
     "package": "vsce package",
+    "package:cross": "node scripts/install-lz4-platforms.js && vsce package",
     "package:ovsx": "npm run build && npx ovsx package",
     "publish": "npm run build && npx vsce publish",
     "publish:ovsx": "npm run build && npx ovsx publish",
@@ -529,13 +530,12 @@
     "encoding-sniffer": "1.0.2"
   },
   "dependencies": {
-    "@addmaple/lz4": "^0.2.0",
     "@bokuweb/zstd-wasm": "^0.0.27",
     "@vscode/codicons": "^0.0.45",
     "brotli-wasm": "^3.0.1",
     "iconv-lite": "^0.7.3",
     "js7z-tools": "^2.5.0",
-    "lz4js": "^0.2.0",
+    "lz4-napi": "^2.9.1",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1"
   },

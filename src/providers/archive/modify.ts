@@ -10,7 +10,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
-import { JS7z, disposeJS7z, decompressLz4Frames, writeLargeVFS } from "../fileListing";
+import { JS7z, disposeJS7z, writeLargeVFS } from "../fileListing";
+import { decompressLz4Frames } from "../../engines/lz4-codec";
 import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
@@ -181,7 +182,7 @@ export async function previewFileFromArchive(
       // and feed the inner tar to 7z.
       if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
         const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
-        const innerTar = decompressLz4Frames(Buffer.from(buf));
+        const innerTar = await decompressLz4Frames(Buffer.from(buf));
         const tarName = path.basename(archivePath, archiveExt) + ".tar";
         archiveFsPath = `/${tarName}`;
         writeLargeVFS(js7z, archiveFsPath, innerTar);
