@@ -4,7 +4,7 @@
  * Tests for: tree builder, format utilities, CJK encoding, RAR utilities.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -22,7 +22,7 @@ import {
   resetActiveInstances,
   disposeAllTracked,
 } from "./shared-setup";
-import type { FlatEntry, JS7zInstance } from "./shared-setup";
+import type { FlatEntry } from "./shared-setup";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -34,7 +34,7 @@ afterEach(() => {
   disposeAllTracked();
 });
 
-const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+const _td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
 describe("tree builder", () => {
   it("flat files only", () => {
     const entries: FlatEntry[] = [

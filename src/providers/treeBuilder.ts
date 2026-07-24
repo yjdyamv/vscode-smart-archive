@@ -440,7 +440,10 @@ export function buildDescendantCounts(
     let size = 0;
     for (const c of children) {
       if (c.type === "DIRECTORY") dirs++;
-      else { files++; size += c.size; }
+      else {
+        files++;
+        size += c.size;
+      }
     }
     result.set(dir, { files, dirs, size });
   }

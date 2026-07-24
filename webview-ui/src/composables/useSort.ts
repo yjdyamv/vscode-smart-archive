@@ -3,6 +3,13 @@ import type { TreeNodeData } from "../types";
 
 export type SortKey = "name" | "size";
 
+function cloneNode(node: TreeNodeData): TreeNodeData {
+  return {
+    ...node,
+    children: node.children ? node.children.map(cloneNode) : undefined,
+  };
+}
+
 export function useSort() {
   const sortKey = ref<SortKey>("name");
   const sortAsc = ref(true);
@@ -14,13 +21,6 @@ export function useSort() {
       sortKey.value = key;
       sortAsc.value = true;
     }
-  }
-
-  function cloneNode(node: TreeNodeData): TreeNodeData {
-    return {
-      ...node,
-      children: node.children ? node.children.map(cloneNode) : undefined,
-    };
   }
 
   function sortNodes(nodes: TreeNodeData[]): TreeNodeData[] {

@@ -122,6 +122,33 @@ async function fetchFileList(
   return [];
 }
 
+/**
+ * Extract an inner tar to VFS and read all entries — avoids
+ * 7z l -slt which doesn't support ustar prefix / LongLink in WASM.
+ */
+async function extractAndList(
+  tarName: string,
+  tarData: Uint8Array,
+): Promise<{ path: string; size: number; type: string }[]> {
+  const js7z = await JS7z({ print: () => {}, printErr: () => {} });
+  try {
+    writeLargeVFS(js7z, `/${tarName}`, tarData);
+    js7z.FS.mkdir("/_lx");
+    const args = ["x", `/${tarName}`, "-o/_lx", "-y"];
+    await new Promise<void>((resolve, reject) => {
+      js7z.onExit = (c: number) => {
+        if (c === 0) resolve();
+        else reject(new Error(`7z x: ${c}`));
+      };
+      js7z.callMain(args);
+    });
+    const topEntries = js7z.FS.readdir("/_lx").filter((e: string) => e !== "." && e !== "..");
+    return readDirEntries(js7z, "/_lx", "", topEntries);
+  } finally {
+    disposeJS7z(js7z);
+  }
+}
+
 async function listViaExtract(
   filePath: string,
   password = "",
@@ -134,70 +161,21 @@ async function listViaExtract(
 
   try {
     // js7z WASM doesn't support LZ4 decompression. Decompress manually,
-    // then feed the inner tar to 7z for listing.
+    // Manually decompress the codec wrapper, then extract the inner tar
+    // to VFS and read entries — unified with the generic path below.
+    // Avoids 7z l -slt which doesn't support ustar prefix / LongLink in WASM.
     if (ext === ".tar.lz4" || ext === ".tlz4") {
       const innerTar = decompressLz4Frames(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
-
-      let stdout = "";
-      let stderr = "";
-      const js7z2 = await JS7z({
-        print: (text: string) => {
-          stdout += text + "\n";
-        },
-        printErr: (text: string) => {
-          stderr += text + "\n";
-        },
-      });
-      try {
-        // Write inner tar via chunked VFS (may be 500MB+ for large archives)
-        writeLargeVFS(js7z2, `/${innerName}`, innerTar);
-
-        await new Promise<void>((resolve, reject) => {
-          js7z2.onExit = (code: number) => {
-            if (code === 0) resolve();
-            else reject(new Error(`7z l inner tar: ${code}\n${stderr}`));
-          };
-          js7z2.callMain(["l", "-slt", "-sccUTF-8", `/${innerName}`]);
-        });
-        return parse7zListing(stdout, innerName);
-      } finally {
-        disposeJS7z(js7z2);
-      }
+      return extractAndList(innerName, innerTar);
     }
 
-    // js7z WASM doesn't support Brotli decompression. Decompress manually,
-    // then feed the inner tar to 7z for listing.
     if (ext === ".tar.br" || ext === ".tbr") {
       const innerTar = brotliDecompress(new Uint8Array(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.brotliDecompressed", size: innerTar.length });
-
-      let stdout = "";
-      let stderr = "";
-      const js7z2 = await JS7z({
-        print: (text: string) => {
-          stdout += text + "\n";
-        },
-        printErr: (text: string) => {
-          stderr += text + "\n";
-        },
-      });
-      try {
-        writeLargeVFS(js7z2, `/${innerName}`, innerTar);
-
-        await new Promise<void>((resolve, reject) => {
-          js7z2.onExit = (code: number) => {
-            if (code === 0) resolve();
-            else reject(new Error(`7z l inner tar: ${code}\n${stderr}`));
-          };
-          js7z2.callMain(["l", "-slt", "-sccUTF-8", `/${innerName}`]);
-        });
-        return parse7zListing(stdout, innerName);
-      } finally {
-        disposeJS7z(js7z2);
-      }
+      return extractAndList(innerName, innerTar);
     }
 
     js7z.FS.writeFile(`/${archiveName}`, buf);
@@ -223,32 +201,10 @@ async function listViaExtract(
     const nonTar = topEntries.filter((e) => !e.endsWith(".tar"));
 
     if (tarEntries.length === 1 && nonTar.length === 0) {
-      // Pure wrapped: one .tar file, no auto-unpack — list inner tar contents
+      // Pure wrapped: one .tar file, no auto-unpack — extract and list contents
       const innerTar = tarEntries[0];
       const innerData = js7z.FS.readFile(`/_ls/${innerTar}`, { encoding: "binary" });
-      let stdout = "";
-      let stderr = "";
-      const js7z2 = await JS7z({
-        print: (text: string) => {
-          stdout += text + "\n";
-        },
-        printErr: (text: string) => {
-          stderr += text + "\n";
-        },
-      });
-      try {
-        js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
-        await new Promise<void>((resolve, reject) => {
-          js7z2.onExit = (code: number) => {
-            if (code === 0) resolve();
-            else reject(new Error(`7z l inner tar: ${code}\n${stderr}`));
-          };
-          js7z2.callMain(["l", "-slt", "-sccUTF-8", `/${innerTar}`]);
-        });
-        return parse7zListing(stdout, innerTar);
-      } finally {
-        disposeJS7z(js7z2);
-      }
+      return extractAndList(innerTar, new Uint8Array(innerData));
     }
 
     // Mixed: 7z auto-unpacked — return non-tar entries only

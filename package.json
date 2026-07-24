@@ -2,7 +2,7 @@
   "name": "smart-archive",
   "displayName": "Smart Archive",
   "description": "Compress and decompress files using JS7z + zstd-wasm. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
-  "version": "1.16.3",
+  "version": "1.17.0",
   "publisher": "yjdyamv",
   "license": "MIT",
   "repository": {
@@ -514,7 +514,7 @@
     "test:ui": "vitest --ui",
     "format": "oxfmt --write src/ test/ webview-ui/src/",
     "format:check": "oxfmt --check src/ test/ webview-ui/src/",
-    "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort src/ test/ webview-ui/src/",
+    "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort -A unicorn/consistent-function-scoping src/ test/ webview-ui/src/",
     "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort --fix src/ test/ webview-ui/src/",
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",

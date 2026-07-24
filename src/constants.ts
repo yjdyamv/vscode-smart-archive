@@ -12,7 +12,6 @@
 import type { FormatInfo } from "./types";
 import * as path from "path";
 import * as fs from "fs";
-import { isRarExt } from "./utils/rar";
 
 // ════════════════════════════════════════════════════════════════════
 // Format table — one row per supported archive format
