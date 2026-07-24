@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/visual-studio-marketplace/v/yjdyamv.smart-archive)](https://marketplace.visualstudio.com/items?itemName=yjdyamv.smart-archive)
 [![License](https://img.shields.io/github/license/yjdyamv/vscode-smart-archive)](LICENSE)
 
-VSCode extension for creating, extracting, and browsing archives — powered by **7-Zip WebAssembly** and **zstd-wasm**. No native binaries required, yet faster than desktop tools when a system 7-Zip is available.
+VSCode extension for creating, extracting, and browsing archives — powered by **7-Zip WebAssembly** and native **zstd/lz4/brotli codecs**. No native binaries required, yet faster than desktop tools when a system 7-Zip is available.
 
 ## Features
 
@@ -123,8 +123,8 @@ npm run release          # build + check + package
 | Package | Purpose |
 |---------|---------|
 | [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly (all compression & extraction) |
-| [@bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm) | Zstandard compression |
-| [@addmaple/lz4](https://github.com/addmaple/lz4) | LZ4 compression |
+| [zstd-napi](https://github.com/drakedevel/zstd-napi) | Zstandard compression |
+| [lz4-napi](https://github.com/antoniomuso/lz4-napi) | LZ4 compression |
 | [brotli-wasm](https://github.com/httptoolkit/brotli-wasm) | Brotli compression |
 | [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding recovery |
 | [Vue 3](https://vuejs.org/) | Archive browser UI |
