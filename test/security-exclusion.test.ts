@@ -501,7 +501,7 @@ const codecs: WrappedCodec[] = [
     compress: async (tar) => {
       const copy = Buffer.alloc(tar.length);
       copy.set(tar);
-      return zstd.compress(copy, 3);
+      return zstd.compress(copy, { compressionLevel: 3 });
     },
     decompress: (data: Buffer) => {
       const copy = Buffer.allocUnsafe(data.length);

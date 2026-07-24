@@ -225,11 +225,9 @@ export async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string
 // ── Wrapped archive helpers ──
 
 const zstd: {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array, level?: number) => Uint8Array;
-  decompress: (data: Uint8Array) => Uint8Array;
-} = require("@bokuweb/zstd-wasm");
-let zstdReady = false;
+  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
+  decompress: (data: Buffer) => Buffer;
+} = require("zstd-napi");
 
 const lz4: {
   compressFrame: (data: Uint8Array) => Promise<Buffer>;
@@ -253,11 +251,7 @@ export async function createWrapped(files: Record<string, string>, ext: string):
     await run7z(j1, ["a", "/_t.tar", ...tops]);
     const tb = Buffer.from(j1.FS.readFile("/_t.tar", { encoding: "binary" }));
     if (ext === "tar.zst" || ext === "tzst") {
-      if (!zstdReady) {
-        await zstd.init();
-        zstdReady = true;
-      }
-      return Buffer.from(zstd.compress(new Uint8Array(tb), 3));
+      return zstd.compress(tb, { compressionLevel: 3 });
     }
     if (ext === "tar.lz4" || ext === "tlz4") {
       return Buffer.from(await lz4.compressFrame(new Uint8Array(tb)));

@@ -4,7 +4,13 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const VERSION = "2.9.1";
+function getLz4Version() {
+  const pkgPath = path.join(__dirname, "..", "node_modules", "lz4-napi", "package.json");
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+  return pkg.version;
+}
+
+const VERSION = getLz4Version();
 const PACKAGES = [
   "lz4-napi-linux-x64-gnu",
   "lz4-napi-linux-x64-musl",
@@ -21,9 +27,23 @@ const PACKAGES = [
 const destBase = path.join(__dirname, "..", "node_modules", "@antoniomuso");
 fs.mkdirSync(destBase, { recursive: true });
 
+let installed = 0;
+let skipped = 0;
+let failed = 0;
+
 for (const pkg of PACKAGES) {
   const scope = "@antoniomuso";
   const fullName = `${scope}/${pkg}`;
+  const pkgDir = path.join(destBase, pkg);
+  const expectedFile = path.join(pkgDir, `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`);
+
+  // Skip if already installed
+  if (fs.existsSync(expectedFile)) {
+    console.log(`Skipping ${fullName} (already installed)`);
+    skipped++;
+    continue;
+  }
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lz4-"));
   const packDir = path.join(tmpDir, "pack");
   fs.mkdirSync(packDir);
@@ -36,16 +56,24 @@ for (const pkg of PACKAGES) {
     const tgz = fs.readdirSync(packDir).find((f) => f.endsWith(".tgz"));
     if (!tgz) throw new Error("No tarball found");
 
-    const pkgDir = path.join(destBase, pkg);
-    fs.rmSync(pkgDir, { recursive: true, force: true });
-    fs.mkdirSync(pkgDir, { recursive: true });
+    const tmpExtract = path.join(tmpDir, "extract");
+    fs.mkdirSync(tmpExtract);
 
-    execSync(`tar xzf "${path.join(packDir, tgz)}" -C "${pkgDir}" --strip-components=1`, {
+    execSync(`tar xzf "${path.join(packDir, tgz)}" -C "${tmpExtract}" --strip-components=1`, {
       stdio: "pipe",
     });
+
+    // Atomic install: rename tmp dir over target
+    fs.rmSync(pkgDir, { recursive: true, force: true });
+    fs.renameSync(tmpExtract, pkgDir);
+
     console.log(`  OK`);
+    installed++;
   } catch (err) {
     console.error(`  FAILED: ${err.message}`);
+    // Clean up failed attempt, leave any existing install intact
+    try { fs.rmSync(pkgDir, { recursive: true, force: true }); } catch {}
+    failed++;
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -62,7 +90,14 @@ function walk(dir) {
 walk(destBase);
 
 const totalSize = nodeFiles.reduce((s, f) => s + fs.statSync(f).size, 0);
-console.log(`\n=== Installed ${nodeFiles.length} platform binaries (${(totalSize / 1024 / 1024).toFixed(1)} MB) ===`);
+console.log(
+  `\n=== ${nodeFiles.length} platform binaries (${(totalSize / 1024 / 1024).toFixed(1)} MB) | ` +
+    `${installed} installed, ${skipped} skipped, ${failed} failed ===`,
+);
 for (const f of nodeFiles) {
   console.log(`  ${(fs.statSync(f).size / 1024).toFixed(0)}K  ${path.relative(destBase, f)}`);
+}
+
+if (failed > 0) {
+  console.error(`\nWARNING: ${failed} platform(s) failed to download. Some platforms may use fallback during install.`);
 }

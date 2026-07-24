@@ -27,10 +27,9 @@ import { brotliCompressFile, brotliDecompressFile } from "../src/engines/brotli-
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
 const zstd: {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array, level?: number) => Uint8Array;
-  decompress: (data: Uint8Array) => Uint8Array;
-} = require("@bokuweb/zstd-wasm");
+  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
+  decompress: (data: Buffer) => Buffer;
+} = require("zstd-napi");
 const lz4: {
   compressFrame: (data: Uint8Array) => Promise<Buffer>;
   decompressFrame: (data: Uint8Array) => Promise<Buffer>;
