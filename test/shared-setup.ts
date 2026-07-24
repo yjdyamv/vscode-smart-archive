@@ -43,17 +43,9 @@ export const zstd: {
   decompress: (data: Uint8Array) => Uint8Array;
 } = require("@bokuweb/zstd-wasm");
 
-export const lz4Wasm: {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
-} = require("@addmaple/lz4");
-export let lz4Inited = false;
-export function setLz4Inited(v: boolean): void {
-  lz4Inited = v;
-}
-
-export const { decompress: lz4jsDec } = require("lz4js") as {
-  decompress: (data: Uint8Array) => Uint8Array;
+export const lz4 = require("lz4-napi") as {
+  compressFrame: (data: Uint8Array) => Promise<Buffer>;
+  decompressFrame: (data: Uint8Array) => Promise<Buffer>;
 };
 
 export const brWasm: {
@@ -94,7 +86,7 @@ export function decompressBrotliFrames(data: Buffer): Uint8Array {
   return result;
 }
 
-export function decompressLz4Frames(data: Buffer): Uint8Array {
+export async function decompressLz4Frames(data: Buffer): Promise<Uint8Array> {
   const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]);
   const parts: Uint8Array[] = [];
   let offset = 0;
@@ -105,7 +97,7 @@ export function decompressLz4Frames(data: Buffer): Uint8Array {
     const nextMagic = data.indexOf(LZ4_MAGIC_BUF, offset + 4);
     const end = nextMagic < 0 ? data.length : nextMagic;
     const frame = data.subarray(offset, end);
-    parts.push(lz4jsDec(frame));
+    parts.push(await lz4.decompressFrame(frame));
     offset = end;
   }
   if (parts.length === 0) throw new Error("No LZ4 frames found");

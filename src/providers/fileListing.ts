@@ -16,58 +16,12 @@ import { getFullExt, isWrappedFormat, isEncryptableExt, VFS_CHUNK } from "../con
 import { logger } from "../utils/logger";
 import { disposeJS7z } from "../engines/js7z-lifecycle";
 import { parse7zListing } from "../utils/parse7z";
-import { validatePassword, checkFileSize, checkTotalSize } from "../utils/security";
+import { validatePassword } from "../utils/security";
 import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
 import { brotliDecompress } from "../engines/brotli-codec";
-
-let _lz4js: { decompress: (data: Uint8Array) => Uint8Array } | null = null;
-
-function getLz4js(): { decompress: (data: Uint8Array) => Uint8Array } {
-  if (!_lz4js) {
-    _lz4js = require("lz4js") as { decompress: (data: Uint8Array) => Uint8Array };
-  }
-  return _lz4js;
-}
-
-/**
- * Decompress concatenated LZ4 frames into a single Uint8Array.
- * lz4js.decompress() handles one frame at a time; this loops until
- * all frames in the buffer are consumed.
- */
-function decompressLz4Frames(compressed: Buffer): Uint8Array {
-  const lz4js = getLz4js();
-  const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]); // LZ4 frame magic in LE bytes
-  const parts: Uint8Array[] = [];
-  let totalDecompressed = 0;
-  let offset = 0;
-  while (offset < compressed.length) {
-    // Use Buffer.indexOf for fast magic-byte scanning instead of byte-by-byte
-    const magicIdx = compressed.indexOf(LZ4_MAGIC_BUF, offset);
-    if (magicIdx < 0) break;
-    offset = magicIdx;
-    // Find end of this frame (next magic or EOF)
-    const nextMagic = compressed.indexOf(LZ4_MAGIC_BUF, offset + 4);
-    const end = nextMagic < 0 ? compressed.length : nextMagic;
-    const frame = compressed.subarray(offset, end);
-    const decompressed = lz4js.decompress(frame);
-    totalDecompressed = checkTotalSize(totalDecompressed, decompressed.length);
-    checkFileSize(decompressed.length);
-    parts.push(decompressed);
-    offset = end;
-  }
-  if (parts.length === 0) throw new Error("No LZ4 frames found");
-  // Concatenate all parts
-  const total = parts.reduce((s, p) => s + p.length, 0);
-  const result = new Uint8Array(total);
-  let pos = 0;
-  for (const p of parts) {
-    result.set(p, pos);
-    pos += p.length;
-  }
-  return result;
-}
+import { decompressLz4Frames } from "../engines/lz4-codec";
 
 /**
  * Write a potentially large Uint8Array to VFS in chunks to avoid
@@ -165,7 +119,7 @@ async function listViaExtract(
     // to VFS and read entries — unified with the generic path below.
     // Avoids 7z l -slt which doesn't support ustar prefix / LongLink in WASM.
     if (ext === ".tar.lz4" || ext === ".tlz4") {
-      const innerTar = decompressLz4Frames(Buffer.from(buf));
+      const innerTar = await decompressLz4Frames(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
       return extractAndList(innerName, innerTar);
@@ -252,6 +206,5 @@ export {
   listViaExtract,
   readDirEntries,
   parse7zListing,
-  decompressLz4Frames,
   writeLargeVFS,
 };
