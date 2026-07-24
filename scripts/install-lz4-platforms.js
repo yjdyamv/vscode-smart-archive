@@ -24,6 +24,19 @@ const PACKAGES = [
   "lz4-napi-win32-ia32-msvc",
 ];
 
+const PLATFORM_META = {
+  "lz4-napi-linux-x64-gnu":       { os: ["linux"],   cpu: ["x64"] },
+  "lz4-napi-linux-x64-musl":      { os: ["linux"],   cpu: ["x64"] },
+  "lz4-napi-linux-arm64-gnu":     { os: ["linux"],   cpu: ["arm64"] },
+  "lz4-napi-linux-arm64-musl":    { os: ["linux"],   cpu: ["arm64"] },
+  "lz4-napi-linux-arm-gnueabihf": { os: ["linux"],   cpu: ["arm"] },
+  "lz4-napi-darwin-x64":          { os: ["darwin"],  cpu: ["x64"] },
+  "lz4-napi-darwin-arm64":        { os: ["darwin"],  cpu: ["arm64"] },
+  "lz4-napi-win32-x64-msvc":      { os: ["win32"],   cpu: ["x64"] },
+  "lz4-napi-win32-arm64-msvc":    { os: ["win32"],   cpu: ["arm64"] },
+  "lz4-napi-win32-ia32-msvc":     { os: ["win32"],   cpu: ["ia32"] },
+};
+
 const destBase = path.join(__dirname, "..", "node_modules", "@antoniomuso");
 fs.mkdirSync(destBase, { recursive: true });
 
@@ -99,7 +112,9 @@ function extractNodeFromTgz(tgzBuf) {
 
 async function installPackage(pkg) {
   const pkgDir = path.join(destBase, pkg);
-  const dotNode = path.join(pkgDir, `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`);
+  const platformKey = pkg.replace("lz4-napi-", "");
+  const nodeFileName = `lz4-napi.${platformKey}.node`;
+  const dotNode = path.join(pkgDir, nodeFileName);
 
   if (fs.existsSync(dotNode)) return "skipped";
 
@@ -118,11 +133,28 @@ async function installPackage(pkg) {
     fs.mkdirSync(pkgDir, { recursive: true });
     fs.writeFileSync(dotNode, nodeData);
 
-    // Write minimal package.json so require() resolution works
+    // Write package.json so require("@antoniomuso/<pkg>") resolves the .node binary
+    const metaInfo = PLATFORM_META[pkg] || {};
     fs.writeFileSync(
       path.join(pkgDir, "package.json"),
-      JSON.stringify({ name: `@antoniomuso/${pkg}`, version: VERSION }),
+      JSON.stringify({
+        name: `@antoniomuso/${pkg}`,
+        version: VERSION,
+        main: nodeFileName,
+        os: metaInfo.os,
+        cpu: metaInfo.cpu,
+        files: [nodeFileName],
+        description: "lz4-napi platform-specific binary",
+        license: "MIT",
+        repository: { type: "git", url: "https://github.com/antoniomuso/lz4-napi.git" },
+      }),
     );
+
+    // Also copy the .node file to lz4-napi/ so the first-priority require("./lz4-napi.*.node") works
+    const lz4Dir = path.join(__dirname, "..", "node_modules", "lz4-napi");
+    if (fs.existsSync(lz4Dir)) {
+      fs.writeFileSync(path.join(lz4Dir, nodeFileName), nodeData);
+    }
 
     return "installed";
   } catch (err) {
@@ -136,11 +168,8 @@ async function main() {
   for (const pkg of PACKAGES) {
     const scope = "@antoniomuso";
     const fullName = `${scope}/${pkg}`;
-    const dotNode = path.join(
-      destBase,
-      pkg,
-      `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`,
-    );
+    const nodeFileName = `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`;
+    const dotNode = path.join(destBase, pkg, nodeFileName);
 
     if (fs.existsSync(dotNode)) {
       console.log(`Skipping ${fullName} (already installed)`);
@@ -157,6 +186,37 @@ async function main() {
       console.error("  FAILED");
       failed++;
     }
+  }
+
+  // Post-processing: ensure all .node files are copied to lz4-napi/ and package.json has main
+  const lz4Dir = path.join(__dirname, "..", "node_modules", "lz4-napi");
+  for (const pkg of PACKAGES) {
+    const platformKey = pkg.replace("lz4-napi-", "");
+    const nodeFileName = `lz4-napi.${platformKey}.node`;
+    const srcPath = path.join(destBase, pkg, nodeFileName);
+    if (!fs.existsSync(srcPath)) continue;
+
+    // Copy to lz4-napi/ so require("./lz4-napi.*.node") works
+    if (fs.existsSync(lz4Dir)) {
+      const destPath = path.join(lz4Dir, nodeFileName);
+      if (!fs.existsSync(destPath)) {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+
+    // Ensure package.json has a "main" field
+    const pkgJsonPath = path.join(destBase, pkg, "package.json");
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
+      if (!pkgJson.main) {
+        pkgJson.main = nodeFileName;
+        const metaInfo = PLATFORM_META[pkg] || {};
+        pkgJson.os = metaInfo.os || pkgJson.os;
+        pkgJson.cpu = metaInfo.cpu || pkgJson.cpu;
+        pkgJson.files = [nodeFileName];
+        fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2));
+      }
+    } catch {}
   }
 
   const nodeFiles = [];

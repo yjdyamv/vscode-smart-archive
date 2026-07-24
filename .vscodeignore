@@ -21,6 +21,7 @@ node_modules/zstd-napi/build/Release/.deps/**
 node_modules/zstd-napi/build/Release/obj.target/**
 node_modules/zstd-napi/build/**/*.a
 node_modules/zstd-napi/build/**/*.o
+node_modules/@antoniomuso/**/*.node
 out/**/*.map
 **/.gitignore
 **/.DS_Store
