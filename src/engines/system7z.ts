@@ -35,6 +35,7 @@ import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
 import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
+import { createTarFile } from "./tar-writer";
 
 // ── Detection (cached) ───────────────────────────────────────────────
 
@@ -426,26 +427,15 @@ export async function compressWithSystem7z(
     if (!innerName.endsWith(".tar")) innerName += ".tar";
     const tarPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
     try {
-      // Step 1: create tar with exclusions
-      const tarArgs = ["a", "-ttar", "-mx0", tarPath];
-      if (excludePatterns && excludePatterns.length > 0) {
-        const singleTarget = options.targets.length === 1;
-        const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
-        for (const pat of excludePatterns) {
-          if (singleTarget && targetNames.has(pat)) continue;
-          tarArgs.push(`-xr!${pat}`);
-        }
-      }
-      // Multi-target: pre-filter targets matching exclusion patterns
-      let wrappedTargets = options.targets;
-      if (options.targets.length > 1 && excludePatterns?.length) {
-        const exclusions = prepareExclusions(excludePatterns);
-        wrappedTargets = options.targets.filter((tg) => !isTargetExcluded(tg.fsPath, exclusions));
-      }
-      tarArgs.push("--", ...wrappedTargets.map((tg) => tg.fsPath));
-      logger.info({ event: "system7z.compress.tar", argsPreview: tarArgs.join(" ") });
+      // Step 1: create tar using createTarFile (avoids GNU extensions
+      // unsupported by WASM 7z during listing/decompression).
       prog.report({ message: t("compress.creatingTar") });
-      await run7z(sz, tarArgs, progress, token);
+      await createTarFile(
+        tarPath,
+        options.targets.map((tg) => tg.fsPath),
+        token,
+        excludePatterns ?? [],
+      );
 
       // Step 2: compress the tar
       const compressArgs = ["a", `-t${typeFlag}`, options.outputPath, "--", tarPath];

@@ -163,34 +163,16 @@ export async function createTarFile(
           const fstat = fs.lstatSync(full);
           const frel = path.relative(rootDir, full).replace(/\\/g, "/");
           if (fstat.isSymbolicLink()) {
-            const linkTarget = fs.readlinkSync(full);
-            if (needsLongLink(frel)) writeLongLink(fd, frel);
-            // GNU tar type 'K' for long link targets (> 100 bytes)
-            if (Buffer.byteLength(linkTarget) > 100) {
-              const nameBytes = Buffer.from(linkTarget);
-              const lhdr = tarHeader("././@LongLink", nameBytes.length, false);
-              lhdr[156] = 0x4b; // type 'K' = long link name
-              let sum = 0;
-              for (let i = 0; i < BLOCK; i++) sum += i >= 148 && i < 156 ? 32 : lhdr[i];
-              const chk = sum.toString(8).padStart(6, "0") + "\0 ";
-              Buffer.from(chk).copy(lhdr, 148);
-              fs.writeSync(fd, lhdr);
-              fs.writeSync(fd, nameBytes);
-              const pad = padSize(nameBytes.length) - nameBytes.length;
-              if (pad > 0) fs.writeSync(fd, Buffer.alloc(pad));
-            }
-            const hdr = tarHeader(frel, 0, false);
-            hdr[156] = 0x32; // type '2' = symbolic link
-            Buffer.from(linkTarget.slice(0, 100)).copy(hdr, 157);
-            let sum = 0;
-            for (let i = 0; i < BLOCK; i++) sum += i >= 148 && i < 156 ? 32 : hdr[i];
-            const chk = sum.toString(8).padStart(6, "0") + "\0 ";
-            Buffer.from(chk).copy(hdr, 148);
-            fs.writeSync(fd, hdr);
+            // Skip symlinks — WASM 7z does not support GNU tar
+            // type '2' (symlink) or type 'K' (long link target).
+            continue;
           } else if (fstat.isDirectory()) {
             const dname = frel + "/";
             if (needsLongLink(dname)) writeLongLink(fd, dname);
             fs.writeSync(fd, tarHeader(dname, 0, true));
+          } else if (stat.isSymbolicLink()) {
+            // Skip symlinks at top level
+            continue;
           } else {
             if (needsLongLink(frel)) writeLongLink(fd, frel);
             fs.writeSync(fd, tarHeader(frel, fstat.size, false));
