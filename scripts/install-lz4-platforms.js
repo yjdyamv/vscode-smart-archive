@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const https = require("https");
 const zlib = require("zlib");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
@@ -38,11 +39,16 @@ const PLATFORM_META = {
 };
 
 const destBase = path.join(__dirname, "..", "node_modules", "@antoniomuso");
-fs.mkdirSync(destBase, { recursive: true });
+const lz4Dir = path.join(__dirname, "..", "node_modules", "lz4-napi");
+const cacheDir = path.join(__dirname, "..", ".cache", "lz4-platforms");
+const skipVerify = process.argv.includes("--skip-verify");
 
-let installed = 0;
-let skipped = 0;
-let failed = 0;
+fs.mkdirSync(destBase, { recursive: true });
+fs.mkdirSync(cacheDir, { recursive: true });
+
+function sha256(buf) {
+  return crypto.createHash("sha256").update(buf).digest("hex");
+}
 
 function httpGet(url) {
   return new Promise((resolve, reject) => {
@@ -58,13 +64,6 @@ function httpGet(url) {
     req.on("error", reject);
     req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
   });
-}
-
-function getTarballUrl(pkgName) {
-  const url = `https://registry.npmjs.org/@antoniomuso/${pkgName}/${VERSION}`;
-  // npm returns the full package metadata JSON, we just need the tarball URL
-  // which is at .dist.tarball
-  return url;
 }
 
 async function httpGetJson(url) {
@@ -110,16 +109,54 @@ function extractNodeFromTgz(tgzBuf) {
   return null;
 }
 
-async function installPackage(pkg) {
-  const pkgDir = path.join(destBase, pkg);
-  const platformKey = pkg.replace("lz4-napi-", "");
-  const nodeFileName = `lz4-napi.${platformKey}.node`;
-  const dotNode = path.join(pkgDir, nodeFileName);
+function writePkgJson(pkgDir, pkg, nodeFileName) {
+  const metaInfo = PLATFORM_META[pkg] || {};
+  fs.writeFileSync(
+    path.join(pkgDir, "package.json"),
+    JSON.stringify({
+      name: `@antoniomuso/${pkg}`,
+      version: VERSION,
+      main: nodeFileName,
+      os: metaInfo.os,
+      cpu: metaInfo.cpu,
+      files: [nodeFileName],
+      description: "lz4-napi platform-specific binary",
+      license: "MIT",
+      repository: { type: "git", url: "https://github.com/antoniomuso/lz4-napi.git" },
+    }),
+  );
+}
 
-  if (fs.existsSync(dotNode)) return "skipped";
+async function resolvePackage(pkg) {
+  const pkgDir = path.join(destBase, pkg);
+  const nodeFileName = `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`;
+  const dotNode = path.join(pkgDir, nodeFileName);
+  const cachedFile = path.join(cacheDir, nodeFileName);
+  const cachedHash = cachedFile + ".sha256";
+
+  if (fs.existsSync(dotNode)) return { status: "skipped" };
+
+  const cacheValid = () => {
+    if (!fs.existsSync(cachedFile)) return false;
+    if (!skipVerify && fs.existsSync(cachedHash)) {
+      const expected = fs.readFileSync(cachedHash, "utf8").trim();
+      const actual = sha256(fs.readFileSync(cachedFile));
+      if (expected !== actual) {
+        console.error(`  ! cache hash mismatch for ${pkg}, re-downloading`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  if (cacheValid()) {
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.copyFileSync(cachedFile, dotNode);
+    writePkgJson(pkgDir, pkg, nodeFileName);
+    return { status: "cached" };
+  }
 
   try {
-    // Get tarball URL from npm metadata
     const metaUrl = `https://registry.npmjs.org/@antoniomuso/${pkg}/${VERSION}`;
     const meta = await httpGetJson(metaUrl);
     const tarballUrl = meta.dist && meta.dist.tarball;
@@ -130,57 +167,39 @@ async function installPackage(pkg) {
     const nodeData = extractNodeFromTgz(decompressed);
     if (!nodeData) throw new Error(".node file not found in tarball");
 
+    const hash = sha256(nodeData);
+    fs.mkdirSync(path.dirname(cachedFile), { recursive: true });
+    fs.writeFileSync(cachedFile, nodeData);
+    fs.writeFileSync(cachedHash, hash + "\n");
+
     fs.mkdirSync(pkgDir, { recursive: true });
     fs.writeFileSync(dotNode, nodeData);
-
-    // Write package.json so require("@antoniomuso/<pkg>") resolves the .node binary
-    const metaInfo = PLATFORM_META[pkg] || {};
-    fs.writeFileSync(
-      path.join(pkgDir, "package.json"),
-      JSON.stringify({
-        name: `@antoniomuso/${pkg}`,
-        version: VERSION,
-        main: nodeFileName,
-        os: metaInfo.os,
-        cpu: metaInfo.cpu,
-        files: [nodeFileName],
-        description: "lz4-napi platform-specific binary",
-        license: "MIT",
-        repository: { type: "git", url: "https://github.com/antoniomuso/lz4-napi.git" },
-      }),
-    );
-
-    // Also copy the .node file to lz4-napi/ so the first-priority require("./lz4-napi.*.node") works
-    const lz4Dir = path.join(__dirname, "..", "node_modules", "lz4-napi");
-    if (fs.existsSync(lz4Dir)) {
-      fs.writeFileSync(path.join(lz4Dir, nodeFileName), nodeData);
-    }
-
-    return "installed";
+    writePkgJson(pkgDir, pkg, nodeFileName);
+    return { status: "downloaded" };
   } catch (err) {
-    // Clean up failed attempt
     try { fs.rmSync(pkgDir, { recursive: true, force: true }); } catch {}
-    return "failed";
+    return { status: "failed" };
   }
 }
 
 async function main() {
+  let installed = 0;
+  let cached = 0;
+  let skipped = 0;
+  let failed = 0;
+
   for (const pkg of PACKAGES) {
-    const scope = "@antoniomuso";
-    const fullName = `${scope}/${pkg}`;
-    const nodeFileName = `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`;
-    const dotNode = path.join(destBase, pkg, nodeFileName);
+    console.log(`[@antoniomuso/${pkg}]`);
+    const result = await resolvePackage(pkg);
 
-    if (fs.existsSync(dotNode)) {
-      console.log(`Skipping ${fullName} (already installed)`);
+    if (result.status === "skipped") {
+      console.log("  skipped (already installed)");
       skipped++;
-      continue;
-    }
-
-    console.log(`Downloading ${fullName}...`);
-    const result = await installPackage(pkg);
-    if (result === "installed") {
-      console.log("  OK");
+    } else if (result.status === "cached") {
+      console.log("  from cache");
+      cached++;
+    } else if (result.status === "downloaded") {
+      console.log("  downloaded + cached");
       installed++;
     } else {
       console.error("  FAILED");
@@ -188,54 +207,35 @@ async function main() {
     }
   }
 
-  // Post-processing: ensure all .node files are copied to lz4-napi/ and package.json has main
-  const lz4Dir = path.join(__dirname, "..", "node_modules", "lz4-napi");
-  for (const pkg of PACKAGES) {
-    const platformKey = pkg.replace("lz4-napi-", "");
-    const nodeFileName = `lz4-napi.${platformKey}.node`;
-    const srcPath = path.join(destBase, pkg, nodeFileName);
-    if (!fs.existsSync(srcPath)) continue;
+  if (fs.existsSync(lz4Dir)) {
+    for (const pkg of PACKAGES) {
+      const nodeFileName = `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`;
+      const srcPath = path.join(destBase, pkg, nodeFileName);
+      if (!fs.existsSync(srcPath)) continue;
 
-    // Copy to lz4-napi/ so require("./lz4-napi.*.node") works
-    if (fs.existsSync(lz4Dir)) {
       const destPath = path.join(lz4Dir, nodeFileName);
       if (!fs.existsSync(destPath)) {
         fs.copyFileSync(srcPath, destPath);
       }
     }
-
-    // Ensure package.json has a "main" field
-    const pkgJsonPath = path.join(destBase, pkg, "package.json");
-    try {
-      const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
-      if (!pkgJson.main) {
-        pkgJson.main = nodeFileName;
-        const metaInfo = PLATFORM_META[pkg] || {};
-        pkgJson.os = metaInfo.os || pkgJson.os;
-        pkgJson.cpu = metaInfo.cpu || pkgJson.cpu;
-        pkgJson.files = [nodeFileName];
-        fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2));
-      }
-    } catch {}
   }
 
   const nodeFiles = [];
-  function walk(dir) {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".node")) nodeFiles.push(full);
-    }
+  for (const pkg of PACKAGES) {
+    const nodeFileName = `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`;
+    const f = path.join(destBase, pkg, nodeFileName);
+    if (fs.existsSync(f)) nodeFiles.push(f);
   }
-  walk(destBase);
 
   const totalSize = nodeFiles.reduce((s, f) => s + fs.statSync(f).size, 0);
   console.log(
     `\n=== ${nodeFiles.length} platform binaries (${(totalSize / 1024 / 1024).toFixed(1)} MB) | ` +
-      `${installed} installed, ${skipped} skipped, ${failed} failed ===`,
+      `${installed} downloaded, ${cached} cached, ${skipped} skipped, ${failed} failed ===`,
   );
   for (const f of nodeFiles) {
-    console.log(`  ${(fs.statSync(f).size / 1024).toFixed(0)}K  ${path.relative(destBase, f)}`);
+    const pkg = path.basename(path.dirname(f));
+    const rel = `${pkg}/${path.basename(f)}`;
+    console.log(`  ${(fs.statSync(f).size / 1024).toFixed(0)}K  ${rel}`);
   }
 
   if (failed > 0) {
