@@ -10,9 +10,9 @@ function getZstdMeta() {
 }
 
 const { version: VERSION } = getZstdMeta();
-const NAPI_VER = "v8";
 const BASE_URLS = [
   `https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}`,
+  `https://gh-proxy.com/https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}`,
   `https://ghproxy.net/https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}`,
 ];
 
@@ -60,7 +60,7 @@ for (const [platform, arch] of PLATFORMS) {
   let success = false;
 
   for (const baseUrl of BASE_URLS) {
-    const url = `${baseUrl}/zstd-napi-v${VERSION}-napi-${NAPI_VER}-${platformKey}.tar.gz`;
+    const url = `${baseUrl}/zstd-napi-v${VERSION}-napi-v8-${platformKey}.tar.gz`;
     if (downloadUrl(url, targetDir)) {
       success = true;
       break;
