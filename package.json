@@ -2,7 +2,7 @@
   "name": "smart-archive",
   "displayName": "Smart Archive",
   "description": "Compress and decompress files using JS7z + zstd-wasm. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "publisher": "yjdyamv",
   "license": "MIT",
   "repository": {
