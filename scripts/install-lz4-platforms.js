@@ -239,8 +239,12 @@ async function main() {
   }
 
   if (failed > 0) {
-    console.error(`\nWARNING: ${failed} platform(s) failed to download.`);
+    console.error("\nERROR: cannot produce a complete cross-platform package.");
+    process.exit(1);
   }
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
