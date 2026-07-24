@@ -96,8 +96,8 @@ async function extractAndList(
       };
       js7z.callMain(args);
     });
-    const topEntries = js7z.FS.readdir("/_lx").filter((e: string) => e !== "." && e !== "..");
-    return readDirEntries(js7z, "/_lx", "", topEntries);
+    js7z.FS.readdir("/_lx").filter((e: string) => e !== "." && e !== "..");
+    return readDirEntries(js7z, "/_lx", "");
   } finally {
     disposeJS7z(js7z);
   }
@@ -162,8 +162,7 @@ async function listViaExtract(
     }
 
     // Mixed: 7z auto-unpacked — return non-tar entries only
-    const entries = nonTar.length > 0 ? nonTar : tarEntries;
-    return readDirEntries(js7z, "/_ls", "", entries);
+    return readDirEntries(js7z, "/_ls", "");
   } finally {
     disposeJS7z(js7z);
   }
