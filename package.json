@@ -529,13 +529,12 @@
     "encoding-sniffer": "1.0.2"
   },
   "dependencies": {
-    "@addmaple/lz4": "^0.2.0",
     "@bokuweb/zstd-wasm": "^0.0.27",
     "@vscode/codicons": "^0.0.45",
     "brotli-wasm": "^3.0.1",
     "iconv-lite": "^0.7.3",
     "js7z-tools": "^2.5.0",
-    "lz4js": "^0.2.0",
+    "lz4-napi": "^2.9.1",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1"
   },

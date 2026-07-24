@@ -32,10 +32,9 @@ const zstd: {
   decompress: (data: Uint8Array) => Uint8Array;
 } = require("@bokuweb/zstd-wasm");
 const lz4: {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
-  decompress: (data: Uint8Array) => Promise<Uint8Array>;
-} = require("@addmaple/lz4");
+  compressFrame: (data: Uint8Array) => Promise<Buffer>;
+  decompressFrame: (data: Uint8Array) => Promise<Buffer>;
+} = require("lz4-napi");
 const brWasm: {
   compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
   decompress: (data: Uint8Array) => Uint8Array;
@@ -297,9 +296,8 @@ describe("selective extraction", () => {
   // ── LZ4 compression roundtrip ──
 
   it("lz4 init and basic compress", async () => {
-    await lz4.init();
     const data = new TextEncoder().encode("hello world lz4 test data");
-    const compressed = await lz4.compress(data);
+    const compressed = await lz4.compressFrame(data);
     expect(compressed.length).toBeGreaterThan(0);
     expect(compressed.length).toBeLessThan(data.length + 64);
     // LZ4 frame magic: 0x04224D18 in little-endian
@@ -309,9 +307,8 @@ describe("selective extraction", () => {
     expect(compressed[3]).toBe(0x18);
   });
 
-  it("lz4 roundtrip: tar.lz4 → self-decompress → 7z extract", async () => {
-    // Build a minimal tar with incompressible random padding
-    // to work around @addmaple/lz4's outLen = len * 10 estimate.
+  it("lz4 roundtrip: tar.lz4 -> self-decompress -> 7z extract", async () => {
+    // Build a minimal tar
     const content = Buffer.from("hello from lz4 test\n");
     const entry = Buffer.concat([
       tarHeader("hello.txt", content.length),
@@ -320,12 +317,12 @@ describe("selective extraction", () => {
     const tarBuf = Buffer.concat([entry, Buffer.alloc(1024, 0)]);
     expect(tarBuf.length).toBe(2048);
 
-    // Compress with LZ4 WASM
-    const compressed = await lz4.compress(new Uint8Array(tarBuf));
+    // Compress with LZ4
+    const compressed = await lz4.compressFrame(new Uint8Array(tarBuf));
     expect(compressed.length).toBeGreaterThan(0);
 
-    // Decompress with LZ4 WASM to get inner tar
-    const dec = await lz4.decompress(compressed);
+    // Decompress with LZ4 to get inner tar
+    const dec = await lz4.decompressFrame(compressed);
     expect(dec.length).toBe(tarBuf.length);
 
     // Extract the tar with 7z to verify contents
@@ -360,17 +357,13 @@ describe("selective extraction", () => {
     const frames: Uint8Array[] = [];
     for (let pos = 0; pos < data.length; pos += CHUNK) {
       const chunk = data.subarray(pos, pos + CHUNK);
-      const frame = await lz4.compress(chunk);
+      const frame = await lz4.compressFrame(chunk);
       frames.push(frame);
     }
     const compressed = Buffer.concat(frames.map((f) => Buffer.from(f)));
     expect(compressed.length).toBeGreaterThan(0);
 
-    // Decompress all frames — lz4js.decompress handles one frame at a time
-    const { decompress: lz4jsDec } = require("lz4js") as {
-      decompress: (data: Uint8Array) => Uint8Array;
-    };
-
+    // Decompress all frames using lz4.decompressFrame
     const parts: Uint8Array[] = [];
     let offset = 0;
     const buf = Buffer.from(compressed);
@@ -381,7 +374,7 @@ describe("selective extraction", () => {
       let end = offset + 4;
       while (end + 4 <= buf.length && buf.readUInt32LE(end) !== MAGIC) end++;
       if (end + 4 > buf.length) end = buf.length;
-      parts.push(lz4jsDec(buf.subarray(offset, end)));
+      parts.push(await lz4.decompressFrame(buf.subarray(offset, end)));
       offset = end;
     }
 

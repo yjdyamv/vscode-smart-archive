@@ -232,11 +232,9 @@ const zstd: {
 let zstdReady = false;
 
 const lz4: {
-  init: () => Promise<void>;
-  compress: (data: Uint8Array, options?: { level?: number }) => Promise<Uint8Array>;
-  decompress: (data: Uint8Array) => Promise<Uint8Array>;
-} = require("@addmaple/lz4");
-let lz4Ready = false;
+  compressFrame: (data: Uint8Array) => Promise<Buffer>;
+  decompressFrame: (data: Uint8Array) => Promise<Buffer>;
+} = require("lz4-napi");
 
 const brWasm: {
   compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
@@ -262,11 +260,7 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       return Buffer.from(zstd.compress(new Uint8Array(tb), 3));
     }
     if (ext === "tar.lz4" || ext === "tlz4") {
-      if (!lz4Ready) {
-        await lz4.init();
-        lz4Ready = true;
-      }
-      return Buffer.from(await lz4.compress(new Uint8Array(tb)));
+      return Buffer.from(await lz4.compressFrame(new Uint8Array(tb)));
     }
     if (ext === "tar.br" || ext === "tbr") {
       return Buffer.from(brWasm.compress(new Uint8Array(tb), { quality: 6 }));

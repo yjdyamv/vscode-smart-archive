@@ -21,9 +21,7 @@ import {
   resetActiveInstances,
   disposeAllTracked,
   zstd,
-  lz4Wasm,
-  lz4Inited,
-  setLz4Inited,
+  lz4,
   brWasm,
   decompressBrotliFrames,
   decompressLz4Frames,
@@ -492,7 +490,7 @@ type WrappedCodec = {
   ext: string;
   shortAlias: string;
   compress: (tar: Uint8Array, level?: number) => Promise<Uint8Array>;
-  decompress: (data: Buffer) => Uint8Array;
+  decompress: (data: Buffer) => Uint8Array | Promise<Uint8Array>;
   init?: () => Promise<void>;
 };
 
@@ -515,8 +513,7 @@ const codecs: WrappedCodec[] = [
     ext: "tar.lz4",
     shortAlias: "tlz4",
     compress: async (tar) => {
-      if (!lz4Inited) { await lz4Wasm.init(); setLz4Inited(true); }
-      return await lz4Wasm.compress(tar);
+      return await lz4.compressFrame(tar);
     },
     decompress: (data: Buffer) => decompressLz4Frames(data),
   },
@@ -533,7 +530,7 @@ for (const c of codecs) {
     it("round-trip compress -> decompress via createWrapped", async () => {
       const wrapped = await createWrapped(stdFiles, c.ext);
       expect(wrapped.length).toBeGreaterThan(0);
-      const innerTar = c.decompress(wrapped);
+      const innerTar = await c.decompress(wrapped);
       expect(innerTar.length).toBeGreaterThan(100);
 
       const j = await trackedJS7z();
@@ -548,7 +545,7 @@ for (const c of codecs) {
 
     it("short alias round-trip", async () => {
       const wrapped = await createWrapped(stdFiles, c.shortAlias);
-      const innerTar = c.decompress(wrapped);
+      const innerTar = await c.decompress(wrapped);
 
       const j = await trackedJS7z();
       j.FS.writeFile("/_t.tar", innerTar);
@@ -562,7 +559,7 @@ for (const c of codecs) {
     it("selective extraction: extract single file from inner tar", async () => {
       const files = { "/src/index.ts": "console.log(1)", "/src/lib/util.ts": "export const x=1" };
       const wrapped = await createWrapped(files, c.ext);
-      const innerTar = c.decompress(wrapped);
+      const innerTar = await c.decompress(wrapped);
 
       // Selective extract just "src/lib" from the tar
       const j = await trackedJS7z();
@@ -578,7 +575,7 @@ for (const c of codecs) {
 
     it("format conversion: wrapped -> 7z", async () => {
       const wrapped = await createWrapped(stdFiles, c.ext);
-      const innerTar = c.decompress(wrapped);
+      const innerTar = await c.decompress(wrapped);
 
       // Convert the inner tar to 7z
       const j = await trackedJS7z();
@@ -590,7 +587,7 @@ for (const c of codecs) {
 
     it("add files: unwrap -> add to tar -> recompress -> verify", async () => {
       const wrapped = await createWrapped(stdFiles, c.ext);
-      const innerTar = c.decompress(wrapped);
+      const innerTar = await c.decompress(wrapped);
 
       // Add a new file to the tar
       const j = await trackedJS7z();
@@ -604,7 +601,7 @@ for (const c of codecs) {
       const recompressed = await c.compress(modifiedTar);
 
       // Decompress and verify
-      const finalTar = c.decompress(Buffer.from(recompressed));
+      const finalTar = await c.decompress(Buffer.from(recompressed));
       const j2 = await trackedJS7z();
       j2.FS.writeFile("/_t.tar", finalTar);
       j2.FS.mkdir("/_out2");
@@ -618,7 +615,7 @@ for (const c of codecs) {
 
     it("delete files: unwrap -> delete from tar -> recompress -> verify", async () => {
         const wrapped = await createWrapped(stdFiles, c.ext);
-        const innerTar = c.decompress(wrapped);
+        const innerTar = await c.decompress(wrapped);
 
         const j = await trackedJS7z();
         j.FS.writeFile("/_t.tar", innerTar);
@@ -626,7 +623,7 @@ for (const c of codecs) {
         const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
         const recompressed = await c.compress(modifiedTar);
-        const finalTar = c.decompress(Buffer.from(recompressed));
+        const finalTar = await c.decompress(Buffer.from(recompressed));
         const j2 = await trackedJS7z();
         j2.FS.writeFile("/_t.tar", finalTar);
         j2.FS.mkdir("/_out3");
@@ -639,7 +636,7 @@ for (const c of codecs) {
 
       it("rename files: unwrap -> rename in tar -> recompress -> verify", async () => {
         const wrapped = await createWrapped(stdFiles, c.ext);
-        const innerTar = c.decompress(wrapped);
+        const innerTar = await c.decompress(wrapped);
 
         const j = await trackedJS7z();
         j.FS.writeFile("/_t.tar", innerTar);
@@ -647,7 +644,7 @@ for (const c of codecs) {
         const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
         const recompressed = await c.compress(modifiedTar);
-        const finalTar = c.decompress(Buffer.from(recompressed));
+        const finalTar = await c.decompress(Buffer.from(recompressed));
         const j2 = await trackedJS7z();
         j2.FS.writeFile("/_t.tar", finalTar);
         j2.FS.mkdir("/_out4");
@@ -661,7 +658,7 @@ for (const c of codecs) {
 
       it("create folder: unwrap -> create dir in tar -> recompress -> verify", async () => {
         const wrapped = await createWrapped(stdFiles, c.ext);
-        const innerTar = c.decompress(wrapped);
+        const innerTar = await c.decompress(wrapped);
 
         const j = await trackedJS7z();
         j.FS.writeFile("/_t.tar", innerTar);
@@ -671,7 +668,7 @@ for (const c of codecs) {
         const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
         const recompressed = await c.compress(modifiedTar);
-        const finalTar = c.decompress(Buffer.from(recompressed));
+        const finalTar = await c.decompress(Buffer.from(recompressed));
         const j2 = await trackedJS7z();
         j2.FS.writeFile("/_t.tar", finalTar);
         j2.FS.mkdir("/_out5");
