@@ -6,10 +6,7 @@
  * re-implementations (avoiding vscode dependency).
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as path from "path";
-import * as fs from "fs";
-import * as os from "os";
 
 export {
   mkdirP,

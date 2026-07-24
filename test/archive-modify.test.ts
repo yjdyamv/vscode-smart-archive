@@ -5,7 +5,7 @@
  * merge/split operations, encrypt/decrypt workflows.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -18,21 +18,11 @@ import {
   copyFS,
   buildTree,
   disposeJS7z,
-  getFullExt,
   createWrapped,
   trackedJS7z,
   resetActiveInstances,
   disposeAllTracked,
-  sanitizeCliPath,
-  sanitizeTargetDir,
-  parseSize,
-  prepareExclusions,
-  isPathExcluded,
-  decompressBrotliFrames,
-  decompressLz4Frames,
-  lz4jsDec,
 } from "./shared-setup";
-import type { JS7zInstance } from "./shared-setup";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -44,7 +34,7 @@ afterEach(() => {
   disposeAllTracked();
 });
 
-const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+const _td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
 describe("add-to-archive", () => {
   it("individual file paths lose dir structure", async () => {
     const j = await trackedJS7z();

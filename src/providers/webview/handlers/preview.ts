@@ -13,7 +13,7 @@ import { showErrorWithCopy } from "../helpers";
 import { startOperation, endOperation } from "../state";
 
 export const handlePreview: MessageHandler = async (ctx) => {
-  const { webview, state: s, msg } = ctx;
+  const { state: s, msg } = ctx;
   if (typeof msg.path !== "string") return;
   logger.info({ event: "webview.preview", path: msg.path });
   const token = startOperation(s);

@@ -12,17 +12,11 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { compressWith7z, decompressWith7z, listFiles, isEncrypted } from "../engines/js7z-engine";
+import { compressWith7z, decompressWith7z, isEncrypted } from "../engines/js7z-engine";
 import {
-  getFullExt,
-  isWrappedFormat,
-  isSplitVolume,
   COMPRESS_FORMATS,
-  isEncryptableExt,
 } from "../constants";
 import { logger } from "../utils/logger";
-import { validatePassword } from "../utils/security";
-import { t } from "../i18n";
 import { fetchFileList } from "../providers/fileListing";
 import { extractSelected } from "../providers/extraction";
 import { previewFileFromArchive, testArchive } from "../providers/archive/modify";
@@ -39,6 +33,7 @@ export interface ArchiveServiceContext {
   password?: string;
 }
 
+// oxlint-disable-next-line typescript/no-extraneous-class
 export class ArchiveService {
   /** Run compress with cancellation support */
   static async compress(

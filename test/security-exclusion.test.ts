@@ -11,28 +11,19 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import {
-  mkdirP,
   run7z,
-  j7zCompress,
   j7zCompressDir,
   j7zDecompress,
   copyFS,
-  buildTree,
-  countTreeStats,
   isEncryptedInline,
-  getFullExt,
-  formatCompactSize,
-  formatDuration,
   createWrapped,
   trackedJS7z,
   resetActiveInstances,
   disposeAllTracked,
-  disposeJS7z,
   zstd,
   lz4Wasm,
   lz4Inited,
   setLz4Inited,
-  lz4jsDec,
   brWasm,
   decompressBrotliFrames,
   decompressLz4Frames,
@@ -45,7 +36,6 @@ import {
   parseSize,
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
-import type { JS7zInstance, FlatEntry } from "./shared-setup";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

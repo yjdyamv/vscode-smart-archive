@@ -11,7 +11,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { prepareExclusions, isPathExcluded } from "../utils/exclude";
-import { logger } from "../utils/logger";
 
 const BLOCK = 512;
 
@@ -36,9 +35,21 @@ export function writeLongLink(fd: number, fullName: string): void {
 
 function tarHeader(name: string, size: number, isDir: boolean): Buffer {
   const buf = Buffer.alloc(BLOCK);
-  // name (100) — zero-padded; caller handles long names via writeLongLink
-  const nameBuf = Buffer.from(name.slice(0, 100));
-  nameBuf.copy(buf, 0);
+  // Split into ustar prefix (directory, 155 bytes) + name (basename, 100 bytes).
+  // Supported by WASM 7z; avoids GNU LongLink type 'L' which WASM 7z ignores.
+  let prefix = "";
+  if (Buffer.byteLength(name) > 100) {
+    const lastSlash = name.lastIndexOf("/");
+    if (lastSlash >= 0) {
+      const dirPart = name.slice(0, lastSlash);
+      const basePart = name.slice(lastSlash + 1);
+      if (Buffer.byteLength(dirPart) <= 155 && Buffer.byteLength(basePart) <= 100) {
+        prefix = dirPart;
+        name = basePart;
+      }
+    }
+  }
+  Buffer.from(name.slice(0, 100)).copy(buf, 0);
   // mode (8) — octal string, space-padded right
   const mode = isDir ? "000755 " : "000644 ";
   Buffer.from(mode).copy(buf, 100);
@@ -65,6 +76,8 @@ function tarHeader(name: string, size: number, isDir: boolean): Buffer {
   // uname/gname (32 each)
   Buffer.from("root").copy(buf, 265);
   Buffer.from("root").copy(buf, 297);
+  // ustar prefix (155 bytes at offset 345)
+  Buffer.from(prefix).copy(buf, 345);
   // Compute checksum — sum of all bytes, with checksum field treated as spaces
   let sum = 0;
   for (let i = 0; i < BLOCK; i++) {
@@ -97,12 +110,21 @@ function collectPaths(
       if (e.isDirectory()) {
         result.push(full);
         stack.push(full);
-      } else if (e.isFile()) {
+      } else if (e.isFile() || e.isSymbolicLink()) {
         result.push(full);
       }
     }
   }
   return result;
+}
+
+function needsLongLink(name: string): boolean {
+  // tarHeader handles names up to 255 bytes via ustar prefix (155) + name (100).
+  // Only need GNU LongLink when the basename alone exceeds 100 bytes.
+  if (Buffer.byteLength(name) <= 100) return false;
+  const lastSlash = name.lastIndexOf("/");
+  if (lastSlash < 0) return Buffer.byteLength(name) > 100;
+  return Buffer.byteLength(name.slice(lastSlash + 1)) > 100;
 }
 
 export async function createTarFile(
@@ -133,19 +155,44 @@ export async function createTarFile(
       if (stat.isDirectory()) {
         const dirName = rel + "/";
         // Write directory entry
-        if (Buffer.byteLength(dirName) > 100) writeLongLink(fd, dirName);
+        if (needsLongLink(dirName)) writeLongLink(fd, dirName);
         fs.writeSync(fd, tarHeader(dirName, 0, true));
         const all = collectPaths(loc, exclusions, token);
         for (const full of all) {
           if (token?.isCancellationRequested) throw new vscode.CancellationError();
-          const fstat = fs.statSync(full);
+          const fstat = fs.lstatSync(full);
           const frel = path.relative(rootDir, full).replace(/\\/g, "/");
-          if (fstat.isDirectory()) {
+          if (fstat.isSymbolicLink()) {
+            const linkTarget = fs.readlinkSync(full);
+            if (needsLongLink(frel)) writeLongLink(fd, frel);
+            // GNU tar type 'K' for long link targets (> 100 bytes)
+            if (Buffer.byteLength(linkTarget) > 100) {
+              const nameBytes = Buffer.from(linkTarget);
+              const lhdr = tarHeader("././@LongLink", nameBytes.length, false);
+              lhdr[156] = 0x4b; // type 'K' = long link name
+              let sum = 0;
+              for (let i = 0; i < BLOCK; i++) sum += i >= 148 && i < 156 ? 32 : lhdr[i];
+              const chk = sum.toString(8).padStart(6, "0") + "\0 ";
+              Buffer.from(chk).copy(lhdr, 148);
+              fs.writeSync(fd, lhdr);
+              fs.writeSync(fd, nameBytes);
+              const pad = padSize(nameBytes.length) - nameBytes.length;
+              if (pad > 0) fs.writeSync(fd, Buffer.alloc(pad));
+            }
+            const hdr = tarHeader(frel, 0, false);
+            hdr[156] = 0x32; // type '2' = symbolic link
+            Buffer.from(linkTarget.slice(0, 100)).copy(hdr, 157);
+            let sum = 0;
+            for (let i = 0; i < BLOCK; i++) sum += i >= 148 && i < 156 ? 32 : hdr[i];
+            const chk = sum.toString(8).padStart(6, "0") + "\0 ";
+            Buffer.from(chk).copy(hdr, 148);
+            fs.writeSync(fd, hdr);
+          } else if (fstat.isDirectory()) {
             const dname = frel + "/";
-            if (Buffer.byteLength(dname) > 100) writeLongLink(fd, dname);
+            if (needsLongLink(dname)) writeLongLink(fd, dname);
             fs.writeSync(fd, tarHeader(dname, 0, true));
           } else {
-            if (Buffer.byteLength(frel) > 100) writeLongLink(fd, frel);
+            if (needsLongLink(frel)) writeLongLink(fd, frel);
             fs.writeSync(fd, tarHeader(frel, fstat.size, false));
             const rfd = fs.openSync(full, "r");
             try {
@@ -164,7 +211,7 @@ export async function createTarFile(
           }
         }
       } else {
-        if (Buffer.byteLength(rel) > 100) writeLongLink(fd, rel);
+        if (needsLongLink(rel)) writeLongLink(fd, rel);
         fs.writeSync(fd, tarHeader(rel, stat.size, false));
         const rfd = fs.openSync(loc, "r");
         try {

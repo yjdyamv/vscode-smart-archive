@@ -10,7 +10,6 @@ import * as fs from "fs";
 import { spawnCapture, detectSystem7z } from "../../../engines/system7z";
 import {
   getFullExt,
-  isSplitVolume,
   COMPRESS_FORMATS,
   removeVolumeSuffix,
 } from "../../../constants";

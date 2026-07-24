@@ -1,4 +1,4 @@
-import { ref, reactive, computed, type Ref, type ComputedRef } from "vue";
+import { reactive, computed, type Ref, type ComputedRef } from "vue";
 import type { TreeNodeData, ExtensionMessage } from "../types";
 import { isCoveredByAncestor } from "./useSelection";
 import {
@@ -258,7 +258,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   }
 
   function copySel() {
-    const { paths, excludes } = getEffectivePaths();
+    const { paths } = getEffectivePaths();
     if (!paths.length) return;
     post({ c: "copy", paths, flat: !isAnyDirSelected(paths) });
     showToast("Copied " + paths.length + " item(s)", true);
