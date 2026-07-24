@@ -5,6 +5,7 @@ test/out/
 .vscode/settings.json
 media/vue/
 **/*.tsbuildinfo
+.cache/
 
 .agents/
 .claude/

@@ -68,6 +68,7 @@ node_modules/lz4-napi/build/**
 node_modules/@antoniomuso/**/*.node
 
 # ── 输出 & 杂项 ──
+.cache/**
 out/**/*.map
 **/.gitignore
 **/.DS_Store
