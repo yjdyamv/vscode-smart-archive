@@ -530,7 +530,6 @@
     "encoding-sniffer": "1.0.2"
   },
   "dependencies": {
-    "@toondepauw/node-zstd": "^2.0.0",
     "@vscode/codicons": "^0.0.45",
     "brotli-wasm": "^3.0.1",
     "iconv-lite": "^0.7.3",
