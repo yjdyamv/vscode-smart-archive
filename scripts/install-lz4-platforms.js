@@ -11,18 +11,11 @@ const PACKAGES = [
   "lz4-napi-linux-arm64-gnu",
   "lz4-napi-linux-arm64-musl",
   "lz4-napi-linux-arm-gnueabihf",
-  "lz4-napi-linux-s390x-gnu",
-  "lz4-napi-linux-ppc64-gnu",
-  "lz4-napi-linux-riscv64-gnu",
   "lz4-napi-darwin-x64",
   "lz4-napi-darwin-arm64",
   "lz4-napi-win32-x64-msvc",
   "lz4-napi-win32-arm64-msvc",
   "lz4-napi-win32-ia32-msvc",
-  "lz4-napi-android-arm64",
-  "lz4-napi-android-arm-eabi",
-  "lz4-napi-freebsd-x64",
-  "lz4-napi-openharmony-arm64",
 ];
 
 const destBase = path.join(__dirname, "..", "node_modules", "@antoniomuso");
