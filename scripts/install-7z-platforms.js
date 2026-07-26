@@ -26,22 +26,22 @@ const os = require("os");
 const { execFileSync } = require("child_process");
 const { httpGet, checkHash } = require("./lib/download-cache");
 
-// Keep in sync with the js7z WASM engine version (README: 7-Zip 25.01).
-const VER = "25.01";
-const TAG = "2501"; // filename token: 25.01 -> "2501"
+// Keep in sync with the js7z WASM engine version (README: 7-Zip 26.02).
+const VER = "26.02";
+const TAG = "2602"; // filename token: 26.02 -> "2602"
 const BASE = `https://github.com/ip7z/7zip/releases/download/${VER}`;
 
 // SHA-256 of each downloaded ARCHIVE, keyed by asset filename. Fail-closed:
 // with no pinned hash the build refuses the binary unless SA_HASH_BOOTSTRAP=1.
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-7z-platforms.js
 const EXPECTED_HASHES = {
-  "7z2501-linux-x64.tar.xz": "4ca3b7c6f2f67866b92622818b58233dc70367be2f36b498eb0bdeaaa44b53f4",
-  "7z2501-linux-arm64.tar.xz": "39c5140f02ce4436599303c59a149f654cb1bbc47cdc105a942120d747ae040d",
-  "7z2501-linux-arm.tar.xz": "f5b498a55ab1bb2adb2690f7ad629022b5e52f159a95e7d71be6c5049db0696e",
-  "7z2501-mac.tar.xz": "26aa75bc262bb10bf0805617b95569c3035c2c590a99f7db55c7e9607b2685e0",
-  "7z2501-x64.exe": "78afa2a1c773caf3cf7edf62f857d2a8a5da55fb0fff5da416074c0d28b2b55f",
-  "7z2501-arm64.exe": "6365c7c44e217b9c1009e065daf9f9aa37454e64315b4aaa263f7f8f060755dc",
-  "7z2501.exe": "b96831eec5928384f0543d6b57c1f802952a0f2668e662882c0a785a2b52fb3b",
+  "7z2602-linux-x64.tar.xz": "41aaba7b1235304ab5aa0624530c67ae829496cd29e875925271efdccc28c03e",
+  "7z2602-linux-arm64.tar.xz": "70ea6cc737ae1495ea2d7eb20ef3120fe579bd3f1a83a9d2362b62ec5bde2bba",
+  "7z2602-linux-arm.tar.xz": "81b7f04b3528852fac10f5becf9f15870a5da4cb94fbcb8a138197eb937468bf",
+  "7z2602-mac.tar.xz": "1cf6760579502f87e591ff5c73a005ec50b3e4d6f507e8b038382d563c3175b9",
+  "7z2602-x64.exe": "6745fa76dc2ea031596d8678f6f6b99c3c1b435b4164a63485adbbc7b8d82ef0",
+  "7z2602-arm64.exe": "7c6fde79ed5e11b81c7bb6573b7962d3b6322aa5fce69c33ed19f672b55173ab",
+  "7z2602.exe": "17d894c17b04984b6ffcc1b31926b39c42c315cd861c3adbf7f34bd941d529ac",
 };
 
 const OUT = path.join(__dirname, "..", "7z-bin");
