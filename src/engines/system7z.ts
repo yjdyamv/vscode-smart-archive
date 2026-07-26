@@ -120,7 +120,44 @@ function bundled7zPath(): string | null {
       logger.warn({ event: "system7z.bundled.chmodFailed", err });
     }
   }
+  if (process.platform === "darwin") prepareMacBundledBinary(p);
   return p;
+}
+
+let _macPrepared = false;
+
+/**
+ * Make the bundled macOS 7zz runnable without a Gatekeeper prompt — silent and
+ * entirely user-level (the file lives in the user-owned extension dir, so no
+ * admin/sudo is ever needed). Runs once per session, best-effort (never throws):
+ *   1. Strip the com.apple.quarantine attribute so Gatekeeper won't block the
+ *      spawned binary.
+ *   2. Only if the binary has NO valid signature (unsigned/invalid), apply a
+ *      free ad-hoc signature — an unsigned arm64 binary is SIGKILLed on Apple
+ *      Silicon. The official 7zz is already Developer-ID signed, so this is
+ *      normally a no-op; we never overwrite a valid signature.
+ */
+function prepareMacBundledBinary(p: string): void {
+  if (_macPrepared) return;
+  _macPrepared = true;
+  try {
+    // -d on a missing attr just errors out harmlessly; ignore the result.
+    spawnSync("xattr", ["-d", "com.apple.quarantine", p], { stdio: "ignore", timeout: 5000 });
+  } catch (err) {
+    logger.debug({ event: "system7z.bundled.xattrFailed", err });
+  }
+  try {
+    const verify = spawnSync("codesign", ["--verify", "--no-strict", p], {
+      stdio: "ignore",
+      timeout: 8000,
+    });
+    if (verify.status !== 0) {
+      logger.info({ event: "system7z.bundled.adhocSign", path: p });
+      spawnSync("codesign", ["--sign", "-", "--force", p], { stdio: "ignore", timeout: 15000 });
+    }
+  } catch (err) {
+    logger.debug({ event: "system7z.bundled.codesignFailed", err });
+  }
 }
 
 export function hasSystem7z(): boolean {
