@@ -1,7 +1,6 @@
 # Smart Archive
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/yjdyamv.smart-archive)](https://marketplace.visualstudio.com/items?itemName=yjdyamv.smart-archive)
-[![License](https://img.shields.io/github/license/yjdyamv/vscode-smart-archive)](LICENSE)
+[![Build](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml)
 
 VSCode extension for creating, extracting, and browsing archives — powered by **7-Zip WebAssembly** and native **zstd/lz4/brotli codecs**. No native binaries required, yet faster than desktop tools when a system 7-Zip is available.
 
@@ -132,7 +131,7 @@ npm run release          # build + check + package
 
 ## License
 
-MIT
+Proprietary. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
