@@ -39,3 +39,52 @@ jobs:
         with:
           files: "*.vsix"
           generate_release_notes: true
+
+  # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
+  # Covers both Intel (macos-13) and Apple Silicon (macos-14). Downloads the same
+  # official binary the install script stages, replicates the extension's runtime
+  # prep (quarantine strip + ad-hoc sign fallback), and does a compress/extract
+  # round-trip — i.e. the exact execve the extension performs via spawn.
+  test-macos-7z:
+    name: Validate bundled mac 7zz
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download & validate macOS 7zz
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER=$(sed -n 's/.*const VER = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
+          TAG=$(sed -n 's/.*const TAG = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
+          echo "Testing 7-Zip $VER on $(uname -m) — macOS $(sw_vers -productVersion)"
+
+          curl -fsSL -o 7zmac.tar.xz "https://github.com/ip7z/7zip/releases/download/${VER}/7z${TAG}-mac.tar.xz"
+          mkdir -p extract && tar -xf 7zmac.tar.xz -C extract
+          BIN="$(find extract -type f -name 7zz | head -1)"
+          test -n "$BIN" || { echo "::error::7zz not found in mac tarball"; exit 1; }
+          chmod +x "$BIN"
+
+          echo "── replicate the extension's runtime mac prep ──"
+          xattr -d com.apple.quarantine "$BIN" 2>/dev/null || true
+          if codesign --verify --no-strict "$BIN" 2>/dev/null; then
+            echo "signature: VALID (Developer ID / notarized) — no ad-hoc signing needed"
+          else
+            echo "signature: missing/invalid → applying ad-hoc signature (extension fallback)"
+            codesign --sign - --force "$BIN"
+          fi
+          codesign -dvv "$BIN" 2>&1 | sed -n '1,6p' || true
+          spctl -a -vv -t exec "$BIN" 2>&1 || echo "(spctl exec assessment non-zero — informational; execve below is the real gate)"
+
+          echo "── round-trip: exactly what the extension does (spawn 7zz) ──"
+          "$BIN" | head -2
+          mkdir -p src out
+          printf 'hello 世界\n' > src/a.txt
+          mkdir -p src/sub && printf 'nested\n' > src/sub/b.txt
+          "$BIN" a -t7z test.7z ./src >/dev/null
+          "$BIN" x -y -oout test.7z >/dev/null
+          diff -r src out/src
+          echo "✅ mac 7zz executed and round-tripped OK on $(uname -m)"
