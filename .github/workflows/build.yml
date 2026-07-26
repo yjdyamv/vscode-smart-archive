@@ -41,16 +41,22 @@ jobs:
           generate_release_notes: true
 
   # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
-  # Covers both Intel (macos-13) and Apple Silicon (macos-14). Downloads the same
-  # official binary the install script stages, replicates the extension's runtime
-  # prep (quarantine strip + ad-hoc sign fallback), and does a compress/extract
-  # round-trip — i.e. the exact execve the extension performs via spawn.
+  # Downloads the same official (universal) binary the install script stages,
+  # replicates the extension's runtime prep (quarantine strip + ad-hoc sign
+  # fallback), and does a compress/extract round-trip — i.e. the exact execve the
+  # extension performs via spawn.
+  #
+  # macos-15 (arm64) is free for public repos and is the higher-risk arch
+  # (unsigned arm64 is SIGKILLed). The Intel slice of the same universal binary
+  # is lower-risk (Intel does not kill unsigned) — free Intel runners are gone
+  # (macos-13 retired), so to also cover Intel add the billable larger runner:
+  #     matrix: { os: [macos-15, macos-15-large] }   # macos-15-large = Intel, costs minutes
   test-macos-7z:
     name: Validate bundled mac 7zz
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-13, macos-14]
+        os: [macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
