@@ -35,7 +35,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - run: npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts
+      # NOT --ignore-scripts: zstd-napi builds its native binding.node in a
+      # postinstall; without it `npm test` fails to load the module. The root
+      # postinstall also installs webview-ui.
+      - run: npm ci
       - run: npm run check
       - run: npm test
 
