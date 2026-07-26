@@ -32,8 +32,8 @@ function nonce(): string {
   return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-function cspMeta(nonce: string, codiconCssUri: string, cssUri: string): string {
-  return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' ${cssUri} ${codiconCssUri}; img-src data:; object-src 'none'; base-uri 'none'">`;
+function cspMeta(nonce: string): string {
+  return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' vscode-webview-resource:; img-src data: vscode-webview-resource:; font-src vscode-webview-resource: data:; object-src 'none'; base-uri 'none'">`;
 }
 
 export function emptyHtml(
@@ -45,7 +45,7 @@ export function emptyHtml(
   const n = nonce();
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${cspMeta(n, codiconCssUri ?? "", cssUri ?? "")}
+${cspMeta(n)}
 ${codiconCssUri ? cssLink(codiconCssUri) : ""}
 ${cssUri ? cssLink(cssUri) : ""}
 </head>
@@ -58,7 +58,7 @@ export function loadingHtml(codiconCssUri?: string): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${cspMeta(n, codiconCssUri ?? "", "")}
+${cspMeta(n)}
 ${codiconCssUri ? cssLink(codiconCssUri) : ""}
 <style>
   body{font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-sideBar-background);display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
@@ -85,7 +85,7 @@ export function contentHtml(
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${cspMeta(n, codiconCssUri, cssUri)}
+${cspMeta(n)}
 ${cssLink(codiconCssUri)}
 ${cssLink(cssUri)}
 </head>
