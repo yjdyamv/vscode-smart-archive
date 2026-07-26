@@ -121,6 +121,17 @@ function bundled7zPath(): string | null {
     }
   }
   if (process.platform === "darwin") prepareMacBundledBinary(p);
+  // Confirm it can actually execute here before handing it out. A read-only or
+  // `noexec` extensions dir, an ownership/permission issue (system-wide or
+  // root-installed VS Code, Nix store), SELinux/AppArmor, or a wrong arch/libc
+  // build all make the binary unrunnable — in which case return null so
+  // detection falls back to WASM instead of "detecting" a binary that would
+  // only fail at spawn time. (mac prep above must run first, or this test spawn
+  // could itself be Gatekeeper-blocked.)
+  if (!testBinary(p) || !versionOk(p)) {
+    logger.warn({ event: "system7z.bundled.notRunnable", path: p });
+    return null;
+  }
   return p;
 }
 
