@@ -12,9 +12,20 @@ function getZstdMeta() {
 
 const { version: VERSION } = getZstdMeta();
 const SOURCE = (p) => `https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`;
-// SHA-256 hashes are verified on download. When upgrading zstd-napi, update
-// this map by running: node -e "console.log(require('crypto').createHash('sha256').update(fs.readFileSync('binding.node')).digest('hex'))"
-const EXPECTED_HASHES = {};
+// SHA-256 of each platform's binding.node, verified on download (fail-closed).
+// This map MUST be populated before release: with requireHash the build refuses
+// any binary lacking a pinned hash. To (re)generate after a zstd-napi bump, run
+// once and paste the printed values keyed by "<platform>-<arch>":
+//   SA_HASH_BOOTSTRAP=1 node scripts/install-zstd-platforms.js
+const EXPECTED_HASHES = {
+  "linux-x64": "26acf4b6b8c0cf0f3bc5752d24b15b0c82568609f9d977daa973a47a859203b8",
+  "linux-arm64": "44151cdbe0584ed38ff7735a80c42242842bd16cc254247c3ac862e54d58bf27",
+  "linux-arm": "d414bd8ff48b88a8a1d09b829f849c0de05a6840df543a0b3a06a4c23cfea85a",
+  "darwin-x64": "e8abcb6d98cf38fef7052053b6f2bb526a76be71cdd292ce2b5e88401086b9ba",
+  "darwin-arm64": "13ca3d1c9017040af51b75b0c9272cc2c211afeb36a9f6299016603469afbda6",
+  "win32-x64": "b2d170f79eb368e2eff89626d27a2872217d17de889cf4baae1299a470003cbe",
+  "win32-ia32": "03258d0e2350d2be5c546852b8532a8f298335475081e0371349b49906847f8f",
+};
 
 const PLATFORMS = [
   ["linux", "x64"],
@@ -79,6 +90,7 @@ async function resolvePlatform(platformKey) {
     cacheKey: path.join(platformKey, "binding.node"),
     destPath,
     expectedSha256: EXPECTED_HASHES[platformKey],
+    requireHash: true,
     label: `zstd-napi ${platformKey}`,
     fetch: async () => {
       const url = SOURCE(platformKey);

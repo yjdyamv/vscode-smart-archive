@@ -36,6 +36,20 @@ function cspMeta(nonce: string): string {
   return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' vscode-webview-resource:; img-src data: vscode-webview-resource:; font-src vscode-webview-resource: data:; object-src 'none'; base-uri 'none'">`;
 }
 
+/**
+ * Escape a JSON string for safe embedding inside a `<script>` element.
+ * `</script>` (and `<!--`, `<script`) terminate a script element regardless
+ * of its `type` attribute, so escaping `<` to its \\u003c JSON form prevents
+ * an attacker-controlled entry name from breaking out of the data block.
+ * Reads back identically via JSON.parse. Defense-in-depth alongside the CSP.
+ */
+export function escapeJsonForScript(json: string): string {
+  return json
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 export function emptyHtml(
   msg: string,
   cssUri?: string,
@@ -91,13 +105,13 @@ ${cssLink(cssUri)}
 </head>
 <body>
 <div id="app"></div>
-<script type="application/json" id="_xTree">${JSON.stringify(tree)}</script>
+<script type="application/json" id="_xTree">${escapeJsonForScript(JSON.stringify(tree))}</script>
 <script type="application/json" id="_xFiles">${fileCount}</script>
 <script type="application/json" id="_xDirs">${dirCount}</script>
-<script type="application/json" id="_xProps">${JSON.stringify(props ?? null)}</script>
-<script type="application/json" id="_xNoisy">${JSON.stringify(noisyPatterns ?? [])}</script>
-${toast ? `<script type="application/json" id="_xToast">${JSON.stringify(toast)}</script>` : ""}
-${viewState ? `<script type="application/json" id="_xViewState">${JSON.stringify(viewState)}</script>` : ""}
+<script type="application/json" id="_xProps">${escapeJsonForScript(JSON.stringify(props ?? null))}</script>
+<script type="application/json" id="_xNoisy">${escapeJsonForScript(JSON.stringify(noisyPatterns ?? []))}</script>
+${toast ? `<script type="application/json" id="_xToast">${escapeJsonForScript(JSON.stringify(toast))}</script>` : ""}
+${viewState ? `<script type="application/json" id="_xViewState">${escapeJsonForScript(JSON.stringify(viewState))}</script>` : ""}
 ${jsModule(jsUri, n)}
 </body></html>`;
 }
