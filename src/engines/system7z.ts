@@ -222,6 +222,17 @@ const MIN_VERSION_ZSTD = 24;
 
 let _cachedVersion: number | undefined;
 
+/**
+ * Reset the cached engine detection so a changed `smart-archive.useSystem7z`
+ * setting takes effect without a window reload. Wired to onDidChangeConfiguration
+ * in extension.ts.
+ */
+export function resetDetectionCache(): void {
+  _cachedPath = undefined;
+  _cachedVersion = undefined;
+  _macPrepared = false;
+}
+
 function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
   if (_cachedVersion !== undefined) return _cachedVersion >= minVersion;
 
