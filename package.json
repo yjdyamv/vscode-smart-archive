@@ -504,8 +504,8 @@
   "scripts": {
     "clean": "node -e \"['out','media/vue','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
     "postinstall": "npm --prefix webview-ui install",
-    "compile": "tsc -p .",
-    "watch": "tsc -watch -p .",
+    "compile": "vite build --config vite.extension.config.ts",
+    "watch": "vite build --config vite.extension.config.ts --watch",
     "build:webview": "npm --prefix webview-ui run build",
     "dev:webview": "npm --prefix webview-ui run dev",
     "build": "npm run build:webview && npm run compile",
