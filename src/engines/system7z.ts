@@ -620,10 +620,17 @@ async function preflightSystem7z(sz: string, inputPath: string, password: string
   }
 
   // H2: enforce the uncompressed total-size limit before writing anything.
-  const entries = parse7zListing(stdout, getBaseName(inputPath), inputPath);
+  // Sum every entry's "Size = <n>" line straight from the raw -slt output so
+  // this is NOT bounded by parse7zListing's MAX_ENTRIES cap — otherwise a bomb
+  // could hide huge entries after the 100k cap and evade the check. The anchored
+  // /^Size = / does not match "Packed Size =", "Physical Size =" or "Headers
+  // Size =". checkTotalSize throws — aborting extraction — the moment the
+  // running total exceeds the limit, so we stop early on a bomb.
   let total = 0;
-  for (const entry of entries) {
-    total = checkTotalSize(total, entry.size);
+  const sizeRe = /^Size = (\d+)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = sizeRe.exec(stdout)) !== null) {
+    total = checkTotalSize(total, parseInt(m[1], 10) || 0);
   }
 }
 
