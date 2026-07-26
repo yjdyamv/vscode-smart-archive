@@ -9,7 +9,9 @@ function httpGet(url, redirects = 5) {
     const req = https.get(url, { timeout: 30000 }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        return httpGet(new URL(res.headers.location, url).toString(), redirects - 1).then(resolve).catch(reject);
+        return httpGet(new URL(res.headers.location, url).toString(), redirects - 1)
+          .then(resolve)
+          .catch(reject);
       }
       if (res.statusCode !== 200) {
         res.resume();
@@ -20,7 +22,10 @@ function httpGet(url, redirects = 5) {
       res.on("end", () => resolve(Buffer.concat(chunks)));
     });
     req.on("error", reject);
-    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("timeout"));
+    });
   });
 }
 
@@ -36,9 +41,7 @@ function sha256(data) {
 function verifySha256(data, expected, label) {
   const actual = sha256(data);
   if (actual !== expected) {
-    throw new Error(
-      `SHA-256 mismatch for ${label}: expected ${expected}, got ${actual}`,
-    );
+    throw new Error(`SHA-256 mismatch for ${label}: expected ${expected}, got ${actual}`);
   }
 }
 
@@ -95,8 +98,12 @@ async function downloadWithCache({
   try {
     data = await fetch();
   } catch {
-    try { fs.rmSync(path.dirname(destPath), { recursive: true, force: true }); } catch {}
-    try { fs.rmSync(cachedFile, { force: true }); } catch {}
+    try {
+      fs.rmSync(path.dirname(destPath), { recursive: true, force: true });
+    } catch {}
+    try {
+      fs.rmSync(cachedFile, { force: true });
+    } catch {}
     return { status: "failed" };
   }
 

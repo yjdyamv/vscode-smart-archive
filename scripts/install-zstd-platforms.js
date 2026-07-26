@@ -11,7 +11,8 @@ function getZstdMeta() {
 }
 
 const { version: VERSION } = getZstdMeta();
-const SOURCE = (p) => `https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`;
+const SOURCE = (p) =>
+  `https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`;
 // SHA-256 of each platform's binding.node, verified on download (fail-closed).
 // This map MUST be populated before release: with requireHash the build refuses
 // any binary lacking a pinned hash. To (re)generate after a zstd-napi bump, run

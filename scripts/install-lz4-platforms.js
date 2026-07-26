@@ -25,16 +25,16 @@ const PACKAGES = [
 ];
 
 const PLATFORM_META = {
-  "lz4-napi-linux-x64-gnu":       { os: ["linux"],   cpu: ["x64"] },
-  "lz4-napi-linux-x64-musl":      { os: ["linux"],   cpu: ["x64"] },
-  "lz4-napi-linux-arm64-gnu":     { os: ["linux"],   cpu: ["arm64"] },
-  "lz4-napi-linux-arm64-musl":    { os: ["linux"],   cpu: ["arm64"] },
-  "lz4-napi-linux-arm-gnueabihf": { os: ["linux"],   cpu: ["arm"] },
-  "lz4-napi-darwin-x64":          { os: ["darwin"],  cpu: ["x64"] },
-  "lz4-napi-darwin-arm64":        { os: ["darwin"],  cpu: ["arm64"] },
-  "lz4-napi-win32-x64-msvc":      { os: ["win32"],   cpu: ["x64"] },
-  "lz4-napi-win32-arm64-msvc":    { os: ["win32"],   cpu: ["arm64"] },
-  "lz4-napi-win32-ia32-msvc":     { os: ["win32"],   cpu: ["ia32"] },
+  "lz4-napi-linux-x64-gnu": { os: ["linux"], cpu: ["x64"] },
+  "lz4-napi-linux-x64-musl": { os: ["linux"], cpu: ["x64"] },
+  "lz4-napi-linux-arm64-gnu": { os: ["linux"], cpu: ["arm64"] },
+  "lz4-napi-linux-arm64-musl": { os: ["linux"], cpu: ["arm64"] },
+  "lz4-napi-linux-arm-gnueabihf": { os: ["linux"], cpu: ["arm"] },
+  "lz4-napi-darwin-x64": { os: ["darwin"], cpu: ["x64"] },
+  "lz4-napi-darwin-arm64": { os: ["darwin"], cpu: ["arm64"] },
+  "lz4-napi-win32-x64-msvc": { os: ["win32"], cpu: ["x64"] },
+  "lz4-napi-win32-arm64-msvc": { os: ["win32"], cpu: ["arm64"] },
+  "lz4-napi-win32-ia32-msvc": { os: ["win32"], cpu: ["ia32"] },
 };
 
 // SHA-256 of each platform's .node, verified on download (fail-closed).
@@ -47,7 +47,8 @@ const EXPECTED_HASHES = {
   "lz4-napi-linux-x64-musl": "b757afebe9122dd9eaa57dfc9d3ae5e2b4a44f6df0125ea6c667f0a9f492d58d",
   "lz4-napi-linux-arm64-gnu": "704e743524cbcc81aae369bb4e54e389b691a05577d74512feb070db1e3401bd",
   "lz4-napi-linux-arm64-musl": "7064336df491df374bba2a5e665a635bd1b310a400cd608b746255d0bf8cf6c4",
-  "lz4-napi-linux-arm-gnueabihf": "f483803b1e8ef42bcff9db1590d889f33ae48cdcb7b0747639aeffa8a2071fe6",
+  "lz4-napi-linux-arm-gnueabihf":
+    "f483803b1e8ef42bcff9db1590d889f33ae48cdcb7b0747639aeffa8a2071fe6",
   "lz4-napi-darwin-x64": "c64076947d80334c388624752120a017c93c03708f20860db260733f53ef019a",
   "lz4-napi-darwin-arm64": "c54e7abd0af3934a33b25b770894952b0ca49ec7708f5a15b3b98697dc03bda0",
   "lz4-napi-win32-x64-msvc": "e56309e6dd0b3280455a93f95a2a75badde202d7e3186d1d62f8864478c8b0fa",
