@@ -25,7 +25,11 @@ const treeData = ref<TreeNodeData[]>([]);
 function readJson(id: string) {
   const el = document.getElementById(id);
   if (!el) return null;
-  try { return JSON.parse(el.textContent ?? ""); } catch { return null; }
+  try {
+    return JSON.parse(el.textContent ?? "");
+  } catch {
+    return null;
+  }
 }
 
 const archiveProps = ref<ArchiveProps | null>(null);

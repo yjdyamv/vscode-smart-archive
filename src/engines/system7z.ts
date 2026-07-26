@@ -676,12 +676,16 @@ export async function decompressWithSystem7z(
   } catch (err) {
     logger.error({ event: "system7z.decompress.failed", err }, "System 7z decompression failed");
     if (fs.existsSync(stagingDir)) {
-      try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
+      try {
+        fs.rmSync(stagingDir, { recursive: true, force: true });
+      } catch {}
     }
     throw err;
   }
 
-  try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
+  try {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+  } catch {}
 }
 
 // ── List ─────────────────────────────────────────────────────────────

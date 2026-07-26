@@ -66,7 +66,10 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
       fs.rmSync(previewDir, { recursive: true, force: true });
     }
   } catch {
-    logger.warn({ event: "tempFiles.initCleanup.deprecated" }, "Failed to clean up old style temp dir");
+    logger.warn(
+      { event: "tempFiles.initCleanup.deprecated" },
+      "Failed to clean up old style temp dir",
+    );
   }
 
   context.subscriptions.push({
