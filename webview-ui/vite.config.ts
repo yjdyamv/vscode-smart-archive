@@ -8,7 +8,7 @@ export default defineConfig({
   build: {
     outDir: "../media/vue",
     emptyOutDir: true,
-    sourcemap: false,
+    sourcemap: process.env.SOURCEMAP === "true",
     cssCodeSplit: false,
     rollupOptions: {
       output: {

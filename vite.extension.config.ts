@@ -11,7 +11,7 @@ export default defineConfig({
     },
     outDir: "out",
     emptyOutDir: true,
-    sourcemap: false,
+    sourcemap: process.env.SOURCEMAP === "true",
     minify: false,
     rollupOptions: {
       external: [
