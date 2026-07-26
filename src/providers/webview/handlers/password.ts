@@ -86,26 +86,26 @@ export const handlePassword: MessageHandler = async (ctx) => {
       getNoisyPatterns(),
       pwToast,
     );
-    const scripts: string[] = [];
+    const extra: string[] = [];
     if (isSplitVolume(s.filePath)) {
-      scripts.push("window._xIsSplit=true");
+      extra.push(`<script type="application/json" id="_xIsSplit">true</script>`);
     }
     if ([".7z", ".zip"].includes(ext) && !isSplitVolume(s.filePath)) {
-      scripts.push("window._xCanSplit=true");
+      extra.push(`<script type="application/json" id="_xCanSplit">true</script>`);
     }
-    scripts.push("window._xIsEncrypted=true");
-    if (isEncryptableExt(ext)) scripts.push("window._xCanEncrypt=true");
-    const descObj: Record<string, { files: number; dirs: number }> = {};
+    extra.push(`<script type="application/json" id="_xIsEncrypted">true</script>`);
+    if (isEncryptableExt(ext)) extra.push(`<script type="application/json" id="_xCanEncrypt">true</script>`);
+    const descObj = Object.create(null) as Record<string, { files: number; dirs: number }>;
     for (const [k, v] of descCounts) descObj[k] = v;
-    scripts.push(`window._xDescCounts=${JSON.stringify(descObj)}`);
+    extra.push(`<script type="application/json" id="_xDescCounts">${JSON.stringify(descObj)}</script>`);
     const persisted = await loadExpandedPaths(s.archiveUri, true);
     if (persisted.length > 0) {
-      scripts.push(`window._xExpanded=${JSON.stringify(persisted)}`);
+      extra.push(`<script type="application/json" id="_xExpanded">${JSON.stringify(persisted)}</script>`);
     }
-    if (scripts.length > 0) {
+    if (extra.length > 0) {
       webview.html = webview.html.replace(
         "</body>",
-        `<script>${scripts.join(";")}</script></body>`,
+        extra.join("") + "</body>",
       );
     }
   } catch (err) {

@@ -16,7 +16,7 @@ import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
 import { t } from "../../i18n";
-import { PREVIEW_TMP_DIR, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
+import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
 import { logger } from "../../utils/logger";
 
 const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024; // 100 MB hard limit for preview
@@ -287,17 +287,17 @@ export async function previewFileFromArchive(
   if (buf.length > MAX_PREVIEW_FILE_SIZE) {
     throw new Error(t("preview.fileTooLarge", String(buf.length), String(MAX_PREVIEW_FILE_SIZE)));
   }
-  fs.mkdirSync(PREVIEW_TMP_DIR, { recursive: true });
+  const previewDir = getPreviewTmpDir();
   const hash = crypto
     .createHash("sha256")
     .update(`${archivePath}|${normalizedFile}`)
     .digest("hex")
     .slice(0, 16);
   const ext = getFullExt(normalizedFile) || path.extname(normalizedFile);
-  const tmpPath = path.join(PREVIEW_TMP_DIR, `${hash}${ext}`);
+  const tmpPath = path.join(previewDir, `${hash}${ext}`);
   if (!fs.existsSync(tmpPath)) {
     pruneOldPreviews();
-    fs.writeFileSync(tmpPath, buf);
+    fs.writeFileSync(tmpPath, buf, { flag: "wx" });
   }
   const uri = vscode.Uri.file(tmpPath);
   await vscode.commands.executeCommand("vscode.open", uri, {

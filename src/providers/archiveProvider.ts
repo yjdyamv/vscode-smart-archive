@@ -29,7 +29,7 @@ class ArchiveEditorProvider implements vscode.CustomReadonlyEditorProvider {
       const extUri = ext.extensionUri;
       webviewPanel.webview.options = {
         enableScripts: true,
-        enableCommandUris: true,
+        enableCommandUris: false,
         localResourceRoots: [extUri],
       };
       await setupWebview(webviewPanel.webview, document.uri);

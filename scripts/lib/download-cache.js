@@ -1,6 +1,7 @@
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 function httpGet(url) {
   return new Promise((resolve, reject) => {
@@ -23,12 +24,29 @@ async function httpGetJson(url) {
   return JSON.parse(buf.toString("utf8"));
 }
 
-async function downloadWithCache({ cacheDir, cacheKey, fetch, destPath }) {
+function sha256(data) {
+  return crypto.createHash("sha256").update(data).digest("hex");
+}
+
+function verifySha256(data, expected, label) {
+  const actual = sha256(data);
+  if (actual !== expected) {
+    throw new Error(
+      `SHA-256 mismatch for ${label}: expected ${expected}, got ${actual}`,
+    );
+  }
+}
+
+async function downloadWithCache({ cacheDir, cacheKey, fetch, destPath, expectedSha256, label }) {
   if (fs.existsSync(destPath)) return { status: "skipped" };
 
   const cachedFile = path.join(cacheDir, cacheKey);
 
   if (fs.existsSync(cachedFile)) {
+    if (expectedSha256) {
+      const cached = fs.readFileSync(cachedFile);
+      verifySha256(cached, expectedSha256, label || cacheKey);
+    }
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
     fs.copyFileSync(cachedFile, destPath);
     return { status: "cached" };
@@ -36,6 +54,10 @@ async function downloadWithCache({ cacheDir, cacheKey, fetch, destPath }) {
 
   try {
     const data = await fetch();
+
+    if (expectedSha256) {
+      verifySha256(data, expectedSha256, label || cacheKey);
+    }
 
     fs.mkdirSync(path.dirname(cachedFile), { recursive: true });
     fs.writeFileSync(cachedFile, data);
@@ -50,4 +72,4 @@ async function downloadWithCache({ cacheDir, cacheKey, fetch, destPath }) {
   }
 }
 
-module.exports = { httpGet, httpGetJson, downloadWithCache };
+module.exports = { httpGet, httpGetJson, downloadWithCache, sha256, verifySha256 };

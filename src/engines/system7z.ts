@@ -35,6 +35,7 @@ import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
 import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
+import { getMaxTotalSize, checkTotalSize } from "../utils/security";
 import { createTarFile } from "./tar-writer";
 
 // ── Detection (cached) ───────────────────────────────────────────────
@@ -518,6 +519,62 @@ export async function compressWithSystem7z(
 
 // ── Decompress ───────────────────────────────────────────────────────
 
+function walkDir(root: string): string[] {
+  const files: string[] = [];
+  const queue = [root];
+  while (queue.length > 0) {
+    const dir = queue.pop()!;
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        queue.push(full);
+      } else if (e.isFile()) {
+        files.push(full);
+      }
+    }
+  }
+  return files;
+}
+
+function verifyStagingDir(stagingDir: string): void {
+  const resolvedStaging = fs.realpathSync(stagingDir);
+  const sep = path.sep;
+  for (const file of walkDir(stagingDir)) {
+    try {
+      const real = fs.realpathSync(file);
+      if (!real.startsWith(resolvedStaging + sep) && real !== resolvedStaging) {
+        fs.rmSync(stagingDir, { recursive: true, force: true });
+        throw new Error(
+          `Symlink escape blocked: "${real}" is outside staging directory "${resolvedStaging}"`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("Symlink escape")) throw err;
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      throw new Error(`Path verification failed for "${file}": ${(err as Error).message}`);
+    }
+  }
+}
+
+async function checkUncompressedSize(
+  sz: string,
+  inputPath: string,
+  password: string,
+): Promise<void> {
+  const maxTotal = getMaxTotalSize();
+  let total = 0;
+  try {
+    const listing = await listWithSystem7z(inputPath, password);
+    for (const entry of listing) {
+      total = checkTotalSize(total, entry.size);
+    }
+  } catch {
+    logger.warn({ event: "system7z.decompress.sizeCheckFailed" }, "Cannot check uncompressed size, proceeding");
+  }
+}
+
 export async function decompressWithSystem7z(
   options: DecompressOptions,
   progress?: vscode.Progress<{ message?: string }>,
@@ -528,9 +585,12 @@ export async function decompressWithSystem7z(
   if (!sz) throw new Error("System 7-Zip not available");
 
   checkArchiveInputSize(options.inputPath);
-  fs.mkdirSync(options.outputDir, { recursive: true });
+  await checkUncompressedSize(sz, options.inputPath, options.password ?? "");
 
-  const args: string[] = ["x", `-o${options.outputDir}`, "-mmt=on"];
+  const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7z_"));
+  fs.mkdirSync(stagingDir, { recursive: true });
+
+  const args: string[] = ["x", `-o${stagingDir}`, "-mmt=on"];
 
   if (options.password) {
     validatePassword(options.password);
@@ -543,6 +603,7 @@ export async function decompressWithSystem7z(
     event: "system7z.decompress.start",
     input: options.inputPath,
     output: options.outputDir,
+    staging: stagingDir,
     sizeBytes: calcSplitVolumeTotalSize(options.inputPath) || fs.statSync(options.inputPath).size,
     encrypted: !!options.password,
     argsPreview: args.filter((a) => !a.startsWith("-p")).join(" "),
@@ -552,10 +613,23 @@ export async function decompressWithSystem7z(
 
   try {
     await run7z(sz, args, progress, token);
+    verifyStagingDir(stagingDir);
+    fs.mkdirSync(options.outputDir, { recursive: true });
+    for (const name of fs.readdirSync(stagingDir)) {
+      const src = path.join(stagingDir, name);
+      const dst = path.join(options.outputDir, name);
+      fs.renameSync(src, dst);
+    }
+    logger.info({ event: "system7z.decompress.ok", output: options.outputDir });
   } catch (err) {
     logger.error({ event: "system7z.decompress.failed", err }, "System 7z decompression failed");
+    if (fs.existsSync(stagingDir)) {
+      try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
+    }
     throw err;
   }
+
+  try { fs.rmSync(stagingDir, { recursive: true, force: true }); } catch {}
 }
 
 // ── List ─────────────────────────────────────────────────────────────
@@ -653,6 +727,11 @@ interface CaptureResult {
   code: number | null;
 }
 
+/** Mask -p<password> tokens for safe logging */
+function maskArgs(args: string[]): string {
+  return args.map((a) => (a.startsWith("-p") ? "-p***" : a)).join(" ");
+}
+
 interface SpawnCaptureOpts {
   cwd?: string;
   timeoutMs?: number;
@@ -672,7 +751,7 @@ export function spawnCapture(
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
     let settled = false;
-    logger.debug({ event: "system7z.spawn", binary, args: args.join(" ") });
+    logger.debug({ event: "system7z.spawn", binary, args: maskArgs(args) });
 
     const proc = spawn(binary, args, {
       stdio: "pipe",
@@ -686,6 +765,9 @@ export function spawnCapture(
     // All actual passwords are passed via -p<value> on the command line.
     proc.stdin?.end();
 
+    const MAX_CAPTURE_BYTES = 500 * 1024 * 1024; // 500 MB
+    let totalCaptured = 0;
+
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
@@ -696,9 +778,23 @@ export function spawnCapture(
 
     proc.stdout?.on("data", (d: Buffer) => {
       stdoutChunks.push(d);
+      totalCaptured += d.length;
+      if (totalCaptured > MAX_CAPTURE_BYTES) {
+        proc.kill();
+        settled = true;
+        clearTimeout(timer);
+        reject(new Error("7z output exceeded 500 MB limit"));
+      }
     });
     proc.stderr?.on("data", (d: Buffer) => {
       stderrChunks.push(d);
+      totalCaptured += d.length;
+      if (totalCaptured > MAX_CAPTURE_BYTES) {
+        proc.kill();
+        settled = true;
+        clearTimeout(timer);
+        reject(new Error("7z output exceeded 500 MB limit"));
+      }
     });
     proc.on("error", (err) => {
       if (settled) return;
@@ -745,13 +841,16 @@ function run7z(
     let lastPct = -1;
     const startTime = Date.now();
 
-    logger.debug({ event: "system7z.run.start", binary, argsPreview: args.join(" ") });
+    logger.debug({ event: "system7z.run.start", binary, argsPreview: maskArgs(args) });
 
     const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true });
 
     // Close stdin immediately — no password via stdin, all passwords
     // are passed on the command line via -p<password> flag.
     proc.stdin?.end();
+
+    const MAX_RUN_BYTES = 500 * 1024 * 1024;
+    let runBytes = 0;
 
     const cancelSub = token?.onCancellationRequested(() => {
       logger.info({ event: "system7z.run.cancelled", elapsedMs: Date.now() - startTime });
@@ -768,11 +867,25 @@ function run7z(
 
     proc.stdout?.on("data", (d: Buffer) => {
       combinedChunks.push(d);
+      runBytes += d.length;
+      if (runBytes > MAX_RUN_BYTES) {
+        proc.kill();
+        cancelSub?.dispose();
+        reject(new Error("7z output exceeded 500 MB limit"));
+        return;
+      }
     });
 
     proc.stderr?.on("data", (d: Buffer) => {
       const text = decodeBuffer(d);
       combinedChunks.push(d);
+      runBytes += d.length;
+      if (runBytes > MAX_RUN_BYTES) {
+        proc.kill();
+        cancelSub?.dispose();
+        reject(new Error("7z output exceeded 500 MB limit"));
+        return;
+      }
 
       // Parse progress: 7z outputs lines like " 45% 12 - file.txt" to stderr
       const m = text.match(/(\d{1,3})%/);

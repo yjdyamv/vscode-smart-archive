@@ -12,6 +12,7 @@ import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { fixArchiveEncoding } from "../utils/path";
 import { listFiles } from "../engines/js7z-engine";
+import { checkArchiveInputSize } from "../engines/vfs-io";
 import { getFullExt, isWrappedFormat, isEncryptableExt, VFS_CHUNK } from "../constants";
 import { logger } from "../utils/logger";
 import { disposeJS7z } from "../engines/js7z-lifecycle";
@@ -108,6 +109,7 @@ async function listViaExtract(
   password = "",
   data?: Uint8Array,
 ): Promise<{ path: string; size: number; type: string }[]> {
+  checkArchiveInputSize(filePath);
   const ext = getFullExt(filePath);
   const buf = data ?? (await vscode.workspace.fs.readFile(vscode.Uri.file(filePath)));
   const archiveName = path.basename(filePath);
