@@ -25,7 +25,11 @@ const node = computed(() => props.flatNode.node);
 function readDescCounts(): Record<string, { files: number; dirs: number; size?: number }> {
   const el = document.getElementById("_xDescCounts");
   if (!el) return {};
-  try { return JSON.parse(el.textContent ?? "{}"); } catch { return {}; }
+  try {
+    return JSON.parse(el.textContent ?? "{}");
+  } catch {
+    return {};
+  }
 }
 
 const isDir = computed(() => node.value.kind === "DIRECTORY");

@@ -94,19 +94,21 @@ export const handlePassword: MessageHandler = async (ctx) => {
       extra.push(`<script type="application/json" id="_xCanSplit">true</script>`);
     }
     extra.push(`<script type="application/json" id="_xIsEncrypted">true</script>`);
-    if (isEncryptableExt(ext)) extra.push(`<script type="application/json" id="_xCanEncrypt">true</script>`);
+    if (isEncryptableExt(ext))
+      extra.push(`<script type="application/json" id="_xCanEncrypt">true</script>`);
     const descObj = Object.create(null) as Record<string, { files: number; dirs: number }>;
     for (const [k, v] of descCounts) descObj[k] = v;
-    extra.push(`<script type="application/json" id="_xDescCounts">${escapeJsonForScript(JSON.stringify(descObj))}</script>`);
+    extra.push(
+      `<script type="application/json" id="_xDescCounts">${escapeJsonForScript(JSON.stringify(descObj))}</script>`,
+    );
     const persisted = await loadExpandedPaths(s.archiveUri, true);
     if (persisted.length > 0) {
-      extra.push(`<script type="application/json" id="_xExpanded">${escapeJsonForScript(JSON.stringify(persisted))}</script>`);
+      extra.push(
+        `<script type="application/json" id="_xExpanded">${escapeJsonForScript(JSON.stringify(persisted))}</script>`,
+      );
     }
     if (extra.length > 0) {
-      webview.html = webview.html.replace(
-        "</body>",
-        extra.join("") + "</body>",
-      );
+      webview.html = webview.html.replace("</body>", extra.join("") + "</body>");
     }
   } catch (err) {
     if (err instanceof vscode.CancellationError) return;

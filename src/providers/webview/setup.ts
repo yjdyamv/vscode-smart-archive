@@ -233,16 +233,27 @@ export async function setupWebview(
   for (const [k, v] of descCounts) descObj[k] = v;
 
   const extra: string[] = [];
-  if (isSplitVolume(filePath)) extra.push(`<script type="application/json" id="_xReadOnly">true</script><script type="application/json" id="_xIsSplit">true</script>`);
+  if (isSplitVolume(filePath))
+    extra.push(
+      `<script type="application/json" id="_xReadOnly">true</script><script type="application/json" id="_xIsSplit">true</script>`,
+    );
   else {
-    if (isReadOnlyExt(resolvedExt)) extra.push(`<script type="application/json" id="_xReadOnly">true</script>`);
-    if ([".7z", ".zip"].includes(resolvedExt)) extra.push(`<script type="application/json" id="_xCanSplit">true</script>`);
+    if (isReadOnlyExt(resolvedExt))
+      extra.push(`<script type="application/json" id="_xReadOnly">true</script>`);
+    if ([".7z", ".zip"].includes(resolvedExt))
+      extra.push(`<script type="application/json" id="_xCanSplit">true</script>`);
   }
   if (isEnc) extra.push(`<script type="application/json" id="_xIsEncrypted">true</script>`);
-  if (isEncryptableExt(resolvedExt)) extra.push(`<script type="application/json" id="_xCanEncrypt">true</script>`);
-  extra.push(`<script type="application/json" id="_xDescCounts">${escapeJsonForScript(JSON.stringify(descObj))}</script>`);
+  if (isEncryptableExt(resolvedExt))
+    extra.push(`<script type="application/json" id="_xCanEncrypt">true</script>`);
+  extra.push(
+    `<script type="application/json" id="_xDescCounts">${escapeJsonForScript(JSON.stringify(descObj))}</script>`,
+  );
   const persisted = await loadExpandedPaths(archiveUri, isEnc);
-  if (persisted.length > 0) extra.push(`<script type="application/json" id="_xExpanded">${escapeJsonForScript(JSON.stringify(persisted))}</script>`);
+  if (persisted.length > 0)
+    extra.push(
+      `<script type="application/json" id="_xExpanded">${escapeJsonForScript(JSON.stringify(persisted))}</script>`,
+    );
   if (extra.length > 0) {
     webview.html = webview.html.replace("</body>", extra.join("") + "</body>");
   }
