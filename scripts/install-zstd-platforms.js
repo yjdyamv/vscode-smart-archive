@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-const https = require("https");
 const zlib = require("zlib");
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { httpGet, downloadWithCache } = require("./lib/download-cache");
 
 function getZstdMeta() {
   const pkgPath = path.join(__dirname, "..", "node_modules", "zstd-napi", "package.json");
@@ -30,30 +29,9 @@ const PLATFORMS = [
 
 const destDir = path.join(__dirname, "..", "node_modules", "zstd-napi", "build", "Release");
 const cacheDir = path.join(__dirname, "..", ".cache", "zstd-platforms");
-const skipVerify = process.argv.includes("--skip-verify");
 
 fs.mkdirSync(destDir, { recursive: true });
 fs.mkdirSync(cacheDir, { recursive: true });
-
-function sha256(buf) {
-  return crypto.createHash("sha256").update(buf).digest("hex");
-}
-
-function httpGet(url) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { timeout: 30000 }, (res) => {
-      if (res.statusCode !== 200) {
-        res.resume();
-        return reject(new Error(`HTTP ${res.statusCode}`));
-      }
-      const chunks = [];
-      res.on("data", (c) => chunks.push(c));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-    });
-    req.on("error", reject);
-    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
-  });
-}
 
 function extractTarFile(tarBuf, tarPath) {
   const BLOCK = 512;
@@ -95,52 +73,27 @@ function extractTarFile(tarBuf, tarPath) {
 }
 
 async function resolvePlatform(platformKey) {
-  const targetDir = path.join(destDir, platformKey);
-  const expectedFile = path.join(targetDir, "binding.node");
-  const cachedFile = path.join(cacheDir, platformKey, "binding.node");
-  const cachedHash = cachedFile + ".sha256";
+  const destPath = path.join(destDir, platformKey, "binding.node");
 
-  if (fs.existsSync(expectedFile)) return { status: "skipped" };
-
-  if (fs.existsSync(cachedFile)) {
-    if (!skipVerify && fs.existsSync(cachedHash)) {
-      const expected = fs.readFileSync(cachedHash, "utf8").trim();
-      const actual = sha256(fs.readFileSync(cachedFile));
-      if (expected === actual) {
-        fs.mkdirSync(targetDir, { recursive: true });
-        fs.copyFileSync(cachedFile, expectedFile);
-        return { status: "cached" };
+  return downloadWithCache({
+    cacheDir,
+    cacheKey: path.join(platformKey, "binding.node"),
+    destPath,
+    fetch: async () => {
+      for (const urlFn of SOURCES) {
+        const url = urlFn(platformKey);
+        try {
+          const compressed = await httpGet(url);
+          const decompressed = zlib.gunzipSync(compressed);
+          const fileData = extractTarFile(decompressed, "build/Release/binding.node");
+          if (!fileData) throw new Error("binding.node not found in tarball");
+          return fileData;
+        } catch (err) {
+        }
       }
-      console.error(`  ! cache hash mismatch for ${platformKey}, re-downloading`);
-    } else {
-      fs.mkdirSync(targetDir, { recursive: true });
-      fs.copyFileSync(cachedFile, expectedFile);
-      return { status: "cached" };
-    }
-  }
-
-  for (const urlFn of SOURCES) {
-    const url = urlFn(platformKey);
-    try {
-      const compressed = await httpGet(url);
-      const decompressed = zlib.gunzipSync(compressed);
-      const fileData = extractTarFile(decompressed, "build/Release/binding.node");
-      if (!fileData) throw new Error("binding.node not found in tarball");
-      const hash = sha256(fileData);
-
-      fs.mkdirSync(path.dirname(cachedFile), { recursive: true });
-      fs.writeFileSync(cachedFile, fileData);
-      fs.writeFileSync(cachedHash, hash + "\n");
-
-      fs.mkdirSync(targetDir, { recursive: true });
-      fs.copyFileSync(cachedFile, expectedFile);
-      return { status: "downloaded" };
-    } catch (err) {
-      // Try next mirror
-    }
-  }
-
-  return { status: "failed" };
+      throw new Error("all mirrors exhausted");
+    },
+  });
 }
 
 async function main() {
@@ -151,7 +104,7 @@ async function main() {
 
   for (const [platform, arch] of PLATFORMS) {
     const platformKey = `${platform}-${arch}`;
-    console.log(`[${platformKey}]`);
+    console.log(`[zstd-napi ${platformKey}]`);
 
     const result = await resolvePlatform(platformKey);
     if (result.status === "skipped") {
