@@ -40,11 +40,14 @@ export function parse7zListing(
     curAttr = "";
   };
 
+  const MAX_ENTRIES = 100_000;
+
   for (const line of stdout.split("\n")) {
-    const m = line.match(/^(\w[\w ]*?)\s*=\s*(.*)/);
-    if (!m) continue;
-    const key = m[1].trim();
-    const val = m[2].trim();
+    if (results.length >= MAX_ENTRIES) break;
+    const eq = line.indexOf(" = ");
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim();
+    const val = line.slice(eq + 3).trim();
     if (key === "Path") {
       flush();
       curPath = val;

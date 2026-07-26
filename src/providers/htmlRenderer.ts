@@ -26,14 +26,26 @@ function jsModule(uri: string): string {
   return `<script type="module" src="${uri}"></script>`;
 }
 
+function nonce(): string {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+function cspMeta(nonce: string, codiconCssUri: string, cssUri: string): string {
+  return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cssUri} ${codiconCssUri}; img-src data:; object-src 'none'; base-uri 'none'">`;
+}
+
 export function emptyHtml(
   msg: string,
   cssUri?: string,
   jsUri?: string,
   codiconCssUri?: string,
 ): string {
+  const n = nonce();
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${cspMeta(n, codiconCssUri ?? "", cssUri ?? "")}
 ${codiconCssUri ? cssLink(codiconCssUri) : ""}
 ${cssUri ? cssLink(cssUri) : ""}
 </head>
@@ -42,9 +54,11 @@ ${jsUri ? jsModule(jsUri) : ""}</body></html>`;
 }
 
 export function loadingHtml(codiconCssUri?: string): string {
+  const n = nonce();
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${cspMeta(n, codiconCssUri ?? "", "")}
 ${codiconCssUri ? cssLink(codiconCssUri) : ""}
 <style>
   body{font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-sideBar-background);display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
@@ -67,21 +81,23 @@ export function contentHtml(
   toast?: string,
   viewState?: string,
 ): string {
+  const n = nonce();
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${cspMeta(n, codiconCssUri, cssUri)}
 ${cssLink(codiconCssUri)}
 ${cssLink(cssUri)}
 </head>
 <body>
 <div id="app"></div>
-<script>window._xTree=${JSON.stringify(tree)}</script>
-<script>window._xFiles=${fileCount}</script>
-<script>window._xDirs=${dirCount}</script>
-<script>window._xProps=${JSON.stringify(props ?? null)}</script>
-<script>window._xNoisy=${JSON.stringify(noisyPatterns ?? [])}</script>
-${toast ? `<script>window._xToast=${JSON.stringify(toast)}</script>` : ""}
-${viewState ? `<script>window._xViewState=${JSON.stringify(viewState)}</script>` : ""}
+<script type="application/json" id="_xTree">${JSON.stringify(tree)}</script>
+<script type="application/json" id="_xFiles">${fileCount}</script>
+<script type="application/json" id="_xDirs">${dirCount}</script>
+<script type="application/json" id="_xProps">${JSON.stringify(props ?? null)}</script>
+<script type="application/json" id="_xNoisy">${JSON.stringify(noisyPatterns ?? [])}</script>
+${toast ? `<script type="application/json" id="_xToast">${JSON.stringify(toast)}</script>` : ""}
+${viewState ? `<script type="application/json" id="_xViewState">${JSON.stringify(viewState)}</script>` : ""}
 ${jsModule(jsUri)}
 </body></html>`;
 }

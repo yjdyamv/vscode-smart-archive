@@ -228,24 +228,23 @@ export async function setupWebview(
     finalToast,
   );
 
-  // Collect window flags for a single script injection
-  const flags: string[] = [];
-  if (isSplitVolume(filePath)) {
-    flags.push("window._xReadOnly=true", "window._xIsSplit=true");
-  } else {
-    if (isReadOnlyExt(resolvedExt)) flags.push("window._xReadOnly=true");
-    if ([".7z", ".zip"].includes(resolvedExt)) flags.push("window._xCanSplit=true");
-  }
-  if (isEnc) flags.push("window._xIsEncrypted=true");
-  if (isEncryptableExt(resolvedExt)) flags.push("window._xCanEncrypt=true");
   // Precomputed descendant counts for accurate toolbar selection count
-  const descObj: Record<string, { files: number; dirs: number }> = {};
+  const descObj = Object.create(null) as Record<string, { files: number; dirs: number }>;
   for (const [k, v] of descCounts) descObj[k] = v;
-  flags.push(`window._xDescCounts=${JSON.stringify(descObj)}`);
+
+  const extra: string[] = [];
+  if (isSplitVolume(filePath)) extra.push(`<script type="application/json" id="_xReadOnly">true</script><script type="application/json" id="_xIsSplit">true</script>`);
+  else {
+    if (isReadOnlyExt(resolvedExt)) extra.push(`<script type="application/json" id="_xReadOnly">true</script>`);
+    if ([".7z", ".zip"].includes(resolvedExt)) extra.push(`<script type="application/json" id="_xCanSplit">true</script>`);
+  }
+  if (isEnc) extra.push(`<script type="application/json" id="_xIsEncrypted">true</script>`);
+  if (isEncryptableExt(resolvedExt)) extra.push(`<script type="application/json" id="_xCanEncrypt">true</script>`);
+  extra.push(`<script type="application/json" id="_xDescCounts">${JSON.stringify(descObj)}</script>`);
   const persisted = await loadExpandedPaths(archiveUri, isEnc);
-  if (persisted.length > 0) flags.push(`window._xExpanded=${JSON.stringify(persisted)}`);
-  if (flags.length > 0) {
-    webview.html = webview.html.replace("</body>", `<script>${flags.join(";")}</script></body>`);
+  if (persisted.length > 0) extra.push(`<script type="application/json" id="_xExpanded">${JSON.stringify(persisted)}</script>`);
+  if (extra.length > 0) {
+    webview.html = webview.html.replace("</body>", extra.join("") + "</body>");
   }
 
   if (!handlerRegistered.has(webview)) {

@@ -11,11 +11,10 @@ function getZstdMeta() {
 }
 
 const { version: VERSION } = getZstdMeta();
-const SOURCES = [
-  (p) => `https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`,
-  (p) => `https://gh-proxy.com/https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`,
-  (p) => `https://ghproxy.net/https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`,
-];
+const SOURCE = (p) => `https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`;
+// SHA-256 hashes are verified on download. When upgrading zstd-napi, update
+// this map by running: node -e "console.log(require('crypto').createHash('sha256').update(fs.readFileSync('binding.node')).digest('hex'))"
+const EXPECTED_HASHES = {};
 
 const PLATFORMS = [
   ["linux", "x64"],
@@ -79,19 +78,15 @@ async function resolvePlatform(platformKey) {
     cacheDir,
     cacheKey: path.join(platformKey, "binding.node"),
     destPath,
+    expectedSha256: EXPECTED_HASHES[platformKey],
+    label: `zstd-napi ${platformKey}`,
     fetch: async () => {
-      for (const urlFn of SOURCES) {
-        const url = urlFn(platformKey);
-        try {
-          const compressed = await httpGet(url);
-          const decompressed = zlib.gunzipSync(compressed);
-          const fileData = extractTarFile(decompressed, "build/Release/binding.node");
-          if (!fileData) throw new Error("binding.node not found in tarball");
-          return fileData;
-        } catch (err) {
-        }
-      }
-      throw new Error("all mirrors exhausted");
+      const url = SOURCE(platformKey);
+      const compressed = await httpGet(url);
+      const decompressed = zlib.gunzipSync(compressed);
+      const fileData = extractTarFile(decompressed, "build/Release/binding.node");
+      if (!fileData) throw new Error("binding.node not found in tarball");
+      return fileData;
     },
   });
 }

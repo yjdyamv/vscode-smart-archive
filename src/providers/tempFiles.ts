@@ -2,8 +2,8 @@
  * Temp file lifecycle — Smart Archive VSCode Extension
  *
  * Manages preview temp files created when previewing individual archive
- * entries. Files are named by content SHA256 hash so that repeated
- * previews of the same content reuse the same file on disk.
+ * entries. Uses per-session unpredictable temp directories to prevent
+ * local symlink attacks and TOCTOU races.
  *
  * Cleanup runs at extension activate (stale from previous session)
  * and deactivate (current session).
@@ -17,7 +17,8 @@ import * as fs from "fs";
 import * as os from "os";
 import { logger } from "../utils/logger";
 
-const PREVIEW_TMP_DIR = path.join(os.tmpdir(), "vscode-7z-preview");
+const PREVIEW_TMP_PREFIX = path.join(os.tmpdir(), "vscode-7z-preview-");
+let PREVIEW_TMP_DIR = "";
 
 let tempCleanupRegistered = false;
 
@@ -38,7 +39,16 @@ export function registerPreviewCleanup(tmpPath: string, docUri: vscode.Uri): vsc
   });
 }
 
+function getPreviewTmpDir(): string {
+  if (!PREVIEW_TMP_DIR) {
+    PREVIEW_TMP_DIR = fs.mkdtempSync(PREVIEW_TMP_PREFIX);
+    fs.chmodSync(PREVIEW_TMP_DIR, 0o700);
+  }
+  return PREVIEW_TMP_DIR;
+}
+
 function cleanupPreviewTemp(): void {
+  if (!PREVIEW_TMP_DIR) return;
   try {
     fs.rmSync(PREVIEW_TMP_DIR, { recursive: true, force: true });
   } catch (err) {
@@ -50,12 +60,13 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
   if (tempCleanupRegistered) return;
   tempCleanupRegistered = true;
 
+  const previewDir = path.join(os.tmpdir(), "vscode-7z-preview");
   try {
-    if (fs.existsSync(PREVIEW_TMP_DIR)) {
-      cleanupPreviewTemp();
+    if (fs.existsSync(previewDir)) {
+      fs.rmSync(previewDir, { recursive: true, force: true });
     }
   } catch {
-    logger.warn({ event: "tempFiles.initCleanup.failed" }, "Failed to clean up temp directory");
+    logger.warn({ event: "tempFiles.initCleanup.deprecated" }, "Failed to clean up old style temp dir");
   }
 
   context.subscriptions.push({
@@ -75,17 +86,17 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
 const MAX_PREVIEW_FILES = 100;
 
 function pruneOldPreviews(): void {
+  const dir = PREVIEW_TMP_DIR;
+  if (!dir || !fs.existsSync(dir)) return;
   try {
-    if (!fs.existsSync(PREVIEW_TMP_DIR)) return;
-    const entries = fs.readdirSync(PREVIEW_TMP_DIR, { withFileTypes: true });
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile());
-    // Quick bail: only stat + sort when actually over the limit
     if (files.length <= MAX_PREVIEW_FILES) return;
 
     const withMtime = files
       .map((e) => ({
         name: e.name,
-        mtime: fs.statSync(path.join(PREVIEW_TMP_DIR, e.name)).mtimeMs,
+        mtime: fs.statSync(path.join(dir, e.name)).mtimeMs,
       }))
       .sort((a, b) => a.mtime - b.mtime);
 
@@ -93,7 +104,7 @@ function pruneOldPreviews(): void {
     while (withMtime.length > MAX_PREVIEW_FILES) {
       const oldest = withMtime.shift()!;
       try {
-        fs.unlinkSync(path.join(PREVIEW_TMP_DIR, oldest.name));
+        fs.unlinkSync(path.join(dir, oldest.name));
         pruned++;
       } catch {
         logger.warn(
@@ -113,4 +124,4 @@ function pruneOldPreviews(): void {
   }
 }
 
-export { PREVIEW_TMP_DIR, initTempCleanup, cleanupPreviewTemp, pruneOldPreviews };
+export { getPreviewTmpDir, initTempCleanup, cleanupPreviewTemp, pruneOldPreviews };

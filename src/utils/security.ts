@@ -214,7 +214,7 @@ export function validatePassword(pw: string): void {
  * Prefixes with ./ if the name starts with '-' to prevent flag injection.
  */
 export function sanitizeCliPath(entryName: string): string {
-  if (entryName.startsWith("-")) return "./" + entryName;
+  if (entryName.startsWith("-") || entryName.startsWith("@")) return "./" + entryName;
   return entryName;
 }
 

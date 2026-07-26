@@ -22,15 +22,21 @@ const search = useSearch();
 
 const viewState = ref<"loading" | "password" | "content" | "empty">("loading");
 const treeData = ref<TreeNodeData[]>([]);
+function readJson(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  try { return JSON.parse(el.textContent ?? ""); } catch { return null; }
+}
+
 const archiveProps = ref<ArchiveProps | null>(null);
 const totalFiles = ref(0);
 const totalDirs = ref(0);
 const loadingMsg = ref("Reading archive...");
-const readOnly = ref(!!window._xReadOnly);
-const isSplit = ref(!!window._xIsSplit);
-const canSplit = ref(!!window._xCanSplit);
-const isEncrypted = ref(!!window._xIsEncrypted);
-const canEncrypt = ref(!!window._xCanEncrypt);
+const readOnly = ref(!!readJson("_xReadOnly"));
+const isSplit = ref(!!readJson("_xIsSplit"));
+const canSplit = ref(!!readJson("_xCanSplit"));
+const isEncrypted = ref(!!readJson("_xIsEncrypted"));
+const canEncrypt = ref(!!readJson("_xCanEncrypt"));
 
 const sort = useSort();
 const tree = useTreeFlatten(treeData);
@@ -87,11 +93,11 @@ onMounted(() => {
   const cleanupMessage = av.setupMessageHandler();
 
   try {
-    const rawTree = window._xTree ?? [];
-    const props = window._xProps;
-    const files = window._xFiles ?? 0;
-    const dirs = window._xDirs ?? 0;
-    const initView = window._xViewState;
+    const rawTree = readJson("_xTree") ?? [];
+    const props = readJson("_xProps");
+    const files = readJson("_xFiles") ?? 0;
+    const dirs = readJson("_xDirs") ?? 0;
+    const initView = readJson("_xViewState");
 
     if (initView === "password") {
       if (props) archiveProps.value = props;
@@ -133,7 +139,7 @@ onMounted(() => {
           if (!stillValid) selection.state.lastAddDir = "";
         }
       }
-      const toastMsg = window._xToast;
+      const toastMsg = readJson("_xToast");
       if (toastMsg) av.showToast(toastMsg, true);
       av.loadExpandedPaths();
     } else {

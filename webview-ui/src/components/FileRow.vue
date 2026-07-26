@@ -22,13 +22,19 @@ const emit = defineEmits<{
 }>();
 
 const node = computed(() => props.flatNode.node);
+function readDescCounts(): Record<string, { files: number; dirs: number; size?: number }> {
+  const el = document.getElementById("_xDescCounts");
+  if (!el) return {};
+  try { return JSON.parse(el.textContent ?? "{}"); } catch { return {}; }
+}
+
 const isDir = computed(() => node.value.kind === "DIRECTORY");
 const isCollapsedDir = computed(() => isDir.value && node.value.collapsed === true);
 const inheritCollapsed = computed(() => props.flatNode.inheritCollapsed);
 const icon = computed(() => getFileIcon(node.value.name, isDir.value));
 const descLabel = computed(() => {
   if (!isDir.value) return "";
-  const counts = window._xDescCounts?.[node.value.path];
+  const counts = readDescCounts()[node.value.path];
   if (!counts) return "";
   const parts: string[] = [];
   if (counts.files > 0) parts.push(`${counts.files} file${counts.files > 1 ? "s" : ""}`);
@@ -38,7 +44,7 @@ const descLabel = computed(() => {
 
 const dirSize = computed(() => {
   if (!isDir.value) return "";
-  const counts = window._xDescCounts?.[node.value.path];
+  const counts = readDescCounts()[node.value.path];
   if (!counts?.size) return "";
   return formatSize(counts.size);
 });
