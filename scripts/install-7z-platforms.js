@@ -161,8 +161,9 @@ async function processTarget(t) {
   });
 
   if (result.status === "failed") {
-    console.error(`  FAILED to download ${t.asset}`);
-    return;
+    throw new Error(
+      `Failed to download ${t.asset} — refusing to build an incomplete cross-platform package`,
+    );
   }
 
   fs.mkdirSync(unpackDir, { recursive: true });
