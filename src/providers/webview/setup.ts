@@ -16,6 +16,7 @@ import {
   isEncryptableExt,
   isSplitVolume,
   resolveSplitVolume,
+  getCompressedArchiveSize,
 } from "../../constants";
 import { isRarVolume, resolveRarVolume } from "../../utils/rar";
 import { logger } from "../../utils/logger";
@@ -143,7 +144,7 @@ export async function setupWebview(
         cssUri,
         jsUri,
         codiconCssUri,
-        { name: archiveName, format: resolvedExt, count: 0, size: "" },
+        { name: archiveName, format: resolvedExt, count: 0, size: "", ratio: 0 },
         undefined,
         undefined,
         "password",
@@ -203,6 +204,8 @@ export async function setupWebview(
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
+  const archiveFileSize = getCompressedArchiveSize(filePath);
+  const ratio = totalSize > 0 ? archiveFileSize / totalSize : 0;
   const roExt = resolvedExt;
   const roToast =
     [".deb", ".rpm"].includes(roExt) || isSplitVolume(filePath) ? t("archive.readOnly") : undefined;
@@ -219,6 +222,7 @@ export async function setupWebview(
       format: resolvedExt,
       count: itemCount,
       size: formatCompactSize(totalSize),
+      ratio,
     },
     patterns,
     finalToast,

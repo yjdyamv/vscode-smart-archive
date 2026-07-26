@@ -392,6 +392,59 @@ export function resolveSplitVolume(filePath: string): string | null {
   return fs.existsSync(target) ? target : null;
 }
 
+/**
+ * Returns the total compressed size of an archive, summing all split
+ * volumes if the archive is a multi-volume set.
+ */
+export function getCompressedArchiveSize(filePath: string): number {
+  const fileName = path.basename(filePath);
+
+  if (isSplitVolume(filePath)) {
+    const dir = path.dirname(filePath);
+    const base = getSplitVolumeBase(fileName);
+    if (!base) return fs.statSync(filePath).size;
+
+    const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    let pattern: RegExp;
+    if (/\.(7z|zip|wim)\.\d+$/i.test(fileName)) {
+      pattern = new RegExp(`^${escapedBase}\\.\\d+$`);
+    } else if (/\.part\d+\.rar$/i.test(fileName)) {
+      pattern = new RegExp(`^${escapedBase}\\.part\\d+\\.rar$`, "i");
+    } else if (/\.r\d{2}$/i.test(fileName)) {
+      pattern = new RegExp(`^${escapedBase}\\.r\\d{2}$`, "i");
+    } else {
+      return fs.statSync(filePath).size;
+    }
+
+    return fs
+      .readdirSync(dir)
+      .filter((f) => pattern.test(f))
+      .reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
+  }
+
+  // RAR main file (.rar) may have old-style .rNN continuation volumes
+  if (/\.rar$/i.test(filePath)) {
+    const dir = path.dirname(filePath);
+    const base = path.basename(filePath, ".rar");
+    const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rnnPattern = new RegExp(`^${escapedBase}\\.r\\d{2}$`, "i");
+    const rnnVols = fs.readdirSync(dir).filter((f) => rnnPattern.test(f));
+    if (rnnVols.length > 0) {
+      const total = rnnVols.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
+      return total + fs.statSync(filePath).size;
+    }
+    const partPattern = new RegExp(`^${escapedBase}\\.part\\d+\\.rar$`, "i");
+    const partVols = fs.readdirSync(dir).filter((f) => partPattern.test(f));
+    if (partVols.length > 0) {
+      const total = partVols.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
+      return total + fs.statSync(filePath).size;
+    }
+  }
+
+  return fs.statSync(filePath).size;
+}
+
 export function isWrappedFormat(ext: string): boolean {
   const f = getFormatByExt(ext);
   return f?.wrapsTar ?? false;
