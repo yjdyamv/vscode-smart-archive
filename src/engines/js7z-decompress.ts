@@ -106,6 +106,11 @@ export async function decompressWith7z(
     return;
   }
 
+  // All WASM paths below write extracted entries directly into outputDir
+  // (and the NODEFS mount requires its root to exist). The system-7z engine
+  // creates it itself; here we must ensure it exists.
+  fs.mkdirSync(options.outputDir, { recursive: true });
+
   const ext = getFullExt(options.inputPath);
 
   // ── Codec-based wrapped formats (brotli, lz4, zstd) ──
