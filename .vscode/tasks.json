@@ -3,13 +3,13 @@
   "tasks": [
     {
       "type": "npm",
-      "script": "compile",
+      "script": "compile:dev",
       "problemMatcher": "$tsc",
       "label": "npm: compile"
     },
     {
       "type": "npm",
-      "script": "build:webview",
+      "script": "build:webview:dev",
       "problemMatcher": [],
       "label": "npm: build webview"
     },
