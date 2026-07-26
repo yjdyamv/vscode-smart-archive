@@ -43,9 +43,9 @@ const channelOut = new Writable({
       }
       const line = parts.length ? `${msg} ${parts.join(" ")}` : msg;
       const ch = getChannel();
-      if (obj.level >= 50) ch.error(line);
-      else if (obj.level >= 40) ch.warn(line);
-      else if (obj.level >= 30) ch.info(line);
+      if (obj.level >= levels.error) ch.error(line);
+      else if (obj.level >= levels.warn) ch.warn(line);
+      else if (obj.level >= levels.info) ch.info(line);
       else ch.debug(line);
     } catch {
       const text = Buffer.isBuffer(chunk) ? chunk.toString().trim() : String(chunk).trim();
