@@ -24,7 +24,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { execFileSync } = require("child_process");
-const { httpGet, checkHash } = require("./lib/download-cache");
+const { downloadWithCache } = require("./lib/download-cache");
 
 // Keep in sync with the js7z WASM engine version (README: 7-Zip 26.02).
 const VER = "26.02";
@@ -41,10 +41,11 @@ const EXPECTED_HASHES = {
   "7z2602-mac.tar.xz": "1cf6760579502f87e591ff5c73a005ec50b3e4d6f507e8b038382d563c3175b9",
   "7z2602-x64.exe": "6745fa76dc2ea031596d8678f6f6b99c3c1b435b4164a63485adbbc7b8d82ef0",
   "7z2602-arm64.exe": "7c6fde79ed5e11b81c7bb6573b7962d3b6322aa5fce69c33ed19f672b55173ab",
-  "7z2602.exe": "17d894c17b04984b6ffcc1b31926b39c42c315cd861c3adbf7f34bd941d529ac",
+  "7z2602.exe": "17d894c17b04984b6ffcc1b31926b39c42d315cd861c3adbf7f34bd941d529ac",
 };
 
 const OUT = path.join(__dirname, "..", "7z-bin");
+const cacheDir = path.join(__dirname, "..", ".cache", "7z-platforms");
 
 // asset : release file to download
 // kind  : "txz" (tar.xz, extract via system tar) | "win" (SFX, extract via 7zz)
@@ -137,16 +138,34 @@ function extract(kind, archivePath, tmpDir) {
 }
 
 async function processTarget(t) {
-  const url = `${BASE}/${t.asset}`;
   console.log(`[7z ${t.asset}]`);
-  const data = await httpGet(url);
-  // Verify the archive itself (fail-closed; bootstrap prints the hash).
-  checkHash(data, EXPECTED_HASHES[t.asset], true, t.asset);
 
+  // Use downloadWithCache for the archive's on-disk path (a temp dir) — the
+  // cache key is the asset name, so re-builds reuse the cached archive.tar.xz.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7zdl_"));
   const archivePath = path.join(tmpDir, t.asset);
-  fs.writeFileSync(archivePath, data);
   const unpackDir = path.join(tmpDir, "unpacked");
+
+  const result = await downloadWithCache({
+    cacheDir,
+    cacheKey: t.asset,
+    destPath: archivePath,
+    expectedSha256: EXPECTED_HASHES[t.asset],
+    requireHash: true,
+    label: t.asset,
+    fetch: async () => {
+      const url = `${BASE}/${t.asset}`;
+      const { httpGet } = require("./lib/download-cache");
+      return httpGet(url);
+    },
+  });
+
+  if (result.status === "failed") {
+    console.error(`  FAILED to download ${t.asset}`);
+    return;
+  }
+
+  fs.mkdirSync(unpackDir, { recursive: true });
 
   try {
     extract(t.kind, archivePath, unpackDir);
