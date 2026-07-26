@@ -1,0 +1,27 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - run: npm ci --ignore-scripts
+      - run: node scripts/install-lz4-platforms.js
+      - run: node scripts/install-zstd-platforms.js
+      - run: npm --prefix webview-ui ci --ignore-scripts
+      - run: npm run build
+      - run: npx vsce package
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vsix
+          path: "*.vsix"
