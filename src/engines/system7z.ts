@@ -564,20 +564,18 @@ function verifyStagingDir(stagingDir: string): void {
   for (const item of walkDir(stagingDir)) {
     if (item.symlink) {
       fs.rmSync(stagingDir, { recursive: true, force: true });
-      throw new Error(`Symlink entry blocked in extraction output: "${item.path}"`);
+      throw new Error(t("security.symlinkInOutput", item.path));
     }
     let real: string;
     try {
       real = fs.realpathSync(item.path);
     } catch (err) {
       fs.rmSync(stagingDir, { recursive: true, force: true });
-      throw new Error(`Path verification failed for "${item.path}": ${(err as Error).message}`);
+      throw new Error(t("security.pathVerifyFailed", item.path, (err as Error).message));
     }
     if (!real.startsWith(resolvedStaging + sep) && real !== resolvedStaging) {
       fs.rmSync(stagingDir, { recursive: true, force: true });
-      throw new Error(
-        `Path escape blocked: "${real}" is outside staging directory "${resolvedStaging}"`,
-      );
+      throw new Error(t("security.pathEscape", real, resolvedStaging));
     }
   }
 }
@@ -613,10 +611,7 @@ async function preflightSystem7z(sz: string, inputPath: string, password: string
   // H1: 7-Zip -slt marks a symlink with a "Symbolic Link = <target>" property
   // and/or a Unix mode beginning with 'l' in the Attributes field.
   if (/^Symbolic Link = \S/m.test(stdout) || /^Attributes = .*\bl[rwxsStT-]{9}\b/m.test(stdout)) {
-    throw new Error(
-      "Archive contains symbolic-link entries; refusing to extract with system 7-Zip " +
-        "to prevent path-traversal writes outside the output directory.",
-    );
+    throw new Error(t("security.symlinkEntry"));
   }
 
   // H2: enforce the uncompressed total-size limit before writing anything.

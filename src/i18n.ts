@@ -735,6 +735,28 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw":
       '系統 7-Zip 版本太舊（需要 v21+）。請安裝新版本或將 smart-archive.useSystem7z 設為 "never"。',
   },
+  "security.symlinkEntry": {
+    en: "Archive contains symbolic-link entries; refusing to extract with system 7-Zip to prevent path-traversal writes outside the output directory.",
+    "zh-cn":
+      "归档包含符号链接条目；为防止路径遍历写入到输出目录之外，已拒绝使用系统 7-Zip 解压。",
+    "zh-tw":
+      "封存包含符號連結項目；為防止路徑遍歷寫入到輸出目錄之外，已拒絕使用系統 7-Zip 解壓。",
+  },
+  "security.symlinkInOutput": {
+    en: 'Symlink entry blocked in extraction output: "{0}"',
+    "zh-cn": '解压输出中拦截到符号链接条目："{0}"',
+    "zh-tw": '解壓輸出中攔截到符號連結項目："{0}"',
+  },
+  "security.pathVerifyFailed": {
+    en: 'Path verification failed for "{0}": {1}',
+    "zh-cn": '路径校验失败 "{0}": {1}',
+    "zh-tw": '路徑校驗失敗 "{0}": {1}',
+  },
+  "security.pathEscape": {
+    en: 'Path escape blocked: "{0}" is outside staging directory "{1}"',
+    "zh-cn": '拦截到路径逃逸："{0}" 位于暂存目录 "{1}" 之外',
+    "zh-tw": '攔截到路徑逃逸："{0}" 位於暫存目錄 "{1}" 之外',
+  },
 };
 
 /**
