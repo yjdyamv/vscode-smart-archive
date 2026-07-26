@@ -22,8 +22,8 @@ function cssLink(uri: string): string {
   return `<link rel="stylesheet" href="${uri}">`;
 }
 
-function jsModule(uri: string, nonce: string): string {
-  return `<script type="module" nonce="${nonce}" src="${uri}"></script>`;
+function jsModule(uri: string, n: string): string {
+  return `<script type="module" nonce="${n}" src="${uri}"></script>`;
 }
 
 function nonce(): string {
@@ -32,8 +32,8 @@ function nonce(): string {
   return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-function cspMeta(nonce: string): string {
-  return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' vscode-webview-resource:; img-src data: vscode-webview-resource:; font-src vscode-webview-resource: data:; object-src 'none'; base-uri 'none'">`;
+function cspMeta(n: string): string {
+  return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${n}'; style-src 'unsafe-inline' vscode-webview-resource:; img-src data: vscode-webview-resource:; font-src vscode-webview-resource: data:; object-src 'none'; base-uri 'none'">`;
 }
 
 /**

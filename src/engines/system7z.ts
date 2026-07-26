@@ -571,7 +571,9 @@ function verifyStagingDir(stagingDir: string): void {
       real = fs.realpathSync(item.path);
     } catch (err) {
       fs.rmSync(stagingDir, { recursive: true, force: true });
-      throw new Error(t("security.pathVerifyFailed", item.path, (err as Error).message));
+      throw new Error(t("security.pathVerifyFailed", item.path, (err as Error).message), {
+        cause: err,
+      });
     }
     if (!real.startsWith(resolvedStaging + sep) && real !== resolvedStaging) {
       fs.rmSync(stagingDir, { recursive: true, force: true });

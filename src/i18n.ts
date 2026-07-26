@@ -737,10 +737,8 @@ const messages: Record<string, Record<Locale, string>> = {
   },
   "security.symlinkEntry": {
     en: "Archive contains symbolic-link entries; refusing to extract with system 7-Zip to prevent path-traversal writes outside the output directory.",
-    "zh-cn":
-      "归档包含符号链接条目；为防止路径遍历写入到输出目录之外，已拒绝使用系统 7-Zip 解压。",
-    "zh-tw":
-      "封存包含符號連結項目；為防止路徑遍歷寫入到輸出目錄之外，已拒絕使用系統 7-Zip 解壓。",
+    "zh-cn": "归档包含符号链接条目；为防止路径遍历写入到输出目录之外，已拒绝使用系统 7-Zip 解压。",
+    "zh-tw": "封存包含符號連結項目；為防止路徑遍歷寫入到輸出目錄之外，已拒絕使用系統 7-Zip 解壓。",
   },
   "security.symlinkInOutput": {
     en: 'Symlink entry blocked in extraction output: "{0}"',
