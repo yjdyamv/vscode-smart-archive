@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-const https = require("https");
 const zlib = require("zlib");
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { httpGet, httpGetJson, downloadWithCache } = require("./lib/download-cache");
 
 function getLz4Version() {
   const pkgPath = path.join(__dirname, "..", "node_modules", "lz4-napi", "package.json");
@@ -41,35 +40,9 @@ const PLATFORM_META = {
 const destBase = path.join(__dirname, "..", "node_modules", "@antoniomuso");
 const lz4Dir = path.join(__dirname, "..", "node_modules", "lz4-napi");
 const cacheDir = path.join(__dirname, "..", ".cache", "lz4-platforms");
-const skipVerify = process.argv.includes("--skip-verify");
 
 fs.mkdirSync(destBase, { recursive: true });
 fs.mkdirSync(cacheDir, { recursive: true });
-
-function sha256(buf) {
-  return crypto.createHash("sha256").update(buf).digest("hex");
-}
-
-function httpGet(url) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { timeout: 30000 }, (res) => {
-      if (res.statusCode !== 200) {
-        res.resume();
-        return reject(new Error(`HTTP ${res.statusCode}`));
-      }
-      const chunks = [];
-      res.on("data", (c) => chunks.push(c));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-    });
-    req.on("error", reject);
-    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
-  });
-}
-
-async function httpGetJson(url) {
-  const buf = await httpGet(url);
-  return JSON.parse(buf.toString("utf8"));
-}
 
 function extractNodeFromTgz(tgzBuf) {
   const BLOCK = 512;
@@ -130,56 +103,31 @@ function writePkgJson(pkgDir, pkg, nodeFileName) {
 async function resolvePackage(pkg) {
   const pkgDir = path.join(destBase, pkg);
   const nodeFileName = `lz4-napi.${pkg.replace("lz4-napi-", "")}.node`;
-  const dotNode = path.join(pkgDir, nodeFileName);
-  const cachedFile = path.join(cacheDir, nodeFileName);
-  const cachedHash = cachedFile + ".sha256";
+  const destPath = path.join(pkgDir, nodeFileName);
 
-  if (fs.existsSync(dotNode)) return { status: "skipped" };
+  const result = await downloadWithCache({
+    cacheDir,
+    cacheKey: nodeFileName,
+    destPath,
+    fetch: async () => {
+      const metaUrl = `https://registry.npmjs.org/@antoniomuso/${pkg}/${VERSION}`;
+      const meta = await httpGetJson(metaUrl);
+      const tarballUrl = meta.dist && meta.dist.tarball;
+      if (!tarballUrl) throw new Error("no tarball URL in metadata");
 
-  const cacheValid = () => {
-    if (!fs.existsSync(cachedFile)) return false;
-    if (!skipVerify && fs.existsSync(cachedHash)) {
-      const expected = fs.readFileSync(cachedHash, "utf8").trim();
-      const actual = sha256(fs.readFileSync(cachedFile));
-      if (expected !== actual) {
-        console.error(`  ! cache hash mismatch for ${pkg}, re-downloading`);
-        return false;
-      }
-    }
-    return true;
-  };
+      const tgz = await httpGet(tarballUrl);
+      const decompressed = zlib.gunzipSync(tgz);
+      const nodeData = extractNodeFromTgz(decompressed);
+      if (!nodeData) throw new Error(".node file not found in tarball");
+      return nodeData;
+    },
+  });
 
-  if (cacheValid()) {
-    fs.mkdirSync(pkgDir, { recursive: true });
-    fs.copyFileSync(cachedFile, dotNode);
+  if (result.status === "downloaded" || result.status === "cached") {
     writePkgJson(pkgDir, pkg, nodeFileName);
-    return { status: "cached" };
   }
 
-  try {
-    const metaUrl = `https://registry.npmjs.org/@antoniomuso/${pkg}/${VERSION}`;
-    const meta = await httpGetJson(metaUrl);
-    const tarballUrl = meta.dist && meta.dist.tarball;
-    if (!tarballUrl) throw new Error("no tarball URL in metadata");
-
-    const tgz = await httpGet(tarballUrl);
-    const decompressed = zlib.gunzipSync(tgz);
-    const nodeData = extractNodeFromTgz(decompressed);
-    if (!nodeData) throw new Error(".node file not found in tarball");
-
-    const hash = sha256(nodeData);
-    fs.mkdirSync(path.dirname(cachedFile), { recursive: true });
-    fs.writeFileSync(cachedFile, nodeData);
-    fs.writeFileSync(cachedHash, hash + "\n");
-
-    fs.mkdirSync(pkgDir, { recursive: true });
-    fs.writeFileSync(dotNode, nodeData);
-    writePkgJson(pkgDir, pkg, nodeFileName);
-    return { status: "downloaded" };
-  } catch (err) {
-    try { fs.rmSync(pkgDir, { recursive: true, force: true }); } catch {}
-    return { status: "failed" };
-  }
+  return result;
 }
 
 async function main() {
