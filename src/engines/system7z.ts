@@ -35,7 +35,7 @@ import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
 import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
-import { getMaxTotalSize, checkTotalSize } from "../utils/security";
+import { checkTotalSize } from "../utils/security";
 import { createTarFile } from "./tar-writer";
 
 // ── Detection (cached) ───────────────────────────────────────────────
@@ -519,59 +519,111 @@ export async function compressWithSystem7z(
 
 // ── Decompress ───────────────────────────────────────────────────────
 
-function walkDir(root: string): string[] {
-  const files: string[] = [];
+interface WalkedEntry {
+  path: string;
+  symlink: boolean;
+}
+
+/** Recursively walk a directory WITHOUT following symlinks; symlinks are
+ *  reported (not traversed) so a caller can reject them. */
+function walkDir(root: string): WalkedEntry[] {
+  const out: WalkedEntry[] = [];
   const queue = [root];
   while (queue.length > 0) {
     const dir = queue.pop()!;
     let entries: fs.Dirent[];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
     for (const e of entries) {
       const full = path.join(dir, e.name);
-      if (e.isDirectory()) {
+      if (e.isSymbolicLink()) {
+        out.push({ path: full, symlink: true });
+      } else if (e.isDirectory()) {
         queue.push(full);
       } else if (e.isFile()) {
-        files.push(full);
+        out.push({ path: full, symlink: false });
       }
     }
   }
-  return files;
+  return out;
 }
 
+/**
+ * Defense-in-depth after extraction: reject any symlink left in the staging
+ * dir and any real file whose resolved path escapes it. NOTE: this is a
+ * secondary net only — the primary defense is preflightSystem7z(), which
+ * refuses symlink-bearing archives BEFORE extraction, because a symlink
+ * write-through escapes during extraction, before this check can run.
+ */
 function verifyStagingDir(stagingDir: string): void {
   const resolvedStaging = fs.realpathSync(stagingDir);
   const sep = path.sep;
-  for (const file of walkDir(stagingDir)) {
-    try {
-      const real = fs.realpathSync(file);
-      if (!real.startsWith(resolvedStaging + sep) && real !== resolvedStaging) {
-        fs.rmSync(stagingDir, { recursive: true, force: true });
-        throw new Error(
-          `Symlink escape blocked: "${real}" is outside staging directory "${resolvedStaging}"`,
-        );
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message.includes("Symlink escape")) throw err;
+  for (const item of walkDir(stagingDir)) {
+    if (item.symlink) {
       fs.rmSync(stagingDir, { recursive: true, force: true });
-      throw new Error(`Path verification failed for "${file}": ${(err as Error).message}`);
+      throw new Error(`Symlink entry blocked in extraction output: "${item.path}"`);
+    }
+    let real: string;
+    try {
+      real = fs.realpathSync(item.path);
+    } catch (err) {
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      throw new Error(`Path verification failed for "${item.path}": ${(err as Error).message}`);
+    }
+    if (!real.startsWith(resolvedStaging + sep) && real !== resolvedStaging) {
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      throw new Error(
+        `Path escape blocked: "${real}" is outside staging directory "${resolvedStaging}"`,
+      );
     }
   }
 }
 
-async function checkUncompressedSize(
-  sz: string,
-  inputPath: string,
-  password: string,
-): Promise<void> {
-  const maxTotal = getMaxTotalSize();
-  let total = 0;
+/**
+ * Pre-extraction guard for the system-7z engine (a single `7z l -slt` pass):
+ *   H1 — refuse archives containing symlink entries (path-traversal write-through
+ *        happens DURING extraction, so it must be blocked before extracting).
+ *   H2 — sum the reported uncompressed sizes and enforce the total-size limit;
+ *        checkTotalSize throws → propagates → extraction is aborted.
+ * A genuine listing failure (e.g. wrong password) is tolerated: the subsequent
+ * extraction will surface that error itself.
+ */
+async function preflightSystem7z(sz: string, inputPath: string, password: string): Promise<void> {
+  const args: string[] = ["l", "-slt", "-sccUTF-8"];
+  if (password) {
+    validatePassword(password);
+    args.splice(1, 0, `-p${password}`);
+  }
+  args.push("--", inputPath);
+
+  let stdout: string;
   try {
-    const listing = await listWithSystem7z(inputPath, password);
-    for (const entry of listing) {
-      total = checkTotalSize(total, entry.size);
-    }
+    ({ stdout } = await spawnCapture(sz, args));
   } catch {
-    logger.warn({ event: "system7z.decompress.sizeCheckFailed" }, "Cannot check uncompressed size, proceeding");
+    logger.warn(
+      { event: "system7z.decompress.preflightFailed" },
+      "Cannot preflight archive (list failed), proceeding — extraction will surface any error",
+    );
+    return;
+  }
+
+  // H1: 7-Zip -slt marks a symlink with a "Symbolic Link = <target>" property
+  // and/or a Unix mode beginning with 'l' in the Attributes field.
+  if (/^Symbolic Link = \S/m.test(stdout) || /^Attributes = .*\bl[rwxsStT-]{9}\b/m.test(stdout)) {
+    throw new Error(
+      "Archive contains symbolic-link entries; refusing to extract with system 7-Zip " +
+        "to prevent path-traversal writes outside the output directory.",
+    );
+  }
+
+  // H2: enforce the uncompressed total-size limit before writing anything.
+  const entries = parse7zListing(stdout, getBaseName(inputPath), inputPath);
+  let total = 0;
+  for (const entry of entries) {
+    total = checkTotalSize(total, entry.size);
   }
 }
 
@@ -585,7 +637,7 @@ export async function decompressWithSystem7z(
   if (!sz) throw new Error("System 7-Zip not available");
 
   checkArchiveInputSize(options.inputPath);
-  await checkUncompressedSize(sz, options.inputPath, options.password ?? "");
+  await preflightSystem7z(sz, options.inputPath, options.password ?? "");
 
   const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7z_"));
   fs.mkdirSync(stagingDir, { recursive: true });

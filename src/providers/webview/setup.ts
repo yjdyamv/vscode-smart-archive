@@ -28,7 +28,7 @@ import {
   countAllStats,
   buildDescendantCounts,
 } from "../treeBuilder";
-import { loadingHtml, emptyHtml, contentHtml } from "../htmlRenderer";
+import { loadingHtml, emptyHtml, contentHtml, escapeJsonForScript } from "../htmlRenderer";
 import { fetchFileList } from "../fileListing";
 import { handlerStates, handlerRegistered } from "./state";
 import { getNoisyPatterns, isReadOnlyExt, getWebviewUris } from "./helpers";
@@ -240,9 +240,9 @@ export async function setupWebview(
   }
   if (isEnc) extra.push(`<script type="application/json" id="_xIsEncrypted">true</script>`);
   if (isEncryptableExt(resolvedExt)) extra.push(`<script type="application/json" id="_xCanEncrypt">true</script>`);
-  extra.push(`<script type="application/json" id="_xDescCounts">${JSON.stringify(descObj)}</script>`);
+  extra.push(`<script type="application/json" id="_xDescCounts">${escapeJsonForScript(JSON.stringify(descObj))}</script>`);
   const persisted = await loadExpandedPaths(archiveUri, isEnc);
-  if (persisted.length > 0) extra.push(`<script type="application/json" id="_xExpanded">${JSON.stringify(persisted)}</script>`);
+  if (persisted.length > 0) extra.push(`<script type="application/json" id="_xExpanded">${escapeJsonForScript(JSON.stringify(persisted))}</script>`);
   if (extra.length > 0) {
     webview.html = webview.html.replace("</body>", extra.join("") + "</body>");
   }
