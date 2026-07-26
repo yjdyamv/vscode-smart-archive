@@ -57,7 +57,11 @@ export { getSplitVolumeStem, getSplitOutputPath, detectVolumeSize } from "./hand
 export function registerHandler(webview: vscode.Webview): void {
   webview.onDidReceiveMessage((msg: WebviewMsg) => {
     (async () => {
-      logger.info({ event: "webview.msg", c: msg.c, dir: msg.dir });
+      if (msg.c === "expandDir" || msg.c === "saveExpanded") {
+        logger.debug({ event: "webview.msg", c: msg.c, dir: msg.dir });
+      } else {
+        logger.info({ event: "webview.msg", c: msg.c, dir: msg.dir });
+      }
       const s = handlerStates.get(webview);
       if (!s) return;
 
