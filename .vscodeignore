@@ -19,19 +19,24 @@ skills-lock.json
 # ── 排除整个 node_modules，只反选需要的文件 ──
 node_modules/
 !node_modules/@vscode/codicons/dist/**
+!node_modules/@vscode/codicons/LICENSE
 !node_modules/brotli-wasm/index.node.js
 !node_modules/brotli-wasm/pkg.node/**
 !node_modules/brotli-wasm/package.json
+!node_modules/brotli-wasm/LICENSE
 !node_modules/js7z-tools/js7z.js
 !node_modules/js7z-tools/js7z.wasm
 !node_modules/js7z-tools/package.json
+!node_modules/js7z-tools/LICENSE
 !node_modules/lz4-napi/index.js
 !node_modules/lz4-napi/lz4-napi.*.node
 !node_modules/lz4-napi/package.json
+!node_modules/lz4-napi/LICENSE
 !node_modules/zstd-napi/dist/**
 !node_modules/zstd-napi/binding.js
 !node_modules/zstd-napi/build/Release/*/binding.node
 !node_modules/zstd-napi/package.json
+!node_modules/zstd-napi/LICENSE
 
 # ── 输出 & 杂项 ──
 .cache/**
