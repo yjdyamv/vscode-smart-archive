@@ -25,6 +25,7 @@ export interface ArchiveProps {
   files: number;
   dirs: number;
   size: string;
+  ratio: number;
 }
 
 export interface FileIcon {

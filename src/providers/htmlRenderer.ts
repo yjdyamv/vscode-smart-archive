@@ -62,7 +62,7 @@ export function contentHtml(
   cssUri: string,
   jsUri: string,
   codiconCssUri: string,
-  props?: { name: string; format: string; count: number; size: string },
+  props?: { name: string; format: string; count: number; size: string; ratio: number },
   noisyPatterns?: string[],
   toast?: string,
   viewState?: string,

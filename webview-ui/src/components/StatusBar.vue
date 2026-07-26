@@ -48,6 +48,8 @@
       <b>{{ count }}</b> <span class="meta-div">|</span> Files: <b>{{ files }}</b>
       <span class="meta-div">|</span> Dirs: <b>{{ dirs }}</b> <span class="meta-div">|</span> Size:
       <b class="text-[var(--vscode-foreground)]">{{ size }}</b>
+      <span class="meta-div">|</span> Ratio:
+      <b class="text-[var(--vscode-foreground)]">{{ ratio === 0 ? "—" : (ratio * 100).toFixed(2) + "%" }}</b>
     </span>
   </div>
 </template>
@@ -60,6 +62,7 @@ defineProps<{
   files: number;
   dirs: number;
   size: string;
+  ratio: number;
   isSplit?: boolean;
   canSplit?: boolean;
   isEncrypted?: boolean;

@@ -296,6 +296,7 @@ provide(
         :files="totalFiles"
         :dirs="totalDirs"
         :size="archiveProps.size"
+        :ratio="archiveProps.ratio"
         :is-split="isSplit"
         :can-split="canSplit"
         :is-encrypted="isEncrypted"
