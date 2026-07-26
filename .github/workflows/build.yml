@@ -25,6 +25,20 @@ jobs:
           name: vsix
           path: "*.vsix"
 
+  # Enforce the repo's own quality gates (format / lint / typecheck / unit tests).
+  # Independent job (informational on PRs); add branch protection or `needs: check`
+  # on release to make it blocking.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
@@ -104,3 +118,34 @@ jobs:
           "$BIN" x -y -oout test.7z >/dev/null
           diff -r src out/src
           echo "✅ mac 7zz executed and round-tripped OK on $(uname -m)"
+
+  # Validate the bundled Windows 7z.exe + 7z.dll on real Windows. The critical
+  # check is DLL co-location: 7z.exe must find its adjacent 7z.dll (RAR etc. live
+  # in the dll). Extracts the same official installer the install script uses and
+  # runs the extracted 7z.exe for a compress/extract round-trip. windows-latest is
+  # free for public repos.
+  test-windows-7z:
+    name: Validate bundled Windows 7z
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download & validate Windows 7z.exe + 7z.dll
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER=$(sed -n 's/.*const VER = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
+          TAG=$(sed -n 's/.*const TAG = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
+          echo "Testing 7-Zip $VER on Windows"
+          curl -fsSL -o inst.exe "https://github.com/ip7z/7zip/releases/download/${VER}/7z${TAG}-x64.exe"
+          # Extract 7z.exe + 7z.dll from the SFX installer using the runner's preinstalled 7-Zip.
+          SZ=$(command -v 7z || echo "/c/Program Files/7-Zip/7z.exe")
+          "$SZ" x -y -obin inst.exe 7z.exe 7z.dll >/dev/null
+          ls -l bin/7z.exe bin/7z.dll
+          # Round-trip using OUR extracted 7z.exe — proves it loads the adjacent 7z.dll.
+          mkdir -p src out
+          printf 'hello world\n' > src/a.txt
+          mkdir -p src/sub && printf 'nested\n' > src/sub/b.txt
+          ./bin/7z.exe a -t7z test.7z ./src >/dev/null
+          ./bin/7z.exe x -y -oout test.7z >/dev/null
+          diff -r src out/src
+          echo "✅ Windows 7z.exe executed with adjacent 7z.dll"

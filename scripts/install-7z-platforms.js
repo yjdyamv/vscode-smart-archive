@@ -126,6 +126,11 @@ function extract(kind, archivePath, tmpDir) {
   if (kind === "txz") {
     execFileSync("tar", ["-xJf", archivePath, "-C", tmpDir], { stdio: "inherit" });
   } else {
+    if (process.platform !== "linux" || process.arch !== "x64") {
+      throw new Error(
+        `Windows SFX extraction uses the staged linux-x64 7zz and therefore requires a linux-x64 build host; current host is ${process.platform}-${process.arch}. Run package:cross on ubuntu-latest (x64).`,
+      );
+    }
     const sz = hostSevenZip();
     if (!sz) {
       throw new Error(
@@ -199,6 +204,12 @@ async function main() {
   // Linux x64 first: its 7zz is the host tool used to unpack the Windows SFX.
   for (const t of TARGETS) {
     await processTarget(t);
+  }
+  // LGPL compliance is mandatory — fail closed if the license text was not staged.
+  if (!fs.existsSync(path.join(OUT, "License.txt"))) {
+    throw new Error(
+      "7-Zip License.txt was not staged (LGPL requirement) — upstream archive layout may have changed",
+    );
   }
   // Report
   const staged = [];
