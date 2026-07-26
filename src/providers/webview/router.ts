@@ -50,6 +50,31 @@ import type { WebviewMsg } from "./handlers/types";
 // Re-export shared utilities for backward compatibility with tests
 export { getSplitVolumeStem, getSplitOutputPath, detectVolumeSize } from "./handlers/shared";
 
+// Upper bound on a message's `paths` array. The archive listing itself is
+// capped at 100k entries (parse7z MAX_ENTRIES), so a legitimate "select all"
+// cannot exceed that; this leaves headroom while bounding a malformed webview.
+const MAX_MSG_PATHS = 200_000;
+
+/**
+ * Reject structurally malformed webview → extension messages before they reach
+ * a handler. Defense-in-depth: with the CSP in place the webview is not
+ * attacker-controlled, but a buggy or crafted message must not drive
+ * filesystem/spawn operations with the wrong types or an unbounded array.
+ */
+function isValidMsg(msg: WebviewMsg): boolean {
+  const m = msg as unknown as Record<string, unknown>;
+  for (const k of ["path", "dir", "pw", "msg"]) {
+    if (m[k] !== undefined && typeof m[k] !== "string") return false;
+  }
+  if (m.paths !== undefined) {
+    if (!Array.isArray(m.paths) || m.paths.length > MAX_MSG_PATHS) return false;
+    for (const p of m.paths) {
+      if (typeof p !== "string") return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Register the webview message handler for an archive viewer instance.
  * Uses a command → handler map rather than a switch-case for extensibility.
@@ -64,6 +89,14 @@ export function registerHandler(webview: vscode.Webview): void {
       }
       const s = handlerStates.get(webview);
       if (!s) return;
+
+      if (!isValidMsg(msg)) {
+        logger.warn(
+          { event: "webview.msg.invalid", c: msg.c },
+          "Rejected malformed webview message",
+        );
+        return;
+      }
 
       // Lightweight inline handlers
       if (msg.c === "log") {

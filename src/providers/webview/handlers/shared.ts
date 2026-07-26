@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { spawnCapture, detectSystem7z } from "../../../engines/system7z";
+import { validatePassword } from "../../../utils/security";
 import { getFullExt, COMPRESS_FORMATS, removeVolumeSuffix } from "../../../constants";
 import { getVolumeSizes, toBinaryVolumeSize } from "../../../utils/volume-sizes";
 import { logger } from "../../../utils/logger";
@@ -157,6 +158,14 @@ export async function verifyArchivePassword(
   archivePath: string,
   password: string,
 ): Promise<boolean> {
+  // Defense-in-depth: a password that fails validation (leading '-', null byte,
+  // newline, over-length) can never be the correct one and must not reach argv.
+  try {
+    validatePassword(password);
+  } catch {
+    return false;
+  }
+
   const sz = detectSystem7z();
   if (sz) {
     try {
