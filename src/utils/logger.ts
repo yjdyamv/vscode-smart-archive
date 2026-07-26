@@ -2,7 +2,8 @@
  * Logger — Smart Archive VSCode Extension
  *
  * Built on pino for structured high-performance logging.
- * Routes to both console (pretty) and VSCode OutputChannel.
+ * Routes to VSCode LogOutputChannel (with level highlighting)
+ * and stderr (JSON for programmatic use).
  *
  * Usage:
  *   import { logger } from "../utils/logger";
@@ -18,45 +19,37 @@ import pino from "pino";
 
 const levels = { debug: 20, info: 30, warn: 40, error: 50 } as const;
 
-let channel: vscode.OutputChannel | null = null;
+let channel: vscode.LogOutputChannel | null = null;
 let _level: keyof typeof levels = "info";
 
-function getChannel(): vscode.OutputChannel {
+function getChannel(): vscode.LogOutputChannel {
   if (!channel) {
     channel = vscode.window.createOutputChannel("Smart Archive", { log: true });
   }
   return channel;
 }
 
-const channelStream = new Writable({
+const channelOut = new Writable({
   write(chunk: unknown, _encoding: string, callback: () => void) {
     try {
       const str = Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
       const obj = JSON.parse(str);
-      const ts = obj.time ? new Date(obj.time).toISOString().slice(11, 23) : "";
-      const lvl = (
-        obj.level === 50 ? "ERROR" : obj.level === 40 ? "WARN" : obj.level === 30 ? "INFO" : "DEBUG"
-      ).padEnd(5);
-      let msg = `[${ts}] [${lvl}] ${obj.event || obj.msg || ""}`;
-      if (obj.err) msg += ` ${obj.err}`;
-      for (const k of Object.keys(obj)) {
-        if (
-          k === "time" ||
-          k === "level" ||
-          k === "hostname" ||
-          k === "pid" ||
-          k === "event" ||
-          k === "msg" ||
-          k === "err"
-        )
-          continue;
-        msg += ` ${k}=${JSON.stringify(obj[k])}`;
+      const msg = obj.event || obj.msg || "";
+      const parts: string[] = [];
+      if (obj.err) parts.push(String(obj.err));
+      for (const [k, v] of Object.entries(obj)) {
+        if (["time", "level", "hostname", "pid", "event", "msg", "err"].includes(k)) continue;
+        parts.push(`${k}=${JSON.stringify(v)}`);
       }
-      getChannel().appendLine(msg);
+      const line = parts.length ? `${msg} ${parts.join(" ")}` : msg;
+      const ch = getChannel();
+      if (obj.level >= 50) ch.error(line);
+      else if (obj.level >= 40) ch.warn(line);
+      else if (obj.level >= 30) ch.info(line);
+      else ch.debug(line);
     } catch {
-      getChannel().appendLine(
-        Buffer.isBuffer(chunk) ? chunk.toString().trim() : String(chunk).trim(),
-      );
+      const text = Buffer.isBuffer(chunk) ? chunk.toString().trim() : String(chunk).trim();
+      if (text) getChannel().info(text);
     }
     callback();
   },
@@ -78,6 +71,7 @@ function sanitize(obj: Record<string, unknown>): Record<string, unknown> {
 const p = pino(
   {
     level: _level,
+    messageKey: "event",
     timestamp: pino.stdTimeFunctions.isoTime,
     formatters: {
       level(label) {
@@ -85,8 +79,7 @@ const p = pino(
       },
     },
   },
-  // Writing directly to stderr avoids pino.transport() spawning a worker thread
-  pino.multistream([{ stream: channelStream }, { level: "info", stream: process.stderr }]),
+  pino.multistream([{ stream: channelOut }, { level: "info", stream: process.stderr }]),
 );
 
 export const logger = {
