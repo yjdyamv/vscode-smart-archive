@@ -3,9 +3,14 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-function httpGet(url) {
+function httpGet(url, redirects = 5) {
   return new Promise((resolve, reject) => {
+    if (redirects <= 0) return reject(new Error("too many redirects"));
     const req = https.get(url, { timeout: 30000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        return httpGet(new URL(res.headers.location, url).toString(), redirects - 1).then(resolve).catch(reject);
+      }
       if (res.statusCode !== 200) {
         res.resume();
         return reject(new Error(`HTTP ${res.statusCode}`));
