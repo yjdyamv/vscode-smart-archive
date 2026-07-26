@@ -737,8 +737,12 @@ export async function decompressWithSystem7z(
   checkArchiveInputSize(options.inputPath);
   await preflightSystem7z(sz, options.inputPath, options.password ?? "");
 
-  const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7z_"));
-  fs.mkdirSync(stagingDir, { recursive: true });
+  // Stage on the SAME filesystem as the output dir so the post-extraction move
+  // is an atomic same-device rename. Using os.tmpdir() breaks whenever /tmp is a
+  // separate mount/tmpfs (common on Linux): renameSync then fails with EXDEV.
+  const stagingParent = path.dirname(path.resolve(options.outputDir));
+  fs.mkdirSync(stagingParent, { recursive: true });
+  const stagingDir = fs.mkdtempSync(path.join(stagingParent, ".sa7z_"));
 
   const args: string[] = ["x", `-o${stagingDir}`, "-mmt=on"];
 
