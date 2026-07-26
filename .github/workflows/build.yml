@@ -74,8 +74,18 @@ jobs:
           test -n "$BIN" || { echo "::error::7zz not found in mac tarball"; exit 1; }
           chmod +x "$BIN"
 
+          echo "── simulate a quarantined file (as if unpacked from a downloaded VSIX) ──"
+          xattr -w com.apple.quarantine "0081;00000000;ci-test;" "$BIN"
+          test -n "$(xattr -p com.apple.quarantine "$BIN" 2>/dev/null)" \
+            || { echo "::error::could not set quarantine attribute for the test"; exit 1; }
+          echo "quarantine attr set: $(xattr -p com.apple.quarantine "$BIN")"
+
           echo "── replicate the extension's runtime mac prep ──"
           xattr -d com.apple.quarantine "$BIN" 2>/dev/null || true
+          if xattr -p com.apple.quarantine "$BIN" 2>/dev/null; then
+            echo "::error::quarantine attribute was NOT removed by the strip step"; exit 1
+          fi
+          echo "quarantine attr removed ✔"
           if codesign --verify --no-strict "$BIN" 2>/dev/null; then
             echo "signature: VALID (Developer ID / notarized) — no ad-hoc signing needed"
           else
