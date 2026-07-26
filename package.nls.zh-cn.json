@@ -28,6 +28,7 @@
   "config.useSystem7z.description": "是否使用系统安装的 7-Zip 来压缩/解压。系统 7-Zip 速度更快、内存占用更小，但需要本地安装。",
   "config.useSystem7z.auto": "自动检测系统 7-Zip。如果存在且版本>=21，用于加速压缩；否则回退到内置 WASM 引擎。",
   "config.useSystem7z.always": "始终使用系统 7-Zip。如果未安装或版本太旧则显示错误。",
+  "config.useSystem7z.bundled": "始终使用本扩展内置的 7-Zip 二进制，忽略系统安装。若当前平台没有可用的内置二进制，则回退到 WASM 引擎。",
   "config.useSystem7z.never": "永不使用系统 7-Zip。始终使用内置 WASM 引擎，即使已安装 7-Zip。",
   "config.useSystemZstd.description": "是否使用系统安装的 zstd 进行 tar.zst 压缩。系统 zstd 速度更快，但需要本地安装。",
   "config.useSystemZstd.auto": "自动检测系统 zstd。如果存在则用于 tar.zst 压缩加速；否则回退到内置 zstd-wasm。",

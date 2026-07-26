@@ -49,6 +49,23 @@ let _cachedPath: string | null | undefined;
 export function detectSystem7z(): string | null {
   if (_cachedPath !== undefined) return _cachedPath;
 
+  const setting = vscode.workspace
+    .getConfiguration("smart-archive")
+    .get<string>("useSystem7z", "auto");
+
+  // "bundled": skip system detection entirely and force the VSIX-bundled 7zz
+  // (→ null / WASM when it is missing or cannot run on this platform).
+  if (setting === "bundled") {
+    _cachedPath = bundled7zPath();
+    logger.info({
+      event: _cachedPath ? "system7z.detected" : "system7z.notFound",
+      path: _cachedPath ?? undefined,
+      method: "bundled-forced",
+      platform: process.platform,
+    });
+    return _cachedPath;
+  }
+
   const candidates: string[] = [];
 
   if (process.platform === "win32") {
