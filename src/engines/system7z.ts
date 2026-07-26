@@ -89,9 +89,38 @@ export function detectSystem7z(): string | null {
     }
   }
 
+  // Fall back to the 7-Zip binary bundled in the VSIX (guarantees availability
+  // even when nothing is installed). A user-installed 7z is preferred above.
+  const bundled = bundled7zPath();
+  if (bundled) {
+    _cachedPath = bundled;
+    logger.info({ event: "system7z.detected", path: bundled, method: "bundled" });
+    return _cachedPath;
+  }
+
   _cachedPath = null;
   logger.info({ event: "system7z.notFound", platform: process.platform });
   return null;
+}
+
+/**
+ * Resolve the full-format 7-Zip console binary bundled under 7z-bin/ for the
+ * current platform/arch (staged by scripts/install-7z-platforms.js). On Unix
+ * the file may lose its execute bit when the VSIX is unpacked, so restore it.
+ * Returns null when no binary is bundled for this platform (→ WASM fallback).
+ */
+function bundled7zPath(): string | null {
+  const bin = process.platform === "win32" ? "7z.exe" : "7zz";
+  const p = path.join(__dirname, "..", "7z-bin", process.platform, process.arch, bin);
+  if (!fs.existsSync(p)) return null;
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(p, 0o755);
+    } catch (err) {
+      logger.warn({ event: "system7z.bundled.chmodFailed", err });
+    }
+  }
+  return p;
 }
 
 export function hasSystem7z(): boolean {
