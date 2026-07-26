@@ -9,7 +9,12 @@ import type { MessageHandler } from "./types";
 import { logger } from "../../../utils/logger";
 import { t, formatCompactSize } from "../../../i18n";
 import { isPasswordOrEncryptError } from "../../../utils/errorClassifier";
-import { getFullExt, isSplitVolume, isEncryptableExt, getCompressedArchiveSize } from "../../../constants";
+import {
+  getFullExt,
+  isSplitVolume,
+  isEncryptableExt,
+  getCompressedArchiveSize,
+} from "../../../constants";
 import { fetchFileList } from "../../fileListing";
 import {
   buildTreeRootOnly,
@@ -76,8 +81,7 @@ export const handlePassword: MessageHandler = async (ctx) => {
         format: ext,
         count: pwStats.total,
         size: formatCompactSize(pwStats.totalSize),
-        ratio:
-          pwStats.totalSize > 0 ? getCompressedArchiveSize(s.filePath) / pwStats.totalSize : 0,
+        ratio: pwStats.totalSize > 0 ? getCompressedArchiveSize(s.filePath) / pwStats.totalSize : 0,
       },
       getNoisyPatterns(),
       pwToast,

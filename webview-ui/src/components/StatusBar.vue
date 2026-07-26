@@ -49,7 +49,9 @@
       <span class="meta-div">|</span> Dirs: <b>{{ dirs }}</b> <span class="meta-div">|</span> Size:
       <b class="text-[var(--vscode-foreground)]">{{ size }}</b>
       <span class="meta-div">|</span> Ratio:
-      <b class="text-[var(--vscode-foreground)]">{{ ratio === 0 ? "—" : (ratio * 100).toFixed(2) + "%" }}</b>
+      <b class="text-[var(--vscode-foreground)]">{{
+        ratio === 0 ? "—" : (ratio * 100).toFixed(2) + "%"
+      }}</b>
     </span>
   </div>
 </template>
