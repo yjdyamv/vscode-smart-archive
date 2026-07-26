@@ -463,11 +463,13 @@
           "enum": [
             "auto",
             "always",
+            "bundled",
             "never"
           ],
           "enumDescriptions": [
             "%config.useSystem7z.auto%",
             "%config.useSystem7z.always%",
+            "%config.useSystem7z.bundled%",
             "%config.useSystem7z.never%"
           ],
           "description": "%config.useSystem7z.description%"
