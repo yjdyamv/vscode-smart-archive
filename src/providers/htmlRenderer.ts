@@ -22,8 +22,8 @@ function cssLink(uri: string): string {
   return `<link rel="stylesheet" href="${uri}">`;
 }
 
-function jsModule(uri: string): string {
-  return `<script type="module" src="${uri}"></script>`;
+function jsModule(uri: string, nonce: string): string {
+  return `<script type="module" nonce="${nonce}" src="${uri}"></script>`;
 }
 
 function nonce(): string {
@@ -33,7 +33,7 @@ function nonce(): string {
 }
 
 function cspMeta(nonce: string, codiconCssUri: string, cssUri: string): string {
-  return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cssUri} ${codiconCssUri}; img-src data:; object-src 'none'; base-uri 'none'">`;
+  return `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline' ${cssUri} ${codiconCssUri}; img-src data:; object-src 'none'; base-uri 'none'">`;
 }
 
 export function emptyHtml(
@@ -50,7 +50,7 @@ ${codiconCssUri ? cssLink(codiconCssUri) : ""}
 ${cssUri ? cssLink(cssUri) : ""}
 </head>
 <body><div style="text-align:center;color:var(--vscode-descriptionForeground);padding:4em 1.5em;font-size:var(--vscode-font-size)">${esc(msg)}</div>
-${jsUri ? jsModule(jsUri) : ""}</body></html>`;
+${jsUri ? jsModule(jsUri, n) : ""}</body></html>`;
 }
 
 export function loadingHtml(codiconCssUri?: string): string {
@@ -98,6 +98,6 @@ ${cssLink(cssUri)}
 <script type="application/json" id="_xNoisy">${JSON.stringify(noisyPatterns ?? [])}</script>
 ${toast ? `<script type="application/json" id="_xToast">${JSON.stringify(toast)}</script>` : ""}
 ${viewState ? `<script type="application/json" id="_xViewState">${JSON.stringify(viewState)}</script>` : ""}
-${jsModule(jsUri)}
+${jsModule(jsUri, n)}
 </body></html>`;
 }
