@@ -41,6 +41,6 @@ node_modules/zstd-napi/build/Release/obj.target/**
 
 # ── 输出 & 杂项 ──
 .cache/**
-out/**/*.map
+**/*.map
 **/.gitignore
 **/.DS_Store
