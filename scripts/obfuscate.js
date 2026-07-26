@@ -26,7 +26,7 @@ for (const { dir, opts } of TARGETS) {
   if (!fs.existsSync(dir)) continue;
   for (const entry of fs.readdirSync(dir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
-    const full = path.join(dir, entry.name);
+    const full = path.join(entry.parentPath, entry.name);
     if (entry.name.endsWith(".map"))
       throw new Error(`[obfuscate] 拒绝打包 sourcemap: ${full}`);
     if (!entry.name.endsWith(".js")) continue;
