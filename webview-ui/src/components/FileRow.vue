@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { FlatNode } from "../types";
-import { getFileIcon, formatSize, escapeHtml } from "../utils/icons";
+import { getFileIcon, formatSize } from "../utils/icons";
 import { INDENT_PX } from "../constants";
 
 const props = defineProps<{
@@ -57,9 +57,18 @@ function indentGuides(depth: number, showChildGuide: boolean): number[] {
   return Array.from({ length: depth + (showChildGuide ? 1 : 0) }, (_, i) => i);
 }
 
-const nameHtml = computed(() => {
+// Split the name into plain / highlighted segments. Rendered with {{ }} in the
+// template (Vue auto-escapes), so no v-html and no manual HTML escaping — an
+// attacker-controlled entry name cannot inject markup.
+interface NameSeg {
+  text: string;
+  mark: boolean;
+}
+
+const nameSegments = computed<NameSeg[]>(() => {
   const name = node.value.name;
-  if (!props.searchQuery.trim()) return escapeHtml(name);
+  const plain: NameSeg[] = [{ text: name, mark: false }];
+  if (!props.searchQuery.trim()) return plain;
 
   const raw = props.searchQuery.trim();
   if (raw.length > 2 && raw[0] === "/" && raw.lastIndexOf("/") === raw.length - 1) {
@@ -70,12 +79,22 @@ const nameHtml = computed(() => {
         /(\+|\*)\s*(\+|\*)/.test(pattern) ||
         pattern.length > 200
       ) {
-        return escapeHtml(name);
+        return plain;
       }
       const re = new RegExp("(" + pattern + ")", "gi");
-      return escapeHtml(name).replace(re, "<mark>$1</mark>");
+      const segs: NameSeg[] = [];
+      let last = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(name)) !== null) {
+        if (m.index > last) segs.push({ text: name.slice(last, m.index), mark: false });
+        segs.push({ text: m[0], mark: true });
+        last = m.index + m[0].length;
+        if (m[0].length === 0) re.lastIndex++; // guard against zero-width matches
+      }
+      if (last < name.length) segs.push({ text: name.slice(last), mark: false });
+      return segs.length > 0 ? segs : plain;
     } catch {
-      return escapeHtml(name);
+      return plain;
     }
   }
 
@@ -89,17 +108,17 @@ const nameHtml = computed(() => {
       qi++;
     }
   }
-  if (pos.length === 0) return escapeHtml(name);
+  if (pos.length === 0) return plain;
 
-  let result = "";
+  const segs: NameSeg[] = [];
   let last = 0;
   for (const p of pos) {
-    result +=
-      escapeHtml(name.substring(last, p)) + "<mark>" + escapeHtml(name.charAt(p)) + "</mark>";
+    if (p > last) segs.push({ text: name.slice(last, p), mark: false });
+    segs.push({ text: name.charAt(p), mark: true });
     last = p + 1;
   }
-  result += escapeHtml(name.substring(last));
-  return result;
+  if (last < name.length) segs.push({ text: name.slice(last), mark: false });
+  return segs;
 });
 
 function onRowClick(e: MouseEvent) {
@@ -160,7 +179,12 @@ function onExpandClick(e: MouseEvent) {
       <span v-else-if="isDir" class="codicon codicon-chevron-right arrow-icon"></span>
     </span>
     <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
-    <span class="name" :title="node.path" v-html="nameHtml"></span>
+    <span class="name" :title="node.path"
+      ><template v-for="(seg, i) in nameSegments" :key="i"
+        ><mark v-if="seg.mark">{{ seg.text }}</mark
+        ><template v-else>{{ seg.text }}</template></template
+      ></span
+    >
     <span v-if="isDir" class="desc-count">{{ descLabel }}</span>
     <span v-if="isDir && dirSize" class="size">{{ dirSize }}</span>
     <span v-else-if="!isDir && node.size > 0" class="size">{{ formatSize(node.size) }}</span>

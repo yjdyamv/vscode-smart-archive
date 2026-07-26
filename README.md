@@ -129,6 +129,11 @@ npm run release          # build + check + package
 | [Vue 3](https://vuejs.org/) | Archive browser UI |
 | [TanStack Virtual](https://tanstack.com/virtual) | Virtual scrolling for large archives |
 
+## Security
+
+- **Untrusted archives** — when a system 7-Zip binary is used, extraction refuses archives that contain symbolic-link entries and enforces the configured size limits *before* writing, guarding against path-traversal writes and decompression bombs. The archive browser renders attacker-controlled entry names under a strict Content-Security-Policy.
+- **Passwords on shared machines** — a system 7-Zip binary receives the archive password on its command line (`-p…`), which is visible to other local users in the process list for the duration of the operation. This is an inherent limitation of the 7-Zip CLI. On a multi-user host, set `smart-archive.useSystem7z` to `never` to use the bundled WebAssembly engine, which never spawns an external process and so never exposes the password in the process table.
+
 ## License
 
 Proprietary. See [LICENSE](LICENSE).
