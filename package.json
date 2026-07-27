@@ -319,19 +319,6 @@
           ],
           "description": "%config.defaultCompressionLevel.description%"
         },
-        "smart-archive.defaultOutputDir": {
-          "type": "string",
-          "default": "source",
-          "enum": [
-            "source",
-            "prompt"
-          ],
-          "enumDescriptions": [
-            "%config.defaultOutputDir.source%",
-            "%config.defaultOutputDir.prompt%"
-          ],
-          "description": "%config.defaultOutputDir.description%"
-        },
         "smart-archive.maxFileSize": {
           "type": [
             "integer",

@@ -81,7 +81,6 @@ All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, A
 |---------|---------|-------------|
 | `smart-archive.defaultFormat` | `7z` | Default archive format |
 | `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
-| `smart-archive.defaultOutputDir` | `source` | Output location: `source` or `prompt` |
 | `smart-archive.maxFileSize` | `"1g"` | Max single decompressed file size (k/m/g units) |
 | `smart-archive.maxTotalSize` | `"10g"` | Max total decompressed size |
 | `smart-archive.useSystem7z` | `"auto"` | 7-Zip engine: `auto` (system→bundled native→WASM), `always` (system only), `bundled` (bundled native only), `never` (WASM only) |

@@ -419,6 +419,16 @@ async function extractOneWithSystem7z(
     }
     if (!filePath) throw new Error("Extracted file not found");
 
+    // The lookups above use statSync, which follows symlinks: a crafted archive
+    // whose entry is a symlink to an absolute host path (e.g. ~/.ssh/id_rsa)
+    // would otherwise be read here and exposed via preview/copy. Refuse anything
+    // whose real path escapes the temp extraction dir.
+    const realTmp = fs.realpathSync(tmpDir);
+    const realFile = fs.realpathSync(filePath);
+    if (realFile !== realTmp && !realFile.startsWith(realTmp + path.sep)) {
+      throw new Error(t("security.pathEscape", realFile, realTmp));
+    }
+
     return new Uint8Array(fs.readFileSync(filePath)).buffer;
   } finally {
     try {
