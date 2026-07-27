@@ -122,7 +122,7 @@ function hostSevenZip() {
     const p = path.join(OUT, "linux", "x64", "7zz");
     return fs.existsSync(p) ? p : null;
   }
-  // macOS: look for system 7z (brew, etc.)
+  // macOS: look for system 7z (brew, etc.), then staged binary
   if (process.platform === "darwin") {
     for (const p of [
       "/opt/homebrew/bin/7zz",
@@ -144,9 +144,14 @@ function hostSevenZip() {
     } catch {
       /* not on PATH */
     }
+    // Fall back to just-staged darwin binary
+    for (const a of ["arm64", "x64"]) {
+      const p = path.join(OUT, "darwin", a, "7zz");
+      if (fs.existsSync(p)) return p;
+    }
     return null;
   }
-  // Windows: check common install paths + PATH
+  // Windows: check common install paths + PATH, then staged binary
   if (process.platform === "win32") {
     for (const p of [
       path.join(process.env.LOCALAPPDATA || "", "Programs", "7-Zip", "7z.exe"),
@@ -166,6 +171,11 @@ function hostSevenZip() {
       return "7zz.exe";
     } catch {
       /* not on PATH */
+    }
+    // Fall back to just-staged win32 binary
+    for (const a of ["x64", "arm64", "ia32"]) {
+      const p = path.join(OUT, "win32", a, "7z.exe");
+      if (fs.existsSync(p)) return p;
     }
     return null;
   }
@@ -248,8 +258,14 @@ async function processTarget(t) {
 
 async function main() {
   console.log(`Staging 7-Zip ${VER} binaries into ${path.relative(process.cwd(), OUT)}/`);
-  // Linux x64 first: its 7zz is the host tool used to unpack the Windows SFX.
+  // Linux x64 must be processed first — its 7zz is the host tool used to
+  // unpack the Windows SFX installers on Linux build hosts.
+  const linuxX64 = TARGETS.find((t) => t.kind === "txz" && t.dests.some(([p, a]) => p === "linux" && a === "x64"));
+  if (linuxX64) {
+    await processTarget(linuxX64);
+  }
   for (const t of TARGETS) {
+    if (t === linuxX64) continue;
     await processTarget(t);
   }
   // LGPL compliance is mandatory — fail closed if the license text was not staged.
