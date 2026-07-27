@@ -115,10 +115,61 @@ function findFile(root, basename) {
   return null;
 }
 
-/** A staged Linux 7zz usable on the (Linux) build host to unpack Windows SFX. */
+/** Find a 7z/7zz binary usable on the current host to unpack Windows SFX. */
 function hostSevenZip() {
-  const p = path.join(OUT, "linux", "x64", "7zz");
-  return fs.existsSync(p) ? p : null;
+  // Linux: use the just-staged linux-x64 7zz
+  if (process.platform === "linux") {
+    const p = path.join(OUT, "linux", "x64", "7zz");
+    return fs.existsSync(p) ? p : null;
+  }
+  // macOS: look for system 7z (brew, etc.)
+  if (process.platform === "darwin") {
+    for (const p of [
+      "/opt/homebrew/bin/7zz",
+      "/opt/homebrew/bin/7z",
+      "/usr/local/bin/7zz",
+      "/usr/local/bin/7z",
+    ]) {
+      if (fs.existsSync(p)) return p;
+    }
+    try {
+      execFileSync("command", ["-v", "7zz"], { stdio: "pipe" });
+      return "7zz";
+    } catch {
+      /* not on PATH */
+    }
+    try {
+      execFileSync("command", ["-v", "7z"], { stdio: "pipe" });
+      return "7z";
+    } catch {
+      /* not on PATH */
+    }
+    return null;
+  }
+  // Windows: check common install paths + PATH
+  if (process.platform === "win32") {
+    for (const p of [
+      path.join(process.env.LOCALAPPDATA || "", "Programs", "7-Zip", "7z.exe"),
+      "C:\\Program Files\\7-Zip\\7z.exe",
+      "C:\\Program Files (x86)\\7-Zip\\7z.exe",
+    ]) {
+      if (fs.existsSync(p)) return p;
+    }
+    try {
+      execFileSync("where", ["7z.exe"], { stdio: "pipe" });
+      return "7z.exe";
+    } catch {
+      /* not on PATH */
+    }
+    try {
+      execFileSync("where", ["7zz.exe"], { stdio: "pipe" });
+      return "7zz.exe";
+    } catch {
+      /* not on PATH */
+    }
+    return null;
+  }
+  return null;
 }
 
 function extract(kind, archivePath, tmpDir) {
@@ -126,18 +177,14 @@ function extract(kind, archivePath, tmpDir) {
   if (kind === "txz") {
     execFileSync("tar", ["-xJf", archivePath, "-C", tmpDir], { stdio: "inherit" });
   } else {
-    if (process.platform !== "linux" || process.arch !== "x64") {
-      throw new Error(
-        `Windows SFX extraction uses the staged linux-x64 7zz and therefore requires a linux-x64 build host; current host is ${process.platform}-${process.arch}. Run package:cross on ubuntu-latest (x64).`,
-      );
-    }
     const sz = hostSevenZip();
     if (!sz) {
       throw new Error(
-        "Windows extraction needs the Linux x64 7zz staged first — ensure the linux-x64 target runs before any win32 target.",
+        `Cannot extract Windows SFX on ${process.platform}-${process.arch}: no 7z/7zz found. ` +
+          "On Linux/macOS install p7zip; on Windows install 7-Zip from https://www.7-zip.org/.",
       );
     }
-    fs.chmodSync(sz, 0o755);
+    if (process.platform !== "win32") fs.chmodSync(sz, 0o755);
     execFileSync(sz, ["x", "-y", `-o${tmpDir}`, archivePath], { stdio: "inherit" });
   }
 }
