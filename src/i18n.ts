@@ -705,6 +705,13 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw":
       "zstd 不可用。請安裝: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
   },
+  "zstd.nativeUnavailable": {
+    en: "Built-in zstd is unavailable on this platform. Install a system zstd (winget/brew/apt install zstd) to compress .tar.zst here.",
+    "zh-cn":
+      "本平台无内置 zstd。请安装系统 zstd (winget/brew/apt install zstd) 以在此压缩 .tar.zst。",
+    "zh-tw":
+      "本平台無內建 zstd。請安裝系統 zstd (winget/brew/apt install zstd) 以在此壓縮 .tar.zst。",
+  },
 
   // ---- Archive operations ----
   "archive.noInnerTar": {
