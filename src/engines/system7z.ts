@@ -9,7 +9,8 @@
  *
  * Cross-platform notes:
  *   - Windows: code page may be CP936/CP932/CP65001 etc. stderr is decoded
- *     accordingly; `-sccUTF-8` only affects `l` command
+ *     accordingly; system 7z lists without -sccUTF-8 so output matches the
+ *     detected code page and fixArchiveEncoding handles legacy CJK filenames
  *   - Linux/macOS: UTF-8 by default, no special handling needed
  *   - 7z exit codes: 0=ok, 1=warning (non-fatal, e.g. permissions),
  *     2=fatal, 7=bad args, 8=OOM, 255=user interrupt
@@ -751,7 +752,7 @@ function verifyStagingDir(stagingDir: string): void {
  * extraction will surface that error itself.
  */
 async function preflightSystem7z(sz: string, inputPath: string, password: string): Promise<void> {
-  const args: string[] = ["l", "-slt", "-sccUTF-8"];
+  const args: string[] = ["l", "-slt"];
   if (password) {
     validatePassword(password);
     args.splice(1, 0, `-p${password}`);
@@ -860,7 +861,7 @@ export async function listWithSystem7z(
   if (!sz) throw new Error("System 7-Zip not available");
 
   const archiveName = getBaseName(filePath);
-  const args: string[] = ["l", "-slt", "-sccUTF-8"];
+  const args: string[] = ["l", "-slt"];
   if (password) {
     validatePassword(password);
     args.splice(1, 0, `-p${password}`);
