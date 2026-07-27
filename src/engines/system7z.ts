@@ -263,7 +263,10 @@ function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
     logger.warn({ event: "system7z.version.checkFailed", err });
   }
 
-  _cachedVersion = 0;
+  // Do NOT cache the failure: a transient spawn failure (AV lock, momentary
+  // load, timeout) must not permanently downgrade the whole session to WASM.
+  // Leaving _cachedVersion undefined lets the next call re-probe; detection
+  // already validated the binary via versionOk, so this only affects retries.
   return false;
 }
 
@@ -663,6 +666,57 @@ function walkDir(root: string): WalkedEntry[] {
  * refuses symlink-bearing archives BEFORE extraction, because a symlink
  * write-through escapes during extraction, before this check can run.
  */
+/**
+ * Move a single entry, falling back to copy+remove across filesystems.
+ * A plain renameSync throws EXDEV when src and dst are on different devices.
+ */
+function moveEntry(src: string, dst: string): void {
+  try {
+    fs.renameSync(src, dst);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EXDEV") {
+      fs.cpSync(src, dst, { recursive: true, force: true });
+      fs.rmSync(src, { recursive: true, force: true });
+      return;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Move everything from srcDir into destDir, merging directories recursively.
+ * A naive `renameSync` loop over the top-level entries fails with ENOTEMPTY the
+ * moment a top-level directory already exists in destDir (extracting an archive
+ * whose top folder collides with an existing one) and — because it is not
+ * transactional — leaves the already-moved entries behind as partial output.
+ * It also throws EXDEV when destDir is a mount point (parent on another device).
+ * This helper merges dir-into-dir, replaces colliding files/type-mismatches, and
+ * copies across devices. Call only AFTER verifyStagingDir (no symlinks present).
+ */
+function moveMerge(srcDir: string, destDir: string): void {
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const name of fs.readdirSync(srcDir)) {
+    const src = path.join(srcDir, name);
+    const dst = path.join(destDir, name);
+    const srcIsDir = fs.lstatSync(src).isDirectory();
+    let dstStat: fs.Stats | undefined;
+    try {
+      dstStat = fs.lstatSync(dst);
+    } catch {
+      dstStat = undefined;
+    }
+    if (srcIsDir && dstStat?.isDirectory()) {
+      moveMerge(src, dst);
+      continue;
+    }
+    // Collision with a file or a type mismatch (or nothing) — clear dst first so
+    // the move is portable (Windows renameSync will not overwrite an existing
+    // target), then move.
+    if (dstStat) fs.rmSync(dst, { recursive: true, force: true });
+    moveEntry(src, dst);
+  }
+}
+
 function verifyStagingDir(stagingDir: string): void {
   const resolvedStaging = fs.realpathSync(stagingDir);
   const sep = path.sep;
@@ -779,12 +833,7 @@ export async function decompressWithSystem7z(
   try {
     await run7z(sz, args, progress, token);
     verifyStagingDir(stagingDir);
-    fs.mkdirSync(options.outputDir, { recursive: true });
-    for (const name of fs.readdirSync(stagingDir)) {
-      const src = path.join(stagingDir, name);
-      const dst = path.join(options.outputDir, name);
-      fs.renameSync(src, dst);
-    }
+    moveMerge(stagingDir, options.outputDir);
     logger.info({ event: "system7z.decompress.ok", output: options.outputDir });
   } catch (err) {
     logger.error({ event: "system7z.decompress.failed", err }, "System 7z decompression failed");
