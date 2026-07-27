@@ -15,7 +15,7 @@
  */
 
 import { logger } from "../utils/logger";
-import { checkFileSize } from "../utils/security";
+import { checkFileSize, checkTotalSize } from "../utils/security";
 import * as fs from "fs";
 import { CODEC_CHUNK } from "../constants";
 
@@ -135,6 +135,10 @@ export async function brotliDecompressFile(input: string, output: string): Promi
     let pending = Buffer.alloc(0);
     const readBuf = Buffer.alloc(READ_CHUNK);
     let filePos = 0;
+    // Cap total decompressed output — brotli's high ratio makes an unbounded
+    // .tar.br a decompression bomb that fills the disk before 7z/copyDirFromFS
+    // ever run (mirrors the lz4 file path's cumulative guard).
+    let written = 0;
 
     while (true) {
       const n = fs.readSync(rfd, readBuf, 0, READ_CHUNK, filePos);
@@ -151,6 +155,7 @@ export async function brotliDecompressFile(input: string, output: string): Promi
       while (off < data.length) {
         const r = stream.decompress(new Uint8Array(data.subarray(off)), OUT_HINT);
         if (r.buf.length > 0) {
+          written = checkTotalSize(written, r.buf.length);
           fs.writeSync(wfd, Buffer.from(r.buf));
         }
 
@@ -178,6 +183,7 @@ export async function brotliDecompressFile(input: string, output: string): Promi
       // Flush remaining output
       const flushR = stream.decompress(new Uint8Array(0), OUT_HINT);
       if (flushR.buf.length > 0) {
+        written = checkTotalSize(written, flushR.buf.length);
         fs.writeSync(wfd, Buffer.from(flushR.buf));
       }
       stream.free();

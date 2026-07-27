@@ -136,6 +136,11 @@ export async function compressWith7z(
     const archiveName = getBaseName(options.outputPath);
     const archiveFsPath = joinFSPath(OUTPUT_DIR, archiveName);
 
+    // Ensure the output directory exists for BOTH branches. The wrapped-format
+    // path below writes options.outputPath directly, so the guard must precede
+    // it — not only the non-wrapped path further down.
+    fs.mkdirSync(path.dirname(options.outputPath), { recursive: true });
+
     if (isWrappedFormat("." + options.format.label)) {
       const wrapExt = getWrapExtension("." + options.format.label);
       // Derive inner tar name from output: report.tar.gz → report.tar
@@ -238,8 +243,6 @@ export async function compressWith7z(
       options.volumeSize,
     );
     await run7z(js7z, [...args, ...excludeArgs], progress);
-
-    fs.mkdirSync(path.dirname(options.outputPath), { recursive: true });
 
     if (options.volumeSize) {
       writeVolumeFiles(js7z, OUTPUT_DIR, options.outputPath);

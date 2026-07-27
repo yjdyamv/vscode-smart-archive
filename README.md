@@ -2,14 +2,14 @@
 
 [![Build](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml)
 
-VSCode extension for creating, extracting, and browsing archives — powered by **7-Zip WebAssembly** and native **zstd/lz4/brotli codecs**. No native binaries required, yet faster than desktop tools when a system 7-Zip is available.
+VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4/brotli codecs**. Works out of the box with no local 7-Zip install, at near-desktop speed.
 
 ## Features
 
 - **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst, tar.lz4, tar.br
 - **Decompress** from 40+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
-- **System 7-Zip detection** — auto-detects local 7-Zip (Windows/macOS/Linux) and zstd for significantly faster operations; falls back to WASM when unavailable
+- **Native 7-Zip engine** — a full 7-Zip binary is bundled for all platforms (no install needed); a newer system 7-Zip is used automatically if present; the WASM engine is the final fallback. Choose explicitly via `smart-archive.useSystem7z` (`auto`/`always`/`bundled`/`never`)
 - **Archive browser** — opens as the default editor for archives: virtual-scrolled tree, search with regex or fuzzy match, sort by name/size, multi-select for partial extract, add/delete/rename files right inside the view
 - **Keyboard navigation** — Arrow keys, PageUp/PageDown (scroll viewport), Home/End, Space to toggle selection, Enter to extract, Delete to remove, Ctrl+A to select all
 - **File preview** — double-click any file to open it in VS Code
@@ -81,10 +81,9 @@ All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, A
 |---------|---------|-------------|
 | `smart-archive.defaultFormat` | `7z` | Default archive format |
 | `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
-| `smart-archive.defaultOutputDir` | `source` | Output location: `source` or `prompt` |
 | `smart-archive.maxFileSize` | `"1g"` | Max single decompressed file size (k/m/g units) |
 | `smart-archive.maxTotalSize` | `"10g"` | Max total decompressed size |
-| `smart-archive.useSystem7z` | `"auto"` | System 7-Zip: `auto`, `always`, `never` |
+| `smart-archive.useSystem7z` | `"auto"` | 7-Zip engine: `auto` (system→bundled native→WASM), `always` (system only), `bundled` (bundled native only), `never` (WASM only) |
 | `smart-archive.useSystemZstd` | `"auto"` | System zstd: `auto`, `always`, `never` |
 | `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
 | `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Patterns excluded when compressing |
@@ -131,8 +130,9 @@ npm run release          # build + check + package
 
 ## Security
 
-- **Untrusted archives** — when a system 7-Zip binary is used, extraction refuses archives that contain symbolic-link entries and enforces the configured size limits *before* writing, guarding against path-traversal writes and decompression bombs. The archive browser renders attacker-controlled entry names under a strict Content-Security-Policy.
-- **Passwords on shared machines** — a system 7-Zip binary receives the archive password on its command line (`-p…`), which is visible to other local users in the process list for the duration of the operation. This is an inherent limitation of the 7-Zip CLI. On a multi-user host, set `smart-archive.useSystem7z` to `never` to use the bundled WebAssembly engine, which never spawns an external process and so never exposes the password in the process table.
+- **Untrusted archives** — whenever a native 7-Zip is used (the bundled binary by default, or a system install), extraction refuses archives containing symbolic-link entries and enforces the configured size limits *before* writing, guarding against path-traversal writes and decompression bombs. The archive browser renders attacker-controlled entry names under a strict Content-Security-Policy.
+- **Native vs sandboxed parsing** — by default (`auto`) archives are parsed by a native 7-Zip process, which is fast but runs C/C++ format handlers on untrusted input. To parse untrusted archives inside the WebAssembly sandbox instead, set `smart-archive.useSystem7z` to `never`.
+- **Passwords on shared machines** — a native 7-Zip receives the archive password on its command line (`-p…`), visible to other local users in the process list for the operation's duration — an inherent limitation of the 7-Zip CLI. Since a native 7-Zip is now bundled and used by default, this applies to all users unless you set `smart-archive.useSystem7z` to `never` (the WASM engine spawns no external process and never exposes the password).
 
 ## License
 

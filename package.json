@@ -1,7 +1,7 @@
 {
   "name": "smart-archive",
   "displayName": "Smart Archive",
-  "description": "Compress and decompress files using JS7z + zstd-wasm. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
+  "description": "Compress and decompress files with a bundled native 7-Zip (WASM fallback) + zstd. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
   "version": "1.21.0",
   "publisher": "yjdyamv",
   "private": true,
@@ -319,19 +319,6 @@
           ],
           "description": "%config.defaultCompressionLevel.description%"
         },
-        "smart-archive.defaultOutputDir": {
-          "type": "string",
-          "default": "source",
-          "enum": [
-            "source",
-            "prompt"
-          ],
-          "enumDescriptions": [
-            "%config.defaultOutputDir.source%",
-            "%config.defaultOutputDir.prompt%"
-          ],
-          "description": "%config.defaultOutputDir.description%"
-        },
         "smart-archive.maxFileSize": {
           "type": [
             "integer",
@@ -463,11 +450,13 @@
           "enum": [
             "auto",
             "always",
+            "bundled",
             "never"
           ],
           "enumDescriptions": [
             "%config.useSystem7z.auto%",
             "%config.useSystem7z.always%",
+            "%config.useSystem7z.bundled%",
             "%config.useSystem7z.never%"
           ],
           "description": "%config.useSystem7z.description%"
@@ -511,11 +500,12 @@
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
     "release": "npm run build && npm run check && npm run package",
+    "stage:natives": "node scripts/install-lz4-platforms.js && node scripts/install-zstd-platforms.js && node scripts/install-7z-platforms.js",
     "package": "vsce package",
-    "package:cross": "npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts && node scripts/install-lz4-platforms.js && node scripts/install-zstd-platforms.js && npm run build && vsce package",
-    "package:ovsx": "npm run build && npx ovsx package",
-    "publish:ovsx": "npm run build && npx ovsx publish",
-    "vscode:prepublish": "npm run build",
+    "package:cross": "npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts && vsce package",
+    "package:ovsx": "npm run stage:natives && npm run build && npx ovsx package",
+    "publish:ovsx": "npm run stage:natives && npm run build && npx ovsx publish",
+    "vscode:prepublish": "npm run stage:natives && npm run build",
     "publish": "npm run build && npx vsce publish"
   },
   "overrides": {
