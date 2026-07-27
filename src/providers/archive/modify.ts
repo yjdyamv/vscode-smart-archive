@@ -424,12 +424,19 @@ async function extractOneWithSystem7z(
     // would otherwise be read here and exposed via preview/copy. Refuse anything
     // whose real path escapes the temp extraction dir.
     const realTmp = fs.realpathSync(tmpDir);
-    const realFile = fs.realpathSync(filePath);
-    if (realFile !== realTmp && !realFile.startsWith(realTmp + path.sep)) {
-      throw new Error(t("security.pathEscape", realFile, realTmp));
+    const realBefore = fs.realpathSync(filePath);
+    if (realBefore !== realTmp && !realBefore.startsWith(realTmp + path.sep)) {
+      throw new Error(t("security.pathEscape", realBefore, realTmp));
     }
 
-    return new Uint8Array(fs.readFileSync(filePath)).buffer;
+    const buf = fs.readFileSync(filePath);
+    // Re-verify realpath after read to catch TOCTOU symlink swap.
+    const realAfter = fs.realpathSync(filePath);
+    if (realAfter !== realBefore) {
+      throw new Error(t("security.pathEscape", realAfter, realTmp));
+    }
+
+    return new Uint8Array(buf).buffer;
   } finally {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });

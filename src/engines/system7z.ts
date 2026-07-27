@@ -31,7 +31,7 @@ import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
-import { BINARY_DETECT_TIMEOUT, SPAWN_CAPTURE_TIMEOUT } from "../constants";
+import { BINARY_DETECT_TIMEOUT, RUN7Z_TIMEOUT, SPAWN_CAPTURE_TIMEOUT } from "../constants";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
@@ -770,9 +770,8 @@ async function preflightSystem7z(sz: string, inputPath: string, password: string
     return;
   }
 
-  // H1: 7-Zip -slt marks a symlink with a "Symbolic Link = <target>" property
-  // and/or a Unix mode beginning with 'l' in the Attributes field.
-  if (/^Symbolic Link = \S/m.test(stdout) || /^Attributes = .*\bl[rwxsStT-]{9}\b/m.test(stdout)) {
+  // H1: 7-Zip -slt marks a symlink with a "Symbolic Link = <target>" property.
+  if (/^Symbolic Link = \S/m.test(stdout)) {
     throw new Error(t("security.symlinkEntry"));
   }
 
@@ -1059,6 +1058,7 @@ function run7z(
     const combinedChunks: Buffer[] = [];
     let lastPct = -1;
     const startTime = Date.now();
+    let settled = false;
 
     logger.debug({ event: "system7z.run.start", binary, argsPreview: maskArgs(args) });
 
@@ -1070,6 +1070,21 @@ function run7z(
 
     const MAX_RUN_BYTES = 500 * 1024 * 1024;
     let runBytes = 0;
+
+    const timeoutTimer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill("SIGTERM");
+        if (process.platform === "win32" && proc.pid) {
+          try {
+            spawn("taskkill", ["/PID", String(proc.pid), "/F"], { windowsHide: true });
+          } catch {
+            // best effort
+          }
+        }
+        reject(new Error(`7z timed out after ${RUN7Z_TIMEOUT}ms`));
+      }
+    }, RUN7Z_TIMEOUT);
 
     const cancelSub = token?.onCancellationRequested(() => {
       logger.info({ event: "system7z.run.cancelled", elapsedMs: Date.now() - startTime });
@@ -1089,6 +1104,8 @@ function run7z(
       runBytes += d.length;
       if (runBytes > MAX_RUN_BYTES) {
         proc.kill();
+        settled = true;
+        clearTimeout(timeoutTimer);
         cancelSub?.dispose();
         reject(new Error("7z output exceeded 500 MB limit"));
         return;
@@ -1101,6 +1118,8 @@ function run7z(
       runBytes += d.length;
       if (runBytes > MAX_RUN_BYTES) {
         proc.kill();
+        settled = true;
+        clearTimeout(timeoutTimer);
         cancelSub?.dispose();
         reject(new Error("7z output exceeded 500 MB limit"));
         return;
@@ -1118,6 +1137,9 @@ function run7z(
     });
 
     proc.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
       cancelSub?.dispose();
       const elapsed = Date.now() - startTime;
       logger.error(
@@ -1135,6 +1157,9 @@ function run7z(
     });
 
     proc.on("close", (code, signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
       cancelSub?.dispose();
       const elapsed = Date.now() - startTime;
       const combinedOutput = decodeBuffer(Buffer.concat(combinedChunks));

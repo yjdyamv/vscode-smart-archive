@@ -523,3 +523,5 @@ export const MAX_COLLISION_RETRIES = 999;
 export const BINARY_DETECT_TIMEOUT = 5000;
 /** default spawnCapture timeout (ms) */
 export const SPAWN_CAPTURE_TIMEOUT = 30_000;
+/** default run7z timeout (ms) — compression / extraction */
+export const RUN7Z_TIMEOUT = 600_000;

@@ -171,11 +171,20 @@ export async function brotliDecompressFile(input: string, output: string): Promi
           break;
         }
 
-        // Data remains but stream won't consume it → frame boundary
+        // Data remains but stream won't consume it → frame boundary.
+        // Create a new stream but guard against corrupt data that stalls.
         stream.free();
         stream = new brotli.DecompressStream();
-        // Continue loop with remaining data (don't advance off)
-        // The next iteration will try to consume from `off`
+        const r2 = stream.decompress(new Uint8Array(data.subarray(off)), OUT_HINT);
+        if (r2.buf.length > 0) {
+          written = checkTotalSize(written, r2.buf.length);
+          fs.writeSync(wfd, Buffer.from(r2.buf));
+        }
+        if (r2.input_offset === 0) {
+          throw new Error("Corrupt brotli data: stream stalled at offset " + off);
+        }
+        off += r2.input_offset;
+        // off advanced past stuckOff — continue loop
       }
     }
 
