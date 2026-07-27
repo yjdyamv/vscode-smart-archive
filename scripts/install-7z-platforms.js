@@ -260,7 +260,9 @@ async function main() {
   console.log(`Staging 7-Zip ${VER} binaries into ${path.relative(process.cwd(), OUT)}/`);
   // Linux x64 must be processed first — its 7zz is the host tool used to
   // unpack the Windows SFX installers on Linux build hosts.
-  const linuxX64 = TARGETS.find((t) => t.kind === "txz" && t.dests.some(([p, a]) => p === "linux" && a === "x64"));
+  const linuxX64 = TARGETS.find(
+    (t) => t.kind === "txz" && t.dests.some(([p, a]) => p === "linux" && a === "x64"),
+  );
   if (linuxX64) {
     await processTarget(linuxX64);
   }
