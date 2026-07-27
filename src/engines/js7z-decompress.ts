@@ -52,22 +52,17 @@ async function decompressCodecWrapper(
     const js7z = await JS7z();
     try {
       const tarFsPath = streamToVFS(js7z, tmpTar);
-      const usesMount = tarFsPath.startsWith("/mnt_");
-      let outPath: string;
-      if (usesMount) {
-        outPath = "/out_mnt";
-        js7z.FS.mkdir(outPath);
-        js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outPath);
-      } else {
-        js7z.FS.mkdir(OUTPUT_DIR);
-        outPath = OUTPUT_DIR;
-      }
+      // Always extract into in-memory OUTPUT_DIR and copy out via
+      // copyDirFromFS, which enforces the Zip-Slip / symlink / size-cap
+      // guards. (A former NODEFS-mount fast-path keyed off a "/mnt_" VFS
+      // prefix that is only ever derived from the archive's own filename,
+      // so a "mnt_"-named archive could route extraction straight to disk
+      // and bypass every guard — removed.)
+      js7z.FS.mkdir(OUTPUT_DIR);
       prog.report({ message: t("decompress.inProgress") });
-      await run7z(js7z, ["x", tarFsPath, `-o${outPath}`], progress);
+      await run7z(js7z, ["x", tarFsPath, `-o${OUTPUT_DIR}`], progress);
       if (token?.isCancellationRequested) throw new vscode.CancellationError();
-      if (!usesMount) {
-        copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
-      }
+      copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
     } finally {
       disposeJS7z(js7z);
     }
@@ -106,6 +101,11 @@ export async function decompressWith7z(
     return;
   }
 
+  // All WASM paths below copy extracted entries into outputDir via
+  // copyDirFromFS, which requires the directory to exist. The system-7z engine
+  // creates it itself; here we must ensure it exists.
+  fs.mkdirSync(options.outputDir, { recursive: true });
+
   const ext = getFullExt(options.inputPath);
 
   // ── Codec-based wrapped formats (brotli, lz4, zstd) ──
@@ -141,20 +141,14 @@ export async function decompressWith7z(
   try {
     checkArchiveInputSize(options.inputPath);
     const archiveFsPath = streamToVFS(js7z, options.inputPath);
-    const usesMount = archiveFsPath.startsWith("/mnt_");
 
-    let outPath: string;
-    if (usesMount) {
-      const outMnt = "/out_mnt";
-      js7z.FS.mkdir(outMnt);
-      js7z.FS.mount(js7z.NODEFS, { root: options.outputDir }, outMnt);
-      outPath = outMnt;
-    } else {
-      js7z.FS.mkdir(OUTPUT_DIR);
-      outPath = OUTPUT_DIR;
-    }
+    // Extract into in-memory OUTPUT_DIR, then copy out via copyDirFromFS so the
+    // Zip-Slip / symlink / size-cap guards always run. (Removed a NODEFS-mount
+    // fast-path whose "/mnt_" trigger was derived from the archive filename and
+    // let a "mnt_"-named archive write straight to disk, bypassing the guards.)
+    js7z.FS.mkdir(OUTPUT_DIR);
 
-    const extractArgs: string[] = ["x", archiveFsPath, `-o${outPath}`];
+    const extractArgs: string[] = ["x", archiveFsPath, `-o${OUTPUT_DIR}`];
     if (options.password) {
       validatePassword(options.password);
       extractArgs.splice(1, 0, `-p${options.password}`);
@@ -164,30 +158,13 @@ export async function decompressWith7z(
 
     await run7z(js7z, extractArgs, progress);
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    if (!usesMount) {
-      copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
-    }
+    copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
 
     await unwrapInnerTar(options.outputDir, progress);
     logger.info({ event: "decompress.complete", outputDir: options.outputDir });
   } finally {
     disposeJS7z(js7z);
   }
-}
-
-/** Recursively sum file sizes in a directory. */
-function dirSize(dirPath: string): number {
-  let total = 0;
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      total += dirSize(full);
-    } else if (entry.isFile()) {
-      total += fs.statSync(full).size;
-    }
-  }
-  return total;
 }
 
 async function unwrapInnerTar(
@@ -256,42 +233,15 @@ async function unwrapInnerTar(
 
       try {
         const innerFsPath = streamToVFS(js7z, tarPath);
-        const usesMount = innerFsPath.startsWith("/mnt_");
-        // Snapshot existing entries before NODEFS extraction so we can
-        // measure newly extracted bytes for totalSize tracking.
-        const beforeEntries = usesMount
-          ? new Set(fs.readdirSync(outputDir).filter((e) => e !== "." && e !== ".."))
-          : null;
-        let outPath: string;
-        if (usesMount) {
-          outPath = "/out_mnt_tar";
-          js7z.FS.mkdir(outPath);
-          js7z.FS.mount(js7z.NODEFS, { root: outputDir }, outPath);
-        } else {
-          outPath = "/_inner_out";
-          js7z.FS.mkdir(outPath);
-        }
+        // Extract into in-memory /_inner_out and copy out via copyDirFromFS so
+        // the Zip-Slip / symlink / size-cap guards always run. (Removed a
+        // NODEFS-mount fast-path whose "/mnt_" trigger came from the tar entry
+        // name, letting an inner tar named "mnt_*" bypass the guards.)
+        const outPath = "/_inner_out";
+        js7z.FS.mkdir(outPath);
 
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
-        if (usesMount && beforeEntries) {
-          // Sum sizes of newly extracted entries to enforce maxTotalSize.
-          const afterEntries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
-          let extractedBytes = 0;
-          for (const name of afterEntries) {
-            if (beforeEntries.has(name) || name === tarFile) continue;
-            try {
-              extractedBytes += dirSize(path.join(outputDir, name));
-            } catch {
-              // best-effort — individual file validation guards against
-              // oversized files; this is a cumulative check.
-            }
-          }
-          if (extractedBytes > 0) {
-            totalSize = checkTotalSize(totalSize, extractedBytes);
-          }
-        } else if (!usesMount) {
-          totalSize = checkTotalSize(totalSize, copyDirFromFS(js7z, "/_inner_out", outputDir));
-        }
+        totalSize = checkTotalSize(totalSize, copyDirFromFS(js7z, outPath, outputDir));
 
         try {
           fs.unlinkSync(tarPath);

@@ -11,6 +11,12 @@ Smart Archive uses the following third-party libraries, each under its own licen
 | js7z-tools | LGPL-2.1+ (7-Zip) | https://github.com/yjdyamv/js7z-tools |
 | lz4-napi | MIT | https://github.com/yjdyamv/lz4-napi |
 | zstd-napi | Apache-2.0 | https://github.com/yjdyamv/zstd-napi |
+| 7-Zip (7zz / 7z.exe + 7z.dll, bundled under 7z-bin/) | LGPL-2.1+ with unRAR restriction | https://github.com/ip7z/7zip |
+
+The bundled 7-Zip console binaries are unmodified official builds, invoked as a
+separate process. The RAR extraction code is subject to the unRAR license (it may
+not be used to develop a RAR-compatible archiver); the extension only invokes 7-Zip
+for extraction. See the 7-Zip License.txt shipped alongside the binaries.
 
 ## Bundled Dependencies (inlined into extension.js)
 

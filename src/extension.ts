@@ -19,6 +19,8 @@ import {
   dispose as disposeExpandedState,
 } from "./providers/webview/expandedState";
 import { initTempCleanup } from "./providers/tempFiles";
+import { resetDetectionCache } from "./engines/system7z";
+import { resetZstdDetectionCache } from "./engines/zstd-codec";
 
 /**
  * Called when the extension is activated.
@@ -35,6 +37,16 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register custom editor as default viewer for archive files (.7z, .zip, …)
   registerArchiveEditor(context);
   logger.info({ event: "extension.archiveProvider.registered" });
+
+  // Invalidate cached engine detection when the relevant setting changes, so
+  // switching useSystem7z (e.g. to "bundled") or useSystemZstd applies without
+  // a window reload.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("smart-archive.useSystem7z")) resetDetectionCache();
+      if (e.affectsConfiguration("smart-archive.useSystemZstd")) resetZstdDetectionCache();
+    }),
+  );
 
   // Register compress command
   const compressDisposable = vscode.commands.registerCommand(

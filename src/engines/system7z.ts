@@ -49,6 +49,23 @@ let _cachedPath: string | null | undefined;
 export function detectSystem7z(): string | null {
   if (_cachedPath !== undefined) return _cachedPath;
 
+  const setting = vscode.workspace
+    .getConfiguration("smart-archive")
+    .get<string>("useSystem7z", "auto");
+
+  // "bundled": skip system detection entirely and force the VSIX-bundled 7zz
+  // (→ null / WASM when it is missing or cannot run on this platform).
+  if (setting === "bundled") {
+    _cachedPath = bundled7zPath();
+    logger.info({
+      event: _cachedPath ? "system7z.detected" : "system7z.notFound",
+      path: _cachedPath ?? undefined,
+      method: "bundled-forced",
+      platform: process.platform,
+    });
+    return _cachedPath;
+  }
+
   const candidates: string[] = [];
 
   if (process.platform === "win32") {
@@ -89,9 +106,86 @@ export function detectSystem7z(): string | null {
     }
   }
 
+  // Fall back to the 7-Zip binary bundled in the VSIX (guarantees availability
+  // even when nothing is installed). A user-installed 7z is preferred above.
+  const bundled = bundled7zPath();
+  if (bundled) {
+    _cachedPath = bundled;
+    logger.info({ event: "system7z.detected", path: bundled, method: "bundled" });
+    return _cachedPath;
+  }
+
   _cachedPath = null;
   logger.info({ event: "system7z.notFound", platform: process.platform });
   return null;
+}
+
+/**
+ * Resolve the full-format 7-Zip console binary bundled under 7z-bin/ for the
+ * current platform/arch (staged by scripts/install-7z-platforms.js). On Unix
+ * the file may lose its execute bit when the VSIX is unpacked, so restore it.
+ * Returns null when no binary is bundled for this platform (→ WASM fallback).
+ */
+function bundled7zPath(): string | null {
+  const bin = process.platform === "win32" ? "7z.exe" : "7zz";
+  const p = path.join(__dirname, "..", "7z-bin", process.platform, process.arch, bin);
+  if (!fs.existsSync(p)) return null;
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(p, 0o755);
+    } catch (err) {
+      logger.warn({ event: "system7z.bundled.chmodFailed", err });
+    }
+  }
+  if (process.platform === "darwin") prepareMacBundledBinary(p);
+  // Confirm it can actually execute here before handing it out. A read-only or
+  // `noexec` extensions dir, an ownership/permission issue (system-wide or
+  // root-installed VS Code, Nix store), SELinux/AppArmor, or a wrong arch/libc
+  // build all make the binary unrunnable — in which case return null so
+  // detection falls back to WASM instead of "detecting" a binary that would
+  // only fail at spawn time. (mac prep above must run first, or this test spawn
+  // could itself be Gatekeeper-blocked.)
+  if (!testBinary(p) || !versionOk(p)) {
+    logger.warn({ event: "system7z.bundled.notRunnable", path: p });
+    return null;
+  }
+  return p;
+}
+
+let _macPrepared = false;
+
+/**
+ * Make the bundled macOS 7zz runnable without a Gatekeeper prompt — silent and
+ * entirely user-level (the file lives in the user-owned extension dir, so no
+ * admin/sudo is ever needed). Runs once per session, best-effort (never throws):
+ *   1. Strip the com.apple.quarantine attribute so Gatekeeper won't block the
+ *      spawned binary.
+ *   2. Only if the binary has NO valid signature (unsigned/invalid), apply a
+ *      free ad-hoc signature — an unsigned arm64 binary is SIGKILLed on Apple
+ *      Silicon. The official 7zz is already Developer-ID signed, so this is
+ *      normally a no-op; we never overwrite a valid signature.
+ */
+function prepareMacBundledBinary(p: string): void {
+  if (_macPrepared) return;
+  _macPrepared = true;
+  try {
+    // -d on a missing attr just errors out harmlessly; ignore the result.
+    spawnSync("xattr", ["-d", "com.apple.quarantine", p], { stdio: "ignore", timeout: 5000 });
+  } catch (err) {
+    logger.debug({ event: "system7z.bundled.xattrFailed", err });
+  }
+  try {
+    const verify = spawnSync("codesign", ["--verify", "--no-strict", p], {
+      stdio: "ignore",
+      timeout: 8000,
+    });
+    if (verify.status !== 0) {
+      logger.info({ event: "system7z.bundled.adhocSign", path: p });
+      spawnSync("codesign", ["--sign", "-", "--force", p], { stdio: "ignore", timeout: 15000 });
+    }
+  } catch (err) {
+    logger.debug({ event: "system7z.bundled.codesignFailed", err });
+  }
 }
 
 export function hasSystem7z(): boolean {
@@ -128,6 +222,17 @@ const MIN_VERSION_ZSTD = 24;
 
 let _cachedVersion: number | undefined;
 
+/**
+ * Reset the cached engine detection so a changed `smart-archive.useSystem7z`
+ * setting takes effect without a window reload. Wired to onDidChangeConfiguration
+ * in extension.ts.
+ */
+export function resetDetectionCache(): void {
+  _cachedPath = undefined;
+  _cachedVersion = undefined;
+  _macPrepared = false;
+}
+
 function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
   if (_cachedVersion !== undefined) return _cachedVersion >= minVersion;
 
@@ -158,7 +263,10 @@ function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
     logger.warn({ event: "system7z.version.checkFailed", err });
   }
 
-  _cachedVersion = 0;
+  // Do NOT cache the failure: a transient spawn failure (AV lock, momentary
+  // load, timeout) must not permanently downgrade the whole session to WASM.
+  // Leaving _cachedVersion undefined lets the next call re-probe; detection
+  // already validated the binary via versionOk, so this only affects retries.
   return false;
 }
 
@@ -558,6 +666,57 @@ function walkDir(root: string): WalkedEntry[] {
  * refuses symlink-bearing archives BEFORE extraction, because a symlink
  * write-through escapes during extraction, before this check can run.
  */
+/**
+ * Move a single entry, falling back to copy+remove across filesystems.
+ * A plain renameSync throws EXDEV when src and dst are on different devices.
+ */
+function moveEntry(src: string, dst: string): void {
+  try {
+    fs.renameSync(src, dst);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EXDEV") {
+      fs.cpSync(src, dst, { recursive: true, force: true });
+      fs.rmSync(src, { recursive: true, force: true });
+      return;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Move everything from srcDir into destDir, merging directories recursively.
+ * A naive `renameSync` loop over the top-level entries fails with ENOTEMPTY the
+ * moment a top-level directory already exists in destDir (extracting an archive
+ * whose top folder collides with an existing one) and — because it is not
+ * transactional — leaves the already-moved entries behind as partial output.
+ * It also throws EXDEV when destDir is a mount point (parent on another device).
+ * This helper merges dir-into-dir, replaces colliding files/type-mismatches, and
+ * copies across devices. Call only AFTER verifyStagingDir (no symlinks present).
+ */
+function moveMerge(srcDir: string, destDir: string): void {
+  fs.mkdirSync(destDir, { recursive: true });
+  for (const name of fs.readdirSync(srcDir)) {
+    const src = path.join(srcDir, name);
+    const dst = path.join(destDir, name);
+    const srcIsDir = fs.lstatSync(src).isDirectory();
+    let dstStat: fs.Stats | undefined;
+    try {
+      dstStat = fs.lstatSync(dst);
+    } catch {
+      dstStat = undefined;
+    }
+    if (srcIsDir && dstStat?.isDirectory()) {
+      moveMerge(src, dst);
+      continue;
+    }
+    // Collision with a file or a type mismatch (or nothing) — clear dst first so
+    // the move is portable (Windows renameSync will not overwrite an existing
+    // target), then move.
+    if (dstStat) fs.rmSync(dst, { recursive: true, force: true });
+    moveEntry(src, dst);
+  }
+}
+
 function verifyStagingDir(stagingDir: string): void {
   const resolvedStaging = fs.realpathSync(stagingDir);
   const sep = path.sep;
@@ -643,8 +802,12 @@ export async function decompressWithSystem7z(
   checkArchiveInputSize(options.inputPath);
   await preflightSystem7z(sz, options.inputPath, options.password ?? "");
 
-  const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7z_"));
-  fs.mkdirSync(stagingDir, { recursive: true });
+  // Stage on the SAME filesystem as the output dir so the post-extraction move
+  // is an atomic same-device rename. Using os.tmpdir() breaks whenever /tmp is a
+  // separate mount/tmpfs (common on Linux): renameSync then fails with EXDEV.
+  const stagingParent = path.dirname(path.resolve(options.outputDir));
+  fs.mkdirSync(stagingParent, { recursive: true });
+  const stagingDir = fs.mkdtempSync(path.join(stagingParent, ".sa7z_"));
 
   const args: string[] = ["x", `-o${stagingDir}`, "-mmt=on"];
 
@@ -670,12 +833,7 @@ export async function decompressWithSystem7z(
   try {
     await run7z(sz, args, progress, token);
     verifyStagingDir(stagingDir);
-    fs.mkdirSync(options.outputDir, { recursive: true });
-    for (const name of fs.readdirSync(stagingDir)) {
-      const src = path.join(stagingDir, name);
-      const dst = path.join(options.outputDir, name);
-      fs.renameSync(src, dst);
-    }
+    moveMerge(stagingDir, options.outputDir);
     logger.info({ event: "system7z.decompress.ok", output: options.outputDir });
   } catch (err) {
     logger.error({ event: "system7z.decompress.failed", err }, "System 7z decompression failed");

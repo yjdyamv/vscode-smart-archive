@@ -19,10 +19,30 @@ import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import { CODEC_CHUNK } from "../constants";
 
-const { compress: zstdCompressRaw, decompress: zstdDecompressRaw } = require("zstd-napi") as {
+type ZstdNative = {
   compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
   decompress: (data: Buffer) => Buffer;
 };
+
+// Load the native binding lazily-tolerant: some platforms have no zstd-napi
+// prebuild (Windows arm64 — upstream ships none — or Alpine/musl). A missing
+// binding must NOT abort extension activation (this require runs at module
+// load, reached from activate()); zstd operations degrade to system tools and
+// surface a clear error only when actually invoked without a binding.
+let zstdNative: ZstdNative | undefined;
+try {
+  zstdNative = require("zstd-napi") as ZstdNative;
+} catch (err) {
+  logger.warn(
+    { event: "zstd.napi.unavailable", err },
+    "zstd-napi native binding unavailable; zstd runs via system zstd only",
+  );
+}
+
+function requireZstdNative(): ZstdNative {
+  if (!zstdNative) throw new Error(t("zstd.nativeUnavailable"));
+  return zstdNative;
+}
 
 /**
  * Map VSCode 0-9 compression level to zstd's 0-22 range.
@@ -37,17 +57,27 @@ function mapZstdLevel(uiLevel: number): number {
 }
 
 export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Array> {
-  return zstdCompressRaw(Buffer.from(data), { compressionLevel: mapZstdLevel(level) });
+  return requireZstdNative().compress(Buffer.from(data), { compressionLevel: mapZstdLevel(level) });
 }
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
   checkFileSize(data.byteLength);
-  const result = zstdDecompressRaw(Buffer.from(data));
+  const result = requireZstdNative().decompress(Buffer.from(data));
   checkFileSize(result.byteLength);
   return result;
 }
 
 let sysZstdPath: string | null | false = null;
+
+/**
+ * Clear the cached system-zstd detection result so a change to
+ * `smart-archive.useSystemZstd` takes effect without a window reload.
+ * Without this, the first resolveSystemZstd() latches sysZstdPath (including
+ * the `false` sentinel written on the "never" branch) for the whole session.
+ */
+export function resetZstdDetectionCache(): void {
+  sysZstdPath = null;
+}
 
 function resolveSystemZstd(): string | null {
   const config = vscode.workspace.getConfiguration("smart-archive");
@@ -147,13 +177,14 @@ function nativeCompressFile(input: string, output: string, level: number): Promi
     const rfd = fs.openSync(input, "r");
     const out = fs.openSync(output, "w");
     try {
+      const native = requireZstdNative();
       const buf = Buffer.alloc(CHUNK);
       let pos = 0;
       const zlevel = mapZstdLevel(level);
       while (true) {
         const n = fs.readSync(rfd, buf, 0, buf.length, pos);
         if (n === 0) break;
-        const frame = zstdCompressRaw(Buffer.from(buf.slice(0, n)), { compressionLevel: zlevel });
+        const frame = native.compress(Buffer.from(buf.slice(0, n)), { compressionLevel: zlevel });
         fs.writeSync(out, frame);
         pos += n;
       }
