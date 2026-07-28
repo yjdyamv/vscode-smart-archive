@@ -11,31 +11,38 @@ function getZstdMeta() {
 }
 
 const { version: VERSION } = getZstdMeta();
+
 const SOURCE = (p) =>
-  `https://github.com/drakedevel/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`;
+  `https://github.com/yjdyamv/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`;
 // SHA-256 of each platform's binding.node, verified on download (fail-closed).
 // This map MUST be populated before release: with requireHash the build refuses
 // any binary lacking a pinned hash. To (re)generate after a zstd-napi bump, run
 // once and paste the printed values keyed by "<platform>-<arch>":
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-zstd-platforms.js
 const EXPECTED_HASHES = {
-  "linux-x64": "26acf4b6b8c0cf0f3bc5752d24b15b0c82568609f9d977daa973a47a859203b8",
-  "linux-arm64": "44151cdbe0584ed38ff7735a80c42242842bd16cc254247c3ac862e54d58bf27",
-  "linux-arm": "d414bd8ff48b88a8a1d09b829f849c0de05a6840df543a0b3a06a4c23cfea85a",
-  "darwin-x64": "e8abcb6d98cf38fef7052053b6f2bb526a76be71cdd292ce2b5e88401086b9ba",
-  "darwin-arm64": "13ca3d1c9017040af51b75b0c9272cc2c211afeb36a9f6299016603469afbda6",
-  "win32-x64": "b2d170f79eb368e2eff89626d27a2872217d17de889cf4baae1299a470003cbe",
-  "win32-ia32": "03258d0e2350d2be5c546852b8532a8f298335475081e0371349b49906847f8f",
+  "linux-x64": "e2703d8efd59cda7187375bf159edc7fcf19fb4a663d7b2de1985dd669ce6134",
+  "linux-arm64": "c673f49c7547c566e1a5943980e0c264662d9b96c155472970dd7c6c78eac7dc",
+  "linux-arm": "7b0cac4685d10536bdc589d0198a6d40e55aa8b61a2f52d83e42b32a7182c02b",
+  "linux-x64-musl": "f42913e92cebd09f1f76aae4d065295baf2f1b3c675c268e3b8460939dbad1cd",
+  "linux-arm64-musl": "140d3a59238986f5836192fe4b33dce2fbdfee04f66a3fd6b47664b3933c8cf5",
+  "darwin-x64": "19209f1713dc57a00fc721a23207f126cb99777a75c10dfee1476817f7812b02",
+  "darwin-arm64": "a96c8a42a5f2f400662961961dbb7369a9149ee61fd0960baf07be5a92c66133",
+  "win32-x64": "60861434f92f2255222829c721232dbbb64b7e34c0f19cef88047904b02b8d34",
+  "win32-ia32": "0b10cf3a6dd81e9b50f94347580da0abf2f432a374b61824d2dce4942f30a815",
+  "win32-arm64": "170170104e1b5a292a0863af1f348f6f8fd75bb6ea7647087abfb23ddfa712fa",
 };
 
 const PLATFORMS = [
   ["linux", "x64"],
   ["linux", "arm64"],
   ["linux", "arm"],
+  ["linux", "x64-musl"],
+  ["linux", "arm64-musl"],
   ["darwin", "x64"],
   ["darwin", "arm64"],
   ["win32", "x64"],
   ["win32", "ia32"],
+  ["win32", "arm64"],
 ];
 
 const destDir = path.join(__dirname, "..", "node_modules", "zstd-napi", "build", "Release");
@@ -130,52 +137,10 @@ async function main() {
     }
   }
 
-  const nodeFiles = [];
-  for (const [platform, arch] of PLATFORMS) {
-    const f = path.join(destDir, `${platform}-${arch}`, "binding.node");
-    if (fs.existsSync(f)) nodeFiles.push(f);
-  }
-
-  console.log(
-    `\n=== ${nodeFiles.length} platform binaries | ${installed} downloaded, ${cached} cached, ${skipped} skipped, ${failed} failed ===`,
-  );
-  for (const f of nodeFiles) {
-    const size = fs.statSync(f).size;
-    const platformDir = path.basename(path.dirname(f));
-    console.log(`  ${(size / 1024).toFixed(0)}K  ${platformDir}/binding.node`);
-  }
-
   if (failed > 0) {
     console.error("\nERROR: cannot produce a complete cross-platform package.");
     process.exit(1);
   }
-
-  const bindingJs = path.join(__dirname, "..", "node_modules", "zstd-napi", "binding.js");
-  const loaderContent = `const fs = require("fs");
-const path = require("path");
-
-const buildType =
-  process.config.target_defaults?.default_configuration ?? "Release";
-
-const archMap = { x64: "x64", arm64: "arm64", arm: "arm", ia32: "ia32" };
-const mappedArch = archMap[process.arch] || process.arch;
-const platformKey = \`\${process.platform}-\${mappedArch}\`;
-
-const platformPath = path.join(__dirname, "build", buildType, platformKey, "binding.node");
-const defaultPath = path.join(__dirname, "build", buildType, "binding.node");
-
-if (fs.existsSync(platformPath)) {
-  module.exports = require(platformPath);
-} else if (fs.existsSync(defaultPath)) {
-  module.exports = require(defaultPath);
-} else {
-  throw new Error(
-    \`zstd-napi native binding not found for platform \${platformKey}\`,
-  );
-}
-`;
-  fs.writeFileSync(bindingJs, loaderContent);
-  console.log("\nUpdated binding.js with platform-aware loader");
 }
 
 main().catch((err) => {

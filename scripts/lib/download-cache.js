@@ -2,11 +2,25 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { HttpsProxyAgent } = require("https-proxy-agent");
+
+const AGENT = (() => {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  if (proxyUrl) {
+    try {
+      return new HttpsProxyAgent(proxyUrl);
+    } catch {
+      return undefined;
+    }
+  }
+})();
 
 function httpGet(url, redirects = 5) {
   return new Promise((resolve, reject) => {
     if (redirects <= 0) return reject(new Error("too many redirects"));
-    const req = https.get(url, { timeout: 30000 }, (res) => {
+    const opts = { timeout: 30000 };
+    if (AGENT) opts.agent = AGENT;
+    const req = https.get(url, opts, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         return httpGet(new URL(res.headers.location, url).toString(), redirects - 1)
