@@ -54,6 +54,16 @@ export function decompressBrotliFrames(data: Buffer): Uint8Array {
   return brotliDecompress(new Uint8Array(data));
 }
 
+export const snappy = require("snappy") as {
+  compressSync: (data: Buffer | Uint8Array) => Buffer;
+  uncompressSync: (data: Buffer) => Buffer;
+};
+
+export function decompressSnappyFrames(data: Buffer): Uint8Array {
+  const frameLen = data.readUInt32LE(0);
+  return snappy.uncompressSync(data.subarray(4, 4 + frameLen));
+}
+
 export async function decompressLz4Frames(data: Buffer): Promise<Uint8Array> {
   const LZ4_MAGIC_BUF = Buffer.from([0x04, 0x22, 0x4d, 0x18]);
   const parts: Uint8Array[] = [];

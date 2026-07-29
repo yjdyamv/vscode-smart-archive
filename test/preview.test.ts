@@ -57,6 +57,8 @@ const FM: Fmt[] = [
   { ext: "tar.lz", wraps: true, j7z: false, short: ["tlz"] },
   { ext: "tar.lzma", wraps: true, j7z: false, short: [] },
   { ext: "tar.lz4", wraps: true, j7z: false, short: ["tlz4"] },
+  { ext: "tar.br", wraps: true, j7z: false, short: ["tbr"] },
+  { ext: "tar.sz", wraps: true, j7z: false, short: ["tsz"] },
   { ext: "gz", wraps: false, j7z: true, short: [] },
   { ext: "bz2", wraps: false, j7z: true, short: [] },
   { ext: "xz", wraps: false, j7z: true, short: [] },

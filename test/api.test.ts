@@ -472,6 +472,7 @@ describe("lookupFormat — wrapped formats", () => {
     { label: "tar.zst", supportsEncryption: false },
     { label: "tar.lz4", supportsEncryption: false },
     { label: "tar.br", supportsEncryption: false },
+    { label: "tar.sz", supportsEncryption: false },
   ];
 
   for (const fmt of wrappedFormats) {
@@ -510,6 +511,11 @@ describe("resolveOutputPath — wrapped formats", () => {
   it("tar.br appends compound extension", () => {
     const result = resolveOutputPath(["/data/pack"], "tar.br");
     expect(path.normalize(result)).toBe(path.normalize("/data/pack.tar.br"));
+  });
+
+  it("tar.sz appends compound extension", () => {
+    const result = resolveOutputPath(["/data/quick"], "tar.sz");
+    expect(path.normalize(result)).toBe(path.normalize("/data/quick.tar.sz"));
   });
 });
 
@@ -564,6 +570,7 @@ const WRAPPED_FORMATS: { label: string; shortAlias?: string }[] = [
   { label: "tar.zst", shortAlias: "tzst" },
   { label: "tar.lz4", shortAlias: "tlz4" },
   { label: "tar.br", shortAlias: "tbr" },
+  { label: "tar.sz", shortAlias: "tsz" },
 ];
 
 describe("API wrapped format compression", () => {
@@ -753,6 +760,54 @@ describe("API wrapped format round-trips", () => {
 
       const archivePath = path.join(tmpDir, "pkg.tlz4");
       await compress({ targets: [projDir], format: "tar.lz4", outputPath: archivePath });
+
+      const outDir = await decompress({ inputPath: archivePath });
+      expect(fs.readFileSync(path.join(outDir, "pkg", "info.json"), "utf-8")).toBe('{"v":1}');
+    });
+  });
+
+  // ── tar.sz — full round-trip (only WASM path) ──
+
+  describe("tar.sz (snappy — napi-rs full pipeline)", () => {
+    it("full round-trip: compress → decompress → verify files", async () => {
+      const files = {
+        "lib/src/core.ts": "export default class Core {}",
+        "lib/src/util/fs.ts": "export const read = (p: string) => {}",
+        "lib/package.json": '{"name": "lib"}',
+      };
+      const targets = writeFiles(files);
+
+      const archivePath = path.join(tmpDir, "bundle.tar.sz");
+      const out = await compress({ targets, format: "tar.sz", outputPath: archivePath });
+      expect(fs.existsSync(out)).toBe(true);
+
+      const outDir = await decompress({ inputPath: out });
+      const extracted = readDirRecursive(outDir);
+      expect(extracted["lib/src/core.ts"]).toBe("export default class Core {}");
+      expect(extracted["lib/src/util/fs.ts"]).toBe("export const read = (p: string) => {}");
+      expect(extracted["lib/package.json"]).toBe('{"name": "lib"}');
+    });
+
+    it("tar.sz single directory round-trip", async () => {
+      const projDir = path.join(tmpDir, "data");
+      fs.mkdirSync(projDir, { recursive: true });
+      fs.writeFileSync(path.join(projDir, "log.txt"), "snappy-test-content");
+
+      const archivePath = path.join(tmpDir, "data.tar.sz");
+      await compress({ targets: [projDir], format: "tar.sz", outputPath: archivePath });
+      expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
+
+      const outDir = await decompress({ inputPath: archivePath });
+      expect(fs.readFileSync(path.join(outDir, "data", "log.txt"), "utf-8")).toBe("snappy-test-content");
+    });
+
+    it("tar.sz short alias (tsz) round-trip with directory", async () => {
+      const projDir = path.join(tmpDir, "pkg");
+      fs.mkdirSync(projDir, { recursive: true });
+      fs.writeFileSync(path.join(projDir, "info.json"), '{"v":1}');
+
+      const archivePath = path.join(tmpDir, "pkg.tsz");
+      await compress({ targets: [projDir], format: "tar.sz", outputPath: archivePath });
 
       const outDir = await decompress({ inputPath: archivePath });
       expect(fs.readFileSync(path.join(outDir, "pkg", "info.json"), "utf-8")).toBe('{"v":1}');

@@ -21,7 +21,7 @@ import { compress, decompress } from "../src/api";
 type TestFormat =
   | "7z" | "zip" | "tar" | "wim"
   | "tar.gz" | "tar.bz2" | "tar.xz"
-  | "tar.zst" | "tar.lz4" | "tar.br";
+  | "tar.zst" | "tar.lz4" | "tar.br" | "tar.sz";
 
 export interface TestCompressOptions {
   password?: string;

@@ -274,6 +274,7 @@ function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
 const ZSTD_EXTS = new Set([".zst", ".tar.zst", ".tzst"]);
 const LZ4_EXTS = new Set([".tar.lz4", ".tlz4"]);
 const BROTLI_EXTS = new Set([".tar.br", ".tbr"]);
+const SNAPPY_EXTS = new Set([".tar.sz", ".tsz"]);
 
 /**
  * Check whether system 7-Zip is usable for a given archive format.
@@ -305,14 +306,16 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
     LZ4_EXTS.has(extOrLabel.toLowerCase()) || LZ4_EXTS.has("." + extOrLabel.toLowerCase());
   const isBrotli =
     BROTLI_EXTS.has(extOrLabel.toLowerCase()) || BROTLI_EXTS.has("." + extOrLabel.toLowerCase());
+  const isSnappy =
+    SNAPPY_EXTS.has(extOrLabel.toLowerCase()) || SNAPPY_EXTS.has("." + extOrLabel.toLowerCase());
 
-  // Brotli and LZ4 are handled entirely by WASM codecs, bypass system 7z —
-  // system 7z cannot decompress these formats at all.
-  if (isBrotli || isLz4) {
+  // Snappy, Brotli and LZ4 are handled entirely by WASM codecs, bypass system
+  // 7z — system 7z cannot decompress these formats at all.
+  if (isBrotli || isLz4 || isSnappy) {
     logger.info({
       event: "system7z.skipCodec",
       ext: extOrLabel,
-      codec: isBrotli ? "brotli" : "lz4",
+      codec: isBrotli ? "brotli" : isSnappy ? "snappy" : "lz4",
     });
     return false;
   }

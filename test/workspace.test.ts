@@ -191,7 +191,8 @@ describe("parse7zListing archive self-reference filter", () => {
 describe("archive naming conventions", () => {
   const COMPOUND = [
     ".tar.zst", ".tar.xz", ".tar.bz2", ".tar.gz", ".tgz",
-    ".tbz2", ".tbz", ".txz", ".tzst", ".tar.lz", ".tar.lzma", ".tlz",
+    ".tbz2", ".tbz", ".txz", ".tzst", ".tar.sz", ".tsz",
+    ".tar.lz", ".tar.lzma", ".tlz",
   ];
   function getExt(fpath: string): string {
     const lower = fpath.toLowerCase();

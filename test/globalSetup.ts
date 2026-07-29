@@ -16,6 +16,8 @@ export function setup(): void {
     "sa_test_",  // compress-decompress
     "saa_",      // system7z add
     "sab_",      // preview brotli
+    "sal_",      // lz4
+    "sas_",      // snappy
     "saz_",      // zstd
     "svt_",      // split-volume tests
     "tcomp_",    // testCompress helper

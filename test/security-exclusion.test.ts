@@ -34,6 +34,7 @@ import {
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
 import { brotliCompress } from "../src/engines/brotli-codec";
+import { snappy, decompressSnappyFrames } from "./shared-setup";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -522,6 +523,17 @@ const codecs: WrappedCodec[] = [
     shortAlias: "tbr",
     compress: async (tar) => brotliCompress(tar, 6),
     decompress: (data: Buffer) => decompressBrotliFrames(data),
+  },
+  {
+    ext: "tar.sz",
+    shortAlias: "tsz",
+    compress: async (tar) => {
+      const compressed = snappy.compressSync(tar);
+      const lenBuf = Buffer.alloc(4);
+      lenBuf.writeUInt32LE(compressed.length, 0);
+      return Buffer.concat([lenBuf, compressed]);
+    },
+    decompress: (data: Buffer) => decompressSnappyFrames(data),
   },
 ];
 

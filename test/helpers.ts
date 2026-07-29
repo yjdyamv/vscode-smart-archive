@@ -236,6 +236,11 @@ const lz4: {
 
 import * as zlib from "node:zlib";
 
+const snappy: {
+  compressSync: (data: Buffer | Uint8Array) => Buffer;
+  uncompressSync: (data: Buffer) => Buffer;
+} = require("snappy");
+
 export async function createWrapped(files: Record<string, string>, ext: string): Promise<Buffer> {
   const j1 = await JS7z();
   try {
@@ -257,6 +262,12 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       return Buffer.from(zlib.brotliCompressSync(Buffer.from(tb), {
         params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 },
       }));
+    }
+    if (ext === "tar.sz" || ext === "tsz") {
+      const compressed = snappy.compressSync(tb);
+      const lenBuf = Buffer.alloc(4);
+      lenBuf.writeUInt32LE(compressed.length, 0);
+      return Buffer.concat([lenBuf, compressed]);
     }
     const j2 = await JS7z();
     try {
@@ -407,7 +418,7 @@ export function fixArchiveEncoding(raw: string): string {
 
 export function getFullExt(fp: string): string {
   const lower = fp.toLowerCase();
-  const compounds = [".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tgz", ".tbz2", ".txz"];
+  const compounds = [".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tar.sz", ".tgz", ".tbz2", ".txz", ".tsz"];
   for (const ext of compounds) {
     if (lower.endsWith(ext)) return ext;
   }

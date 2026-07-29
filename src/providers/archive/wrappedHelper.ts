@@ -15,6 +15,7 @@ import { getFullExt, getWrapExtension } from "../../constants";
 import { zstdCompress } from "../../engines/zstd-codec";
 import { brotliCompress, brotliDecompress } from "../../engines/brotli-codec";
 import { lz4Compress, lz4Decompress } from "../../engines/lz4-codec";
+import { snappyCompress, snappyDecompress } from "../../engines/snappy-codec";
 import { validatePassword } from "../../utils/security";
 import { t } from "../../i18n";
 
@@ -58,6 +59,11 @@ export async function withWrappedArchive(
       innerTarName = path.basename(archivePath, ext) + ".tar";
       js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       js7z.FS.writeFile(`${tmpDir}/${innerTarName}`, innerTar);
+    } else if (ext === ".tar.sz" || ext === ".tsz") {
+      const innerTar = await snappyDecompress(new Uint8Array(data));
+      innerTarName = path.basename(archivePath, ext) + ".tar";
+      js7z.FS.writeFile(`/${innerTarName}`, innerTar);
+      js7z.FS.writeFile(`${tmpDir}/${innerTarName}`, innerTar);
     } else {
       js7z.FS.writeFile(`/${archiveName}`, data);
 
@@ -94,6 +100,8 @@ export async function withWrappedArchive(
         compressedData = await lz4Compress(new Uint8Array(modifiedTar));
       } else if (wrapExt === "br") {
         compressedData = brotliCompress(new Uint8Array(modifiedTar), getUserCompressionLevel());
+      } else if (wrapExt === "sz") {
+        compressedData = await snappyCompress(new Uint8Array(modifiedTar));
       } else {
         // Use a fresh instance for recompression — reusing js7z2 after
         // callMain (7z d/7z rn) causes the second callMain (7z a) to hang.
