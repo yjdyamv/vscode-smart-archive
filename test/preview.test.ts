@@ -23,7 +23,8 @@ import {
 import type { JS7zInstance, TreeNode, FlatEntry } from "./helpers";
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
 import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
-import { brotliCompressFile, brotliDecompressFile } from "../src/engines/brotli-codec";
+import { brotliCompressFile, brotliDecompressFile, brotliCompress, brotliDecompress } from "../src/engines/brotli-codec";
+import * as zlib from "node:zlib";
 
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
 const zstd: {
@@ -34,14 +35,6 @@ const lz4: {
   compressFrame: (data: Uint8Array) => Promise<Buffer>;
   decompressFrame: (data: Uint8Array) => Promise<Buffer>;
 } = require("lz4-napi");
-const brWasm: {
-  compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
-  decompress: (data: Uint8Array) => Uint8Array;
-  DecompressStream: new () => {
-    decompress: (input: Uint8Array, outputSize?: number) => { code: number; buf: Uint8Array; input_offset: number };
-    free: () => void;
-  };
-} = require("brotli-wasm");
 
 
 // ── Format matrix (mirrors FORMAT_TABLE from constants.ts) ──
@@ -397,10 +390,10 @@ describe("selective extraction", () => {
 describe("brotli", () => {
   it("brotli basic compress and decompress", () => {
     const data = new TextEncoder().encode("hello brotli compression test data");
-    const compressed = brWasm.compress(data, { quality: 6 });
+    const compressed = brotliCompress(data, 6);
     expect(compressed.length).toBeGreaterThan(0);
     expect(compressed.length).toBeLessThan(data.length + 64);
-    const decompressed = brWasm.decompress(compressed);
+    const decompressed = brotliDecompress(compressed);
     expect(decompressed.length).toBe(data.length);
     expect(Buffer.from(decompressed).equals(Buffer.from(data))).toBe(true);
   });
@@ -409,7 +402,7 @@ describe("brotli", () => {
     const b = await createWrapped(stdFiles, "tar.br");
     expect(b.length).toBeLessThan(4096);
 
-    const dec = brWasm.decompress(b);
+    const dec = brotliDecompress(new Uint8Array(b));
     expect(dec.length).toBeGreaterThan(100);
 
     const j = await JS7z();
@@ -439,29 +432,15 @@ describe("brotli", () => {
     ];
     const expected = Buffer.concat(parts.map((p) => Buffer.from(p)));
 
-    const frames: Uint8Array[] = parts.map((p) => brWasm.compress(p, { quality: 6 }));
-    const compressed = Buffer.concat(frames.map((f) => Buffer.from(f)));
+    // Produce multi-frame brotli by compressing each part independently
+    const params = { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 } };
+    const frames: Buffer[] = parts.map((p) =>
+      zlib.brotliCompressSync(Buffer.from(p), params),
+    );
+    const compressed = Buffer.concat(frames);
 
-    let allOut: Uint8Array[] = [];
-    let offset = 0;
-    while (offset < compressed.length) {
-      const stream = new brWasm.DecompressStream();
-      const r = stream.decompress(compressed.subarray(offset), 50 * 1024 * 1024);
-      if (r.buf.length > 0) allOut.push(r.buf);
-      if (r.input_offset === 0) {
-        stream.free();
-        break;
-      }
-      offset += r.input_offset;
-      stream.free();
-    }
-    const total = allOut.reduce((s, a) => s + a.length, 0);
-    const result = new Uint8Array(total);
-    let pos = 0;
-    for (const p of allOut) {
-      result.set(p, pos);
-      pos += p.length;
-    }
+    // brotliDecompress handles multi-frame detection and frame-by-frame decoding
+    const result = brotliDecompress(new Uint8Array(compressed));
 
     expect(result.length).toBe(expected.length);
     expect(Buffer.from(result).equals(expected)).toBe(true);

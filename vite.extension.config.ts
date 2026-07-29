@@ -18,7 +18,6 @@ export default defineConfig({
         "vscode",
         "zstd-napi",
         "lz4-napi",
-        "brotli-wasm",
         "js7z-tools",
         "@vscode/codicons",
         ...builtinModules,

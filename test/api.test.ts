@@ -668,7 +668,7 @@ describe("API wrapped format round-trips", () => {
 
   // ── tar.br — full round-trip (only WASM path) ──
 
-  describe("tar.br (brotli — WASM full pipeline)", () => {
+  describe("tar.br (brotli — node:zlib full pipeline)", () => {
     it("full round-trip: compress → decompress → verify files with subdirectories", async () => {
       const files = {
         "pkg/src/index.ts": "main()",
