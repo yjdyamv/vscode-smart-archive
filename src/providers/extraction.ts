@@ -191,7 +191,8 @@ async function extractSelected(
   const start = Date.now();
   const ext = getFullExt(archivePath);
   const isWrapped = isWrappedFormat(ext);
-  const outputDir = outputOverride || getOutputPath(archivePath, "extracted");
+  const rawOutputDir = outputOverride || getOutputPath(archivePath, "extracted");
+  const outputDir = path.resolve(rawOutputDir);
 
   logger.info({
     event: "extractSelected.enter",
@@ -226,7 +227,7 @@ async function extractSelected(
         js7z.FS.mkdir("/_x1");
         await new Promise<void>((resolve, reject) => {
           js7z.onExit = (c: number) => {
-            if (c === 0) resolve();
+            if (c === 0 || c === 1) resolve();
             else reject(new Error(`7z x outer: ${c}`));
           };
           const outerArgs = ["x", outerFsPath, "-o/_x1", "-y"];
@@ -248,22 +249,43 @@ async function extractSelected(
         js7z2.FS.mkdir("/_x2");
         const normalizedPaths = selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/")));
         const excludeFlags = (excludes ?? []).map((ex) => "-xr!" + ex.replace(/\\/g, "/"));
+        const innerArgs = [
+          flat ? "e" : "x",
+          `/${innerTarName}`,
+          "-o/_x2",
+          flat ? "-aou" : "-y",
+          ...excludeFlags,
+          ...normalizedPaths,
+        ];
         await new Promise<void>((resolve, reject) => {
           js7z2.onExit = (c: number) => {
-            if (c === 0) resolve();
+            if (c === 0 || c === 1) resolve();
             else reject(new Error(`7z ${flat ? "e" : "x"} inner: ${c}`));
           };
-          js7z2.callMain([
-            flat ? "e" : "x",
-            `/${innerTarName}`,
-            "-o/_x2",
-            flat ? "-aou" : "-y",
-            ...excludeFlags,
-            ...normalizedPaths,
-          ]);
+          js7z2.callMain(innerArgs);
         });
+
+        let x2HasContent =
+          js7z2.FS.readdir("/_x2").filter((e: string) => e !== "." && e !== "..").length > 0;
+
+        if (!x2HasContent) {
+          logger.warn({
+            event: "extractSelected.emptySelectiveWrapped",
+            archivePath,
+            pathCount: normalizedPaths.length,
+          });
+          const allInnerArgs = ["x", `/${innerTarName}`, "-o/_x2", "-y"];
+          await new Promise<void>((resolve, reject) => {
+            js7z2.onExit = (c: number) => {
+              if (c === 0 || c === 1) resolve();
+              else reject(new Error(`7z x inner (full): ${c}`));
+            };
+            js7z2.callMain(allInnerArgs);
+          });
+        }
+
         fs.mkdirSync(outputDir, { recursive: true });
-        if (flat) {
+        if (flat && x2HasContent) {
           copyDirFromFS(js7z2, "/_x2", outputDir);
         } else {
           copyFromFSWithStrip(js7z2, "/_x2", outputDir, selectedPaths);
@@ -300,27 +322,52 @@ async function extractSelected(
     const archiveFsPath = streamToVFS(js7z, archivePath);
     js7z.FS.mkdir("/out");
 
+    const normalizedPaths = selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/")));
+    const eArgs = [flat ? "e" : "x", archiveFsPath, "-o/out", flat ? "-aou" : "-y"];
+    if (password) {
+      validatePassword(password);
+      eArgs.splice(1, 0, `-p${password}`);
+    }
+    if (excludes && excludes.length > 0) {
+      for (const ex of excludes) {
+        eArgs.push("-xr!" + ex.replace(/\\/g, "/"));
+      }
+    }
+    eArgs.push(...normalizedPaths);
+
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (code: number) => {
-        if (code === 0) resolve();
+        if (code === 0 || code === 1) resolve();
         else reject(new Error(`7z ${flat ? "e" : "x"}: ${code}\n${stderr}`));
       };
-      const normalizedPaths = selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/")));
-      const eArgs = [flat ? "e" : "x", archiveFsPath, "-o/out", flat ? "-aou" : "-y"];
-      if (password) {
-        validatePassword(password);
-        eArgs.splice(1, 0, `-p${password}`);
-      }
-      if (excludes && excludes.length > 0) {
-        for (const ex of excludes) {
-          eArgs.push("-xr!" + ex.replace(/\\/g, "/"));
-        }
-      }
-      eArgs.push(...normalizedPaths);
       js7z.callMain(eArgs);
     });
+
+    let outHasContent =
+      js7z.FS.readdir("/out").filter((e: string) => e !== "." && e !== "..").length > 0;
+
+    if (!outHasContent) {
+      logger.warn({
+        event: "extractSelected.emptySelective",
+        archivePath,
+        pathCount: normalizedPaths.length,
+      });
+      const allArgs = ["x", archiveFsPath, "-o/out", "-y"];
+      if (password) {
+        allArgs.splice(1, 0, `-p${password}`);
+      }
+      stderr = "";
+      await new Promise<void>((resolve, reject) => {
+        js7z.onExit = (code: number) => {
+          if (code === 0 || code === 1) resolve();
+          else reject(new Error(`7z x (full): ${code}\n${stderr}`));
+        };
+        js7z.callMain(allArgs);
+      });
+    }
+
     fs.mkdirSync(outputDir, { recursive: true });
-    if (flat) {
+    if (flat && outHasContent) {
       copyDirFromFS(js7z, "/out", outputDir);
     } else {
       copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths);
