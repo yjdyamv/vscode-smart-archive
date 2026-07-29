@@ -61,9 +61,7 @@ export function brotliDecompress(data: Uint8Array): Uint8Array {
 
     const consumed = result.engine.bytesWritten;
     if (consumed <= 0) {
-      throw new Error(
-        "Brotli decompression stalled at offset " + offset,
-      );
+      throw new Error("Brotli decompression stalled at offset " + offset);
     }
 
     checkFileSize(result.buffer.length);
@@ -100,10 +98,7 @@ export async function brotliCompressFile(
   }
 }
 
-export async function brotliDecompressFile(
-  input: string,
-  output: string,
-): Promise<void> {
+export async function brotliDecompressFile(input: string, output: string): Promise<void> {
   let streamDecompressed = 0;
 
   try {
@@ -163,9 +158,6 @@ function cleanup(path: string): void {
   try {
     fs.unlinkSync(path);
   } catch {
-    logger.warn(
-      { event: "brotli.cleanup.failed", path },
-      "Failed to remove temp file",
-    );
+    logger.warn({ event: "brotli.cleanup.failed", path }, "Failed to remove temp file");
   }
 }
