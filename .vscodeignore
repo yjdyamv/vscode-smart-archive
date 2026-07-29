@@ -20,10 +20,6 @@ skills-lock.json
 node_modules/
 !node_modules/@vscode/codicons/dist/**
 !node_modules/@vscode/codicons/LICENSE
-!node_modules/brotli-wasm/index.node.js
-!node_modules/brotli-wasm/pkg.node/**
-!node_modules/brotli-wasm/package.json
-!node_modules/brotli-wasm/LICENSE
 !node_modules/js7z-tools/js7z.js
 !node_modules/js7z-tools/js7z.wasm
 !node_modules/js7z-tools/package.json

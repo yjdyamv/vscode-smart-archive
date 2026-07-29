@@ -47,42 +47,11 @@ export const lz4 = require("lz4-napi") as {
   decompressFrame: (data: Uint8Array) => Promise<Buffer>;
 };
 
-export const brWasm: {
-  compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
-  decompress: (data: Uint8Array) => Uint8Array;
-  DecompressStream: new () => {
-    decompress: (
-      input: Uint8Array,
-      outputSize?: number,
-    ) => { code: number; buf: Uint8Array; input_offset: number };
-    free: () => void;
-  };
-} = require("brotli-wasm");
-
-// ── Decompression helpers ──
+// brotli: migrated to node:zlib; in-memory helper uses brotli-codec engine
+import { brotliDecompress } from "../src/engines/brotli-codec";
 
 export function decompressBrotliFrames(data: Buffer): Uint8Array {
-  let allOut: Uint8Array[] = [];
-  let offset = 0;
-  while (offset < data.length) {
-    const stream = new brWasm.DecompressStream();
-    const r = stream.decompress(data.subarray(offset), 50 * 1024 * 1024);
-    if (r.buf.length > 0) allOut.push(r.buf);
-    if (r.input_offset === 0) {
-      stream.free();
-      break;
-    }
-    offset += r.input_offset;
-    stream.free();
-  }
-  const total = allOut.reduce((s, a) => s + a.length, 0);
-  const result = new Uint8Array(total);
-  let pos = 0;
-  for (const p of allOut) {
-    result.set(p, pos);
-    pos += p.length;
-  }
-  return result;
+  return brotliDecompress(new Uint8Array(data));
 }
 
 export async function decompressLz4Frames(data: Buffer): Promise<Uint8Array> {

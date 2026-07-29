@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml)
 
-VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4/brotli codecs**. Works out of the box with no local 7-Zip install, at near-desktop speed.
+VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4 codecs** plus Node.js built-in **brotli**. Works out of the box with no local 7-Zip install, at near-desktop speed.
 
 ## Features
 
@@ -123,7 +123,7 @@ npm run release          # build + check + package
 | [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly (all compression & extraction) |
 | [zstd-napi](https://github.com/drakedevel/zstd-napi) | Zstandard compression |
 | [lz4-napi](https://github.com/antoniomuso/lz4-napi) | LZ4 compression |
-| [brotli-wasm](https://github.com/httptoolkit/brotli-wasm) | Brotli compression |
+| Node.js `zlib` (built-in) | Brotli compression |
 | [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding recovery |
 | [Vue 3](https://vuejs.org/) | Archive browser UI |
 | [TanStack Virtual](https://tanstack.com/virtual) | Virtual scrolling for large archives |

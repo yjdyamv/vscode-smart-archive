@@ -22,7 +22,6 @@ import {
   disposeAllTracked,
   zstd,
   lz4,
-  brWasm,
   decompressBrotliFrames,
   decompressLz4Frames,
   prepareExclusions,
@@ -34,6 +33,7 @@ import {
   parseSize,
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
+import { brotliCompress } from "../src/engines/brotli-codec";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -520,7 +520,7 @@ const codecs: WrappedCodec[] = [
   {
     ext: "tar.br",
     shortAlias: "tbr",
-    compress: async (tar) => brWasm.compress(tar, { quality: 6 }),
+    compress: async (tar) => brotliCompress(tar, 6),
     decompress: (data: Buffer) => decompressBrotliFrames(data),
   },
 ];

@@ -187,7 +187,7 @@ export async function previewFileFromArchive(
         archiveFsPath = `/${tarName}`;
         writeLargeVFS(js7z, archiveFsPath, innerTar);
       } else if (archiveExt === ".tar.br" || archiveExt === ".tbr") {
-        // js7z WASM doesn't support Brotli. Decompress with brotli-wasm,
+        // js7z WASM doesn't support Brotli. Decompress with node:zlib,
         // then feed the inner tar to 7z for extraction.
         const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
         const innerTar = brotliDecompress(new Uint8Array(buf));

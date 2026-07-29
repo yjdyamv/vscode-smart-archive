@@ -234,10 +234,7 @@ const lz4: {
   decompressFrame: (data: Uint8Array) => Promise<Buffer>;
 } = require("lz4-napi");
 
-const brWasm: {
-  compress: (data: Uint8Array, options?: { quality?: number }) => Uint8Array;
-  decompress: (data: Uint8Array) => Uint8Array;
-} = require("brotli-wasm");
+import * as zlib from "node:zlib";
 
 export async function createWrapped(files: Record<string, string>, ext: string): Promise<Buffer> {
   const j1 = await JS7z();
@@ -257,7 +254,9 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       return Buffer.from(await lz4.compressFrame(new Uint8Array(tb)));
     }
     if (ext === "tar.br" || ext === "tbr") {
-      return Buffer.from(brWasm.compress(new Uint8Array(tb), { quality: 6 }));
+      return Buffer.from(zlib.brotliCompressSync(Buffer.from(tb), {
+        params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 },
+      }));
     }
     const j2 = await JS7z();
     try {

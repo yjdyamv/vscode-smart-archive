@@ -514,7 +514,6 @@
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.45",
-    "brotli-wasm": "^3.0.1",
     "iconv-lite": "^0.7.3",
     "js7z-tools": "^2.5.0",
     "lz4-napi": "^2.9.1",
@@ -532,5 +531,8 @@
     "oxlint": "^1.74.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "lz4-napi@2.9.1": true
   }
 }
