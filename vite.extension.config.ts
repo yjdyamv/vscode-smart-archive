@@ -18,6 +18,7 @@ export default defineConfig({
         "vscode",
         "zstd-napi",
         "lz4-napi",
+        "snappy",
         "js7z-tools",
         "@vscode/codicons",
         ...builtinModules,

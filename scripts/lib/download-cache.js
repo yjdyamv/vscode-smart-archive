@@ -86,6 +86,37 @@ function checkHash(data, expected, requireHash, label) {
   }
 }
 
+/**
+ * Extract the first file ending with ".node" from a gzipped npm tarball (tgz).
+ * Returns the raw .node data, or null if not found.
+ */
+function extractNodeFromTgz(tgzBuf) {
+  const BLOCK = 512;
+  let pos = 0;
+  const buf = tgzBuf;
+  while (pos + BLOCK <= buf.length) {
+    const header = buf.subarray(pos, pos + BLOCK);
+    if (header.every((b) => b === 0)) break;
+    let nameEnd = header.indexOf(0, 0);
+    if (nameEnd < 0 || nameEnd > 100) nameEnd = 100;
+    const name = header.subarray(0, nameEnd).toString("utf8");
+    const typeFlag = String.fromCharCode(header[156]);
+    const isDir = typeFlag === "5";
+    const isLongName = typeFlag === "L" || typeFlag === "K";
+    const sizeStr = header.subarray(124, 136).toString("utf8").replace(/\0/g, "").trim();
+    const size = parseInt(sizeStr, 8) || 0;
+    pos += BLOCK;
+    if (isLongName) {
+      pos += Math.ceil(size / BLOCK) * BLOCK;
+      continue;
+    }
+    const dataEnd = pos + Math.ceil(size / BLOCK) * BLOCK;
+    if (!isDir && name.endsWith(".node")) return buf.subarray(pos, pos + size);
+    pos = dataEnd;
+  }
+  return null;
+}
+
 async function downloadWithCache({
   cacheDir,
   cacheKey,
@@ -134,4 +165,12 @@ async function downloadWithCache({
   return { status: "downloaded" };
 }
 
-module.exports = { httpGet, httpGetJson, downloadWithCache, sha256, verifySha256, checkHash };
+module.exports = {
+  httpGet,
+  httpGetJson,
+  downloadWithCache,
+  sha256,
+  verifySha256,
+  checkHash,
+  extractNodeFromTgz,
+};

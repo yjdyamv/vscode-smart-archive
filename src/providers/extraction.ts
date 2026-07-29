@@ -14,6 +14,9 @@ import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { JS7z, disposeJS7z } from "./fileListing";
 import { streamToVFS } from "../engines/vfs-io";
+import { decompressLz4Frames } from "../engines/lz4-codec";
+import { brotliDecompress } from "../engines/brotli-codec";
+import { snappyDecompress } from "../engines/snappy-codec";
 import { getFullExt, isWrappedFormat, MAX_COLLISION_RETRIES } from "../constants";
 import { t } from "../i18n";
 import { getOutputPath, copyDirFromFS } from "../utils/fs";
@@ -202,27 +205,46 @@ async function extractSelected(
   if (isWrapped) {
     const js7z = await JS7z({ print: () => {}, printErr: () => {} });
     try {
-      const outerFsPath = streamToVFS(js7z, archivePath);
-      js7z.FS.mkdir("/_x1");
-      await new Promise<void>((resolve, reject) => {
-        js7z.onExit = (c: number) => {
-          if (c === 0) resolve();
-          else reject(new Error(`7z x outer: ${c}`));
-        };
-        const outerArgs = ["x", outerFsPath, "-o/_x1", "-y"];
-        if (password) {
-          validatePassword(password);
-          outerArgs.splice(1, 0, `-p${password}`);
-        }
-        js7z.callMain(outerArgs);
-      });
-      const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
-      const innerTar = top.find((e: string) => e.endsWith(".tar"));
-      if (!innerTar) throw new Error("Wrapped archive: no inner .tar found");
-      const innerData = js7z.FS.readFile(`/_x1/${innerTar}`, { encoding: "binary" });
+      let innerTarName: string;
+      if (ext === ".tar.lz4" || ext === ".tlz4") {
+        const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+        const innerTar = await decompressLz4Frames(Buffer.from(buf));
+        innerTarName = path.basename(archivePath, ext) + ".tar";
+        js7z.FS.writeFile(`/${innerTarName}`, new Uint8Array(innerTar));
+      } else if (ext === ".tar.br" || ext === ".tbr") {
+        const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+        const innerTar = brotliDecompress(new Uint8Array(buf));
+        innerTarName = path.basename(archivePath, ext) + ".tar";
+        js7z.FS.writeFile(`/${innerTarName}`, innerTar);
+      } else if (ext === ".tar.sz" || ext === ".tsz") {
+        const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+        const innerTar = await snappyDecompress(new Uint8Array(buf));
+        innerTarName = path.basename(archivePath, ext) + ".tar";
+        js7z.FS.writeFile(`/${innerTarName}`, innerTar);
+      } else {
+        const outerFsPath = streamToVFS(js7z, archivePath);
+        js7z.FS.mkdir("/_x1");
+        await new Promise<void>((resolve, reject) => {
+          js7z.onExit = (c: number) => {
+            if (c === 0) resolve();
+            else reject(new Error(`7z x outer: ${c}`));
+          };
+          const outerArgs = ["x", outerFsPath, "-o/_x1", "-y"];
+          if (password) {
+            validatePassword(password);
+            outerArgs.splice(1, 0, `-p${password}`);
+          }
+          js7z.callMain(outerArgs);
+        });
+        const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
+        const found = top.find((e: string) => e.endsWith(".tar"));
+        if (!found) throw new Error("Wrapped archive: no inner .tar found");
+        innerTarName = found;
+      }
+      const innerData = js7z.FS.readFile(`/${innerTarName}`, { encoding: "binary" });
       const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
       try {
-        js7z2.FS.writeFile(`/${innerTar}`, new Uint8Array(innerData));
+        js7z2.FS.writeFile(`/${innerTarName}`, new Uint8Array(innerData));
         js7z2.FS.mkdir("/_x2");
         const normalizedPaths = selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/")));
         const excludeFlags = (excludes ?? []).map((ex) => "-xr!" + ex.replace(/\\/g, "/"));
@@ -233,7 +255,7 @@ async function extractSelected(
           };
           js7z2.callMain([
             flat ? "e" : "x",
-            `/${innerTar}`,
+            `/${innerTarName}`,
             "-o/_x2",
             flat ? "-aou" : "-y",
             ...excludeFlags,

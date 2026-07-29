@@ -23,6 +23,7 @@ import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "../engines/js7z-factory";
 import { brotliDecompress } from "../engines/brotli-codec";
 import { decompressLz4Frames } from "../engines/lz4-codec";
+import { snappyDecompress } from "../engines/snappy-codec";
 
 /**
  * Write a potentially large Uint8Array to VFS in chunks to avoid
@@ -131,6 +132,13 @@ async function listViaExtract(
       const innerTar = brotliDecompress(new Uint8Array(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.brotliDecompressed", size: innerTar.length });
+      return extractAndList(innerName, innerTar);
+    }
+
+    if (ext === ".tar.sz" || ext === ".tsz") {
+      const innerTar = await snappyDecompress(new Uint8Array(buf));
+      const innerName = path.basename(filePath, ext) + ".tar";
+      logger.info({ event: "listViaExtract.snappyDecompressed", size: innerTar.length });
       return extractAndList(innerName, innerTar);
     }
 

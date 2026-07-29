@@ -23,6 +23,7 @@ import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { zstdCompressFile } from "./zstd-codec";
 import { lz4CompressFile } from "./lz4-codec";
 import { brotliCompressFile } from "./brotli-codec";
+import { snappyCompressFile } from "./snappy-codec";
 import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger";
 import { validatePassword } from "../utils/security";
@@ -184,6 +185,11 @@ export async function compressWith7z(
           const brOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.br");
           await brotliCompressFile(tarDiskPath, brOut, options.level);
           compressedData = new Uint8Array(fs.readFileSync(brOut));
+        } else if (wrapExt === "sz") {
+          prog.report({ message: t("compress.compressingTar", wrapExt) });
+          const szOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.sz");
+          await snappyCompressFile(tarDiskPath, szOut, options.level);
+          compressedData = new Uint8Array(fs.readFileSync(szOut));
         } else {
           prog.report({ message: t("compress.compressingTar", wrapExt) });
           const js7z2 = await JS7z();

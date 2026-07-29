@@ -12,6 +12,7 @@ import * as crypto from "crypto";
 import type { JS7zInstance } from "../../types";
 import { JS7z, disposeJS7z, writeLargeVFS } from "../fileListing";
 import { decompressLz4Frames } from "../../engines/lz4-codec";
+import { snappyDecompress } from "../../engines/snappy-codec";
 import { streamToVFS } from "../../engines/vfs-io";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../../utils/security";
@@ -194,6 +195,12 @@ export async function previewFileFromArchive(
         const tarName = path.basename(archivePath, archiveExt) + ".tar";
         archiveFsPath = `/${tarName}`;
         writeLargeVFS(js7z, archiveFsPath, innerTar);
+      } else if (archiveExt === ".tar.sz" || archiveExt === ".tsz") {
+        const buf = await vscode.workspace.fs.readFile(vscode.Uri.file(archivePath));
+        const innerTar = await snappyDecompress(new Uint8Array(buf));
+        const tarName = path.basename(archivePath, archiveExt) + ".tar";
+        archiveFsPath = `/${tarName}`;
+        writeLargeVFS(js7z, archiveFsPath, innerTar);
       } else {
         archiveFsPath = streamToVFS(js7z, archivePath);
       }
@@ -254,6 +261,8 @@ export async function previewFileFromArchive(
           ".tlz",
           ".tlz4",
           ".tbr",
+          ".tar.sz",
+          ".tsz",
         ];
         const tarEntries = top.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
         let found = false;

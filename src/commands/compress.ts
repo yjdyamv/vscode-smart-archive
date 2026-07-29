@@ -328,17 +328,20 @@ export async function compressCommand(
         continue;
       }
 
-      // ── 2. Level ──
+      // ── 2. Level (skip for single-speed codecs) ──
       case 2: {
-        const r = await promptLevelWizard();
-        if (r.kind !== "ok") {
-          if (r.kind === "back") {
-            step = 1;
-            continue;
+        const singleSpeed = ["tar.sz", "tar.lz4"].includes(format!.label);
+        if (!singleSpeed) {
+          const r = await promptLevelWizard();
+          if (r.kind !== "ok") {
+            if (r.kind === "back") {
+              step = 1;
+              continue;
+            }
+            return;
           }
-          return;
+          level = r.value;
         }
-        level = r.value;
         const supSplit = ["7z", "zip"].includes(format!.label);
         step = supSplit ? 3 : 4; // skip volume if not splittable
         continue;

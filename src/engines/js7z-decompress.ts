@@ -23,6 +23,7 @@ import { hasSystem7zForFormat, decompressWithSystem7z } from "./system7z";
 import { getFullExt, getWrapExtension } from "../constants";
 import { brotliDecompressFile } from "./brotli-codec";
 import { lz4DecompressFile } from "./lz4-codec";
+import { snappyDecompressFile } from "./snappy-codec";
 import { zstdDecompress } from "./zstd-codec";
 
 /**
@@ -125,6 +126,13 @@ export async function decompressWith7z(
     return;
   }
 
+  if (getWrapExtension(ext) === "sz") {
+    await decompressCodecWrapper(options, progress, token, "sas_", ext, (input, tmpTar) =>
+      snappyDecompressFile(input, tmpTar),
+    );
+    return;
+  }
+
   if (getWrapExtension(ext) === "zst") {
     await decompressCodecWrapper(options, progress, token, "saz_", ext, async (input, tmpTar) => {
       const compressedData = new Uint8Array(fs.readFileSync(input));
@@ -181,11 +189,13 @@ async function unwrapInnerTar(
     ".tar.lz",
     ".tar.lzma",
     ".tar.lz4",
+    ".tar.sz",
     ".tgz",
     ".tbz2",
     ".tbz",
     ".txz",
     ".tzst",
+    ".tsz",
     ".tlz",
     ".tlz4",
   ];
