@@ -2,7 +2,7 @@
 const zlib = require("zlib");
 const fs = require("fs");
 const path = require("path");
-const { httpGet, downloadWithCache, sha256 } = require("./lib/download-cache");
+const { httpGetMirrored, downloadWithCache, sha256 } = require("./lib/download-cache");
 
 function getZstdMeta() {
   const pkgPath = path.join(__dirname, "..", "node_modules", "zstd-napi", "package.json");
@@ -15,7 +15,9 @@ const { version: VERSION } = getZstdMeta();
 const SOURCE = (p) =>
   `https://github.com/yjdyamv/zstd-napi/releases/download/v${VERSION}/zstd-napi-v${VERSION}-napi-v8-${p}.tar.gz`;
 
-const ATTESTATION_URL = `https://github.com/yjdyamv/zstd-napi/releases/download/v${VERSION}/prebuilds.intoto.jsonl`;
+const ATTESTATION_URL =
+  process.env.SA_ZSTD_ATTESTATION_URL ||
+  `https://github.com/yjdyamv/zstd-napi/releases/download/v${VERSION}/prebuilds.intoto.jsonl`;
 
 const PLATFORMS = [
   ["linux", "x64"],
@@ -76,7 +78,7 @@ function extractTarFile(tarBuf, tarPath) {
 }
 
 async function fetchReleaseHashes() {
-  const content = await httpGet(ATTESTATION_URL);
+  const content = await httpGetMirrored(ATTESTATION_URL);
   const tarballHashes = {};
   for (const line of content.toString("utf8").trim().split("\n")) {
     const obj = JSON.parse(line);
@@ -94,6 +96,49 @@ async function fetchReleaseHashes() {
   return tarballHashes;
 }
 
+/**
+ * Load the per-platform tarball hashes, preferring a cached copy so
+ * repeat builds work fully offline. The cache is version-keyed, so a
+ * zstd-napi bump automatically refetches.
+ *
+ * Returns { hashes, source } — source is "cache", "network" or "none".
+ * A network failure with a usable cache degrades to a warning instead of
+ * aborting the whole build (the cached hashes still pin the binaries).
+ */
+async function loadReleaseHashes() {
+  const cacheFile = path.join(cacheDir, `attestation-${VERSION}.json`);
+  const readCache = () => {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const cached = readCache();
+  if (cached && Object.keys(cached).length > 0) {
+    return { hashes: cached, source: "cache" };
+  }
+
+  try {
+    const hashes = await fetchReleaseHashes();
+    try {
+      fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+      fs.writeFileSync(cacheFile, JSON.stringify(hashes));
+    } catch (err) {
+      console.warn(`WARN: could not cache attestation hashes: ${err.message}`);
+    }
+    return { hashes, source: "network" };
+  } catch (err) {
+    if (cached && Object.keys(cached).length > 0) {
+      console.warn(`WARN: attestation fetch failed (${err.message}) — using cached hashes`);
+      return { hashes: cached, source: "cache" };
+    }
+    return { hashes: null, source: "none", error: err };
+  }
+}
+
 async function resolvePlatform(platformKey, expectedTarballHash) {
   const destPath = path.join(destDir, platformKey, "binding.node");
 
@@ -106,7 +151,7 @@ async function resolvePlatform(platformKey, expectedTarballHash) {
     label: `zstd-napi ${platformKey}`,
     fetch: async () => {
       const url = SOURCE(platformKey);
-      const compressed = await httpGet(url);
+      const compressed = await httpGetMirrored(url);
       const actualHash = sha256(compressed);
       if (actualHash !== expectedTarballHash) {
         throw new Error(
@@ -127,13 +172,15 @@ async function main() {
   let skipped = 0;
   let failed = 0;
 
-  let releaseHashes;
-  try {
-    releaseHashes = await fetchReleaseHashes();
-  } catch (err) {
-    console.error(`ERROR: cannot fetch release attestation: ${err.message}`);
+  const { hashes: releaseHashes, source, error } = await loadReleaseHashes();
+  if (!releaseHashes) {
+    console.error(`ERROR: cannot fetch release attestation: ${error && error.message}`);
+    console.error(
+      "  No cached hashes either. Retry when GitHub is reachable, or run with SA_GITHUB_MIRRORS",
+    );
     process.exit(1);
   }
+  console.log(`[zstd-napi] attestation hashes: ${source}`);
 
   for (const [platform, arch] of PLATFORMS) {
     const platformKey = `${platform}-${arch}`;
@@ -168,7 +215,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

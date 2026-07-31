@@ -217,8 +217,8 @@ async function processTarget(t) {
     label: t.asset,
     fetch: async () => {
       const url = `${BASE}/${t.asset}`;
-      const { httpGet } = require("./lib/download-cache");
-      return httpGet(url);
+      const { httpGetMirrored } = require("./lib/download-cache");
+      return httpGetMirrored(url);
     },
   });
 

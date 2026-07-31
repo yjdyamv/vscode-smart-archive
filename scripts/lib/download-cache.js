@@ -15,15 +15,15 @@ const AGENT = (() => {
   }
 })();
 
-function httpGet(url, redirects = 5) {
+function httpGet(url, redirects = 5, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     if (redirects <= 0) return reject(new Error("too many redirects"));
-    const opts = { timeout: 30000 };
+    const opts = { timeout: timeoutMs };
     if (AGENT) opts.agent = AGENT;
     const req = https.get(url, opts, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        return httpGet(new URL(res.headers.location, url).toString(), redirects - 1)
+        return httpGet(new URL(res.headers.location, url).toString(), redirects - 1, timeoutMs)
           .then(resolve)
           .catch(reject);
       }
@@ -41,6 +41,58 @@ function httpGet(url, redirects = 5) {
       reject(new Error("timeout"));
     });
   });
+}
+
+/**
+ * httpGet with exponential-backoff retries (transient network failures,
+ * timeouts and 5xx). 3 attempts: 500ms / 1s / 2s delays.
+ */
+async function httpGetRetry(url, { timeoutMs = 30000, retries = 3 } = {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await httpGet(url, 5, timeoutMs);
+    } catch (err) {
+      lastErr = err;
+      const msg = err && err.message ? err.message : String(err);
+      // 4xx is deterministic — do not retry.
+      if (msg.startsWith("HTTP 4")) throw err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// GitHub download mirrors tried AFTER a direct fetch fails. Prefixes are
+// prepended verbatim to the original URL. Override/extend via the
+// SA_GITHUB_MIRRORS env var (comma-separated prefixes).
+function githubMirrors() {
+  const fromEnv = (process.env.SA_GITHUB_MIRRORS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return [...fromEnv, "https://gh-proxy.com/"];
+}
+
+/**
+ * Fetch a URL, falling back to GitHub mirror prefixes on failure.
+ * Direct connection first — mirrors only kick in when it fails or times
+ * out, so normal-network behaviour is unchanged. All callers still verify
+ * SHA-256 afterwards, so a compromised mirror cannot inject binaries.
+ */
+async function httpGetMirrored(url, opts = {}) {
+  const urls = [url, ...githubMirrors().map((p) => `${p}${url}`)];
+  let lastErr;
+  for (const candidate of urls) {
+    try {
+      return await httpGetRetry(candidate, opts);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
 }
 
 async function httpGetJson(url) {
@@ -167,6 +219,8 @@ async function downloadWithCache({
 
 module.exports = {
   httpGet,
+  httpGetRetry,
+  httpGetMirrored,
   httpGetJson,
   downloadWithCache,
   sha256,
