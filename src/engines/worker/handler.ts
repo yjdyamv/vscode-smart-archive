@@ -67,6 +67,7 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
     resetZstdDetectionCache();
     setWorkerMemoryLimitMb(config.workerMemoryMb ?? WORKER_MEMORY_LIMIT_DEFAULT_MB);
     setModifyConfig({ compressionLevel: config.compressionLevel ?? 5 });
+    logger.setLevel(config.logLevel ?? "info");
   }
 
   function makeToken(requestId: number): TokenLike {

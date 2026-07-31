@@ -17,6 +17,7 @@ import {
 } from "../constants";
 import { setLocale } from "../i18n";
 import { setZstdConfig } from "../engines/zstd-codec";
+import { logger } from "./logger";
 import type { EngineConfig } from "../engines/worker/types";
 
 /**
@@ -39,7 +40,12 @@ export function readEngineConfig(): EngineConfig {
       typeof memMb === "number" && Number.isFinite(memMb)
         ? Math.max(0, Math.floor(memMb))
         : WORKER_MEMORY_LIMIT_DEFAULT_MB,
+    logLevel: validLogLevel(config.get<string>("logLevel", "info")),
   };
+}
+
+function validLogLevel(raw: string): "error" | "warn" | "info" | "debug" {
+  return raw === "error" || raw === "warn" || raw === "debug" ? raw : "info";
 }
 
 /**
@@ -52,6 +58,7 @@ export function applyHostConfig(): void {
   setLocale(config.locale);
 
   setSecurityLimits(config.limits);
+  logger.setLevel(config.logLevel ?? "info");
 
   setZstdConfig({
     useSystemZstd: config.useSystemZstd,
