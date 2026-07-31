@@ -17,6 +17,13 @@ export default defineConfig({
     sourcemap: process.env.SOURCEMAP === "true",
     minify: false,
     rollupOptions: {
+      output: {
+        // Stable filenames for shared chunks (no content hash): the worker
+        // entry requires them by relative path, and obfuscate.js walks out/
+        // recursively — deterministic names keep both predictable.
+        chunkFileNames: (chunkInfo) =>
+          chunkInfo.name === "rolldown-runtime" ? "rolldown-runtime.js" : "shared-core.js",
+      },
       external: [
         "vscode",
         "zstd-napi",
