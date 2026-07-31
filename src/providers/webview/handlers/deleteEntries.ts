@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt, isWrappedFormat } from "../../../constants";
@@ -73,7 +74,7 @@ export const handleDelete: MessageHandler = async (ctx) => {
       );
     }
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     logger.error({ event: "webview.delSel.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {

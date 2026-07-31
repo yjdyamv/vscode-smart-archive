@@ -8,12 +8,14 @@
  */
 
 import * as fs from "fs";
-import * as vscode from "vscode";
+
 import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
 import { copyDirToFS } from "../utils/fs";
 import { t } from "../i18n";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
+import { CancelledError } from "../utils/cancellation";
+import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import { streamToVFS } from "./vfs-io";
 
 // Canonical cleanup re-exported from the pool module for convenience
@@ -25,11 +27,11 @@ const OUTPUT_DIR = "/out";
 function copyInputsToFS(
   js7z: JS7zInstance,
   localPaths: readonly string[],
-  token?: vscode.CancellationToken,
+  token?: TokenLike,
 ): string[] {
   const fsPaths: string[] = [];
   for (const localPath of localPaths) {
-    if (token?.isCancellationRequested) throw new vscode.CancellationError();
+    if (token?.isCancellationRequested) throw new CancelledError();
     const name = getBaseName(localPath);
     const fsTarget = joinFSPath(INPUT_DIR, name);
     const stat = fs.statSync(localPath);
@@ -52,7 +54,7 @@ function sanitizeArgs(args: string[]): string[] {
 function run7z(
   js7z: JS7zInstance,
   args: string[],
-  progress?: vscode.Progress<{ message?: string; increment?: number }>,
+  progress?: ProgressLike,
   onStdout?: (text: string) => void,
   timeoutMs = 600_000, // 10 minutes default
 ): Promise<void> {

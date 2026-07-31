@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
@@ -41,7 +42,7 @@ export const handleMerge: MessageHandler = async (ctx) => {
     logger.info({ event: "webview.merge.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     logger.error({ event: "webview.merge.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {

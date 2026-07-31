@@ -7,6 +7,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
@@ -64,7 +65,7 @@ export const handleRename: MessageHandler = async (ctx) => {
       }
     }
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     logger.error({ event: "webview.rename.failed", err }, (err as Error).message);
     showErrorWithCopy(t("decompress.failed") + (err as Error).message);
   } finally {

@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { decompressWithKnownPassword } from "../../../commands/decompress";
@@ -25,7 +26,7 @@ export const handleExtractAll: MessageHandler = async (ctx) => {
     logger.info({ event: "webview.extAll.complete", archiveName: s.archiveName });
     webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     logger.error({ event: "webview.extAll.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {

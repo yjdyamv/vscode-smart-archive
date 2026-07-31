@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
@@ -50,7 +51,7 @@ export const handleDropFiles: MessageHandler = async (ctx) => {
       );
     }
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     logger.error({ event: "webview.dropFiles.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {

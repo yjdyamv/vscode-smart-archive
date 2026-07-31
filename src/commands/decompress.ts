@@ -28,8 +28,9 @@ import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../u
 import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
-import { promptOversizeFile } from "../utils/security";
+import { promptOversizeFile } from "../utils/promptOversize";
 import { resolveEffectiveInput } from "../api/decompress";
+import { isCancellationError } from "../utils/cancellation";
 
 export async function decompressCommand(
   uri: vscode.Uri | undefined,
@@ -157,7 +158,7 @@ async function decompressSingleFile(
             "Failed to clean up output directory",
           );
         }
-        if (!(err instanceof vscode.CancellationError)) {
+        if (!isCancellationError(err)) {
           vscode.window.showErrorMessage(t("decompress.failed") + (err as Error).message);
         }
       }

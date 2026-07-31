@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { previewFileFromArchive } from "../../archive";
@@ -22,7 +23,7 @@ export const handlePreview: MessageHandler = async (ctx) => {
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     logger.info({ event: "webview.preview.complete", path: msg.path });
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     const errMsg = err instanceof Error ? err.message : String(err ?? "");
     logger.error({ event: "webview.preview.failed", err }, errMsg);
     showErrorWithCopy(t("decompress.failed") + " " + errMsg);

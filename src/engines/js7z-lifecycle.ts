@@ -8,7 +8,7 @@
  */
 
 import type { JS7zInstance } from "../types";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
 
 /**
  * Canonical cleanup for a JS7z WASM instance.

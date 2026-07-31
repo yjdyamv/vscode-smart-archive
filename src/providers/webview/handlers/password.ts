@@ -6,6 +6,7 @@
 
 import * as vscode from "vscode";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t, formatCompactSize } from "../../../i18n";
 import { isPasswordOrEncryptError } from "../../../utils/errorClassifier";
@@ -111,7 +112,7 @@ export const handlePassword: MessageHandler = async (ctx) => {
       webview.html = webview.html.replace("</body>", extra.join("") + "</body>");
     }
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     logger.error({ event: "webview.password.error", err });
     const errMsg = err instanceof Error ? err.message : String(err);
     if (isPasswordOrEncryptError(errMsg)) {

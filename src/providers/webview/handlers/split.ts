@@ -8,6 +8,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import type { MessageHandler } from "./types";
+import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
@@ -43,7 +44,7 @@ export const handleSplit: MessageHandler = async (ctx) => {
     logger.info({ event: "webview.split.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
   } catch (err) {
-    if (err instanceof vscode.CancellationError) return;
+    if (isCancellationError(err)) return;
     logger.error({ event: "webview.split.failed", err }, (err as Error).message);
     webview.postMessage({ c: "err", t: t("decompress.failed") + (err as Error).message });
   } finally {

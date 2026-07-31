@@ -9,7 +9,7 @@
  * @module engines/brotli-codec
  */
 
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
 import { checkFileSize, checkTotalSize } from "../utils/security";
 import * as zlib from "node:zlib";
 import * as fs from "fs";

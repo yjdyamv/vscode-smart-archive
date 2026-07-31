@@ -1,8 +1,10 @@
 /**
  * Internationalization (i18n) helper — 7z VSCode Extension
  *
- * Detects VSCode display language and returns UI strings in the appropriate locale.
+ * Returns UI strings in the appropriate locale.
  * Currently supports English (default) and Chinese (zh-cn, zh-tw).
+ * Vscode-free: the host extension calls setLocale(vscode.env.language);
+ * worker threads receive the locale in their init message.
  *
  * Usage:
  *   import { t } from '../i18n';
@@ -10,8 +12,6 @@
  *
  * @module i18n
  */
-
-import * as vscode from "vscode";
 
 /** Supported locale codes */
 type Locale = "en" | "zh-cn" | "zh-tw";
@@ -771,14 +771,23 @@ const messages: Record<string, Record<Locale, string>> = {
  */
 let _cachedLocale: Locale | null = null;
 
+/**
+ * Set the display language explicitly (e.g. vscode.env.language from the
+ * host, or the locale sent to a worker thread). Falls back to English when
+ * never called.
+ */
+export function setLocale(lang: string): void {
+  _cachedLocale = null;
+  const l = lang.toLowerCase();
+  if (l.startsWith("zh-cn") || l === "zh-hans") _cachedLocale = "zh-cn";
+  else if (l.startsWith("zh-tw") || l === "zh-hant") _cachedLocale = "zh-tw";
+  else if (l.startsWith("zh")) _cachedLocale = "zh-cn";
+  else _cachedLocale = "en";
+}
+
 function detectLocale(): Locale {
   if (_cachedLocale) return _cachedLocale;
-  const lang = vscode.env.language.toLowerCase();
-  if (lang.startsWith("zh-cn") || lang === "zh-hans") _cachedLocale = "zh-cn";
-  else if (lang.startsWith("zh-tw") || lang === "zh-hant") _cachedLocale = "zh-tw";
-  else if (lang.startsWith("zh")) _cachedLocale = "zh-cn";
-  else _cachedLocale = "en";
-  return _cachedLocale;
+  return (_cachedLocale = "en");
 }
 
 /**
