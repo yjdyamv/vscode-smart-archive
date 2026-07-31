@@ -27,6 +27,7 @@ import {
   TAR_INNER_PATTERNS,
   UNWRAP_MAX_DEPTH,
   UNWRAP_MAX_TAR_FILES,
+  VFS_TMP_INNER_OUT,
 } from "../constants";
 import { brotliDecompressFile } from "./brotli-codec";
 import { lz4DecompressFile } from "./lz4-codec";
@@ -224,7 +225,7 @@ export async function unwrapInnerTar(outputDir: string, progress?: ProgressLike)
         // the Zip-Slip / symlink / size-cap guards always run. (Removed a
         // NODEFS-mount fast-path whose "/mnt_" trigger came from the tar entry
         // name, letting an inner tar named "mnt_*" bypass the guards.)
-        const outPath = "/_inner_out";
+        const outPath = VFS_TMP_INNER_OUT;
         js7z.FS.mkdir(outPath);
 
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);

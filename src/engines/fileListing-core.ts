@@ -14,7 +14,14 @@ import type { JS7zInstance } from "../types";
 import { fixArchiveEncoding } from "../utils/path";
 import { listFilesWasm } from "./js7z-list-core";
 import { checkArchiveInputSize } from "./vfs-io";
-import { getFullExt, isWrappedFormat, isEncryptableExt, VFS_CHUNK } from "../constants";
+import {
+  getFullExt,
+  isWrappedFormat,
+  isEncryptableExt,
+  VFS_CHUNK,
+  VFS_TMP_LX,
+  VFS_TMP_LS,
+} from "../constants";
 import { logger } from "../utils/logger-core";
 import { disposeJS7z } from "./js7z-lifecycle";
 import { validatePassword } from "../utils/security";
@@ -92,7 +99,7 @@ export async function extractAndList(tarName: string, tarData: Uint8Array): Prom
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
     writeLargeVFS(js7z, `/${tarName}`, tarData);
-    js7z.FS.mkdir("/_lx");
+    js7z.FS.mkdir(VFS_TMP_LX);
     const args = ["x", `/${tarName}`, "-o/_lx", "-y"];
     await new Promise<void>((resolve, reject) => {
       js7z.onExit = (c: number) => {
@@ -101,8 +108,8 @@ export async function extractAndList(tarName: string, tarData: Uint8Array): Prom
       };
       js7z.callMain(args);
     });
-    js7z.FS.readdir("/_lx").filter((e: string) => e !== "." && e !== "..");
-    return readDirEntries(js7z, "/_lx", "");
+    js7z.FS.readdir(VFS_TMP_LX).filter((e: string) => e !== "." && e !== "..");
+    return readDirEntries(js7z, VFS_TMP_LX, "");
   } finally {
     disposeJS7z(js7z);
   }
@@ -146,7 +153,7 @@ export async function listViaExtract(
     }
 
     js7z.FS.writeFile(`/${archiveName}`, buf);
-    js7z.FS.mkdir("/_ls");
+    js7z.FS.mkdir(VFS_TMP_LS);
     const args = ["x", `/${archiveName}`, "-o/_ls", "-y"];
     if (password) {
       validatePassword(password);
@@ -159,7 +166,7 @@ export async function listViaExtract(
       };
       js7z.callMain(args);
     });
-    const topEntries = js7z.FS.readdir("/_ls").filter((e: string) => e !== "." && e !== "..");
+    const topEntries = js7z.FS.readdir(VFS_TMP_LS).filter((e: string) => e !== "." && e !== "..");
 
     // Wrapped formats: if extraction produced a single .tar, list its contents.
     // Also handle the case where 7z auto-unpacks the inner tar — the .tar is an
@@ -170,12 +177,12 @@ export async function listViaExtract(
     if (tarEntries.length === 1 && nonTar.length === 0) {
       // Pure wrapped: one .tar file, no auto-unpack — extract and list contents
       const innerTar = tarEntries[0];
-      const innerData = js7z.FS.readFile(`/_ls/${innerTar}`, { encoding: "binary" });
+      const innerData = js7z.FS.readFile(`${VFS_TMP_LS}/${innerTar}`, { encoding: "binary" });
       return extractAndList(innerTar, new Uint8Array(innerData));
     }
 
     // Mixed: 7z auto-unpacked — return non-tar entries only
-    return readDirEntries(js7z, "/_ls", "");
+    return readDirEntries(js7z, VFS_TMP_LS, "");
   } finally {
     disposeJS7z(js7z);
   }

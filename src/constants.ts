@@ -586,3 +586,26 @@ export const TAR_INNER_PATTERNS = [
   ".tlz4",
   ".tbr",
 ] as const;
+
+// ── JS7z virtual-FS work directories ───────────────────────────────
+// Single source of truth for the VFS paths the WASM engine uses as
+// scratch space. All internal — never surfaced to the user.
+
+/** Outer-layer extraction scratch dir (extract-selected, wrapped) */
+export const VFS_TMP_X1 = "/_x1";
+/** Inner-tar extraction scratch dir (extract-selected, wrapped) */
+export const VFS_TMP_X2 = "/_x2";
+/** Tar-extraction scratch dir (list wrapped / preview inner tar) */
+export const VFS_TMP_LX = "/_lx";
+/** Archive-extraction scratch dir (list wrapped) */
+export const VFS_TMP_LS = "/_ls";
+/** Preview extraction scratch dir */
+export const VFS_TMP_PV = "/_pv";
+/** Nested-archive unwrap scratch dir (preview) */
+export const VFS_TMP_PV2 = "/_pv2";
+/** Wrapped-format mutation scratch dir (extract outer layer) */
+export const VFS_TMP_WRAP1 = "/_wrap1";
+/** Inner-tar unwrap scratch dir (decompress) */
+export const VFS_TMP_INNER_OUT = "/_inner_out";
+/** Inner .tar file name used by wrapped-format mutations */
+export const VFS_INNER_TAR = "/inner.tar";
