@@ -36,7 +36,11 @@ export const handleDelete: MessageHandler = async (ctx) => {
 
   const token = startOperation(s);
   try {
-    webview.postMessage({ c: "loading", t: t("archive.deleting") });
+    // Deleting rebuilds the whole archive (7-Zip has no in-place delete)
+    // and recompresses the remaining data — on large high-compression
+    // archives this takes tens of seconds with NO progress output from
+    // `7z d`. Tell the user up front instead of showing a static spinner.
+    webview.postMessage({ c: "loading", t: t("archive.deletingRebuild") });
 
     const ext = getFullExt(s.filePath);
     let pathsToDelete = msg.paths;

@@ -1056,6 +1056,7 @@ function run7z(
   args: string[],
   progress?: ProgressLike,
   token?: TokenLike,
+  cwd?: string,
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
   return new Promise<void>((resolve, reject) => {
@@ -1066,7 +1067,11 @@ function run7z(
 
     logger.debug({ event: "system7z.run.start", binary, argsPreview: maskArgs(args) });
 
-    const proc = spawn(binary, args, { stdio: "pipe", windowsHide: true });
+    const proc = spawn(binary, args, {
+      stdio: "pipe",
+      windowsHide: true,
+      ...(cwd ? { cwd } : {}),
+    });
 
     // Close stdin immediately — no password via stdin, all passwords
     // are passed on the command line via -p<password> flag.
@@ -1350,6 +1355,8 @@ export async function deleteFromArchiveSystem7z(
   archivePath: string,
   selectedPaths: string[],
   password?: string,
+  progress?: ProgressLike,
+  token?: TokenLike,
 ): Promise<void> {
   const sz = getSystem7zOrNull();
   if (!sz) throw new Error("System 7-Zip not available");
@@ -1368,7 +1375,12 @@ export async function deleteFromArchiveSystem7z(
     encrypted: !!password,
   });
 
-  await spawnCaptureInCwd(sz, dArgs, path.dirname(archivePath));
+  // run7z (not spawnCapture) so the caller sees real progress: deleting
+  // rebuilds the whole archive (7-Zip has no in-place delete) and
+  // recompresses the remaining data — with -mx9 archives that takes a
+  // while, and without progress it looks frozen. cwd = archive dir so
+  // 7-Zip's atomic <archive>.tmp replacement lands next to the archive.
+  await run7z(sz, dArgs, progress, token, path.dirname(archivePath));
 
   logger.info({ event: "system7z.delete.ok", archivePath, entries: selectedPaths.length });
 }
