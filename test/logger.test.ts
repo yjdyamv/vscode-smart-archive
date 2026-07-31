@@ -198,4 +198,111 @@ describe("logger.setLevel", () => {
       spy.mockRestore();
     }
   });
+
+  it("replays info/warn history when the panel level rises to Info", async () => {
+    const { freshLogger, channel, calls, listeners, spy } =
+      await freshLoggerAndChannel(vscode.LogLevel.Warning);
+    try {
+      freshLogger.setLevel("debug");
+      freshLogger.debug({ event: "rise.debug" });
+      freshLogger.info({ event: "rise.info" });
+      freshLogger.warn({ event: "rise.warn" });
+      await flush();
+      expect(calls.debug).toHaveLength(0);
+      expect(calls.info).toHaveLength(0);
+      // Warning panel shows warn+ — the warn record surfaced live already.
+      expect(calls.warn).toEqual([expect.stringContaining("rise.warn")]);
+      const warnCallsBefore = calls.warn.length;
+
+      // Panel Warning → Info: info records replay (warn already visible).
+      channel.logLevel = vscode.LogLevel.Info;
+      for (const cb of listeners) cb(vscode.LogLevel.Info);
+      await flush();
+      expect(calls.info).toEqual(
+        expect.arrayContaining([expect.stringContaining("rise.info")]),
+      );
+      expect(calls.warn.length).toBe(warnCallsBefore); // no duplicate replay
+      expect(calls.debug.some((l) => l.includes("rise.debug"))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("env log-level changes replay history too, idempotently", async () => {
+    const envListeners: Array<(lvl: number) => void> = [];
+    const { freshLogger, channel, calls, listeners, spy } = await freshLoggerAndChannel();
+    try {
+      vi.spyOn(vscode.env, "onDidChangeLogLevel").mockImplementation(
+        (cb: (lvl: number) => void) => {
+          envListeners.push(cb);
+          return { dispose: vi.fn() };
+        },
+      );
+      freshLogger.setLevel("debug");
+      freshLogger.debug({ event: "env.replay" });
+      await flush();
+      expect(calls.debug).toHaveLength(0);
+
+      // Both the panel and the env fire for the same logical change.
+      channel.logLevel = vscode.LogLevel.Debug;
+      for (const cb of listeners) cb(vscode.LogLevel.Debug);
+      for (const cb of envListeners) cb(vscode.LogLevel.Debug);
+      await flush();
+      const debugLines = calls.debug.filter((l) => l.includes("env.replay"));
+      expect(debugLines).toHaveLength(1); // idempotent across both listeners
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("rebuilds listeners and history after dispose (re-activation)", async () => {
+    const { freshLogger, calls, spy } = await freshLoggerAndChannel();
+    try {
+      freshLogger.setLevel("debug");
+      freshLogger.debug({ event: "life.before" });
+      await flush();
+
+      freshLogger.dispose();
+      // A fresh channel on re-activation: prior history is gone, listeners
+      // are re-attached to the new channel.
+      const channel2 = {
+        appendLine: vi.fn(),
+        logLevel: vscode.LogLevel.Info,
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        show: vi.fn(),
+        dispose: vi.fn(),
+        onDidChangeLogLevel: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+      };
+      spy.mockReturnValue(channel2 as unknown as vscode.LogOutputChannel);
+      freshLogger.setLevel("debug");
+      expect(channel2.onDidChangeLogLevel).toHaveBeenCalledTimes(1); // re-attached
+
+      freshLogger.debug({ event: "life.after" });
+      await flush();
+      // Panel Info still hides debug; the OLD channel's history is gone —
+      // switching the new panel to Debug replays only post-reactivation logs.
+      const oldDebugCalls = calls.debug.length;
+      channel2.logLevel = vscode.LogLevel.Debug;
+      const cb2 = (channel2.onDidChangeLogLevel as ReturnType<typeof vi.fn>)
+        .mock.calls[0][0] as (lvl: number) => void;
+      cb2(vscode.LogLevel.Debug);
+      await flush();
+      expect(calls.debug.length).toBe(oldDebugCalls); // old channel untouched
+      expect(
+        (channel2.debug as ReturnType<typeof vi.fn>).mock.calls.some((c) =>
+          String(c[0]).includes("life.after"),
+        ),
+      ).toBe(true);
+      expect(
+        (channel2.debug as ReturnType<typeof vi.fn>).mock.calls.some((c) =>
+          String(c[0]).includes("life.before"),
+        ),
+      ).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });

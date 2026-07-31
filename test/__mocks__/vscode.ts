@@ -1,4 +1,7 @@
-export const env = { language: "en" };
+export const env = {
+  language: "en",
+  onDidChangeLogLevel: () => ({ dispose: () => {} }),
+};
 
 export const window = {
   showWarningMessage: () => undefined,
