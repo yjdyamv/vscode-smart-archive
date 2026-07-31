@@ -31,5 +31,7 @@
   "config.useSystemZstd.description": "是否使用系统安装的 zstd 进行 tar.zst 压缩。系统 zstd 速度更快，但需要本地安装。",
   "config.useSystemZstd.auto": "自动检测系统 zstd。如果存在则用于 tar.zst 压缩加速；否则回退到内置 zstd-wasm。",
   "config.useSystemZstd.always": "始终使用系统 zstd。如果未安装则显示错误。",
-  "config.useSystemZstd.never": "永不使用系统 zstd。始终使用内置 zstd-wasm，即使已安装 zstd。"
+  "config.useSystemZstd.never": "永不使用系统 zstd。始终使用内置 zstd-wasm，即使已安装 zstd。",
+  "config.workerMemoryMb.description": "归档 worker 线程（运行 WASM 7-Zip）的内存上限（MiB）。设为 0 可禁用护栏。降低可减少扩展内存占用；若大压缩包报内存超限错误请调高。",
+  "config.workerPoolSize.description": "归档 worker 线程数。1 表示所有操作串行（内存占用最低）；2 允许小压缩包批量操作并行执行。每个 worker 独立持有 WASM 7-Zip 堆内存。修改后需重载窗口生效。"
 }

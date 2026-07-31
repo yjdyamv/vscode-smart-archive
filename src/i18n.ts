@@ -762,6 +762,13 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": '拦截到路径逃逸："{0}" 位于暂存目录 "{1}" 之外',
     "zh-tw": '攔截到路徑逃逸："{0}" 位於暫存目錄 "{1}" 之外',
   },
+  "worker.memoryLimit": {
+    en: "Operation requires more memory than the worker limit ({0} MB). Close other archives or increase smart-archive.workerMemoryMb.",
+    "zh-cn":
+      "操作所需内存超过 worker 上限（{0} MB）。请关闭其他压缩包或增大 smart-archive.workerMemoryMb。",
+    "zh-tw":
+      "操作所需記憶體超過 worker 上限（{0} MB）。請關閉其他壓縮檔或增大 smart-archive.workerMemoryMb。",
+  },
 };
 
 /**

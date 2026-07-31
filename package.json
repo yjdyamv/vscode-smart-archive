@@ -483,6 +483,19 @@
             "%config.useSystemZstd.never%"
           ],
           "description": "%config.useSystemZstd.description%"
+        },
+        "smart-archive.workerMemoryMb": {
+          "type": "integer",
+          "default": 3072,
+          "minimum": 0,
+          "description": "%config.workerMemoryMb.description%"
+        },
+        "smart-archive.workerPoolSize": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 2,
+          "description": "%config.workerPoolSize.description%"
         }
       }
     }

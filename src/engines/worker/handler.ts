@@ -17,10 +17,24 @@ import type {
 } from "./types";
 import { compressWith7z as compressCore } from "../js7z-compress-core";
 import { decompressWith7z as decompressCore } from "../js7z-decompress-core";
+import { fetchFileListCore } from "../fileListing-core";
+import { isEncryptedWasm } from "../js7z-list-core";
+import {
+  addToArchiveCore,
+  deleteFromArchiveCore,
+  renameInArchiveCore,
+  createFolderInArchiveCore,
+  previewFileCore,
+  testArchiveCore,
+  setModifyConfig,
+} from "../modify-core";
+import { extractSelectedCore } from "../extract-core";
+import type { ModifyPayload } from "./types";
 import { setLocale } from "../../i18n";
 import { setSecurityLimits } from "../../utils/security";
-import { setZstdConfig } from "../zstd-codec";
+import { setZstdConfig, resetZstdDetectionCache } from "../zstd-codec";
 import { setLoggerSink } from "../../utils/logger-core";
+import { setWorkerMemoryLimitMb } from "./memory-guard";
 import { isCancellationError } from "../../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
 import { logger } from "../../utils/logger-core";
@@ -46,6 +60,11 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
       useSystemZstd: config.useSystemZstd ?? "auto",
       warn: (message) => post({ type: "notify", message }),
     });
+    // A setting change may flip the system-zstd decision — drop the cached
+    // detection result so the next zstd op re-detects.
+    resetZstdDetectionCache();
+    setWorkerMemoryLimitMb(config.workerMemoryMb ?? 3072);
+    setModifyConfig({ compressionLevel: config.compressionLevel ?? 5 });
   }
 
   function makeToken(requestId: number): TokenLike {
@@ -74,14 +93,68 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
     const { id, op, payload } = message;
     logger.info({ event: "worker.request.start", id, op });
     try {
+      let result: unknown;
       if (op === "compress") {
         const p = payload as CompressPayload;
         await compressCore(p.options, makeProgress(id), makeToken(id), p.excludePatterns);
-      } else {
+      } else if (op === "decompress") {
         const p = payload as DecompressPayload;
         await decompressCore(p.options, makeProgress(id), makeToken(id));
+      } else if (op === "list") {
+        const p = payload as { inputPath: string; password?: string; data?: Uint8Array };
+        result = await fetchFileListCore(p.inputPath, p.password ?? "", p.data);
+      } else if (op === "isEncrypted") {
+        const p = payload as { inputPath: string };
+        result = await isEncryptedWasm(p.inputPath);
+      } else if (op === "modify") {
+        const p = payload as ModifyPayload;
+        const token = makeToken(id);
+        switch (p.action) {
+          case "add":
+            await addToArchiveCore(
+              p.archivePath,
+              p.localPaths,
+              p.targetDir,
+              p.password,
+              p.excludePatterns,
+              token,
+            );
+            break;
+          case "delete":
+            await deleteFromArchiveCore(p.archivePath, p.paths, p.password, token);
+            break;
+          case "rename":
+            await renameInArchiveCore(p.archivePath, p.oldPath, p.newPath, p.password, token);
+            break;
+          case "createFolder":
+            await createFolderInArchiveCore(
+              p.archivePath,
+              p.targetDir,
+              p.folderName,
+              p.password,
+              token,
+            );
+            break;
+          case "preview":
+            await previewFileCore(p.archivePath, p.filePath, p.password, p.outputPath);
+            break;
+          case "test":
+            result = await testArchiveCore(p.archivePath, p.password);
+            break;
+          case "extract":
+            await extractSelectedCore(
+              p.archivePath,
+              p.paths,
+              p.password,
+              p.flat,
+              p.outputDir,
+              p.excludes,
+              token,
+            );
+            break;
+        }
       }
-      post({ type: "done", id });
+      post({ type: "done", id, result });
     } catch (err) {
       post({
         type: "error",

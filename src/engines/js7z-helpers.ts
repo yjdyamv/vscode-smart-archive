@@ -17,6 +17,7 @@ import { logger } from "../utils/logger-core";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import { streamToVFS } from "./vfs-io";
+import { checkWorkerMemory } from "./worker/memory-guard";
 
 // Canonical cleanup re-exported from the pool module for convenience
 export { disposeJS7z } from "./js7z-lifecycle";
@@ -63,8 +64,12 @@ function run7z(
   const prevPrintErr = js7z.printErr;
   let stderr = "";
   let lastPct = -1;
+  let printCount = 0;
   js7z.print = (text: string) => {
     if (onStdout) onStdout(text);
+    // RSS guard: check every ~10th print tick (7z prints steadily while
+    // working). Throws synchronously — caught by the callMain try/catch.
+    if (++printCount % 10 === 0) checkWorkerMemory();
     const m = text.match(/(\d{1,3})%/);
     if (m && progress) {
       const pct = parseInt(m[1], 10);

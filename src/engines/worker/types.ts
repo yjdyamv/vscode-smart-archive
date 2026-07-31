@@ -12,12 +12,16 @@
 
 import type { CompressOptions, DecompressOptions } from "../../types";
 
-export type ArchiveOp = "compress" | "decompress";
+export type ArchiveOp = "compress" | "decompress" | "list" | "isEncrypted" | "modify";
 
 export interface EngineConfig {
   locale: string;
   limits: { maxFileSize?: number; maxTotalSize?: number };
   useSystemZstd?: string;
+  /** Worker RSS memory guard threshold in MiB (0 = disabled) */
+  workerMemoryMb?: number;
+  /** Default compression level (0-9) for wrapped-format mutations */
+  compressionLevel?: number;
 }
 
 export interface InitMessage {
@@ -39,7 +43,66 @@ export interface DecompressPayload {
   options: DecompressOptions;
 }
 
-export type RequestPayload = CompressPayload | DecompressPayload;
+export interface ListPayload {
+  inputPath: string;
+  password?: string;
+  /** In-memory archive bytes (overrides reading from inputPath) */
+  data?: Uint8Array;
+}
+
+export type ModifyPayload =
+  | {
+      action: "add";
+      archivePath: string;
+      localPaths: string[];
+      targetDir: string;
+      password?: string;
+      excludePatterns?: string[];
+    }
+  | {
+      action: "delete";
+      archivePath: string;
+      paths: string[];
+      password?: string;
+    }
+  | {
+      action: "rename";
+      archivePath: string;
+      oldPath: string;
+      newPath: string;
+      password?: string;
+    }
+  | {
+      action: "createFolder";
+      archivePath: string;
+      targetDir: string;
+      folderName: string;
+      password?: string;
+    }
+  | {
+      action: "preview";
+      archivePath: string;
+      filePath: string;
+      password?: string;
+      /** Host-managed temp file the worker writes the extracted bytes to */
+      outputPath: string;
+    }
+  | {
+      action: "test";
+      archivePath: string;
+      password?: string;
+    }
+  | {
+      action: "extract";
+      archivePath: string;
+      paths: string[];
+      password?: string;
+      flat?: boolean;
+      outputDir: string;
+      excludes?: string[];
+    };
+
+export type RequestPayload = CompressPayload | DecompressPayload | ListPayload | ModifyPayload;
 
 export interface RequestMessage {
   type: "request";
@@ -90,6 +153,8 @@ export interface NotifyMessage {
 export interface DoneMessage {
   type: "done";
   id: number;
+  /** Operation result (e.g. the entry list for op "list") */
+  result?: unknown;
 }
 
 export interface ErrorMessage {
