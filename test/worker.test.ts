@@ -313,6 +313,57 @@ describe("createArchiveWorkerHandler", () => {
     expect(await encResult).toBe(true);
   });
 
+  it("unwraps inner tar files via the unwrap op", async () => {
+    initWorker();
+    // Build a tar.gz archive, then drop it into a directory like an
+    // extraction output that contains an inner tar.
+    const innerSrc = path.join(td, "inner-file.txt");
+    fs.writeFileSync(innerSrc, "inner content");
+    const innerTar = path.join(td, "nested.tar.gz");
+    const done = new Promise<void>((resolve) => {
+      const check = () => {
+        if (port.last().type === "done") resolve();
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    port.send({
+      type: "request",
+      id: 1,
+      op: "compress",
+      payload: {
+        options: {
+          targets: [{ fsPath: innerSrc }],
+          format: { label: "tar.gz", description: "", canCreate: true, supportsEncryption: false },
+          outputPath: innerTar,
+          password: "",
+          level: 5,
+        },
+        excludePatterns: [],
+      },
+    });
+    await done;
+
+    const outDir = path.join(td, "unwrap-out");
+    fs.mkdirSync(outDir);
+    fs.copyFileSync(innerTar, path.join(outDir, "nested.tar.gz"));
+
+    const unwrapDone = new Promise<void>((resolve) => {
+      const check = () => {
+        const last = port.last();
+        if (last.type === "done" && last.id === 2) resolve();
+        else if (last.type === "error" && last.id === 2) throw new Error(last.message);
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    port.send({ type: "request", id: 2, op: "unwrap", payload: { outputDir: outDir } });
+    await unwrapDone;
+    expect(fs.existsSync(path.join(outDir, "inner-file.txt"))).toBe(true);
+    // The intermediate tar is removed after unwrapping.
+    expect(fs.existsSync(path.join(outDir, "nested.tar.gz"))).toBe(false);
+  });
+
   it("applies reconfigure (locale + limits)", async () => {
     initWorker({ locale: "en" });
     port.send({

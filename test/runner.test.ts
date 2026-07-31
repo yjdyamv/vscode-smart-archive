@@ -15,6 +15,7 @@ import {
   setArchiveRunner,
   runArchiveOp,
   reconfigureArchiveWorker,
+  resetArchiveRunner,
 } from "../src/engines/worker/runner";
 
 class FakeWorker {
@@ -311,21 +312,43 @@ describe("WorkerThreadRunner", () => {
   });
 
   it("reconfigureArchiveWorker reaches the active runner", async () => {
-    const { runner, workers } = makeRunner();
+    const { runner, workers: wkrs } = makeRunner();
     setArchiveRunner(runner);
     const promise = runner.run("decompress", payload);
     await sleep(0);
-    workers[0].emitMessage({ type: "ready" });
+    wkrs[0].emitMessage({ type: "ready" });
     await sleep(0);
-    const [req] = sentRequests(workers[0]);
+    const [req] = sentRequests(wkrs[0]);
 
     reconfigureArchiveWorker();
     expect(
-      workers[0].posted.some((m) => (m as { type: string }).type === "reconfigure"),
+      wkrs[0].posted.some((m) => (m as { type: string }).type === "reconfigure"),
     ).toBe(true);
 
-    workers[0].emitMessage({ type: "done", id: req.id });
+    wkrs[0].emitMessage({ type: "done", id: req.id });
     await promise;
+    setArchiveRunner(new InProcessRunner());
+  });
+
+  it("resetArchiveRunner disposes the active runner and drops it", async () => {
+    const { runner, workers: wkrs } = makeRunner();
+    setArchiveRunner(runner);
+    const p1 = runner.run("decompress", payload);
+    await sleep(0);
+    wkrs[0].emitMessage({ type: "ready" });
+    await sleep(0);
+    const [req] = sentRequests(wkrs[0]);
+    wkrs[0].emitMessage({ type: "done", id: req.id });
+    await p1;
+
+    resetArchiveRunner();
+    expect(wkrs[0].posted).toContainEqual({ type: "shutdown" });
+
+    // The next op must NOT silently reuse the stale (in-process) runner:
+    // it attempts a fresh worker spawn, which fails in vitest because the
+    // default factory points at the unbuilt bundle — proving no in-process
+    // fallback was latched by the reset.
+    await expect(runArchiveOp("decompress", payload)).rejects.toThrow();
     setArchiveRunner(new InProcessRunner());
   });
 });

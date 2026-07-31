@@ -4,19 +4,12 @@
  * Host-side entry point for archive listing. Keeps the original
  * fetchFileList signature; the WASM work runs in the worker thread
  * (engines/fileListing-core). The system-7z fast path (child process)
- * stays on the host. Also re-exports the JS7z helpers the archive
- * modify providers rely on, until those migrate to the worker too.
+ * stays on the host.
  *
  * @module providers/fileListing
  */
 
 import { runArchiveOp } from "../engines/worker/runner";
-import {
-  fetchFileListCore,
-  listViaExtract,
-  readDirEntries,
-  writeLargeVFS,
-} from "../engines/fileListing-core";
 import type { ListEntry } from "../engines/fileListing-core";
 import { hasSystem7z, listWithSystem7z } from "../engines/system7z";
 import { getFullExt, isWrappedFormat } from "../constants";
@@ -46,11 +39,3 @@ export async function fetchFileList(
 
   return runArchiveOp<ListEntry[]>("list", { inputPath: filePath, password, data });
 }
-
-export { fetchFileListCore, listViaExtract, readDirEntries, writeLargeVFS };
-
-// Re-exports kept for the archive modify providers (add/delete/modify/
-// extraction) which still run WASM on the host until they migrate.
-export { JS7z } from "../engines/js7z-factory";
-export { disposeJS7z } from "../engines/js7z-lifecycle";
-export { parse7zListing } from "../utils/parse7z";

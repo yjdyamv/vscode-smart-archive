@@ -545,8 +545,10 @@ export const RUN7Z_TIMEOUT = 600_000;
 export const DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024;
 /** Default total decompressed size limit (10 GiB) — matches maxTotalSize */
 export const DEFAULT_MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024;
-/** Default worker RSS memory guard (MiB) — matches workerMemoryMb */
-export const WORKER_MEMORY_LIMIT_DEFAULT_MB = 3072;
+/** Default worker RSS memory guard (MiB) — matches workerMemoryMb. Covers
+ *  default-config extraction of multi-GB archives (the VFS holds the whole
+ *  archive in worker RSS); raise it for near-maxTotalSize extractions. */
+export const WORKER_MEMORY_LIMIT_DEFAULT_MB = 8192;
 /** Hard size cap for previewing a single archive entry (100 MB) */
 export const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024;
 /** Worker RSS guard sampling: every Nth 7z print tick */

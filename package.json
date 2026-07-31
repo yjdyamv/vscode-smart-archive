@@ -486,7 +486,7 @@
         },
         "smart-archive.workerMemoryMb": {
           "type": "integer",
-          "default": 3072,
+          "default": 8192,
           "minimum": 0,
           "description": "%config.workerMemoryMb.description%"
         },

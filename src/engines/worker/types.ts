@@ -12,7 +12,7 @@
 
 import type { CompressOptions, DecompressOptions } from "../../types";
 
-export type ArchiveOp = "compress" | "decompress" | "list" | "isEncrypted" | "modify";
+export type ArchiveOp = "compress" | "decompress" | "list" | "isEncrypted" | "modify" | "unwrap";
 
 export interface EngineConfig {
   locale: string;
@@ -102,7 +102,17 @@ export type ModifyPayload =
       excludes?: string[];
     };
 
-export type RequestPayload = CompressPayload | DecompressPayload | ListPayload | ModifyPayload;
+export type RequestPayload =
+  | CompressPayload
+  | DecompressPayload
+  | ListPayload
+  | ModifyPayload
+  | UnwrapPayload;
+
+export interface UnwrapPayload {
+  /** Directory containing extracted files with possible inner tars */
+  outputDir: string;
+}
 
 export interface RequestMessage {
   type: "request";

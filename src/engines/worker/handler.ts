@@ -29,6 +29,7 @@ import {
   setModifyConfig,
 } from "../modify-core";
 import { extractSelectedCore } from "../extract-core";
+import { unwrapInnerTar } from "../js7z-decompress-core";
 import type { ModifyPayload } from "./types";
 import { setLocale } from "../../i18n";
 import { WORKER_MEMORY_LIMIT_DEFAULT_MB } from "../../constants";
@@ -107,6 +108,9 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
       } else if (op === "isEncrypted") {
         const p = payload as { inputPath: string };
         result = await isEncryptedWasm(p.inputPath);
+      } else if (op === "unwrap") {
+        const p = payload as { outputDir: string };
+        await unwrapInnerTar(p.outputDir, makeProgress(id), makeToken(id));
       } else if (op === "modify") {
         const p = payload as ModifyPayload;
         const token = makeToken(id);

@@ -174,7 +174,11 @@ export async function decompressWith7z(
   }
 }
 
-export async function unwrapInnerTar(outputDir: string, progress?: ProgressLike): Promise<void> {
+export async function unwrapInnerTar(
+  outputDir: string,
+  progress?: ProgressLike,
+  token?: TokenLike,
+): Promise<void> {
   const prog = progress ?? { report: () => {} };
   let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
 
@@ -198,6 +202,7 @@ export async function unwrapInnerTar(outputDir: string, progress?: ProgressLike)
     }
 
     for (const tarFile of tarFiles) {
+      if (token?.isCancellationRequested) throw new CancelledError();
       tarCount++;
       if (tarCount > UNWRAP_MAX_TAR_FILES) {
         logger.warn(
@@ -229,7 +234,7 @@ export async function unwrapInnerTar(outputDir: string, progress?: ProgressLike)
         js7z.FS.mkdir(outPath);
 
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
-        totalSize = checkTotalSize(totalSize, copyDirFromFS(js7z, outPath, outputDir));
+        totalSize = checkTotalSize(totalSize, copyDirFromFS(js7z, outPath, outputDir, token));
 
         try {
           fs.unlinkSync(tarPath);
