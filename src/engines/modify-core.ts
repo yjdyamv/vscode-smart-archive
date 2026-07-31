@@ -19,6 +19,10 @@ import {
   getWrapExtension,
   MAX_PREVIEW_FILE_SIZE,
   TAR_INNER_PATTERNS,
+  VFS_TMP_WRAP1,
+  VFS_TMP_PV,
+  VFS_TMP_PV2,
+  VFS_INNER_TAR,
 } from "../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../utils/security";
 import { getBaseName } from "../utils/path";
@@ -63,7 +67,7 @@ export async function withWrappedArchiveCore(
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
-    const tmpDir = "/_wrap1";
+    const tmpDir = VFS_TMP_WRAP1;
     js7z.FS.mkdir(tmpDir);
     let innerTarName: string;
 
@@ -106,11 +110,11 @@ export async function withWrappedArchiveCore(
     const innerData = js7z.FS.readFile(`${tmpDir}/${innerTarName}`, { encoding: "binary" });
     const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
     try {
-      js7z2.FS.writeFile("/inner.tar", new Uint8Array(innerData));
+      js7z2.FS.writeFile(VFS_INNER_TAR, new Uint8Array(innerData));
 
       await innerOp(js7z2);
 
-      const modifiedTar = js7z2.FS.readFile("/inner.tar", { encoding: "binary" });
+      const modifiedTar = js7z2.FS.readFile(VFS_INNER_TAR, { encoding: "binary" });
       const wrapExt = getWrapExtension(ext);
 
       let compressedData: Uint8Array;
@@ -262,8 +266,8 @@ export async function addToArchiveCore(
         );
 
         const aArgs = vfsDir
-          ? ["a", "/inner.tar", "-aot", vfsDir]
-          : ["a", "/inner.tar", "-aot", ...vfsPaths];
+          ? ["a", VFS_INNER_TAR, "-aot", vfsDir]
+          : ["a", VFS_INNER_TAR, "-aot", ...vfsPaths];
         if (password) {
           validatePassword(password);
           aArgs.splice(1, 0, `-p${password}`);
@@ -339,7 +343,7 @@ export async function deleteFromArchiveCore(
       archivePath,
       password,
       async (js7z2) => {
-        const dArgs = ["d", "/inner.tar", "-y"];
+        const dArgs = ["d", VFS_INNER_TAR, "-y"];
         if (password) {
           validatePassword(password);
           dArgs.splice(1, 0, `-p${password}`);
@@ -404,7 +408,7 @@ export async function renameInArchiveCore(
       archivePath,
       password,
       async (js7z2) => {
-        const rnArgs = ["rn", "/inner.tar", sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
+        const rnArgs = ["rn", VFS_INNER_TAR, sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
         if (password) {
           validatePassword(password);
           rnArgs.splice(1, 0, `-p${password}`);
@@ -495,8 +499,8 @@ export async function createFolderInArchiveCore(
         const parts = folderPath.split("/").filter(Boolean);
         const firstLevel = parts[0];
         const aArgs = firstLevel
-          ? ["a", "/inner.tar", "-aot", `/${firstLevel}`]
-          : ["a", "/inner.tar", "-aot", dotfile];
+          ? ["a", VFS_INNER_TAR, "-aot", `/${firstLevel}`]
+          : ["a", VFS_INNER_TAR, "-aot", dotfile];
         if (password) {
           validatePassword(password);
           aArgs.splice(1, 0, `-p${password}`);
@@ -572,7 +576,7 @@ async function unwrapArchives(
   const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
   try {
     js7z2.FS.writeFile(`/${archiveName}`, new Uint8Array(rawData));
-    js7z2.FS.mkdir("/_pv2");
+    js7z2.FS.mkdir(VFS_TMP_PV2);
     const args = ["x", `/${archiveName}`, "-o/_pv2", "-y", sanitizeCliPath(target)];
     if (password) {
       validatePassword(password);
@@ -584,7 +588,7 @@ async function unwrapArchives(
     });
 
     // Try direct path first, then fall back to reading the first non-dir entry
-    const vfsPath = `/_pv2/${target}`;
+    const vfsPath = `${VFS_TMP_PV2}/${target}`;
     try {
       return js7z2.FS.readFile(vfsPath, { encoding: "binary" });
     } catch {
@@ -594,10 +598,10 @@ async function unwrapArchives(
       );
       // 7z may have flattened the path — look for the base name.
       // Skip .tar entries (intermediate artifacts from wrapped archives).
-      const top2 = js7z2.FS.readdir("/_pv2").filter((e: string) => e !== "." && e !== "..");
+      const top2 = js7z2.FS.readdir(VFS_TMP_PV2).filter((e: string) => e !== "." && e !== "..");
       for (const entry of top2) {
         if (entry.endsWith(".tar")) continue;
-        const ep = `/_pv2/${entry}`;
+        const ep = `${VFS_TMP_PV2}/${entry}`;
         try {
           const st = js7z2.FS.stat(ep);
           if (!js7z2.FS.isDir(st.mode)) {
@@ -668,7 +672,7 @@ export async function previewFileCore(
       archiveFsPath = streamToVFS(js7z, archivePath);
     }
 
-    js7z.FS.mkdir("/_pv");
+    js7z.FS.mkdir(VFS_TMP_PV);
 
     const xArgs = ["x", archiveFsPath, "-o/_pv", "-y"];
     if (password) {
@@ -682,7 +686,7 @@ export async function previewFileCore(
       js7z.callMain(xArgs);
     });
 
-    let top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+    let top = js7z.FS.readdir(VFS_TMP_PV).filter((e: string) => e !== "." && e !== "..");
 
     // If selective extraction produced nothing (e.g. ar archives like .deb),
     // retry extracting everything then locate the requested file.
@@ -693,11 +697,11 @@ export async function previewFileCore(
         js7z.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`7z x: ${c}`)));
         js7z.callMain(allArgs);
       });
-      top = js7z.FS.readdir("/_pv").filter((e: string) => e !== "." && e !== "..");
+      top = js7z.FS.readdir(VFS_TMP_PV).filter((e: string) => e !== "." && e !== "..");
     }
 
     // Try reading the requested file directly
-    const directPath = `/_pv/${normalizedFile}`;
+    const directPath = `${VFS_TMP_PV}/${normalizedFile}`;
     try {
       fileData = js7z.FS.readFile(directPath, { encoding: "binary" });
     } catch {
@@ -710,7 +714,12 @@ export async function previewFileCore(
       let found = false;
       for (const tarEntry of tarEntries) {
         try {
-          fileData = await unwrapArchives(js7z, `/_pv/${tarEntry}`, normalizedFile, password);
+          fileData = await unwrapArchives(
+            js7z,
+            `${VFS_TMP_PV}/${tarEntry}`,
+            normalizedFile,
+            password,
+          );
           found = true;
           break;
         } catch {

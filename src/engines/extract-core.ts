@@ -15,7 +15,13 @@ import { streamToVFS } from "./vfs-io";
 import { decompressLz4Frames } from "./lz4-codec";
 import { brotliDecompress } from "./brotli-codec";
 import { snappyDecompress } from "./snappy-codec";
-import { getFullExt, isWrappedFormat, MAX_COLLISION_RETRIES } from "../constants";
+import {
+  getFullExt,
+  isWrappedFormat,
+  MAX_COLLISION_RETRIES,
+  VFS_TMP_X1,
+  VFS_TMP_X2,
+} from "../constants";
 import { t } from "../i18n";
 import { copyDirFromFS } from "../utils/fs";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../utils/security";
@@ -227,7 +233,7 @@ export async function extractSelectedCore(
         js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       } else {
         const outerFsPath = streamToVFS(js7z, archivePath);
-        js7z.FS.mkdir("/_x1");
+        js7z.FS.mkdir(VFS_TMP_X1);
         await new Promise<void>((resolve, reject) => {
           js7z.onExit = (c: number) => {
             if (c === 0 || c === 1) resolve();
@@ -240,7 +246,7 @@ export async function extractSelectedCore(
           }
           js7z.callMain(outerArgs);
         });
-        const top = js7z.FS.readdir("/_x1").filter((e: string) => e !== "." && e !== "..");
+        const top = js7z.FS.readdir(VFS_TMP_X1).filter((e: string) => e !== "." && e !== "..");
         const found = top.find((e: string) => e.endsWith(".tar"));
         if (!found) throw new Error("Wrapped archive: no inner .tar found");
         innerTarName = found;
@@ -250,7 +256,7 @@ export async function extractSelectedCore(
       const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
       try {
         js7z2.FS.writeFile(`/${innerTarName}`, new Uint8Array(innerData));
-        js7z2.FS.mkdir("/_x2");
+        js7z2.FS.mkdir(VFS_TMP_X2);
         const normalizedPaths = selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/")));
         const excludeFlags = (excludes ?? []).map((ex) => "-xr!" + ex.replace(/\\/g, "/"));
         const innerArgs = [
@@ -270,7 +276,7 @@ export async function extractSelectedCore(
         });
 
         let x2HasContent =
-          js7z2.FS.readdir("/_x2").filter((e: string) => e !== "." && e !== "..").length > 0;
+          js7z2.FS.readdir(VFS_TMP_X2).filter((e: string) => e !== "." && e !== "..").length > 0;
 
         if (!x2HasContent) {
           logger.warn({
@@ -291,9 +297,9 @@ export async function extractSelectedCore(
 
         fs.mkdirSync(outputDir, { recursive: true });
         if (flat && x2HasContent) {
-          copyDirFromFS(js7z2, "/_x2", outputDir, token);
+          copyDirFromFS(js7z2, VFS_TMP_X2, outputDir, token);
         } else {
-          copyFromFSWithStrip(js7z2, "/_x2", outputDir, selectedPaths, token);
+          copyFromFSWithStrip(js7z2, VFS_TMP_X2, outputDir, selectedPaths, token);
         }
       } finally {
         disposeJS7z(js7z2);
