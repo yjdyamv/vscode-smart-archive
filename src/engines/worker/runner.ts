@@ -33,6 +33,15 @@ import { extractSelectedCore } from "../extract-core";
 import type { ModifyPayload } from "./types";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
 
+// ── Worker lifecycle constants ─────────────────────────────────────
+/** Wide JS-heap cap as a backstop against JS-level leaks (the WASM
+ *  memory is a WebAssembly.Memory and is guarded by workerMemoryMb). */
+const WORKER_JS_HEAP_CAP_MB = 4096;
+/** Time to wait for a freshly spawned worker to report ready */
+const WORKER_READY_TIMEOUT_MS = 30_000;
+/** Delay before force-terminating a worker after dispose/shutdown */
+const WORKER_TERMINATE_DELAY_MS = 1000;
+
 interface PendingRequest {
   id: number;
   op: ArchiveOp;
@@ -187,7 +196,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
         // Wide JS-heap cap as a backstop against JS-level leaks. The WASM
         // memory (VFS) is a WebAssembly.Memory, not part of this heap —
         // it is guarded by the worker-side RSS check (workerMemoryMb).
-        resourceLimits: { maxOldGenerationSizeMb: 4096 },
+        resourceLimits: { maxOldGenerationSizeMb: WORKER_JS_HEAP_CAP_MB },
       }),
     private readonly poolSize = 1,
   ) {}
@@ -424,7 +433,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error("Archive worker did not become ready in time")),
-        30_000,
+        WORKER_READY_TIMEOUT_MS,
       );
       const check = (message: WorkerMessage) => {
         if (message.type === "ready") {
@@ -455,7 +464,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
         } catch {
           // worker already gone
         }
-        setTimeout(() => w.terminate(), 1000).unref();
+        setTimeout(() => w.terminate(), WORKER_TERMINATE_DELAY_MS).unref();
       }
       slot.worker = null;
       slot.ready = false;

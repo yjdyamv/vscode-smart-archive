@@ -10,13 +10,14 @@
 
 import * as vscode from "vscode";
 import { parseSize, setSecurityLimits } from "./security";
+import {
+  DEFAULT_MAX_FILE_SIZE,
+  DEFAULT_MAX_TOTAL_SIZE,
+  WORKER_MEMORY_LIMIT_DEFAULT_MB,
+} from "../constants";
 import { setLocale } from "../i18n";
 import { setZstdConfig } from "../engines/zstd-codec";
 import type { EngineConfig } from "../engines/worker/types";
-
-const DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1 GiB
-const DEFAULT_MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024; // 10 GiB
-const DEFAULT_WORKER_MEMORY_MB = 3072;
 
 /**
  * Read the engine-relevant configuration from vscode.
@@ -25,7 +26,7 @@ const DEFAULT_WORKER_MEMORY_MB = 3072;
  */
 export function readEngineConfig(): EngineConfig {
   const config = vscode.workspace.getConfiguration("smart-archive");
-  const memMb = config.get<number>("workerMemoryMb", DEFAULT_WORKER_MEMORY_MB);
+  const memMb = config.get<number>("workerMemoryMb", WORKER_MEMORY_LIMIT_DEFAULT_MB);
   return {
     locale: vscode.env.language,
     limits: {
@@ -37,7 +38,7 @@ export function readEngineConfig(): EngineConfig {
     workerMemoryMb:
       typeof memMb === "number" && Number.isFinite(memMb)
         ? Math.max(0, Math.floor(memMb))
-        : DEFAULT_WORKER_MEMORY_MB,
+        : WORKER_MEMORY_LIMIT_DEFAULT_MB,
   };
 }
 

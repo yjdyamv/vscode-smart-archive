@@ -13,6 +13,7 @@ import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
 import { copyDirToFS } from "../utils/fs";
 import { t } from "../i18n";
+import { RUN7Z_TIMEOUT, MEMORY_CHECK_EVERY_PRINT } from "../constants";
 import { logger } from "../utils/logger-core";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
@@ -57,7 +58,7 @@ function run7z(
   args: string[],
   progress?: ProgressLike,
   onStdout?: (text: string) => void,
-  timeoutMs = 600_000, // 10 minutes default
+  timeoutMs = RUN7Z_TIMEOUT,
 ): Promise<void> {
   logger.info({ event: "run7z.enter", args: sanitizeArgs(args) });
   const prevPrint = js7z.print;
@@ -69,7 +70,7 @@ function run7z(
     if (onStdout) onStdout(text);
     // RSS guard: check every ~10th print tick (7z prints steadily while
     // working). Throws synchronously — caught by the callMain try/catch.
-    if (++printCount % 10 === 0) checkWorkerMemory();
+    if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
     const m = text.match(/(\d{1,3})%/);
     if (m && progress) {
       const pct = parseInt(m[1], 10);

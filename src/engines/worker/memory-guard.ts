@@ -13,8 +13,9 @@
  */
 
 import { t } from "../../i18n";
+import { WORKER_MEMORY_LIMIT_DEFAULT_MB } from "../../constants";
 
-let _limitMb = 3072;
+let _limitMb = WORKER_MEMORY_LIMIT_DEFAULT_MB;
 
 /** Set the RSS ceiling in MiB (0 disables the guard). */
 export function setWorkerMemoryLimitMb(mb: number): void {

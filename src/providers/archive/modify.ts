@@ -14,10 +14,13 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
-import { getFullExt, isWrappedFormat } from "../../constants";
+import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { t } from "../../i18n";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
+
+/** Delay before disposing the preview tab cleanup subscription (10 min) */
+const PREVIEW_CLEANUP_DELAY_MS = 600_000;
 import { logger } from "../../utils/logger";
 import {
   hasSystem7zForFormat,
@@ -26,8 +29,6 @@ import {
   renameInArchiveSystem7z,
 } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
-
-const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024; // 100 MB hard limit for preview
 
 export async function createFolderInArchive(
   archivePath: string,
@@ -137,7 +138,7 @@ export async function previewFileFromArchive(
     } catch {
       logger.warn({ event: "preview.cleanup.failed" }, "Failed to dispose preview cleanup");
     }
-  }, 600_000);
+  }, PREVIEW_CLEANUP_DELAY_MS);
   logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
 }
 

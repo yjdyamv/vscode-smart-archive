@@ -10,6 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { prepareExclusions, isPathExcluded } from "../utils/exclude";
+import { TAR_IO_BUFFER } from "../constants";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike } from "../utils/cancellation";
 
@@ -179,7 +180,7 @@ export async function createTarFile(
             fs.writeSync(fd, tarHeader(frel, fstat.size, false));
             const rfd = fs.openSync(full, "r");
             try {
-              const buf = Buffer.alloc(1024 * 1024);
+              const buf = Buffer.alloc(TAR_IO_BUFFER);
               let bytesRead: number;
               let written = 0;
               while ((bytesRead = fs.readSync(rfd, buf, 0, buf.length, null)) > 0) {
@@ -198,7 +199,7 @@ export async function createTarFile(
         fs.writeSync(fd, tarHeader(rel, stat.size, false));
         const rfd = fs.openSync(loc, "r");
         try {
-          const buf = Buffer.alloc(1024 * 1024);
+          const buf = Buffer.alloc(TAR_IO_BUFFER);
           let bytesRead: number;
           let written = 0;
           while ((bytesRead = fs.readSync(rfd, buf, 0, buf.length, null)) > 0) {

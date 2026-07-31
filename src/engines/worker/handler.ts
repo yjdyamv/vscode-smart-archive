@@ -31,6 +31,7 @@ import {
 import { extractSelectedCore } from "../extract-core";
 import type { ModifyPayload } from "./types";
 import { setLocale } from "../../i18n";
+import { WORKER_MEMORY_LIMIT_DEFAULT_MB } from "../../constants";
 import { setSecurityLimits } from "../../utils/security";
 import { setZstdConfig, resetZstdDetectionCache } from "../zstd-codec";
 import { setLoggerSink } from "../../utils/logger-core";
@@ -63,7 +64,7 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
     // A setting change may flip the system-zstd decision — drop the cached
     // detection result so the next zstd op re-detects.
     resetZstdDetectionCache();
-    setWorkerMemoryLimitMb(config.workerMemoryMb ?? 3072);
+    setWorkerMemoryLimitMb(config.workerMemoryMb ?? WORKER_MEMORY_LIMIT_DEFAULT_MB);
     setModifyConfig({ compressionLevel: config.compressionLevel ?? 5 });
   }
 

@@ -13,7 +13,13 @@ import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { streamToVFS } from "./vfs-io";
 import { writeLargeVFS } from "./fileListing-core";
-import { getFullExt, isWrappedFormat, getWrapExtension } from "../constants";
+import {
+  getFullExt,
+  isWrappedFormat,
+  getWrapExtension,
+  MAX_PREVIEW_FILE_SIZE,
+  TAR_INNER_PATTERNS,
+} from "../constants";
 import { checkFileSize, validatePassword, sanitizeCliPath } from "../utils/security";
 import { getBaseName } from "../utils/path";
 import { logger } from "../utils/logger-core";
@@ -554,8 +560,6 @@ export async function createFolderInArchiveCore(
 
 // ── Preview ──
 
-const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024; // 100 MB hard limit for preview
-
 async function unwrapArchives(
   js7z: JS7zInstance,
   archiveVfsPath: string,
@@ -702,28 +706,7 @@ export async function previewFileCore(
         "Preview direct read failed, trying unwrap",
       );
       // File not found directly — try unwrapping inner tar archives
-      const tarPatterns = [
-        ".tar",
-        ".tar.gz",
-        ".tar.bz2",
-        ".tar.xz",
-        ".tar.zst",
-        ".tar.lz",
-        ".tar.lzma",
-        ".tar.lz4",
-        ".tar.br",
-        ".tgz",
-        ".tbz2",
-        ".tbz",
-        ".txz",
-        ".tzst",
-        ".tlz",
-        ".tlz4",
-        ".tbr",
-        ".tar.sz",
-        ".tsz",
-      ];
-      const tarEntries = top.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
+      const tarEntries = top.filter((e) => TAR_INNER_PATTERNS.some((ext) => e.endsWith(ext)));
       let found = false;
       for (const tarEntry of tarEntries) {
         try {
