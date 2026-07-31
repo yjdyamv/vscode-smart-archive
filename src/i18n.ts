@@ -465,6 +465,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "正在删除...",
     "zh-tw": "正在刪除...",
   },
+  "archive.deletingRebuild": {
+    en: "Deleting... (the whole archive is being rebuilt; large archives may take a while)",
+    "zh-cn": "正在删除...（正在重建整个归档，大压缩包可能需要一些时间）",
+    "zh-tw": "正在刪除...（正在重建整個封存檔，大型壓縮檔可能需要一些時間）",
+  },
   "archive.deletingProgress": {
     en: "Delete {0} selected item(s) from archive? This cannot be undone.",
     "zh-cn": "确定要从压缩包中永久删除 {0} 个选中项吗？",
