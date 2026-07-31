@@ -18,6 +18,19 @@ import type { ArchiveOp, EngineConfig, RequestPayload, WorkerMessage } from "./t
 import { compressWith7z as compressCore } from "../js7z-compress-core";
 import { decompressWith7z as decompressCore } from "../js7z-decompress-core";
 import { writeHostLog, logger } from "../../utils/logger";
+import { readEngineConfig } from "../../utils/config";
+import { fetchFileListCore } from "../fileListing-core";
+import { isEncryptedWasm } from "../js7z-list-core";
+import {
+  addToArchiveCore,
+  deleteFromArchiveCore,
+  renameInArchiveCore,
+  createFolderInArchiveCore,
+  previewFileCore,
+  testArchiveCore,
+} from "../modify-core";
+import { extractSelectedCore } from "../extract-core";
+import type { ModifyPayload } from "./types";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
 
 interface PendingRequest {
@@ -27,8 +40,8 @@ interface PendingRequest {
   progress?: ProgressLike;
   token?: TokenLike;
   cancelSub?: { dispose(): void };
-  promise: Promise<void>;
-  resolve: () => void;
+  promise: Promise<unknown>;
+  resolve: (value: unknown) => void;
   reject: (err: Error) => void;
 }
 
@@ -38,15 +51,21 @@ export interface ArchiveRunner {
     payload: RequestPayload,
     progress?: ProgressLike,
     token?: TokenLike,
-  ): Promise<void>;
+  ): Promise<unknown>;
   dispose(): void;
 }
 
 let nextId = 1;
 let _active: ArchiveRunner | null = null;
 
+function readPoolSize(): number {
+  const raw = vscode.workspace.getConfiguration("smart-archive").get<number>("workerPoolSize");
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 1;
+  return Math.max(1, Math.min(2, Math.floor(raw)));
+}
+
 function activeRunner(): ArchiveRunner {
-  if (!_active) _active = new WorkerThreadRunner();
+  if (!_active) _active = new WorkerThreadRunner(undefined, readPoolSize());
   return _active;
 }
 
@@ -57,41 +76,23 @@ export function setArchiveRunner(runner: ArchiveRunner): void {
 }
 
 /** Run a compress/decompress op through the active runner. */
-export function runArchiveOp(
+export function runArchiveOp<T = void>(
   op: ArchiveOp,
   payload: RequestPayload,
   progress?: ProgressLike,
   token?: TokenLike,
-): Promise<void> {
-  return activeRunner().run(op, payload, progress, token);
+): Promise<T> {
+  return activeRunner().run(op, payload, progress, token) as Promise<T>;
 }
 
-/** Read the engine-relevant config from vscode (same values as utils/config). */
-function currentConfig(): EngineConfig {
-  const raw = vscode.workspace.getConfiguration("smart-archive");
-  const maxFileSize = raw.get<string | number>("maxFileSize");
-  const maxTotalSize = raw.get<string | number>("maxTotalSize");
-  return {
-    locale: vscode.env.language,
-    limits: {
-      maxFileSize: parseSize(maxFileSize, 1024 * 1024 * 1024),
-      maxTotalSize: parseSize(maxTotalSize, 10 * 1024 * 1024 * 1024),
-    },
-    useSystemZstd: raw.get<string>("useSystemZstd", "auto"),
-  };
-}
-
-function parseSize(raw: string | number | undefined, defaultBytes: number): number {
-  if (raw === undefined || raw === null) return defaultBytes;
-  if (typeof raw === "number") return raw > 0 ? raw : defaultBytes;
-  const m = String(raw)
-    .trim()
-    .toLowerCase()
-    .match(/^(\d+(?:\.\d+)?)\s*(k|m|g)$/i);
-  if (!m) return defaultBytes;
-  const num = parseFloat(m[1]);
-  const multipliers: Record<string, number> = { k: 1024, m: 1024 * 1024, g: 1024 * 1024 * 1024 };
-  return Math.round(num * multipliers[m[2].toLowerCase()]);
+/**
+ * Push the current workspace configuration to a live worker (limits,
+ * locale, zstd setting, memory guard). Called on config change so the
+ * worker never runs with stale values until its next restart.
+ */
+export function reconfigureArchiveWorker(): void {
+  const runner = _active;
+  if (runner instanceof WorkerThreadRunner) runner.reconfigure();
 }
 
 /**
@@ -105,13 +106,53 @@ export class InProcessRunner implements ArchiveRunner {
     payload: RequestPayload,
     progress?: ProgressLike,
     token?: TokenLike,
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (op === "compress") {
       const p = payload as {
         options: Parameters<typeof compressCore>[0];
         excludePatterns?: string[];
       };
       return compressCore(p.options, progress, token, p.excludePatterns);
+    }
+    if (op === "list") {
+      const p = payload as { inputPath: string; password?: string; data?: Uint8Array };
+      return fetchFileListCore(p.inputPath, p.password ?? "", p.data);
+    }
+    if (op === "isEncrypted") {
+      const p = payload as { inputPath: string };
+      return isEncryptedWasm(p.inputPath);
+    }
+    if (op === "modify") {
+      const p = payload as ModifyPayload;
+      switch (p.action) {
+        case "add":
+          return addToArchiveCore(
+            p.archivePath,
+            p.localPaths,
+            p.targetDir,
+            p.password,
+            p.excludePatterns,
+          );
+        case "delete":
+          return deleteFromArchiveCore(p.archivePath, p.paths, p.password);
+        case "rename":
+          return renameInArchiveCore(p.archivePath, p.oldPath, p.newPath, p.password);
+        case "createFolder":
+          return createFolderInArchiveCore(p.archivePath, p.targetDir, p.folderName, p.password);
+        case "preview":
+          return previewFileCore(p.archivePath, p.filePath, p.password, p.outputPath);
+        case "test":
+          return testArchiveCore(p.archivePath, p.password);
+        case "extract":
+          return extractSelectedCore(
+            p.archivePath,
+            p.paths,
+            p.password,
+            p.flat,
+            p.outputDir,
+            p.excludes,
+          );
+      }
     }
     const p = payload as { options: Parameters<typeof decompressCore>[0] };
     return decompressCore(p.options, progress, token);
@@ -122,29 +163,57 @@ export class InProcessRunner implements ArchiveRunner {
   }
 }
 
+interface WorkerSlot {
+  worker: Worker | null;
+  ready: boolean;
+  failed: boolean;
+  current: PendingRequest | null;
+}
+
 /**
- * Worker-thread runner — a single lazy-spawned Worker with a FIFO queue.
+ * Worker-thread runner — a FIFO queue over a pool of worker_threads
+ * workers (default pool size 1 = serialized). Each request runs on the
+ * first free worker; a crashed worker is replaced on the next use.
  */
 export class WorkerThreadRunner implements ArchiveRunner {
-  private worker: Worker | null = null;
-  private ready = false;
-  private failed = false;
+  private slots: WorkerSlot[] = [];
   private queue: PendingRequest[] = [];
-  private current: PendingRequest | null = null;
+  private draining = false;
+  private config: EngineConfig = readEngineConfig();
 
   constructor(
-    private readonly createWorker: (workerPath: string) => Worker = (p) => new Worker(p),
+    private readonly createWorker: (workerPath: string) => Worker = (p) =>
+      new Worker(p, {
+        // Wide JS-heap cap as a backstop against JS-level leaks. The WASM
+        // memory (VFS) is a WebAssembly.Memory, not part of this heap —
+        // it is guarded by the worker-side RSS check (workerMemoryMb).
+        resourceLimits: { maxOldGenerationSizeMb: 4096 },
+      }),
+    private readonly poolSize = 1,
   ) {}
+
+  /**
+   * Push the latest workspace config to all live workers. No-op while no
+   * worker is running — the next spawn uses fresh config anyway.
+   */
+  reconfigure(): void {
+    this.config = readEngineConfig();
+    for (const slot of this.slots) {
+      if (slot.worker && slot.ready) {
+        this.postTo(slot, { type: "reconfigure", config: this.config });
+      }
+    }
+  }
 
   run(
     op: ArchiveOp,
     payload: RequestPayload,
     progress?: ProgressLike,
     token?: TokenLike,
-  ): Promise<void> {
-    let resolve!: () => void;
+  ): Promise<unknown> {
+    let resolve!: (value: unknown) => void;
     let reject!: (err: Error) => void;
-    const promise = new Promise<void>((res, rej) => {
+    const promise = new Promise<unknown>((res, rej) => {
       resolve = res;
       reject = rej;
     });
@@ -171,8 +240,9 @@ export class WorkerThreadRunner implements ArchiveRunner {
         this.queue.splice(idx, 1);
         request.cancelSub?.dispose();
         request.reject(new vscode.CancellationError());
-      } else if (this.current === request) {
-        this.post({ type: "cancel", id: request.id });
+      } else {
+        const slot = this.slots.find((s) => s.current === request);
+        if (slot) this.postTo(slot, { type: "cancel", id: request.id });
       }
     });
     this.drain();
@@ -180,51 +250,124 @@ export class WorkerThreadRunner implements ArchiveRunner {
   }
 
   private async drain(): Promise<void> {
-    if (this.current || this.queue.length === 0) return;
-    const request = this.queue.shift()!;
-    this.current = request;
+    if (this.draining) return;
+    this.draining = true;
     try {
-      await this.ensureWorker();
-      if (request.token?.isCancellationRequested) throw new vscode.CancellationError();
-      this.post({ type: "request", id: request.id, op: request.op, payload: request.payload });
-      // Settles when the worker replies done/error (or the worker crashes).
-      await request.promise;
-    } catch (err) {
-      if (this.current === request) {
-        request.reject(err instanceof Error ? err : new Error(String(err)));
+      while (this.queue.length > 0) {
+        // Drop queued requests that were cancelled while we were busy.
+        while (this.queue.length > 0 && this.queue[0].token?.isCancellationRequested) {
+          const cancelled = this.queue.shift()!;
+          cancelled.cancelSub?.dispose();
+          cancelled.reject(new vscode.CancellationError());
+        }
+        if (this.queue.length === 0) break;
+
+        // 1) An idle ready slot is the fastest path.
+        let slot = this.slots.find((s) => !s.current && s.ready);
+        if (slot) {
+          this.assign(slot, this.queue.shift()!);
+          continue;
+        }
+
+        // 2) Rebuild a crashed/dead slot (worker lost its thread).
+        const deadSlot = this.slots.find((s) => !s.current && !s.ready);
+        if (deadSlot) {
+          try {
+            await this.ensureSlotReady(deadSlot);
+          } catch (err) {
+            logger.error(
+              {
+                event: "worker.spawn.failed",
+                err: err instanceof Error ? err.message : String(err),
+              },
+              "Archive worker failed to start",
+            );
+            const failedReq = this.queue.shift();
+            failedReq?.cancelSub?.dispose();
+            failedReq?.reject(err instanceof Error ? err : new Error(String(err)));
+            continue;
+          }
+          if (this.queue.length === 0) break;
+          if (deadSlot.ready) {
+            this.assign(deadSlot, this.queue.shift()!);
+          }
+          continue;
+        }
+
+        // 3) Grow the pool up to poolSize.
+        if (this.slots.length < this.poolSize) {
+          slot = { worker: null, ready: false, failed: false, current: null };
+          this.slots.push(slot);
+          try {
+            await this.ensureSlotReady(slot);
+          } catch (err) {
+            // Spawn failed (missing bundle / worker startup crash) — fail
+            // the queued request and drop the dead slot.
+            logger.error(
+              {
+                event: "worker.spawn.failed",
+                err: err instanceof Error ? err.message : String(err),
+              },
+              "Archive worker failed to start",
+            );
+            this.slots.pop();
+            const failedReq = this.queue.shift();
+            failedReq?.cancelSub?.dispose();
+            failedReq?.reject(err instanceof Error ? err : new Error(String(err)));
+            continue;
+          }
+          if (this.queue.length === 0) break;
+          if (slot.ready) {
+            this.assign(slot, this.queue.shift()!);
+          }
+          continue;
+        }
+
+        // All workers busy — wait for one to free up.
+        break;
       }
     } finally {
-      request.cancelSub?.dispose();
-      if (this.current === request) this.current = null;
-      // Reject anything that was cancelled while we were busy.
-      while (this.queue.length > 0 && this.queue[0].token?.isCancellationRequested) {
-        const cancelled = this.queue.shift()!;
-        cancelled.cancelSub?.dispose();
-        cancelled.reject(new vscode.CancellationError());
-      }
-      this.drain();
+      this.draining = false;
     }
   }
 
-  private async ensureWorker(): Promise<void> {
-    if (this.worker && this.ready) return;
-    if (this.worker) {
+  private assign(slot: WorkerSlot, request: PendingRequest): void {
+    slot.current = request;
+    this.postTo(slot, {
+      type: "request",
+      id: request.id,
+      op: request.op,
+      payload: request.payload,
+    });
+    // The request settles when the worker replies done/error (or crashes).
+    void request.promise
+      .finally(() => {
+        request.cancelSub?.dispose();
+        if (slot.current === request) slot.current = null;
+        this.drain();
+      })
+      .catch(() => {});
+  }
+
+  private async ensureSlotReady(slot: WorkerSlot): Promise<void> {
+    if (slot.worker && slot.ready) return;
+    if (slot.worker) {
       // Previous worker crashed — terminate and spawn fresh.
-      this.worker.terminate().catch(() => {});
+      slot.worker.terminate().catch(() => {});
     }
     const workerPath = path.join(__dirname, "worker", "worker.js");
     const worker = this.createWorker(workerPath);
-    this.worker = worker;
-    this.ready = false;
-    this.failed = false;
+    slot.worker = worker;
+    slot.ready = false;
+    slot.failed = false;
 
     worker.on("message", (message: WorkerMessage) => {
       switch (message.type) {
         case "ready":
-          this.ready = true;
+          slot.ready = true;
           break;
         case "progress":
-          this.current?.progress?.report({
+          slot.current?.progress?.report({
             message: message.message,
             increment: message.increment,
           });
@@ -236,15 +379,15 @@ export class WorkerThreadRunner implements ArchiveRunner {
           void vscode.window.showWarningMessage(message.message);
           break;
         case "done":
-          if (this.current?.id === message.id) this.current.resolve();
+          if (slot.current?.id === message.id) slot.current.resolve(message.result);
           break;
         case "error":
-          if (this.current?.id === message.id) {
+          if (slot.current?.id === message.id) {
             const err = message.cancelled
               ? new vscode.CancellationError()
               : new Error(message.message);
             if (message.stack && !message.cancelled) err.stack = message.stack;
-            this.current.reject(err);
+            slot.current.reject(err);
           }
           break;
       }
@@ -253,30 +396,31 @@ export class WorkerThreadRunner implements ArchiveRunner {
     worker.on("error", (err) => {
       const e = err instanceof Error ? err : new Error(String(err));
       logger.error({ event: "worker.crashed", err: e.message }, "Archive worker crashed");
-      this.failed = true;
-      this.ready = false;
-      this.worker = null;
-      const cur = this.current;
-      this.current = null;
+      slot.failed = true;
+      slot.ready = false;
+      slot.worker = null;
+      const cur = slot.current;
+      slot.current = null;
       cur?.reject(new Error(`Archive worker crashed: ${e.message}`));
       this.drain();
     });
 
     worker.on("exit", (code) => {
-      if (this.ready && !this.failed) {
+      if (slot.ready && !slot.failed) {
         // Unexpected exit while idle — clear state so next use respawns.
         logger.warn({ event: "worker.exited", code }, "Archive worker exited");
-        this.worker = null;
-        this.ready = false;
-        this.failed = true;
-        const cur = this.current;
-        this.current = null;
+        slot.worker = null;
+        slot.ready = false;
+        slot.failed = true;
+        const cur = slot.current;
+        slot.current = null;
         cur?.reject(new Error(`Archive worker exited with code ${code}`));
         this.drain();
       }
     });
 
-    worker.postMessage({ type: "init", config: currentConfig() });
+    this.config = readEngineConfig();
+    worker.postMessage({ type: "init", config: this.config });
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error("Archive worker did not become ready in time")),
@@ -297,29 +441,32 @@ export class WorkerThreadRunner implements ArchiveRunner {
     });
   }
 
-  private post(message: unknown): void {
-    if (!this.worker) return;
-    this.worker.postMessage(message);
+  private postTo(slot: WorkerSlot, message: unknown): void {
+    if (!slot.worker) return;
+    slot.worker.postMessage(message);
   }
 
   dispose(): void {
-    const w = this.worker;
-    if (w) {
-      try {
-        w.postMessage({ type: "shutdown" });
-      } catch {
-        // worker already gone
+    for (const slot of this.slots) {
+      const w = slot.worker;
+      if (w) {
+        try {
+          w.postMessage({ type: "shutdown" });
+        } catch {
+          // worker already gone
+        }
+        setTimeout(() => w.terminate(), 1000).unref();
       }
-      setTimeout(() => w.terminate(), 1000).unref();
-      this.worker = null;
-      this.ready = false;
+      slot.worker = null;
+      slot.ready = false;
     }
-    const pending = [...this.queue, this.current].filter((r): r is PendingRequest => !!r);
+    const pending = this.queue.filter((r): r is PendingRequest => !!r);
+    for (const slot of this.slots) if (slot.current) pending.push(slot.current);
     for (const request of pending) {
       request.cancelSub?.dispose();
       request.reject(new vscode.CancellationError());
     }
     this.queue = [];
-    this.current = null;
+    for (const slot of this.slots) slot.current = null;
   }
 }

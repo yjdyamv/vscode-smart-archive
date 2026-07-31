@@ -22,7 +22,11 @@ import { initTempCleanup } from "./providers/tempFiles";
 import { resetDetectionCache } from "./engines/system7z";
 import { resetZstdDetectionCache } from "./engines/zstd-codec";
 import { applyHostConfig } from "./utils/config";
-import { setArchiveRunner, InProcessRunner } from "./engines/worker/runner";
+import {
+  setArchiveRunner,
+  InProcessRunner,
+  reconfigureArchiveWorker,
+} from "./engines/worker/runner";
 
 /**
  * Called when the extension is activated.
@@ -48,6 +52,9 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       applyHostConfig();
+      // Push the new values into a live worker too — without this, the
+      // worker keeps stale limits/zstd settings until it is restarted.
+      reconfigureArchiveWorker();
       if (e.affectsConfiguration("smart-archive.useSystem7z")) resetDetectionCache();
       if (e.affectsConfiguration("smart-archive.useSystemZstd")) resetZstdDetectionCache();
     }),

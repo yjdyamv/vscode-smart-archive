@@ -19,6 +19,7 @@ import { getFullExt, MAX_COLLISION_RETRIES } from "../constants";
 import { logger } from "./logger-core";
 import { streamToVFS } from "../engines/vfs-io";
 import { CancelledError } from "./cancellation";
+import { checkWorkerMemory } from "../engines/worker/memory-guard";
 import type { TokenLike } from "./cancellation";
 
 /**
@@ -151,6 +152,7 @@ function _copyDirFromFS(
       totalSize = _copyDirFromFS(js7z, fsEntry, localEntry, totalSize, depth + 1, token);
     } else {
       // Read the file data from VFS
+      checkWorkerMemory();
       const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
       if (stat) checkFileSize(stat.size);
       checkFileSize(data.byteLength);

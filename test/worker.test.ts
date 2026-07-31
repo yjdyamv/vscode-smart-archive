@@ -219,6 +219,100 @@ describe("createArchiveWorkerHandler", () => {
     expect((msg as { cancelled?: boolean }).cancelled).toBe(true);
   });
 
+  it("lists archive entries and replies done with the result", async () => {
+    initWorker();
+    const src = path.join(td, "w5.txt");
+    fs.writeFileSync(src, "list me");
+    const archive = path.join(td, "w5.7z");
+    const done = new Promise<void>((resolve) => {
+      const check = () => {
+        if (port.last().type === "done") resolve();
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    port.send({
+      type: "request",
+      id: 1,
+      op: "compress",
+      payload: {
+        options: {
+          targets: [{ fsPath: src }],
+          format: { label: "7z", description: "", canCreate: true, supportsEncryption: false },
+          outputPath: archive,
+          password: "",
+          level: 5,
+        },
+        excludePatterns: [],
+      },
+    });
+    await done;
+
+    const listResult = new Promise<unknown>((resolve) => {
+      const check = () => {
+        const last = port.last();
+        if (last.type === "done" && last.id === 2) resolve(last.result);
+        else if (last.type === "error" && last.id === 2) throw new Error(last.message);
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    port.send({
+      type: "request",
+      id: 2,
+      op: "list",
+      payload: { inputPath: archive, password: "" },
+    });
+    const entries = (await listResult) as { path: string; size: number; type: string }[];
+    expect(entries).toContainEqual({
+      path: "w5.txt",
+      size: 7,
+      type: "REGULAR_FILE",
+    });
+  });
+
+  it("detects encryption via the isEncrypted op", async () => {
+    initWorker();
+    const src = path.join(td, "w6.txt");
+    fs.writeFileSync(src, "secret content");
+    const archive = path.join(td, "w6.7z");
+    const done = new Promise<void>((resolve) => {
+      const check = () => {
+        if (port.last().type === "done") resolve();
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    port.send({
+      type: "request",
+      id: 1,
+      op: "compress",
+      payload: {
+        options: {
+          targets: [{ fsPath: src }],
+          format: { label: "7z", description: "", canCreate: true, supportsEncryption: false },
+          outputPath: archive,
+          password: "pw123",
+          level: 5,
+        },
+        excludePatterns: [],
+      },
+    });
+    await done;
+
+    const encResult = new Promise<unknown>((resolve) => {
+      const check = () => {
+        const last = port.last();
+        if (last.type === "done" && last.id === 2) resolve(last.result);
+        else if (last.type === "error" && last.id === 2) throw new Error(last.message);
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    port.send({ type: "request", id: 2, op: "isEncrypted", payload: { inputPath: archive } });
+    expect(await encResult).toBe(true);
+  });
+
   it("applies reconfigure (locale + limits)", async () => {
     initWorker({ locale: "en" });
     port.send({

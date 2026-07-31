@@ -31,5 +31,7 @@
   "config.useSystemZstd.description": "是否使用系統安裝的 zstd 進行 tar.zst 壓縮。系統 zstd 速度更快，但需要本機安裝。",
   "config.useSystemZstd.auto": "自動偵測系統 zstd。如果存在則用於 tar.zst 壓縮加速；否則回退到內建 zstd-wasm。",
   "config.useSystemZstd.always": "始終使用系統 zstd。如果未安裝則顯示錯誤。",
-  "config.useSystemZstd.never": "永不使用系統 zstd。始終使用內建 zstd-wasm，即使已安裝 zstd。"
+  "config.useSystemZstd.never": "永不使用系統 zstd。始終使用內建 zstd-wasm，即使已安裝 zstd。",
+  "config.workerMemoryMb.description": "封存 worker 執行緒（執行 WASM 7-Zip）的記憶體上限（MiB）。設為 0 可停用護欄。調低可減少擴充功能記憶體佔用；若大型壓縮檔報記憶體超限錯誤請調高。",
+  "config.workerPoolSize.description": "封存 worker 執行緒數。1 表示所有操作序列化（記憶體佔用最低）；2 允許小壓縮檔批次操作並行執行。每個 worker 各自持有 WASM 7-Zip 堆記憶體。修改後需重載視窗生效。"
 }

@@ -31,5 +31,7 @@
   "config.useSystemZstd.description": "Whether to use a system-installed zstd binary for tar.zst compression. System zstd is faster, but requires a local installation.",
   "config.useSystemZstd.auto": "Detect system zstd automatically. If found, use it for faster tar.zst compression; otherwise fall back to bundled zstd-wasm.",
   "config.useSystemZstd.always": "Always use system zstd. Show an error if zstd is not installed.",
-  "config.useSystemZstd.never": "Never use system zstd. Always use the bundled zstd-wasm engine, even if zstd is installed."
+  "config.useSystemZstd.never": "Never use system zstd. Always use the bundled zstd-wasm engine, even if zstd is installed.",
+  "config.workerMemoryMb.description": "Memory ceiling (MiB) for the archive worker thread, which runs WASM 7-Zip. 0 disables the guard. Lower it to reduce the extension's memory footprint; raise it if large archives fail with a memory-limit error.",
+  "config.workerPoolSize.description": "Number of archive worker threads. 1 serializes all operations (lowest memory); 2 allows batch operations on small archives to run in parallel. Each worker holds its own WASM 7-Zip heap. Requires a window reload to take effect."
 }
