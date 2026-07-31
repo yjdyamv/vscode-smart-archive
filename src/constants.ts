@@ -538,3 +538,51 @@ export const BINARY_DETECT_TIMEOUT = 5000;
 export const SPAWN_CAPTURE_TIMEOUT = 30_000;
 /** default run7z timeout (ms) — compression / extraction */
 export const RUN7Z_TIMEOUT = 600_000;
+
+// ── Shared size/time limits (single source of truth) ───────────────
+
+/** Default per-file size limit (1 GiB) — matches package.json maxFileSize */
+export const DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024;
+/** Default total decompressed size limit (10 GiB) — matches maxTotalSize */
+export const DEFAULT_MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024;
+/** Default worker RSS memory guard (MiB) — matches workerMemoryMb */
+export const WORKER_MEMORY_LIMIT_DEFAULT_MB = 3072;
+/** Hard size cap for previewing a single archive entry (100 MB) */
+export const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024;
+/** Worker RSS guard sampling: every Nth 7z print tick */
+export const MEMORY_CHECK_EVERY_PRINT = 10;
+/** Worker RSS guard sampling: every Nth VFS chunk copy */
+export const MEMORY_CHECK_EVERY_CHUNKS = 32;
+/** Inner-tar unwrap: max nesting depth */
+export const UNWRAP_MAX_DEPTH = 3;
+/** Inner-tar unwrap: max total tar files processed */
+export const UNWRAP_MAX_TAR_FILES = 100;
+/** TAR writer read/write buffer size (1 MB) */
+export const TAR_IO_BUFFER = 1024 * 1024;
+
+/**
+ * File extensions treated as inner tars by the unwrap / preview paths.
+ * Union of the per-module lists (decompress and modify previously
+ * drifted: decompress lacked .tar.br/.tbr).
+ */
+export const TAR_INNER_PATTERNS = [
+  ".tar",
+  ".tar.gz",
+  ".tar.bz2",
+  ".tar.xz",
+  ".tar.zst",
+  ".tar.lz",
+  ".tar.lzma",
+  ".tar.lz4",
+  ".tar.sz",
+  ".tar.br",
+  ".tgz",
+  ".tbz2",
+  ".tbz",
+  ".txz",
+  ".tzst",
+  ".tsz",
+  ".tlz",
+  ".tlz4",
+  ".tbr",
+] as const;

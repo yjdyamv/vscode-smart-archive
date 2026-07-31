@@ -14,6 +14,7 @@
 
 import * as path from "path";
 import { t } from "../i18n";
+import { DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_TOTAL_SIZE } from "../constants";
 import { logger } from "./logger-core";
 
 /**
@@ -74,9 +75,6 @@ export function parseSize(raw: string | number | undefined, defaultBytes: number
 
   return bytes;
 }
-
-const DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1 GiB
-const DEFAULT_MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024; // 10 GiB
 
 let _limits: { maxFileSize?: number; maxTotalSize?: number } = {};
 

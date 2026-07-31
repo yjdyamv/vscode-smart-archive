@@ -21,7 +21,13 @@ import { t } from "../i18n";
 import { logger } from "../utils/logger-core";
 import { checkTotalSize, checkFileSize, validatePassword } from "../utils/security";
 import { JS7z } from "./js7z-factory";
-import { getFullExt, getWrapExtension } from "../constants";
+import {
+  getFullExt,
+  getWrapExtension,
+  TAR_INNER_PATTERNS,
+  UNWRAP_MAX_DEPTH,
+  UNWRAP_MAX_TAR_FILES,
+} from "../constants";
 import { brotliDecompressFile } from "./brotli-codec";
 import { lz4DecompressFile } from "./lz4-codec";
 import { snappyDecompressFile } from "./snappy-codec";
@@ -169,26 +175,6 @@ export async function decompressWith7z(
 
 export async function unwrapInnerTar(outputDir: string, progress?: ProgressLike): Promise<void> {
   const prog = progress ?? { report: () => {} };
-  const tarPatterns = [
-    ".tar",
-    ".tar.gz",
-    ".tar.bz2",
-    ".tar.xz",
-    ".tar.zst",
-    ".tar.lz",
-    ".tar.lzma",
-    ".tar.lz4",
-    ".tar.sz",
-    ".tgz",
-    ".tbz2",
-    ".tbz",
-    ".txz",
-    ".tzst",
-    ".tsz",
-    ".tlz",
-    ".tlz4",
-  ];
-
   let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
 
   logger.info({ event: "decompress.unwrapTar.start", outputDir });
@@ -201,12 +187,10 @@ export async function unwrapInnerTar(outputDir: string, progress?: ProgressLike)
   let depth = 0;
   let totalSize = 0;
   let tarCount = 0;
-  const maxDepth = 3;
-  const maxTarFiles = 100;
 
-  while (depth < maxDepth) {
+  while (depth < UNWRAP_MAX_DEPTH) {
     depth++;
-    const tarFiles = entries.filter((e) => tarPatterns.some((ext) => e.endsWith(ext)));
+    const tarFiles = entries.filter((e) => TAR_INNER_PATTERNS.some((ext) => e.endsWith(ext)));
     if (tarFiles.length === 0) {
       logger.info({ event: "decompress.unwrapTar.noTarFound", outputDir, depth });
       break;
@@ -214,9 +198,13 @@ export async function unwrapInnerTar(outputDir: string, progress?: ProgressLike)
 
     for (const tarFile of tarFiles) {
       tarCount++;
-      if (tarCount > maxTarFiles) {
+      if (tarCount > UNWRAP_MAX_TAR_FILES) {
         logger.warn(
-          { event: "decompress.unwrapTar.tooManyTars", tarCount, maxTarFiles },
+          {
+            event: "decompress.unwrapTar.tooManyTars",
+            tarCount,
+            maxTarFiles: UNWRAP_MAX_TAR_FILES,
+          },
           "Too many inner tar files, stopping unwrap",
         );
         return;

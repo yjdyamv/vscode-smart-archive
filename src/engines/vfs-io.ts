@@ -16,7 +16,7 @@ import { t } from "../i18n";
 import { checkFileSize } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { checkWorkerMemory } from "./worker/memory-guard";
-import { VFS_CHUNK } from "../constants";
+import { VFS_CHUNK, MEMORY_CHECK_EVERY_CHUNKS } from "../constants";
 
 const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;
 const CHUNK = VFS_CHUNK;
@@ -48,7 +48,7 @@ export function copyToVFS(js7z: JS7zInstance, filePath: string, vfsPath: string)
       let pos = 0;
       let chunkCount = 0;
       while (true) {
-        if (++chunkCount % 32 === 0) checkWorkerMemory();
+        if (++chunkCount % MEMORY_CHECK_EVERY_CHUNKS === 0) checkWorkerMemory();
         const n = fs.readSync(rfd, buf, 0, buf.length, pos);
         if (n === 0) break;
         js7z.FS.write(vfsStream, new Uint8Array(buf.slice(0, n)), 0, n, pos);
