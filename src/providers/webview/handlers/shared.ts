@@ -13,7 +13,8 @@ import { getFullExt, COMPRESS_FORMATS, removeVolumeSuffix } from "../../../const
 import { getVolumeSizes, toBinaryVolumeSize } from "../../../utils/volume-sizes";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
-import { JS7z, disposeJS7z } from "../../fileListing";
+import { JS7z } from "../../../engines/js7z-factory";
+import { disposeJS7z } from "../../../engines/js7z-lifecycle";
 import { streamToVFS } from "../../../engines/vfs-io";
 
 export function pwInputBox(

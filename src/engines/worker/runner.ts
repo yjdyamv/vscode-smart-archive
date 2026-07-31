@@ -21,6 +21,7 @@ import { writeHostLog, logger } from "../../utils/logger";
 import { readEngineConfig } from "../../utils/config";
 import { fetchFileListCore } from "../fileListing-core";
 import { isEncryptedWasm } from "../js7z-list-core";
+import { unwrapInnerTar } from "../js7z-decompress-core";
 import {
   addToArchiveCore,
   deleteFromArchiveCore,
@@ -84,6 +85,16 @@ export function setArchiveRunner(runner: ArchiveRunner): void {
   _active = runner;
 }
 
+/**
+ * Dispose the active runner and drop it. On the next runArchiveOp a fresh
+ * runner (and worker) is created — used on deactivate so a re-activation
+ * does not keep running WASM on the host via a stale in-process runner.
+ */
+export function resetArchiveRunner(): void {
+  _active?.dispose();
+  _active = null;
+}
+
 /** Run a compress/decompress op through the active runner. */
 export function runArchiveOp<T = void>(
   op: ArchiveOp,
@@ -130,6 +141,10 @@ export class InProcessRunner implements ArchiveRunner {
     if (op === "isEncrypted") {
       const p = payload as { inputPath: string };
       return isEncryptedWasm(p.inputPath);
+    }
+    if (op === "unwrap") {
+      const p = payload as { outputDir: string };
+      return unwrapInnerTar(p.outputDir);
     }
     if (op === "modify") {
       const p = payload as ModifyPayload;
@@ -291,6 +306,10 @@ export class WorkerThreadRunner implements ArchiveRunner {
               },
               "Archive worker failed to start",
             );
+            // The spawn may have timed out after creating the thread —
+            // reclaim it so it does not leak.
+            deadSlot.worker?.terminate().catch(() => {});
+            deadSlot.worker = null;
             const failedReq = this.queue.shift();
             failedReq?.cancelSub?.dispose();
             failedReq?.reject(err instanceof Error ? err : new Error(String(err)));
@@ -319,6 +338,9 @@ export class WorkerThreadRunner implements ArchiveRunner {
               },
               "Archive worker failed to start",
             );
+            // The spawn may have timed out after creating the thread —
+            // reclaim it before dropping the slot.
+            slot.worker?.terminate().catch(() => {});
             this.slots.pop();
             const failedReq = this.queue.shift();
             failedReq?.cancelSub?.dispose();
@@ -431,22 +453,32 @@ export class WorkerThreadRunner implements ArchiveRunner {
     this.config = readEngineConfig();
     worker.postMessage({ type: "init", config: this.config });
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error("Archive worker did not become ready in time")),
-        WORKER_READY_TIMEOUT_MS,
-      );
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("Archive worker did not become ready in time"));
+      }, WORKER_READY_TIMEOUT_MS);
+      const cleanup = () => {
+        clearTimeout(timer);
+        worker.off("message", check);
+        worker.off("error", onError);
+      };
       const check = (message: WorkerMessage) => {
         if (message.type === "ready") {
-          clearTimeout(timer);
-          worker.off("message", check);
+          cleanup();
           resolve();
         } else if (message.type === "error") {
-          clearTimeout(timer);
-          worker.off("message", check);
+          cleanup();
           reject(new Error(message.message));
         }
       };
+      const onError = (err: unknown) => {
+        // Spawn failed (e.g. missing worker bundle) — fail fast instead of
+        // waiting out the ready timeout.
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
       worker.on("message", check);
+      worker.on("error", onError);
     });
   }
 

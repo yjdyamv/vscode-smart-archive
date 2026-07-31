@@ -9,4 +9,4 @@
 
 export { compressWith7z } from "./js7z-compress";
 export { decompressWith7z } from "./js7z-decompress";
-export { listFiles, isEncrypted } from "./js7z-list";
+export { isEncrypted } from "./js7z-list";
