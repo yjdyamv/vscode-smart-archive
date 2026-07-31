@@ -26,11 +26,48 @@ function getChannel(): vscode.LogOutputChannel {
   return channel;
 }
 
+// Ring buffer of the most recent debug-level records (raw pino lines).
+// VS Code's LogOutputChannel filters debug() by its panel level and does
+// NOT replay history when the level is raised — so on a switch to Debug we
+// re-emit these lines (they route to ch.debug() again and become visible).
+const DEBUG_HISTORY_LIMIT = 500;
+const debugHistory: string[] = [];
+let replayedDebugCount = 0;
+
+/** Re-emit buffered debug lines that the panel level previously hid. */
+function replayDebugHistory(): void {
+  if (replayedDebugCount > debugHistory.length) replayedDebugCount = 0; // buffer rolled
+  for (let i = replayedDebugCount; i < debugHistory.length; i++) {
+    channelOut.write(debugHistory[i]);
+  }
+  replayedDebugCount = debugHistory.length;
+}
+
+let logLevelListenerAttached = false;
+
+/** Replay history whenever the user raises the panel level to Debug/Trace. */
+function attachLogLevelListener(): void {
+  if (logLevelListenerAttached) return;
+  logLevelListenerAttached = true;
+  const ch = getChannel();
+  ch.onDidChangeLogLevel?.((lvl) => {
+    if (lvl === vscode.LogLevel.Debug || lvl === vscode.LogLevel.Trace) {
+      replayDebugHistory();
+    }
+  });
+}
+
 const channelOut = new Writable({
   write(chunk: unknown, _encoding: string, callback: () => void) {
     try {
       const str = Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
       const obj = JSON.parse(str);
+      // Keep debug records for replay (workers' forwarded logs pass through
+      // here too via writeHostLog, so history covers both sides).
+      if (obj.level === levels.debug) {
+        debugHistory.push(str);
+        if (debugHistory.length > DEBUG_HISTORY_LIMIT) debugHistory.shift();
+      }
       const msg = obj.event || obj.msg || "";
       const parts: string[] = [];
       if (obj.err) parts.push(String(obj.err));
@@ -67,9 +104,26 @@ export function writeHostLog(chunk: string): void {
   channelOut.write(chunk);
 }
 
+let _lastLevel: LogLevel | null = null;
+
 export const logger = {
   setLevel(lvl: LogLevel): void {
     coreLogger.setLevel(lvl);
+    const ch = getChannel();
+    attachLogLevelListener();
+    // The VS Code LogOutputChannel filters debug() calls by its own panel
+    // level (readonly, defaults to env.logLevel = Info). There is no API to
+    // force it — but appendLine() is NOT filtered, so when the user asks for
+    // debug verbosity we print a one-time hint pointing at the dropdown, and
+    // replay any debug lines that were hidden so far.
+    if (lvl === "debug" && _lastLevel !== "debug") {
+      if (ch.logLevel !== vscode.LogLevel.Debug) {
+        ch.appendLine(
+          '[Smart Archive] Log level set to debug — switch the output panel dropdown (top right) to "Debug" to see debug lines (earlier lines are replayed on the switch). The choice is remembered per panel.',
+        );
+      }
+    }
+    _lastLevel = lvl;
   },
 
   debug(obj: Record<string, unknown>, msg?: string): void {
