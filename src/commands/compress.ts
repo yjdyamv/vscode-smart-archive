@@ -21,6 +21,7 @@ import type { CompressOptions, FormatInfo } from "../types";
 import { t, compressLevels, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 import { lookupFormat, resolveSaveName } from "../api/compress";
+import { isCancellationError } from "../utils/cancellation";
 
 // ── Shared helpers for back-navigable QuickPick / InputBox ──
 
@@ -495,7 +496,7 @@ export async function compressCommand(
                   "Failed to clean up partial output file",
                 );
               }
-              if (!(err instanceof vscode.CancellationError)) {
+              if (!isCancellationError(err)) {
                 vscode.window.showErrorMessage(t("compress.failed") + (err as Error).message);
               }
             }

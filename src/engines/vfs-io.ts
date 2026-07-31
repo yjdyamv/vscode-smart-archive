@@ -14,7 +14,7 @@ import type { JS7zInstance } from "../types";
 import { getBaseName } from "../utils/path";
 import { t } from "../i18n";
 import { checkFileSize } from "../utils/security";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
 import { VFS_CHUNK } from "../constants";
 
 const MAX_BUFFER = 2 * 1024 * 1024 * 1024 - 1;

@@ -6,6 +6,7 @@ export default defineConfig({
     name: "extension",
     include: ["test/**/*.test.ts"],
     globalSetup: ["./test/globalSetup.ts"],
+    setupFiles: ["./test/setupRunner.ts"],
     environment: "node",
     globals: true,
     testTimeout: 120_000,

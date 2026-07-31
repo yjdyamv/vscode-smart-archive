@@ -9,8 +9,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
 import { prepareExclusions, isPathExcluded } from "../utils/exclude";
+import { CancelledError } from "../utils/cancellation";
+import type { TokenLike } from "../utils/cancellation";
 
 const BLOCK = 512;
 
@@ -95,12 +96,12 @@ function padSize(n: number): number {
 function collectPaths(
   basePath: string,
   exclusions: ReturnType<typeof prepareExclusions>,
-  token?: vscode.CancellationToken,
+  token?: TokenLike,
 ): string[] {
   const result: string[] = [];
   const stack = [basePath];
   while (stack.length > 0) {
-    if (token?.isCancellationRequested) throw new vscode.CancellationError();
+    if (token?.isCancellationRequested) throw new CancelledError();
     const current = stack.pop()!;
     const entries = fs.readdirSync(current, { withFileTypes: true });
     for (const e of entries) {
@@ -130,7 +131,7 @@ function needsLongLink(name: string): boolean {
 export async function createTarFile(
   outputPath: string,
   localPaths: readonly string[],
-  token?: vscode.CancellationToken,
+  token?: TokenLike,
   excludePatterns: string[] = [],
 ): Promise<void> {
   if (localPaths.length === 0) {
@@ -147,7 +148,7 @@ export async function createTarFile(
     const rootDir = path.dirname(localPaths[0]);
 
     for (const loc of localPaths) {
-      if (token?.isCancellationRequested) throw new vscode.CancellationError();
+      if (token?.isCancellationRequested) throw new CancelledError();
 
       const stat = fs.statSync(loc);
       const rel = path.relative(rootDir, loc).replace(/\\/g, "/");
@@ -159,7 +160,7 @@ export async function createTarFile(
         fs.writeSync(fd, tarHeader(dirName, 0, true));
         const all = collectPaths(loc, exclusions, token);
         for (const full of all) {
-          if (token?.isCancellationRequested) throw new vscode.CancellationError();
+          if (token?.isCancellationRequested) throw new CancelledError();
           const fstat = fs.lstatSync(full);
           const frel = path.relative(rootDir, full).replace(/\\/g, "/");
           if (fstat.isSymbolicLink()) {

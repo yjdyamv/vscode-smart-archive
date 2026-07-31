@@ -13,12 +13,13 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import * as vscode from "vscode";
 import type { JS7zInstance } from "../types";
 import { safeJoinPath, checkFileSize, checkTotalSize } from "./security";
 import { getFullExt, MAX_COLLISION_RETRIES } from "../constants";
-import { logger } from "./logger";
+import { logger } from "./logger-core";
 import { streamToVFS } from "../engines/vfs-io";
+import { CancelledError } from "./cancellation";
+import type { TokenLike } from "./cancellation";
 
 /**
  * Generate a collision-free output path.
@@ -61,11 +62,11 @@ export function copyDirToFS(
   js7z: JS7zInstance,
   localDir: string,
   fsDir: string,
-  token?: vscode.CancellationToken,
+  token?: TokenLike,
 ): void {
   const entries = fs.readdirSync(localDir, { withFileTypes: true });
   for (const entry of entries) {
-    if (token?.isCancellationRequested) throw new vscode.CancellationError();
+    if (token?.isCancellationRequested) throw new CancelledError();
     const localEntry = path.join(localDir, entry.name);
     const fsEntry = `${fsDir}/${entry.name}`;
     if (entry.isDirectory()) {
@@ -90,7 +91,7 @@ export function copyDirFromFS(
   js7z: JS7zInstance,
   fsDir: string,
   localDir: string,
-  token?: vscode.CancellationToken,
+  token?: TokenLike,
 ): number {
   return _copyDirFromFS(js7z, fsDir, localDir, 0, 0, token);
 }
@@ -101,7 +102,7 @@ function _copyDirFromFS(
   localDir: string,
   totalSize: number,
   depth: number,
-  token?: vscode.CancellationToken,
+  token?: TokenLike,
 ): number {
   if (depth > MAX_DIR_DEPTH) {
     logger.warn(
@@ -112,7 +113,7 @@ function _copyDirFromFS(
   }
   const entries = js7z.FS.readdir(fsDir);
   for (const entry of entries) {
-    if (token?.isCancellationRequested) throw new vscode.CancellationError();
+    if (token?.isCancellationRequested) throw new CancelledError();
     if (entry === "." || entry === "..") continue;
 
     // Skip internal .smartarchive marker files used to preserve empty folders

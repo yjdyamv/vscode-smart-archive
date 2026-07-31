@@ -23,6 +23,7 @@ import * as path from "path";
 import * as os from "os";
 import { spawn, spawnSync } from "child_process";
 import * as vscode from "vscode";
+import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import * as iconv from "iconv-lite";
 import type { CompressOptions, DecompressOptions } from "../types";
 import { t } from "../i18n";
@@ -518,8 +519,8 @@ function getSystem7zOrNull(): string | null {
 
 export async function compressWithSystem7z(
   options: CompressOptions,
-  progress?: vscode.Progress<{ message?: string }>,
-  token?: vscode.CancellationToken,
+  progress?: ProgressLike,
+  token?: TokenLike,
   excludePatterns?: string[],
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
@@ -795,8 +796,8 @@ async function preflightSystem7z(sz: string, inputPath: string, password: string
 
 export async function decompressWithSystem7z(
   options: DecompressOptions,
-  progress?: vscode.Progress<{ message?: string }>,
-  token?: vscode.CancellationToken,
+  progress?: ProgressLike,
+  token?: TokenLike,
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
   const sz = getSystem7zOrNull();
@@ -1053,8 +1054,8 @@ export function spawnCapture(
 function run7z(
   binary: string,
   args: string[],
-  progress?: vscode.Progress<{ message?: string }>,
-  token?: vscode.CancellationToken,
+  progress?: ProgressLike,
+  token?: TokenLike,
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
   return new Promise<void>((resolve, reject) => {
@@ -1089,7 +1090,7 @@ function run7z(
       }
     }, RUN7Z_TIMEOUT);
 
-    const cancelSub = token?.onCancellationRequested(() => {
+    const cancelSub = token?.onCancellationRequested?.(() => {
       logger.info({ event: "system7z.run.cancelled", elapsedMs: Date.now() - startTime });
       proc.kill("SIGTERM");
       // On Windows SIGTERM may not work, try taskkill

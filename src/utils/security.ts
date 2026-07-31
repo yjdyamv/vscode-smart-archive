@@ -6,13 +6,15 @@
  *   - Symlink escape (archives containing out-of-tree symlinks)
  *   - Entry name sanitization (leading slashes, null bytes)
  *
+ * Vscode-free: size limits are injected via setSecurityLimits (host reads
+ * workspace config; worker threads receive them in the init message).
+ *
  * @module utils/security
  */
 
 import * as path from "path";
-import * as vscode from "vscode";
 import { t } from "../i18n";
-import { logger } from "./logger";
+import { logger } from "./logger-core";
 
 /**
  * Parse a size string like "100m", "1g", "500k" to bytes.
@@ -73,17 +75,25 @@ export function parseSize(raw: string | number | undefined, defaultBytes: number
   return bytes;
 }
 
-function getLimit(key: string, defaultBytes: number): number {
-  const raw = vscode.workspace.getConfiguration("smart-archive").get<string | number>(key);
-  return parseSize(raw, defaultBytes);
+const DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1 GiB
+const DEFAULT_MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024; // 10 GiB
+
+let _limits: { maxFileSize?: number; maxTotalSize?: number } = {};
+
+/**
+ * Inject the configured size limits. Host calls this at activation and on
+ * configuration change; worker threads receive the same values at init.
+ */
+export function setSecurityLimits(limits: { maxFileSize?: number; maxTotalSize?: number }): void {
+  _limits = limits;
 }
 
-export function getMaxFileSize(): number {
-  return getLimit("maxFileSize", 1024 * 1024 * 1024); // 1 GiB default
+function getMaxFileSize(): number {
+  return _limits.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
 }
 
-export function getMaxTotalSize(): number {
-  return getLimit("maxTotalSize", 10 * 1024 * 1024 * 1024); // 10 GiB default
+function getMaxTotalSize(): number {
+  return _limits.maxTotalSize ?? DEFAULT_MAX_TOTAL_SIZE;
 }
 
 /** Human-readable size string used in dialogs, matching the config format */
@@ -92,21 +102,6 @@ function fmtSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
-
-/**
- * Prompt the user to confirm extraction of an oversized file.
- * Returns true if the user chooses to continue.
- */
-export async function promptOversizeFile(label: string, size: number): Promise<boolean> {
-  const maxSize = getMaxFileSize();
-  if (size <= maxSize) return true;
-  const choice = await vscode.window.showWarningMessage(
-    t("security.oversizeWarning", label, fmtSize(size), fmtSize(maxSize)),
-    { modal: true },
-    t("security.extractAnyway"),
-  );
-  return choice === t("security.extractAnyway");
 }
 
 /**

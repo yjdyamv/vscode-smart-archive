@@ -21,6 +21,8 @@ import {
 import { initTempCleanup } from "./providers/tempFiles";
 import { resetDetectionCache } from "./engines/system7z";
 import { resetZstdDetectionCache } from "./engines/zstd-codec";
+import { applyHostConfig } from "./utils/config";
+import { setArchiveRunner, InProcessRunner } from "./engines/worker/runner";
 
 /**
  * Called when the extension is activated.
@@ -30,6 +32,8 @@ import { resetZstdDetectionCache } from "./engines/zstd-codec";
  */
 export function activate(context: vscode.ExtensionContext): void {
   logger.info({ event: "extension.activate", vscode: vscode.version });
+
+  applyHostConfig();
 
   initExpandedState(context.secrets);
   initTempCleanup(context);
@@ -43,6 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // a window reload.
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
+      applyHostConfig();
       if (e.affectsConfiguration("smart-archive.useSystem7z")) resetDetectionCache();
       if (e.affectsConfiguration("smart-archive.useSystemZstd")) resetZstdDetectionCache();
     }),
@@ -93,6 +98,7 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export function deactivate(): void {
   disposeExpandedState();
+  setArchiveRunner(new InProcessRunner());
   logger.info({ event: "extension.deactivate" });
   logger.dispose();
 }

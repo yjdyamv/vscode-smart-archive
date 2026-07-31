@@ -1,4 +1,4 @@
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
 import { checkFileSize, checkTotalSize } from "../utils/security";
 import * as fs from "fs";
 import { CODEC_CHUNK } from "../constants";

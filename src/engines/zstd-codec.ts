@@ -11,9 +11,8 @@
  * @module engines/zstd-codec
  */
 
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
 import { checkFileSize } from "../utils/security";
-import * as vscode from "vscode";
 import { t } from "../i18n";
 import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
@@ -69,6 +68,21 @@ export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
 
 let sysZstdPath: string | null | false = null;
 
+/** Injected config: useSystemZstd setting + optional warning hook (host shows it). */
+let zstdConfig: { useSystemZstd?: string; warn?: (message: string) => void } = {};
+
+/**
+ * Inject the useSystemZstd setting and a warning callback. The host wires
+ * warn → vscode.window.showWarningMessage; worker threads receive the
+ * setting at init and forward warnings as notify messages.
+ */
+export function setZstdConfig(config: {
+  useSystemZstd?: string;
+  warn?: (message: string) => void;
+}): void {
+  zstdConfig = config;
+}
+
 /**
  * Clear the cached system-zstd detection result so a change to
  * `smart-archive.useSystemZstd` takes effect without a window reload.
@@ -80,8 +94,7 @@ export function resetZstdDetectionCache(): void {
 }
 
 function resolveSystemZstd(): string | null {
-  const config = vscode.workspace.getConfiguration("smart-archive");
-  const setting = config.get<string>("useSystemZstd", "auto");
+  const setting = zstdConfig.useSystemZstd ?? "auto";
 
   if (setting === "never") {
     logger.debug({ event: "zstd.system.disabled" });
@@ -105,7 +118,7 @@ function resolveSystemZstd(): string | null {
   }
 
   if (!sysZstdPath && setting === "always") {
-    vscode.window.showWarningMessage(t("zstd.notAvailable"));
+    zstdConfig.warn?.(t("zstd.notAvailable"));
   }
 
   return sysZstdPath || null;

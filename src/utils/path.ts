@@ -9,7 +9,7 @@
 
 import * as path from "path";
 import * as iconv from "iconv-lite";
-import { logger } from "./logger";
+import { logger } from "./logger-core";
 
 /**
  * Join a virtual FS directory with a file/directory name.

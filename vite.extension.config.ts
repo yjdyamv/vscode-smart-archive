@@ -5,9 +5,12 @@ import path from "path";
 export default defineConfig({
   build: {
     lib: {
-      entry: path.resolve(__dirname, "src/extension.ts"),
+      entry: {
+        extension: path.resolve(__dirname, "src/extension.ts"),
+        "worker/worker": path.resolve(__dirname, "src/engines/worker/worker.ts"),
+      },
       formats: ["cjs"],
-      fileName: () => "extension.js",
+      fileName: (format, entryName) => `${entryName}.js`,
     },
     outDir: "out",
     emptyOutDir: true,

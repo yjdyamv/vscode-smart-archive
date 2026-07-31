@@ -1,9 +1,8 @@
 /**
  * Logger — Smart Archive VSCode Extension
  *
- * Built on pino for structured high-performance logging.
- * Routes to VSCode LogOutputChannel (with level highlighting)
- * and stderr (JSON for programmatic use).
+ * Host-side logger built on logger-core, routing structured pino records
+ * to the VSCode LogOutputChannel (with level highlighting) and stderr.
  *
  * Usage:
  *   import { logger } from "../utils/logger";
@@ -15,12 +14,10 @@
 
 import * as vscode from "vscode";
 import { Writable } from "stream";
-import pino from "pino";
-
-const levels = { debug: 20, info: 30, warn: 40, error: 50 } as const;
+import { logger as coreLogger, setLoggerSink, levels } from "./logger-core";
+import type { LogLevel } from "./logger-core";
 
 let channel: vscode.LogOutputChannel | null = null;
-let _level: keyof typeof levels = "info";
 
 function getChannel(): vscode.LogOutputChannel {
   if (!channel) {
@@ -55,64 +52,44 @@ const channelOut = new Writable({
   },
 });
 
-/** Sanitize sensitive fields before hitting any output */
-function sanitize(obj: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (k === "password" || k === "pw" || k === "pass") {
-      out[k] = "***";
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
+// Route logger-core records (used by the vscode-free engine modules) to the
+// OutputChannel as well, so host-side operations keep their existing logs.
+setLoggerSink((chunk) => {
+  channelOut.write(chunk);
+  process.stderr.write(chunk);
+});
+
+/**
+ * Write a raw pino JSON line (e.g. forwarded from the archive worker) to
+ * the host OutputChannel.
+ */
+export function writeHostLog(chunk: string): void {
+  channelOut.write(chunk);
 }
 
-const p = pino(
-  {
-    level: _level,
-    messageKey: "event",
-    timestamp: pino.stdTimeFunctions.isoTime,
-    formatters: {
-      level(label) {
-        return { level: levels[label as keyof typeof levels] ?? 30 };
-      },
-    },
-  },
-  pino.multistream([{ stream: channelOut }, { level: "info", stream: process.stderr }]),
-);
-
 export const logger = {
-  setLevel(lvl: keyof typeof levels): void {
-    _level = lvl;
-    p.level = lvl;
+  setLevel(lvl: LogLevel): void {
+    coreLogger.setLevel(lvl);
   },
 
   debug(obj: Record<string, unknown>, msg?: string): void {
-    p.debug(sanitize(obj), msg);
+    coreLogger.debug(obj, msg);
   },
 
   info(obj: Record<string, unknown>, msg?: string): void {
-    p.info(sanitize(obj), msg);
+    coreLogger.info(obj, msg);
   },
 
   warn(obj: Record<string, unknown>, msg?: string): void {
-    p.warn(sanitize(obj), msg);
+    coreLogger.warn(obj, msg);
   },
 
   error(obj: Record<string, unknown>, msg?: string): void {
-    if (obj.err instanceof Error) {
-      const e = obj.err;
-      obj.err = e.message;
-      obj.stack = e.stack?.split("\n").slice(0, 3).join(" | ");
-    }
-    p.error(sanitize(obj), msg);
+    coreLogger.error(obj, msg);
   },
 
   throw(event: string, err: unknown, data?: Record<string, unknown>): never {
-    logger.error({ event, err, ...data });
-    if (err instanceof Error) throw err;
-    throw new Error(String(err));
+    return coreLogger.throw(event, err, data);
   },
 
   dispose(): void {

@@ -13,7 +13,7 @@ import { disposeJS7z } from "./js7z-helpers";
 import { streamToVFS } from "./vfs-io";
 import { getBaseName } from "../utils/path";
 import { checkFileSize, validatePassword } from "../utils/security";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { JS7z } from "./js7z-factory";
 import { parse7zListing } from "../utils/parse7z";
