@@ -11,6 +11,7 @@
  */
 
 import type { CompressOptions, DecompressOptions } from "../../types";
+import type { LogLevel } from "../../utils/logger-core";
 
 export type ArchiveOp = "compress" | "decompress" | "list" | "isEncrypted" | "modify" | "unwrap";
 
@@ -22,6 +23,8 @@ export interface EngineConfig {
   workerMemoryMb?: number;
   /** Default compression level (0-9) for wrapped-format mutations */
   compressionLevel?: number;
+  /** Output-channel verbosity (matches smart-archive.logLevel) */
+  logLevel?: LogLevel;
 }
 
 export interface InitMessage {

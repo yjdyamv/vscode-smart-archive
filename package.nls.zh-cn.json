@@ -33,5 +33,10 @@
   "config.useSystemZstd.always": "始终使用系统 zstd。如果未安装则显示错误。",
   "config.useSystemZstd.never": "永不使用系统 zstd。始终使用内置 zstd-wasm，即使已安装 zstd。",
   "config.workerMemoryMb.description": "归档 worker 线程（运行 WASM 7-Zip）的内存上限（MiB）。设为 0 可禁用护栏。降低可减少扩展内存占用；若大压缩包报内存超限错误请调高。",
-  "config.workerPoolSize.description": "归档 worker 线程数。1 表示所有操作串行（内存占用最低）；2 允许小压缩包批量操作并行执行。每个 worker 独立持有 WASM 7-Zip 堆内存。修改后需重载窗口生效。"
+  "config.workerPoolSize.description": "归档 worker 线程数。1 表示所有操作串行（内存占用最低）；2 允许小压缩包批量操作并行执行。每个 worker 独立持有 WASM 7-Zip 堆内存。修改后需重载窗口生效。",
+  "config.logLevel.description": "Smart Archive 输出面板日志的详细程度。",
+  "config.logLevel.error": "仅错误",
+  "config.logLevel.warn": "错误和警告",
+  "config.logLevel.info": "错误、警告和信息（默认）",
+  "config.logLevel.debug": "全部，包括调试细节（较嘈杂）"
 }

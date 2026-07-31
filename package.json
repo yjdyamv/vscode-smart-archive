@@ -496,6 +496,23 @@
           "minimum": 1,
           "maximum": 2,
           "description": "%config.workerPoolSize.description%"
+        },
+        "smart-archive.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ],
+          "enumDescriptions": [
+            "%config.logLevel.error%",
+            "%config.logLevel.warn%",
+            "%config.logLevel.info%",
+            "%config.logLevel.debug%"
+          ],
+          "description": "%config.logLevel.description%"
         }
       }
     }
