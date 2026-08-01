@@ -22,7 +22,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { httpGet, downloadWithCache } = require("./lib/download-cache");
+const { httpGetMirrored, downloadWithCache } = require("./lib/download-cache");
 
 const PKG_VERSION = "0.1.0"; // keep in sync with the binding package.json
 const RELEASE_BASE = process.env.SA_RAR5_RELEASE_BASE ||
@@ -30,7 +30,18 @@ const RELEASE_BASE = process.env.SA_RAR5_RELEASE_BASE ||
 
 // SHA-256 of each platform .node asset; fail-closed. Regenerate once a release
 // exists: SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
-const EXPECTED_HASHES = {};
+const EXPECTED_HASHES = {
+  "linux-x64-gnu": "1d77e8428b2f9abbadc582a5a4ea944fd97dc4230be4058b370f55bdc288c291",
+  "linux-x64-musl": "4421f41e27df2c21da29ac33ca27b2038e98409c4cf911b02c59e82915f33d48",
+  "linux-arm64-gnu": "79a78d3c13c0ed7e7ccff7fc40641a6733bda32f7a604e9df19b98750a40ab6d",
+  "linux-arm64-musl": "bad1f17f9cdb0a1ff06eac94b88db1ac44ff92320bc0a2b35912865b93bc3a38",
+  "linux-arm-gnueabihf": "db68b28462cef2a5b777db059e75f7df75bde921dd0e35a640b134eebdd66bc7",
+  "darwin-x64": "e02e80f1a4a98f31d24d81f35fba210f2ae99e72631e521f7e26e2a02d373339",
+  "darwin-arm64": "ecf59bc42dfc7a4aa785c23cb7196bf0074ce4da99877668f3aa1082cf014ca4",
+  "win32-x64-msvc": "1ba51bca7d2c6a6c4b2ea5376930a08c88c4f540691d62b6eb2aa6cd3421a632",
+  "win32-ia32-msvc": "7d4a148c67161d9f8a345cf7c53a4f3d6bd9f7ec68aecb1b9792ea531b2371f6",
+  "win32-arm64-msvc": "fce5411e3f85505e76abda860c77cc3f6d0b6f00d70436ca924a9324cd8e0edd",
+};
 
 // <platform>/<arch> -> napi-rs triples
 const TRIPLES = {
@@ -124,8 +135,11 @@ async function releaseMode(strict) {
         requireHash: !process.env.SA_HASH_BOOTSTRAP && strict,
         label: `rar5 ${triple}`,
         fetch: async () => {
+          // Direct download first, mirror fallback (gh-proxy.com, or
+          // SA_GITHUB_MIRRORS) on failure. SHA-256 pinning below keeps the
+          // fail-closed guarantee regardless of the source.
           const url = `${RELEASE_BASE}/${nodeFileName}`;
-          return httpGet(url);
+          return httpGetMirrored(url);
         },
       });
 
