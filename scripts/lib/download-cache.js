@@ -15,10 +15,10 @@ const AGENT = (() => {
   }
 })();
 
-function httpGet(url, redirects = 5, timeoutMs = 30000) {
+function httpGet(url, redirects = 5, timeoutMs = 30000, headers = {}) {
   return new Promise((resolve, reject) => {
     if (redirects <= 0) return reject(new Error("too many redirects"));
-    const opts = { timeout: timeoutMs };
+    const opts = { timeout: timeoutMs, headers };
     if (AGENT) opts.agent = AGENT;
     const req = https.get(url, opts, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {

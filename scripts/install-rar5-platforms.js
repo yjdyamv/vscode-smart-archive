@@ -22,14 +22,53 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { httpGetMirrored, downloadWithCache } = require("./lib/download-cache");
+const { httpGet, httpGetMirrored, downloadWithCache } = require("./lib/download-cache");
 
-const PKG_VERSION = "0.1.0"; // keep in sync with the binding package.json
-const RELEASE_BASE = process.env.SA_RAR5_RELEASE_BASE ||
-  `https://github.com/yjdyamv/smart-archive-rar/releases/download/v${PKG_VERSION}`;
+// Binding repo, overridable (e.g. a fork):
+//   SA_RAR5_REPO=me/smart-archive-rar
+const REPO = process.env.SA_RAR5_REPO || "yjdyamv/smart-archive-rar";
 
-// SHA-256 of each platform .node asset; fail-closed. Regenerate once a release
-// exists: SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
+// Fallback version used only when the GitHub API is unreachable. Prefer
+// SA_RAR5_VERSION (explicit) — otherwise the latest release tag is resolved
+// automatically (cached for 1 h under .cache/rar5-platforms/).
+const PKG_VERSION_FALLBACK = "0.1.0";
+
+const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
+
+async function resolveVersion() {
+  if (process.env.SA_RAR5_VERSION) return process.env.SA_RAR5_VERSION;
+  const cacheFile = path.join(cacheDir, "latest-version.txt");
+  try {
+    if (fs.existsSync(cacheFile)) {
+      const age = Date.now() - fs.statSync(cacheFile).mtimeMs;
+      if (age < VERSION_CACHE_TTL_MS) {
+        const cached = fs.readFileSync(cacheFile, "utf8").trim();
+        if (cached) return cached;
+      }
+    }
+    const url = `https://api.github.com/repos/${REPO}/releases/latest`;
+    const body = await httpGet(url, 5, 15000, {
+      "User-Agent": "smart-archive-vscode",
+      Accept: "application/vnd.github+json",
+    });
+    const tag = String(JSON.parse(body.toString("utf8")).tag_name).replace(/^v/, "");
+    if (!/^\d+\.\d+\.\d+/.test(tag)) throw new Error(`unexpected release tag: ${tag}`);
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(cacheFile, tag);
+    return tag;
+  } catch (err) {
+    console.warn(
+      `  cannot resolve latest release of ${REPO} (${err.message}); ` +
+        `falling back to ${PKG_VERSION_FALLBACK} — set SA_RAR5_VERSION to pin`,
+    );
+    return PKG_VERSION_FALLBACK;
+  }
+}
+
+// SHA-256 of each platform .node release asset; fail-closed. Verify against
+// the official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test) after a new
+// release, then regenerate here:
+//   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
   "linux-x64-gnu": "1d77e8428b2f9abbadc582a5a4ea944fd97dc4230be4058b370f55bdc288c291",
   "linux-x64-musl": "4421f41e27df2c21da29ac33ca27b2038e98409c4cf911b02c59e82915f33d48",
@@ -55,6 +94,10 @@ const TRIPLES = {
   "win32/arm64": ["win32-arm64-msvc"],
 };
 
+function devProject() {
+  return process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "smart-archive-rar");
+}
+
 const destDir = path.join(__dirname, "..", "rar5-bin");
 const cacheDir = path.join(__dirname, "..", ".cache", "rar5-platforms");
 fs.mkdirSync(cacheDir, { recursive: true });
@@ -70,8 +113,7 @@ function stageNode(nodeData, triple) {
 }
 
 function devMode() {
-  const project =
-    process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "smart-archive-rar");
+  const project = devProject();
   const candidates = [
     project, // napi build --platform copies the addon to the project root
     path.join(project, "target", "release"),
@@ -138,7 +180,7 @@ async function releaseMode(strict) {
           // Direct download first, mirror fallback (gh-proxy.com, or
           // SA_GITHUB_MIRRORS) on failure. SHA-256 pinning below keeps the
           // fail-closed guarantee regardless of the source.
-          const url = `${RELEASE_BASE}/${nodeFileName}`;
+          const url = `${releaseBase}/${nodeFileName}`;
           return httpGetMirrored(url);
         },
       });
@@ -175,13 +217,23 @@ async function main() {
     devMode();
     return;
   }
+
+  // Version resolution: SA_RAR5_VERSION > cached latest-release > GitHub API
+  // (with a documented fallback only when the API is unreachable).
+  const version = await resolveVersion();
+  releaseBase =
+    process.env.SA_RAR5_RELEASE_BASE ||
+    `https://github.com/${REPO}/releases/download/v${version}`;
+  console.log(`rar5: resolving bindings from ${releaseBase}`);
+
   if (process.env.SA_RAR5_REQUIRE === "1") {
     // Fail-closed release build: every platform must be staged.
     await releaseMode(true);
     return;
   }
   // Local-first default: stage whatever local builds exist (dev ergonomics),
-  // otherwise fall back to npm. Releases must use SA_RAR5_REQUIRE=1.
+  // otherwise fall back to release downloads. Releases must use
+  // SA_RAR5_REQUIRE=1.
   try {
     devMode();
     const staged = fs.readdirSync(destDir, { recursive: true }).filter((f) => f.endsWith(".node"));
@@ -198,4 +250,18 @@ async function main() {
   }
 }
 
-main();
+let releaseBase = "";
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  REPO,
+  PKG_VERSION_FALLBACK,
+  resolveVersion,
+  getReleaseBase: () => releaseBase,
+  TRIPLES,
+  EXPECTED_HASHES,
+  devProject,
+};
