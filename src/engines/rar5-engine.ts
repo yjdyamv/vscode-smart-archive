@@ -128,12 +128,15 @@ function collectEntries(
     if (!fs.existsSync(target.fsPath)) {
       throw new Error(`Target does not exist: ${target.fsPath}`);
     }
-    const stat = fs.statSync(target.fsPath);
+    const stat = fs.statSync(target.fsPath); // follows symlinks
     if (stat.isFile()) {
       entries.push({ kind: "file", path: target.fsPath, name });
     } else if (stat.isDirectory()) {
       entries.push({ kind: "dir", path: target.fsPath, name });
       const stack: Array<{ dir: string; rel: string }> = [{ dir: target.fsPath, rel: name }];
+      // Real-path guard: symlinked directories (followed via realpath) must
+      // not loop back into an ancestor.
+      const visited = new Set<string>();
       while (stack.length > 0) {
         const { dir, rel } = stack.pop()!;
         let children: fs.Dirent[];
@@ -147,9 +150,28 @@ function collectEntries(
           if (isPathExcluded(childRel, exclusions)) continue;
           const childFull = path.join(dir, child.name);
           if (child.isDirectory()) {
+            entries.push({ kind: "dir", path: childFull, name: childRel });
             stack.push({ dir: childFull, rel: childRel });
           } else if (child.isFile()) {
             entries.push({ kind: "file", path: childFull, name: childRel });
+          } else if (child.isSymbolicLink()) {
+            // rar-rs cannot store symlink entries yet; follow the link and
+            // add the target as a regular entry (7-Zip stores links, so this
+            // is the closest equivalent until the fork gains symlink support).
+            try {
+              const real = fs.realpathSync(childFull);
+              if (visited.has(real)) continue;
+              const rstat = fs.statSync(real);
+              if (rstat.isDirectory()) {
+                visited.add(real);
+                entries.push({ kind: "dir", path: real, name: childRel });
+                stack.push({ dir: real, rel: childRel });
+              } else if (rstat.isFile()) {
+                entries.push({ kind: "file", path: real, name: childRel });
+              }
+            } catch {
+              // dangling or looping symlink — skip
+            }
           }
         }
       }
