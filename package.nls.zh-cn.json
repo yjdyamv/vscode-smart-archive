@@ -38,5 +38,6 @@
   "config.logLevel.error": "仅错误",
   "config.logLevel.warn": "错误和警告",
   "config.logLevel.info": "错误、警告和信息（默认）",
-  "config.logLevel.debug": "全部，包括调试细节（较嘈杂）"
+  "config.logLevel.debug": "全部，包括调试细节（较嘈杂）",
+  "config.logHistoryBytes.description": "日志历史缓冲的内存预算（字节）。切换日志级别时用它重渲染输出面板；预算越大保留的日志行越多。"
 }

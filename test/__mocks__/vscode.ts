@@ -1,6 +1,5 @@
 export const env = {
   language: "en",
-  onDidChangeLogLevel: () => ({ dispose: () => {} }),
 };
 
 export const window = {
@@ -8,26 +7,15 @@ export const window = {
   showErrorMessage: () => undefined,
   showInformationMessage: () => undefined,
   createOutputChannel: (_name: string, _options?: Record<string, unknown>) => {
-    // Mimic the real LogOutputChannel: level methods are filtered by the
-    // panel logLevel (default Info), appendLine is not filtered.
-    const listeners: Array<(lvl: number) => void> = [];
-    let logLevel = LogLevel.Info;
+    // Plain OutputChannel used by utils/logger: appendLine is never
+    // filtered and clear() really empties the rendered buffer.
+    const rendered: string[] = [];
     const channel = {
-      get logLevel() {
-        return logLevel;
+      appendLine: (line: string) => {
+        rendered.push(line);
       },
-      set logLevel(lvl: number) {
-        logLevel = lvl;
-        for (const cb of listeners) cb(lvl);
-      },
-      appendLine: () => {},
-      info: () => {},
-      warn: () => {},
-      error: () => {},
-      debug: () => {},
-      onDidChangeLogLevel: (cb: (lvl: number) => void) => {
-        listeners.push(cb);
-        return { dispose: () => {} };
+      clear: () => {
+        rendered.length = 0;
       },
       show: () => {},
       dispose: () => {},
@@ -53,15 +41,6 @@ export const Uri = {
 
 export const CancellationError = class extends Error {};
 
-export const LogLevel = {
-  Off: 0,
-  Trace: 1,
-  Debug: 2,
-  Info: 3,
-  Warning: 4,
-  Error: 5,
-};
-
 export default {
   env,
   window,
@@ -69,5 +48,4 @@ export default {
   ProgressLocation,
   Uri,
   CancellationError,
-  LogLevel,
 };

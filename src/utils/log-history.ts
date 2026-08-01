@@ -1,17 +1,15 @@
 /**
  * Log history — Smart Archive VSCode Extension
  *
- * Byte-budgeted ring buffer of structured log records, used to replay
- * lines that VS Code's LogOutputChannel hid while its panel level was
- * lower. Robustness properties:
+ * Byte-budgeted ring buffer of structured log records. The host owns the
+ * output panel's rendering (appendLine on a plain OutputChannel), so a
+ * level change clears the panel and re-renders it from this buffer in
+ * sequence order — the buffer is what makes that rebuild possible.
  *
- *  - All levels are buffered, so raising the panel level to ANY level
- *    (Warn→Info, Info→Debug, …) can replay the corresponding history.
- *  - Monotonic sequence numbers keep the replay cursor aligned when the
- *    buffer rolls over — a rolled-out record can never be replayed twice.
- *  - Replay snapshots its end boundary up front: records pushed while a
- *    replay is in flight are NOT part of that replay (they are delivered
- *    live by the regular routing instead), so nothing is duplicated.
+ * Robustness properties:
+ *
+ *  - All levels are buffered, so switching the level to ANY level can
+ *    re-render the corresponding records.
  *  - A byte budget (not a record count) bounds memory: dense log bursts
  *    cover the same wall-clock window as sparse ones.
  *
@@ -19,69 +17,61 @@
  */
 
 export interface LogRecord {
-  /** Monotonic sequence number (never reused) */
-  seq: number;
   /** pino numeric level (20 = debug … 50 = error) */
   level: number;
   /** Raw pino JSON line, re-emitted verbatim through the channel */
   line: string;
-  /**
-   * Whether this record was already visible in the panel when it was
-   * produced (panel level allowed it). Visible records surface live and
-   * must never be replayed — replay is only for lines the panel hid.
-   */
-  wasVisible: boolean;
 }
 
 const DEFAULT_MAX_BYTES = 256 * 1024; // 256 KiB ≈ thousands of records
 
 export class LogHistory {
   private records: LogRecord[] = [];
-  private nextSeq = 1;
   private bytes = 0;
 
-  constructor(private readonly maxBytes: number = DEFAULT_MAX_BYTES) {}
+  constructor(private maxBytes: number = DEFAULT_MAX_BYTES) {}
 
   /** Append a record, evicting the oldest while over budget. */
-  push(level: number, line: string, wasVisible = false): void {
-    const rec: LogRecord = { seq: this.nextSeq++, level, line, wasVisible };
-    this.records.push(rec);
-    this.bytes += line.length;
-    while (this.bytes > this.maxBytes && this.records.length > 0) {
-      const dropped = this.records.shift()!;
-      this.bytes -= dropped.line.length;
-    }
-  }
-
-  /** Latest sequence number (0 when empty). */
-  get cursor(): number {
-    const last = this.records[this.records.length - 1];
-    return last ? last.seq : 0;
+  push(level: number, line: string): void {
+    this.records.push({ level, line });
+    this.bytes += Buffer.byteLength(line);
+    this.evict();
   }
 
   /**
-   * Replay records newer than `afterSeq` whose level is at least
-   * `minLevel` and which were NOT visible when produced, delivering each
-   * through `out`. The end boundary is snapshotted at call time —
-   * concurrent pushes are not replayed (they surface live through the
-   * normal routing). Returns the new cursor to pass as `afterSeq` next time.
+   * Deliver every record at or above `minLevel` in sequence order. Used to
+   * re-render the whole panel content after a level change, so lines keep
+   * their original chronology.
    */
-  replayFrom(afterSeq: number, minLevel: number, out: (line: string) => void): number {
-    const end = this.records.length;
-    for (let i = 0; i < end; i++) {
-      const rec = this.records[i];
-      if (rec.seq > afterSeq && rec.level >= minLevel && !rec.wasVisible) {
+  replayAll(minLevel: number, out: (line: string) => void): void {
+    for (const rec of this.records) {
+      if (rec.level >= minLevel) {
         out(rec.line);
       }
     }
-    return this.cursor;
   }
 
-  /** Drop all buffered records and reset the sequence. */
+  /** Drop all buffered records. */
   reset(): void {
     this.records = [];
-    this.nextSeq = 1;
     this.bytes = 0;
+  }
+
+  /**
+   * Adjust the byte budget (e.g. from a setting change). Shrinking evicts
+   * the oldest records while over the new budget; growing keeps everything.
+   */
+  setMaxBytes(maxBytes: number): void {
+    this.maxBytes = maxBytes;
+    this.evict();
+  }
+
+  /** Evict the oldest records while over the byte budget. */
+  private evict(): void {
+    while (this.bytes > this.maxBytes && this.records.length > 0) {
+      const dropped = this.records.shift()!;
+      this.bytes -= Buffer.byteLength(dropped.line);
+    }
   }
 
   get size(): number {

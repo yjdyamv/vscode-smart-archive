@@ -38,5 +38,6 @@
   "config.logLevel.error": "Errors only",
   "config.logLevel.warn": "Errors and warnings",
   "config.logLevel.info": "Errors, warnings and info (default)",
-  "config.logLevel.debug": "Everything, including debug details (noisy)"
+  "config.logLevel.debug": "Everything, including debug details (noisy)",
+  "config.logHistoryBytes.description": "Memory budget (bytes) for the log history buffer used to re-render the output panel when the log level changes. Larger budgets keep more log lines available."
 }

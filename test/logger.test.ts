@@ -1,12 +1,11 @@
 /**
  * Logger tests — Smart Archive VSCode Extension
  *
- * Verifies logger.setLevel() semantics on the shared logger-core pino
- * instance, the one-time panel hint emitted when debug verbosity is
- * requested while the panel level is not Debug, and the replay of
- * previously hidden debug records when the panel level is raised
- * (VS Code's LogOutputChannel filters debug() by panel level and does
- * not replay history — the host buffers and re-emits it).
+ * The host renders every record to a plain OutputChannel via appendLine
+ * (unfiltered), and a log-level change clears the panel and re-renders it
+ * from the history buffer in sequence order. These tests verify the
+ * production-level semantics of logger.setLevel() on the shared
+ * logger-core pino instance and that re-rendering keeps chronology.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -17,62 +16,42 @@ import { logger } from "../src/utils/logger";
 
 const flush = () => new Promise((r) => setTimeout(r, 50));
 
-beforeEach(() => {
-  logger.setLevel("info");
-});
+/** Extract the event name (e.g. "info.before") from a rendered line. */
+const eventsFrom = (rendered: string[]) =>
+  rendered.map((l) => l.match(/[a-z]+\.[a-z0-9_]+/)?.[0]);
 
-/**
- * A LogOutputChannel double that mimics the real filtering: level methods
- * only record when the panel logLevel allows them; appendLine never
- * filters; setting logLevel fires onDidChangeLogLevel.
- */
-function makeChannel(initialLevel: number = vscode.LogLevel.Info) {
-  const listeners: Array<(lvl: number) => void> = [];
-  let logLevel = initialLevel;
-  const calls: Record<"debug" | "info" | "warn" | "error", string[]> = {
-    debug: [],
-    info: [],
-    warn: [],
-    error: [],
-  };
-  const record = (bucket: keyof typeof calls, threshold: number) => (line: string) => {
-    if (logLevel <= threshold) calls[bucket].push(line);
-  };
+/** A plain OutputChannel double: appendLine + working clear(). */
+function makeChannel() {
+  const rendered: string[] = [];
   const channel = {
-    get logLevel() {
-      return logLevel;
-    },
-    set logLevel(lvl: number) {
-      logLevel = lvl;
-      for (const cb of listeners) cb(lvl);
-    },
-    appendLine: vi.fn(),
-    onDidChangeLogLevel: vi.fn((cb: (lvl: number) => void) => {
-      listeners.push(cb);
-      return { dispose: vi.fn() };
+    appendLine: vi.fn((line: string) => {
+      rendered.push(line);
     }),
-    info: vi.fn(record("info", vscode.LogLevel.Info)),
-    warn: vi.fn(record("warn", vscode.LogLevel.Warning)),
-    error: vi.fn(record("error", vscode.LogLevel.Error)),
-    debug: vi.fn(record("debug", vscode.LogLevel.Debug)),
+    clear: vi.fn(() => {
+      rendered.length = 0;
+    }),
     show: vi.fn(),
     dispose: vi.fn(),
   };
-  return { channel, calls, listeners };
+  return { channel, rendered };
 }
 
-async function freshLoggerAndChannel(initialLevel?: number) {
+async function freshLoggerAndChannel() {
   vi.resetModules();
   const { logger: freshLogger } = await import("../src/utils/logger");
   const vs = await import("vscode");
-  const { channel, calls, listeners } = makeChannel(initialLevel);
+  const { channel, rendered } = makeChannel();
   const spy = vi
     .spyOn(vs.window, "createOutputChannel")
-    .mockReturnValue(channel as unknown as vscode.LogOutputChannel);
-  return { freshLogger, channel, calls, listeners, spy };
+    .mockReturnValue(channel as unknown as vscode.OutputChannel);
+  return { freshLogger, channel, rendered, spy };
 }
 
 describe("logger.setLevel", () => {
+  beforeEach(() => {
+    logger.setLevel("info");
+  });
+
   it("routes debug records through the shared pino after setLevel('debug')", async () => {
     const received: string[] = [];
     const sink = new Writable({
@@ -111,193 +90,142 @@ describe("logger.setLevel", () => {
     }
   });
 
-  it("emits the panel hint exactly once when switching to debug", async () => {
-    const { freshLogger, channel, spy } = await freshLoggerAndChannel();
+  it("renders records with a level tag and timestamp", async () => {
+    const { freshLogger, rendered, spy } = await freshLoggerAndChannel();
+    try {
+      freshLogger.info({ event: "fmt.info", k: "v" });
+      await flush();
+      expect(rendered).toHaveLength(1);
+      expect(rendered[0]).toMatch(
+        /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[info\] fmt\.info k="v"$/,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("raising the level preserves rendered history and streams debug live", async () => {
+    const { freshLogger, channel, rendered, spy } = await freshLoggerAndChannel();
+    try {
+      freshLogger.info({ event: "info.before" });
+      freshLogger.debug({ event: "gone.one" }); // dropped by pino at info
+      await flush();
+      expect(eventsFrom(rendered)).toEqual(["info.before"]);
+
+      // Raising re-renders the panel from history — the info line survives
+      // the rebuild (there is nothing hidden to reveal: pino never emitted
+      // debug records while the level was info).
+      freshLogger.setLevel("debug");
+      await flush();
+      expect(channel.clear).toHaveBeenCalledTimes(1);
+      expect(eventsFrom(rendered)).toEqual(["info.before"]);
+
+      // Debug records now stream live, interleaved with the re-rendered
+      // history in chronological order.
+      freshLogger.debug({ event: "live.one" });
+      freshLogger.info({ event: "info.after" });
+      await flush();
+      expect(eventsFrom(rendered)).toEqual([
+        "info.before",
+        "live.one",
+        "info.after",
+      ]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("setLevel('info') removes debug lines from the panel", async () => {
+    const { freshLogger, rendered, spy } = await freshLoggerAndChannel();
     try {
       freshLogger.setLevel("debug");
-      expect(channel.appendLine).toHaveBeenCalledTimes(1);
-      expect(channel.appendLine.mock.calls[0][0]).toContain("dropdown");
+      freshLogger.debug({ event: "mode.debug1" });
+      freshLogger.info({ event: "mode.info" });
+      freshLogger.debug({ event: "mode.debug2" });
+      await flush();
+      expect(eventsFrom(rendered)).toEqual([
+        "mode.debug1",
+        "mode.info",
+        "mode.debug2",
+      ]);
 
-      // Switching to another level and back re-arms the hint.
+      // Lowering re-renders at the info floor: debug lines disappear, the
+      // info line keeps its position.
       freshLogger.setLevel("info");
-      freshLogger.setLevel("debug");
-      expect(channel.appendLine).toHaveBeenCalledTimes(2);
+      await flush();
+      expect(eventsFrom(rendered)).toEqual(["mode.info"]);
+
+      // New debug records are dropped by pino entirely.
+      freshLogger.debug({ event: "mode.hidden" });
+      await flush();
+      expect(eventsFrom(rendered)).toEqual(["mode.info"]);
     } finally {
       spy.mockRestore();
     }
   });
 
-  it("skips the hint when the panel level is already Debug", async () => {
-    const { freshLogger, channel, spy } = await freshLoggerAndChannel(vscode.LogLevel.Debug);
+  it("bounces between levels without losing or duplicating records", async () => {
+    const { freshLogger, rendered, spy } = await freshLoggerAndChannel();
     try {
       freshLogger.setLevel("debug");
-      expect(channel.appendLine).not.toHaveBeenCalled();
-    } finally {
-      spy.mockRestore();
-    }
-  });
+      freshLogger.debug({ event: "b.one" });
+      freshLogger.info({ event: "b.two" });
+      await flush();
+      expect(eventsFrom(rendered)).toEqual(["b.one", "b.two"]);
 
-  it("replays previously hidden debug records when the panel level is raised", async () => {
-    const { freshLogger, channel, calls, listeners, spy } = await freshLoggerAndChannel();
-    try {
-      // logLevel=debug: pino lets debug records through, but the Info panel
-      // level hides them — they are buffered for replay.
+      freshLogger.setLevel("info");
+      await flush();
+      expect(eventsFrom(rendered)).toEqual(["b.two"]);
+
       freshLogger.setLevel("debug");
-      freshLogger.debug({ event: "replay.one" });
-      freshLogger.debug({ event: "replay.two" });
       await flush();
-      expect(calls.debug).toHaveLength(0);
+      expect(eventsFrom(rendered)).toEqual(["b.one", "b.two"]);
 
-      // Simulate the user picking "Debug" in the panel dropdown.
-      channel.logLevel = vscode.LogLevel.Debug;
-      for (const cb of listeners) cb(vscode.LogLevel.Debug);
-      await flush();
-      expect(calls.debug).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("replay.one"),
-          expect.stringContaining("replay.two"),
-        ]),
-      );
-
-      // Raising the level again must not duplicate already-replayed records.
-      const callsAfterReplay = calls.debug.length;
-      channel.logLevel = vscode.LogLevel.Info;
-      for (const cb of listeners) cb(vscode.LogLevel.Info);
-      channel.logLevel = vscode.LogLevel.Debug;
-      for (const cb of listeners) cb(vscode.LogLevel.Debug);
-      await flush();
-      expect(calls.debug.length).toBe(callsAfterReplay);
-
-      // New records after the switch appear live (and are not replayed twice).
-      freshLogger.debug({ event: "replay.live" });
-      await flush();
-      expect(calls.debug).toEqual(
-        expect.arrayContaining([expect.stringContaining("replay.live")]),
-      );
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
-  it("replays history when the panel level changes to Debug", async () => {
-    const { freshLogger, channel, calls, listeners, spy } = await freshLoggerAndChannel();
-    try {
+      // Same-level calls are no-ops (no extra re-render).
+      const renderedBefore = [...rendered];
       freshLogger.setLevel("debug");
-      freshLogger.debug({ event: "replay.panel" });
       await flush();
-      expect(calls.debug).toHaveLength(0);
-
-      // Simulate the user picking "Debug" in the panel dropdown.
-      channel.logLevel = vscode.LogLevel.Debug;
-      for (const cb of listeners) cb(vscode.LogLevel.Debug);
-      await flush();
-      expect(calls.debug).toEqual(
-        expect.arrayContaining([expect.stringContaining("replay.panel")]),
-      );
+      expect(rendered).toEqual(renderedBefore);
     } finally {
       spy.mockRestore();
     }
   });
 
-  it("replays info/warn history when the panel level rises to Info", async () => {
-    const { freshLogger, channel, calls, listeners, spy } =
-      await freshLoggerAndChannel(vscode.LogLevel.Warning);
-    try {
-      freshLogger.setLevel("debug");
-      freshLogger.debug({ event: "rise.debug" });
-      freshLogger.info({ event: "rise.info" });
-      freshLogger.warn({ event: "rise.warn" });
-      await flush();
-      expect(calls.debug).toHaveLength(0);
-      expect(calls.info).toHaveLength(0);
-      // Warning panel shows warn+ — the warn record surfaced live already.
-      expect(calls.warn).toEqual([expect.stringContaining("rise.warn")]);
-      const warnCallsBefore = calls.warn.length;
-
-      // Panel Warning → Info: info records replay (warn already visible).
-      channel.logLevel = vscode.LogLevel.Info;
-      for (const cb of listeners) cb(vscode.LogLevel.Info);
-      await flush();
-      expect(calls.info).toEqual(
-        expect.arrayContaining([expect.stringContaining("rise.info")]),
-      );
-      expect(calls.warn.length).toBe(warnCallsBefore); // no duplicate replay
-      expect(calls.debug.some((l) => l.includes("rise.debug"))).toBe(false);
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
-  it("env log-level changes replay history too, idempotently", async () => {
-    const envListeners: Array<(lvl: number) => void> = [];
-    const { freshLogger, channel, calls, listeners, spy } = await freshLoggerAndChannel();
-    try {
-      vi.spyOn(vscode.env, "onDidChangeLogLevel").mockImplementation(
-        (cb: (lvl: number) => void) => {
-          envListeners.push(cb);
-          return { dispose: vi.fn() };
-        },
-      );
-      freshLogger.setLevel("debug");
-      freshLogger.debug({ event: "env.replay" });
-      await flush();
-      expect(calls.debug).toHaveLength(0);
-
-      // Both the panel and the env fire for the same logical change.
-      channel.logLevel = vscode.LogLevel.Debug;
-      for (const cb of listeners) cb(vscode.LogLevel.Debug);
-      for (const cb of envListeners) cb(vscode.LogLevel.Debug);
-      await flush();
-      const debugLines = calls.debug.filter((l) => l.includes("env.replay"));
-      expect(debugLines).toHaveLength(1); // idempotent across both listeners
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
-  it("rebuilds listeners and history after dispose (re-activation)", async () => {
-    const { freshLogger, calls, spy } = await freshLoggerAndChannel();
+  it("rebuilds on a fresh channel after dispose (re-activation)", async () => {
+    const { freshLogger, rendered, spy } = await freshLoggerAndChannel();
     try {
       freshLogger.setLevel("debug");
       freshLogger.debug({ event: "life.before" });
       await flush();
+      expect(eventsFrom(rendered)).toEqual(["life.before"]);
 
       freshLogger.dispose();
-      // A fresh channel on re-activation: prior history is gone, listeners
-      // are re-attached to the new channel.
+      // A fresh channel on re-activation: prior history is gone, the new
+      // channel renders only post-reactivation records.
       const channel2 = {
         appendLine: vi.fn(),
-        logLevel: vscode.LogLevel.Info,
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        debug: vi.fn(),
+        clear: vi.fn(),
         show: vi.fn(),
         dispose: vi.fn(),
-        onDidChangeLogLevel: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       };
-      spy.mockReturnValue(channel2 as unknown as vscode.LogOutputChannel);
-      freshLogger.setLevel("debug");
-      expect(channel2.onDidChangeLogLevel).toHaveBeenCalledTimes(1); // re-attached
+      spy.mockReturnValue(channel2 as unknown as vscode.OutputChannel);
 
+      // The first setLevel of a session rebuilds even when the level is
+      // unchanged — this purges stale content the output panel may have
+      // restored across a window reload.
+      freshLogger.setLevel("info");
+      expect(channel2.clear).toHaveBeenCalledTimes(1);
+
+      freshLogger.setLevel("debug");
       freshLogger.debug({ event: "life.after" });
       await flush();
-      // Panel Info still hides debug; the OLD channel's history is gone —
-      // switching the new panel to Debug replays only post-reactivation logs.
-      const oldDebugCalls = calls.debug.length;
-      channel2.logLevel = vscode.LogLevel.Debug;
-      const cb2 = (channel2.onDidChangeLogLevel as ReturnType<typeof vi.fn>)
-        .mock.calls[0][0] as (lvl: number) => void;
-      cb2(vscode.LogLevel.Debug);
-      await flush();
-      expect(calls.debug.length).toBe(oldDebugCalls); // old channel untouched
       expect(
-        (channel2.debug as ReturnType<typeof vi.fn>).mock.calls.some((c) =>
+        (channel2.appendLine as ReturnType<typeof vi.fn>).mock.calls.some((c) =>
           String(c[0]).includes("life.after"),
         ),
       ).toBe(true);
       expect(
-        (channel2.debug as ReturnType<typeof vi.fn>).mock.calls.some((c) =>
+        (channel2.appendLine as ReturnType<typeof vi.fn>).mock.calls.some((c) =>
           String(c[0]).includes("life.before"),
         ),
       ).toBe(false);

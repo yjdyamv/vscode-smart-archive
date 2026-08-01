@@ -55,6 +55,70 @@ export { getSplitVolumeStem, getSplitOutputPath, detectVolumeSize } from "./hand
 // cannot exceed that; this leaves headroom while bounding a malformed webview.
 const MAX_MSG_PATHS = 200_000;
 
+// Per-message debug logging for high-frequency messages (expandDir fires per
+// folder expansion, saveExpanded per expansion toggle — opening an archive
+// with many restored expanded paths bursts dozens at once). Burst
+// aggregation: the first message of each type logs immediately, further
+// ones within a quiet window are counted, and one "×N" summary line per
+// type is emitted when the window closes — signal without the screen-flood.
+const BURST_WINDOW_MS = 1000;
+
+interface BurstLogger {
+  log: (c: string, dir: string | undefined) => void;
+  dispose: () => void;
+}
+
+/** Create a per-webview burst aggregator (state never crosses webviews). */
+function createBurstLogger(): BurstLogger {
+  const totals = new Map<string, number>();
+  const firstDir = new Map<string, string | undefined>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let self: BurstLogger;
+
+  const flush = (): void => {
+    timer = undefined;
+    activeBurstLoggers.delete(self);
+    for (const [c, total] of totals) {
+      if (total > 1) {
+        logger.debug({ event: "webview.msg.burst", c, total });
+      }
+    }
+    totals.clear();
+    firstDir.clear();
+  };
+
+  const log = (c: string, dir: string | undefined): void => {
+    const total = (totals.get(c) ?? 0) + 1;
+    totals.set(c, total);
+    if (total === 1) {
+      firstDir.set(c, dir);
+      logger.debug({ event: "webview.msg", c, dir });
+    }
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(flush, BURST_WINDOW_MS);
+  };
+
+  const dispose = (): void => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    activeBurstLoggers.delete(self);
+    totals.clear();
+    firstDir.clear();
+  };
+
+  self = { log, dispose };
+  activeBurstLoggers.add(self);
+  return self;
+}
+
+const activeBurstLoggers = new Set<BurstLogger>();
+
+/** Drop pending burst timers (called on extension deactivation). */
+export function disposeBurstLoggers(): void {
+  for (const b of activeBurstLoggers) b.dispose();
+  activeBurstLoggers.clear();
+}
+
 /**
  * Reject structurally malformed webview → extension messages before they reach
  * a handler. Defense-in-depth: with the CSP in place the webview is not
@@ -80,10 +144,11 @@ function isValidMsg(msg: WebviewMsg): boolean {
  * Uses a command → handler map rather than a switch-case for extensibility.
  */
 export function registerHandler(webview: vscode.Webview): void {
+  const burstLog = createBurstLogger();
   webview.onDidReceiveMessage((msg: WebviewMsg) => {
     (async () => {
       if (msg.c === "expandDir" || msg.c === "saveExpanded") {
-        logger.debug({ event: "webview.msg", c: msg.c, dir: msg.dir });
+        burstLog.log(msg.c, msg.dir);
       } else {
         logger.info({ event: "webview.msg", c: msg.c, dir: msg.dir });
       }

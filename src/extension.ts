@@ -22,6 +22,7 @@ import { initTempCleanup } from "./providers/tempFiles";
 import { resetDetectionCache } from "./engines/system7z";
 import { resetZstdDetectionCache } from "./engines/zstd-codec";
 import { applyHostConfig } from "./utils/config";
+import { disposeBurstLoggers } from "./providers/webview/router";
 import { resetArchiveRunner, reconfigureArchiveWorker } from "./engines/worker/runner";
 
 /**
@@ -101,6 +102,7 @@ export function activate(context: vscode.ExtensionContext): void {
  */
 export function deactivate(): void {
   disposeExpandedState();
+  disposeBurstLoggers();
   resetArchiveRunner();
   logger.info({ event: "extension.deactivate" });
   logger.dispose();

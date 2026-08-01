@@ -549,6 +549,13 @@ export const DEFAULT_MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024;
  *  default-config extraction of multi-GB archives (the VFS holds the whole
  *  archive in worker RSS); raise it for near-maxTotalSize extractions. */
 export const WORKER_MEMORY_LIMIT_DEFAULT_MB = 8192;
+/** Default log-history byte budget (1 MiB ≈ thousands of records) — matches
+ *  the logHistoryBytes setting. Bounds replay memory while keeping enough
+ *  history to rebuild the output panel after a level change. */
+export const DEFAULT_LOG_HISTORY_BYTES = 1024 * 1024;
+/** Clamp bounds for the logHistoryBytes setting (64 KiB – 16 MiB) */
+export const MIN_LOG_HISTORY_BYTES = 64 * 1024;
+export const MAX_LOG_HISTORY_BYTES = 16 * 1024 * 1024;
 /** Hard size cap for previewing a single archive entry (100 MB) */
 export const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024;
 /** Worker RSS guard sampling: every Nth 7z print tick */
