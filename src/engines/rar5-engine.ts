@@ -216,7 +216,17 @@ export async function compressWithRar5(
     name: e.name,
   }));
 
+  // Deterministic progress: report cumulative increment so the VS Code
+  // notification shows a real percentage bar (message-only reports render
+  // as an indeterminate spinner that can lag/stall on fast compressions).
   let lastPct = -1;
+  const reportPct = (pct: number) => {
+    if (pct <= 0 || pct === lastPct) return;
+    const delta = pct - (lastPct < 0 ? 0 : lastPct);
+    lastPct = pct;
+    prog.report({ message: `${pct}%`, increment: delta });
+  };
+
   try {
     await mod.createArchive(
       {
@@ -229,10 +239,7 @@ export async function compressWithRar5(
       (err, p) => {
         if (err) return;
         const pct = Math.min(100, Math.floor((p.done / Math.max(p.total, 1)) * 100));
-        if (pct !== lastPct) {
-          lastPct = pct;
-          prog.report({ message: `${pct}%` });
-        }
+        reportPct(pct);
       },
       controller.signal,
     );
@@ -253,7 +260,9 @@ export async function compressWithRar5(
     throw new CancelledError();
   }
 
-  prog.report({ message: "100%" });
+  // Force the bar to 100% — progress events are delivered asynchronously and
+  // may otherwise leave the notification stuck on a stale low percentage.
+  reportPct(100);
 }
 
 function cleanupPartialOutput(outputPath: string): void {
