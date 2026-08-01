@@ -2,7 +2,17 @@
  * Logger — Smart Archive VSCode Extension
  *
  * Host-side logger built on logger-core, routing structured pino records
- * to the VSCode LogOutputChannel (with level highlighting) and stderr.
+ * to the "Smart Archive" output panel and stderr.
+ *
+ * Rendering model: a plain OutputChannel with appendLine for every record,
+ * formatted with a level tag and timestamp. This is deliberate — VS Code's
+ * LogOutputChannel filters level methods by its own panel level at append
+ * time and its clear() is a no-op in the extension host, so its content
+ * can never be rebuilt or pruned. With a plain channel we own the whole
+ * buffer: every record is appended unfiltered, and a log-level change
+ * (the smart-archive.logLevel setting) clears the panel and re-renders it
+ * from the history buffer in sequence order. Lowering the level removes
+ * the now-excluded lines; raising it brings buffered records back.
  *
  * Usage:
  *   import { logger } from "../utils/logger";
@@ -17,140 +27,109 @@ import { Writable } from "stream";
 import { logger as coreLogger, setLoggerSink, levels } from "./logger-core";
 import type { LogLevel } from "./logger-core";
 import { LogHistory } from "./log-history";
+import { DEFAULT_LOG_HISTORY_BYTES } from "../constants";
 
-let channel: vscode.LogOutputChannel | null = null;
+let channel: vscode.OutputChannel | null = null;
 
-function getChannel(): vscode.LogOutputChannel {
+function getChannel(): vscode.OutputChannel {
   if (!channel) {
-    channel = vscode.window.createOutputChannel("Smart Archive", { log: true });
+    channel = vscode.window.createOutputChannel("Smart Archive");
   }
   return channel;
 }
 
-// Byte-budgeted buffer of structured log records (all levels). VS Code's
-// LogOutputChannel filters level methods by its own panel level and does
-// NOT replay history when the level is raised — on a panel-level change we
-// re-emit the lines the previous level hid, filtered by the new level.
-// Worker-forwarded logs pass through channelOut too, so history covers both
-// sides of the extension.
-const logHistory = new LogHistory();
+// Byte-budgeted buffer of structured log records (all levels). Records are
+// re-rendered from here when the log level changes; worker-forwarded logs
+// pass through channelOut too, so history covers both sides of the extension.
+const logHistory = new LogHistory(DEFAULT_LOG_HISTORY_BYTES);
 
-let logLevelListenerAttached = false;
-let envLevelListenerAttached = false;
-
-// Verbosity ordering of VS Code LogLevel, independent of the enum's numeric
-// values (which differ between @types/vscode and the running extension host):
-// Off(0) < Error(1) < Warning(2) < Info(3) < Debug(4) < Trace(5).
-function panelVerbosity(lvl: vscode.LogLevel): number {
-  switch (lvl) {
-    case vscode.LogLevel.Off:
-      return 0;
-    case vscode.LogLevel.Error:
-      return 1;
-    case vscode.LogLevel.Warning:
-      return 2;
-    case vscode.LogLevel.Info:
-      return 3;
-    case vscode.LogLevel.Debug:
-      return 4;
-    default:
-      return 5; // Trace
-  }
-}
-
-/** Map a VS Code LogLevel to the minimum pino level a replay must include. */
-function minPinoLevelForPanel(lvl: vscode.LogLevel): number {
-  switch (panelVerbosity(lvl)) {
-    case 0:
-      return Number.MAX_SAFE_INTEGER; // Off — nothing visible
-    case 1:
-      return levels.error;
-    case 2:
-      return levels.warn;
-    case 3:
-      return levels.info;
-    default: // Debug / Trace — we have no trace records; debug is the floor
-      return levels.debug;
-  }
-}
-
-/** Map a pino level to its verbosity ordering (mirror of panelVerbosity). */
-function pinoVerbosity(level: number): number {
-  if (level >= levels.error) return 1;
-  if (level >= levels.warn) return 2;
-  if (level >= levels.info) return 3;
-  return 4; // debug
+/** Resize the history byte budget (from the logHistoryBytes setting). */
+export function setHistoryBudget(bytes: number): void {
+  logHistory.setMaxBytes(bytes);
 }
 
 /**
- * Whether a record with `pinoLevel` is shown by a panel at `panelLogLevel`.
- * VS Code semantics: a panel shows records at least as detailed as its own
- * level (Warning panel → warning+error; Debug panel → debug+info+…).
+ * Current production log level (the logLevel setting, mirrored from pino).
+ * `null` after module init or dispose — a level change event (or the first
+ * setLevel of a session) then rebuilds the panel unconditionally, purging
+ * stale content the output panel may have restored across a window reload.
  */
-function isVisibleAtPanelLevel(pinoLevel: number, panelLogLevel: vscode.LogLevel): boolean {
-  return pinoVerbosity(pinoLevel) <= panelVerbosity(panelLogLevel);
+let currentLevel: LogLevel | null = null;
+
+function levelName(level: unknown): string {
+  if (level === levels.error) return "error";
+  if (level === levels.warn) return "warn";
+  if (level === levels.info) return "info";
+  return "debug";
 }
 
-/** Re-emit buffered records that the given panel level now allows. */
-function replayHistoryForPanelLevel(lvl: vscode.LogLevel): void {
-  if (lvl === vscode.LogLevel.Off) return;
-  const minLevel = minPinoLevelForPanel(lvl);
-  // Replay is idempotent per cursor; concurrent pushes after the snapshot
-  // are delivered live by the regular routing and never replayed.
-  logHistory.replayFrom(replayedCursor, minLevel, (line) => channelOut.write(line));
-  replayedCursor = logHistory.cursor;
+/** Format a pino ISO timestamp as "YYYY-MM-DD HH:MM:SS.mmm" (local time). */
+function formatTime(iso: unknown): string {
+  if (typeof iso !== "string") return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number, w = 2) => String(n).padStart(w, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
 }
 
-let replayedCursor = 0;
+/**
+ * Format one raw pino JSON record into the panel line:
+ * "time [level] event key=value". Mirrors the native log-panel look.
+ */
+function formatLine(obj: Record<string, unknown>): string {
+  const msg = obj.event || obj.msg || "";
+  const parts: string[] = [];
+  if (obj.err) parts.push(String(obj.err));
+  for (const [k, v] of Object.entries(obj)) {
+    if (["time", "level", "hostname", "pid", "event", "msg", "err"].includes(k)) continue;
+    parts.push(`${k}=${JSON.stringify(v)}`);
+  }
+  const body = parts.length ? `${msg} ${parts.join(" ")}` : msg;
+  const tag = `[${levelName(obj.level)}]`;
+  const line = body ? `${tag} ${body}` : tag;
+  const ts = formatTime(obj.time);
+  return ts ? `${ts} ${line}` : line;
+}
 
-/** Replay history when the panel level changes (dropdown or env-driven). */
-function attachLogLevelListeners(): void {
+/** Append a non-JSON line verbatim (trimmed), if non-empty. */
+function appendRaw(ch: vscode.OutputChannel, text: string): void {
+  const trimmed = text.trim();
+  if (trimmed) ch.appendLine(trimmed);
+}
+
+/** Rebuild the whole panel content from history at the current level. */
+function rebuildPanel(): void {
   const ch = getChannel();
-  if (!logLevelListenerAttached) {
-    logLevelListenerAttached = true;
-    ch.onDidChangeLogLevel?.((lvl) => replayHistoryForPanelLevel(lvl));
-  }
-  // env.logLevel drives the panel default; a global change (--log /
-  // setLogLevel command) may re-level the channel without its own event.
-  if (!envLevelListenerAttached) {
-    envLevelListenerAttached = true;
-    vscode.env.onDidChangeLogLevel?.((lvl) => replayHistoryForPanelLevel(lvl));
-  }
+  ch.clear();
+  const minLevel = levels[currentLevel ?? "info"];
+  logHistory.replayAll(minLevel, (raw) => {
+    try {
+      ch.appendLine(formatLine(JSON.parse(raw) as Record<string, unknown>));
+    } catch {
+      appendRaw(ch, raw);
+    }
+  });
 }
 
 const channelOut = new Writable({
   write(chunk: unknown, _encoding: string, callback: () => void) {
     try {
       const str = Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
-      const obj = JSON.parse(str);
+      const obj = JSON.parse(str) as Record<string, unknown>;
       const level = typeof obj.level === "number" ? obj.level : 0;
-      // Buffer every structured record for future replay (bounded by bytes).
-      // Records the panel already shows are marked visible so a later
-      // replay never duplicates them.
-      logHistory.push(level, str, isVisibleAtPanelLevel(level, getChannel().logLevel));
-      const msg = obj.event || obj.msg || "";
-      const parts: string[] = [];
-      if (obj.err) parts.push(String(obj.err));
-      for (const [k, v] of Object.entries(obj)) {
-        if (["time", "level", "hostname", "pid", "event", "msg", "err"].includes(k)) continue;
-        parts.push(`${k}=${JSON.stringify(v)}`);
-      }
-      const line = parts.length ? `${msg} ${parts.join(" ")}` : msg;
-      const ch = getChannel();
-      if (level >= levels.error) ch.error(line);
-      else if (level >= levels.warn) ch.warn(line);
-      else if (level >= levels.info) ch.info(line);
-      else ch.debug(line);
+      // Buffer every structured record for re-rendering on level changes
+      // (bounded by bytes).
+      logHistory.push(level, str);
+      getChannel().appendLine(formatLine(obj));
     } catch {
-      const text = Buffer.isBuffer(chunk) ? chunk.toString().trim() : String(chunk).trim();
-      if (text) getChannel().info(text);
+      appendRaw(getChannel(), Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk));
     }
     callback();
   },
 });
 
 // Route logger-core records (used by the vscode-free engine modules) to the
-// OutputChannel as well, so host-side operations keep their existing logs.
+// output panel as well, so host-side operations keep their existing logs.
 setLoggerSink((chunk) => {
   channelOut.write(chunk);
   process.stderr.write(chunk);
@@ -158,32 +137,20 @@ setLoggerSink((chunk) => {
 
 /**
  * Write a raw pino JSON line (e.g. forwarded from the archive worker) to
- * the host OutputChannel.
+ * the host output panel.
  */
 export function writeHostLog(chunk: string): void {
   channelOut.write(chunk);
 }
 
-let _lastLevel: LogLevel | null = null;
-
 export const logger = {
   setLevel(lvl: LogLevel): void {
     coreLogger.setLevel(lvl);
-    const ch = getChannel();
-    attachLogLevelListeners();
-    // The VS Code LogOutputChannel filters level methods by its own panel
-    // level (readonly, defaults to env.logLevel = Info). There is no API to
-    // force it — but appendLine() is NOT filtered, so when the user asks for
-    // debug verbosity we print a one-time hint pointing at the dropdown.
-    // (History is replayed automatically on the panel-level switch.)
-    if (lvl === "debug" && _lastLevel !== "debug") {
-      if (ch.logLevel !== vscode.LogLevel.Debug) {
-        ch.appendLine(
-          '[Smart Archive] Log level set to debug — switch the output panel dropdown (top right) to "Debug" to see debug lines; earlier lines are replayed automatically on the switch. The choice is remembered per panel.',
-        );
-      }
-    }
-    _lastLevel = lvl;
+    if (lvl === currentLevel) return;
+    currentLevel = lvl;
+    // Re-render the panel at the new level: raising reveals buffered
+    // records, lowering removes the now-excluded lines.
+    rebuildPanel();
   },
 
   debug(obj: Record<string, unknown>, msg?: string): void {
@@ -207,11 +174,10 @@ export const logger = {
   },
 
   dispose(): void {
-    // Reset listeners/cursor so a re-activation (same process) rebuilds a
-    // fresh channel with working replay.
-    logLevelListenerAttached = false;
-    envLevelListenerAttached = false;
-    replayedCursor = 0;
+    // Reset state so a re-activation (same process) starts with a fresh
+    // level and history; the next setLevel rebuilds the panel and purges
+    // stale content restored by the output panel.
+    currentLevel = null;
     logHistory.reset();
     channel?.dispose();
     channel = null;

@@ -17,8 +17,13 @@ import {
 } from "../constants";
 import { setLocale } from "../i18n";
 import { setZstdConfig } from "../engines/zstd-codec";
-import { logger } from "./logger";
+import { logger, setHistoryBudget } from "./logger";
 import type { EngineConfig } from "../engines/worker/types";
+import {
+  DEFAULT_LOG_HISTORY_BYTES,
+  MAX_LOG_HISTORY_BYTES,
+  MIN_LOG_HISTORY_BYTES,
+} from "../constants";
 
 /**
  * Read the engine-relevant configuration from vscode.
@@ -59,6 +64,7 @@ export function applyHostConfig(): void {
 
   setSecurityLimits(config.limits);
   logger.setLevel(config.logLevel ?? "info");
+  setHistoryBudget(readLogHistoryBudget(vscode.workspace.getConfiguration("smart-archive")));
 
   setZstdConfig({
     useSystemZstd: config.useSystemZstd,
@@ -66,4 +72,11 @@ export function applyHostConfig(): void {
       void vscode.window.showWarningMessage(message);
     },
   });
+}
+
+/** Read and clamp the logHistoryBytes setting into its documented bounds. */
+function readLogHistoryBudget(config: vscode.WorkspaceConfiguration): number {
+  const raw = config.get<number>("logHistoryBytes", DEFAULT_LOG_HISTORY_BYTES);
+  if (!Number.isFinite(raw)) return DEFAULT_LOG_HISTORY_BYTES;
+  return Math.min(MAX_LOG_HISTORY_BYTES, Math.max(MIN_LOG_HISTORY_BYTES, Math.floor(raw)));
 }

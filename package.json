@@ -513,6 +513,13 @@
             "%config.logLevel.debug%"
           ],
           "description": "%config.logLevel.description%"
+        },
+        "smart-archive.logHistoryBytes": {
+          "type": "integer",
+          "default": 1048576,
+          "minimum": 65536,
+          "maximum": 16777216,
+          "description": "%config.logHistoryBytes.description%"
         }
       }
     }

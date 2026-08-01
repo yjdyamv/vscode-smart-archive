@@ -38,5 +38,6 @@
   "config.logLevel.error": "僅錯誤",
   "config.logLevel.warn": "錯誤和警告",
   "config.logLevel.info": "錯誤、警告和資訊（預設）",
-  "config.logLevel.debug": "全部，包括偵錯細節（較吵雜）"
+  "config.logLevel.debug": "全部，包括偵錯細節（較吵雜）",
+  "config.logHistoryBytes.description": "日誌歷史緩衝的記憶體預算（位元組）。切換日誌層級時用它重渲染輸出面板；預算越大保留的日誌行越多。"
 }
