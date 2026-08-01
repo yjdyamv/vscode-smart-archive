@@ -224,8 +224,8 @@ export const FORMAT_TABLE: FormatMeta[] = [
   {
     exts: [".rar"],
     label: "rar",
-    description: "RAR — extraction only (creation unavailable)",
-    canCreate: false,
+    description: "RAR5 — native creation with AES-256 encryption (no external tools)",
+    canCreate: true,
     supportsEncryption: true,
     category: "special",
     j7zSelective: false,

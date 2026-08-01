@@ -343,7 +343,7 @@ export async function compressCommand(
           }
           level = r.value;
         }
-        const supSplit = ["7z", "zip"].includes(format!.label);
+        const supSplit = ["7z", "zip", "rar"].includes(format!.label);
         step = supSplit ? 3 : 4; // skip volume if not splittable
         continue;
       }
@@ -372,7 +372,7 @@ export async function compressCommand(
         const r = await promptEncryptWizard();
         if (r.kind !== "ok") {
           if (r.kind === "back") {
-            step = ["7z", "zip"].includes(format!.label) ? 3 : 2;
+            step = ["7z", "zip", "rar"].includes(format!.label) ? 3 : 2;
             continue;
           }
           return;
