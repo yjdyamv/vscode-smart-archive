@@ -36,7 +36,7 @@ const PKG_VERSION_FALLBACK = "0.1.0";
 const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
 
 async function resolveVersion() {
-  if (process.env.SA_RAR5_VERSION) return process.env.SA_RAR5_VERSION;
+  if (process.env.SA_RAR5_VERSION) return process.env.SA_RAR5_VERSION.replace(/^v/, "");
   const cacheFile = path.join(cacheDir, "latest-version.txt");
   try {
     if (fs.existsSync(cacheFile)) {
@@ -70,16 +70,16 @@ async function resolveVersion() {
 // release, then regenerate here:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "a36915083ef7ba5a75a2b18a3921b51be26a5a3afaff8f5d158843c7def45f1a",
-  "linux-x64-musl": "4a71fcea1007831454c33d23f656e85ed3858c32c799a20ab15e50136432e486",
-  "linux-arm64-gnu": "5c6962a6f51adb3d8839bc585fc5f9b36409e9e60fe696f601e600f47ab0a9b8",
-  "linux-arm64-musl": "5d8f5b7bc654ac8b7db0df9fc80e53f3c40f1bbb0d8261018999e71bce0a2989",
-  "linux-arm-gnueabihf": "f571c4885f837a31d0460993f0a76e5464e1fc21b07f3883d68bbff0c39b8f30",
-  "darwin-x64": "e5c78bb2cff7ff11605a2a6d29769dfd224e4ae7552e2683080b530c699d5c00",
-  "darwin-arm64": "762790e0b7c4bc34d438df60d4e6057821dce82583a8f2b0414e8e37d3e4ef77",
-  "win32-x64-msvc": "313e39c1db62c0e596206877171294905ab8e023b2ab5af6a5de8fec8ba48380",
-  "win32-ia32-msvc": "a69ca3c027becfce73bb7e04b59375b9dbd0a64d0def7a3aaad56c22c6518f56",
-  "win32-arm64-msvc": "b864f93154a5ede710e0a793dd502408b43e974464355d8f45ca21f67c8ed025",
+  "linux-x64-gnu": "db7ba3bb67d0f3c243a381aca085fd22488e3ae03d21269b19a8fae91826d255",
+  "linux-x64-musl": "266f77b1184337cd70606ebaf51fbdc967e6a7559f68b9a8da76850571bb20dd",
+  "linux-arm64-gnu": "b2b2e19f5d223734e0cbfaf67a26359c5978e22cf5a7254602dcf8f7d97eb02d",
+  "linux-arm64-musl": "e3c0d2bd2982971dcd02a813ba226470f0903b5e734e28115870a321492ba3ea",
+  "linux-arm-gnueabihf": "5c6fc245345349dee92bbdf78112c79ab63d4648b3aaea80acb41f9e4541177d",
+  "darwin-x64": "a20ff9cd9081e4382f428e3e674d7553cec215efcc8de5f30d05fa556911d864",
+  "darwin-arm64": "7cfd668eec72b63b8fc80c464616ff319f02c454e223c0bef633d825591cbc73",
+  "win32-x64-msvc": "004b3dabdc60f26b8d91d8dd44d5d3b245449677ad79fafda7788c762180558c",
+  "win32-ia32-msvc": "2f709dbdb59b9f368c5bf898d46ddb49f83e0e52f1d42a287b4bc970e3cd09ef",
+  "win32-arm64-msvc": "b4f5b9bae704d72df77c70663f4b831eb202f86a36c20af9ed6a57dc34b1bd01",
 };
 
 // <platform>/<arch> -> napi-rs triples
