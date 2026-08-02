@@ -8,10 +8,13 @@
  * @module providers/archive/delete
  */
 
+import * as fs from "fs";
+import { isRarExt } from "../../utils/rar";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { logger } from "../../utils/logger";
 import { hasSystem7zForFormat, deleteFromArchiveSystem7z } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
+import { rebuildRarArchive, archiveJoin } from "./rar5-modify";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
 
 export async function deleteFromArchive(
@@ -32,6 +35,23 @@ export async function deleteFromArchive(
       progress,
       token,
     );
+    return;
+  }
+
+  // 7-Zip cannot modify RAR archives (E_NOTIMPL) — rebuild instead.
+  if (isRarExt(ext)) {
+    logger.info({ event: "deleteFromArchive.rar5.rebuild", archivePath, ext });
+    await rebuildRarArchive({
+      archivePath,
+      password,
+      progress,
+      token,
+      mutate: (root) => {
+        for (const p of selectedPaths) {
+          fs.rmSync(archiveJoin(root, p), { recursive: true, force: true });
+        }
+      },
+    });
     return;
   }
 
