@@ -63,6 +63,7 @@ interface Rar5Binding {
       }>;
       level?: number;
       password?: string;
+      encryptHeaders?: boolean;
       volumeSize?: number;
       maxTotalBytes?: number;
     },
@@ -256,6 +257,7 @@ export async function compressWithRar5(
         entries: bindingEntries,
         level: mapLevel(options.level),
         password: options.password || undefined,
+        encryptHeaders: options.encryptHeaders ?? false,
         volumeSize: volumeSize && volumeSize > 0 ? volumeSize : undefined,
       },
       (err, p) => {

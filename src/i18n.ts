@@ -188,6 +188,16 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "未输入密码，将跳过加密。",
     "zh-tw": "未輸入密碼，將跳過加密。",
   },
+  "encrypt.headersTitle": {
+    en: "Encrypt file names and structure (RAR5)?",
+    "zh-cn": "是否加密文件名和目录结构（RAR5）？",
+    "zh-tw": "是否加密檔名和目錄結構（RAR5）？",
+  },
+  "encrypt.headersYes": {
+    en: "Encrypt file names too",
+    "zh-cn": "同时加密文件名",
+    "zh-tw": "同時加密檔名",
+  },
 
   // ---- Decompress flow ----
   "decompress.noFile": {
