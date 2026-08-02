@@ -40,7 +40,12 @@ export async function deleteFromArchive(
 
   // 7-Zip cannot modify RAR archives (E_NOTIMPL) — rebuild instead.
   if (isRarExt(ext)) {
-    logger.info({ event: "deleteFromArchive.rar5.rebuild", archivePath, ext });
+    logger.info({
+      event: "deleteFromArchive.rar5.rebuild",
+      archivePath,
+      ext,
+      count: selectedPaths.length,
+    });
     await rebuildRarArchive({
       archivePath,
       password,
