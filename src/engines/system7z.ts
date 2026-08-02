@@ -32,7 +32,12 @@ import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
-import { BINARY_DETECT_TIMEOUT, RUN7Z_TIMEOUT, SPAWN_CAPTURE_TIMEOUT, getFullExt } from "../constants";
+import {
+  BINARY_DETECT_TIMEOUT,
+  RUN7Z_TIMEOUT,
+  SPAWN_CAPTURE_TIMEOUT,
+  getFullExt,
+} from "../constants";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
