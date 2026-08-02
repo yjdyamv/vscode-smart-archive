@@ -32,13 +32,14 @@ import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { getBaseName } from "../utils/path";
-import { BINARY_DETECT_TIMEOUT, RUN7Z_TIMEOUT, SPAWN_CAPTURE_TIMEOUT } from "../constants";
+import { BINARY_DETECT_TIMEOUT, RUN7Z_TIMEOUT, SPAWN_CAPTURE_TIMEOUT, getFullExt } from "../constants";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
 import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
 import { checkTotalSize } from "../utils/security";
 import { createTarFile } from "./tar-writer";
+import { isRarExt } from "../utils/rar";
 
 // ── Detection (cached) ───────────────────────────────────────────────
 
@@ -130,8 +131,14 @@ export function detectSystem7z(): string | null {
  */
 function bundled7zPath(): string | null {
   const bin = process.platform === "win32" ? "7z.exe" : "7zz";
-  const p = path.join(__dirname, "..", "7z-bin", process.platform, process.arch, bin);
-  if (!fs.existsSync(p)) return null;
+  const rel = path.join("7z-bin", process.platform, process.arch, bin);
+  // Compiled bundle (out/extension.js) resolves from <root>/out; source
+  // modules (src/engines, vitest) resolve from <root>/src/engines. Try both.
+  const p =
+    [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)].find((c) =>
+      fs.existsSync(c),
+    ) ?? null;
+  if (!p) return null;
   if (process.platform !== "win32") {
     try {
       fs.chmodSync(p, 0o755);
@@ -291,6 +298,27 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
   if (setting === "never") {
     logger.debug({ event: "system7z.disabledBySetting" });
     return false;
+  }
+
+  // RAR requires a full-format 7-Zip — some distro builds strip RAR support
+  // and would fail every RAR operation (list/extract/rebuild). Resolve a
+  // RAR-capable binary explicitly instead of using the generic detection.
+  const extKey = extOrLabel.startsWith(".") ? extOrLabel : `.${extOrLabel}`;
+  if (isRarExt(extKey)) {
+    const rarSz = system7zForExt(extKey);
+    if (!rarSz) {
+      if (setting === "always") {
+        vscode.window.showWarningMessage(t("system7z.notInstalled"));
+      }
+      return false;
+    }
+    if (!checkVersion(rarSz)) {
+      if (setting === "always") {
+        vscode.window.showWarningMessage(t("system7z.tooOld"));
+      }
+      return false;
+    }
+    return true;
   }
 
   const sz = detectSystem7z();
@@ -515,6 +543,48 @@ function getSystem7zOrNull(): string | null {
     return null;
   }
   return sz;
+}
+
+const _rarSupportCache = new Map<string, boolean>();
+
+/**
+ * Does this 7-Zip binary include RAR (RAR4/RAR5) read support? Some distro
+ * builds strip RAR for licensing reasons (e.g. Fedora's 7zip package), in
+ * which case they cannot open RAR archives at all.
+ */
+export function hasRarSupport(binary: string): boolean {
+  const cached = _rarSupportCache.get(binary);
+  if (cached !== undefined) return cached;
+  let supported = false;
+  try {
+    const r = spawnSync(binary, ["i"], { stdio: "pipe", timeout: BINARY_DETECT_TIMEOUT });
+    if (r.status === 0) {
+      const out = `${r.stdout.toString("utf8")}\n${r.stderr.toString("utf8")}`;
+      supported = /\bRar5\b/i.test(out) || /\bRar\b/i.test(out);
+    }
+  } catch {
+    supported = false;
+  }
+  _rarSupportCache.set(binary, supported);
+  return supported;
+}
+
+/**
+ * Resolve the 7-Zip binary for a given archive extension. RAR archives are
+ * always handled by a RAR-capable build: the bundled full-format 7zz when
+ * available, otherwise a system 7-Zip only if it proves RAR support via
+ * `7z i` (some distro builds ship without RAR at all).
+ */
+export function system7zForExt(extOrLabel: string): string | null {
+  const key = extOrLabel.startsWith(".") ? extOrLabel : `.${extOrLabel}`;
+  if (isRarExt(key)) {
+    const bundled = bundled7zPath();
+    if (bundled && hasRarSupport(bundled)) return bundled;
+    const sys = detectSystem7z();
+    if (sys && hasRarSupport(sys)) return sys;
+    return null;
+  }
+  return getSystem7zOrNull();
 }
 
 export async function compressWithSystem7z(
@@ -800,7 +870,7 @@ export async function decompressWithSystem7z(
   token?: TokenLike,
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
-  const sz = getSystem7zOrNull();
+  const sz = system7zForExt(getFullExt(options.inputPath));
   if (!sz) throw new Error("System 7-Zip not available");
 
   checkArchiveInputSize(options.inputPath);
@@ -860,7 +930,7 @@ export async function listWithSystem7z(
   filePath: string,
   password = "",
 ): Promise<{ path: string; size: number; type: string }[]> {
-  const sz = getSystem7zOrNull();
+  const sz = system7zForExt(getFullExt(filePath));
   if (!sz) throw new Error("System 7-Zip not available");
 
   const archiveName = getBaseName(filePath);
@@ -888,7 +958,7 @@ export async function listWithSystem7z(
 // ── Encryption detection ─────────────────────────────────────────────
 
 export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
-  const sz = getSystem7zOrNull();
+  const sz = system7zForExt(getFullExt(filePath));
   if (!sz) throw new Error("System 7-Zip not available");
 
   checkFileSize(fs.statSync(filePath).size);
@@ -1280,7 +1350,7 @@ export async function addToArchiveSystem7z(
   exclusions?: ExclusionSet,
   password?: string,
 ): Promise<void> {
-  const sz = getSystem7zOrNull();
+  const sz = system7zForExt(getFullExt(archivePath));
   if (!sz) throw new Error("System 7-Zip not available");
 
   const normDir = targetDir.replace(/\\/g, "/").replace(/^\/+/, "");
@@ -1358,7 +1428,7 @@ export async function deleteFromArchiveSystem7z(
   progress?: ProgressLike,
   token?: TokenLike,
 ): Promise<void> {
-  const sz = getSystem7zOrNull();
+  const sz = system7zForExt(getFullExt(archivePath));
   if (!sz) throw new Error("System 7-Zip not available");
 
   const dArgs = ["d", archivePath, "-y"];
@@ -1391,7 +1461,7 @@ export async function renameInArchiveSystem7z(
   newPath: string,
   password?: string,
 ): Promise<void> {
-  const sz = getSystem7zOrNull();
+  const sz = system7zForExt(getFullExt(archivePath));
   if (!sz) throw new Error("System 7-Zip not available");
 
   const rnArgs = ["rn", archivePath, sanitizeCliPath(oldPath), sanitizeCliPath(newPath)];

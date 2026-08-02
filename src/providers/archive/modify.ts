@@ -25,7 +25,7 @@ const PREVIEW_CLEANUP_DELAY_MS = 600_000;
 import { logger } from "../../utils/logger";
 import {
   hasSystem7zForFormat,
-  detectSystem7z,
+  system7zForExt,
   spawnCapture,
   renameInArchiveSystem7z,
 } from "../../engines/system7z";
@@ -171,7 +171,7 @@ async function extractOneWithSystem7z(
   archiveExt: string,
   password?: string,
 ): Promise<ArrayBuffer> {
-  const sz = detectSystem7z();
+  const sz = system7zForExt(archiveExt);
   if (!sz) throw new Error("System 7z not found");
 
   const wrapped = isWrappedFormat(archiveExt);
