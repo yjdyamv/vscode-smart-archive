@@ -262,7 +262,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
         password: "",
         level: 3,
         volumeSize: "32k",
-        recoveryVolumesPercent: 20,
+        recoveryVolumeCount: 10,
       },
       undefined,
       undefined,
@@ -270,7 +270,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
     );
 
     const revs = fs.readdirSync(dir).filter((n) => n.endsWith(".rev"));
-    expect(revs.length).toBeGreaterThanOrEqual(1);
+    expect(revs.length).toBe(4); // 4 data volumes, requested 10 -> capped
     const revPath = path.join(dir, revs[0]);
     const revHead = fs.readFileSync(revPath);
     expect(revHead.subarray(0, 8).equals(Buffer.from("Rar!\x1aRev"))).toBe(true);
