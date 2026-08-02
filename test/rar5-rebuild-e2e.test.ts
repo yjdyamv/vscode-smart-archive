@@ -102,4 +102,48 @@ describe("rar5 rebuild e2e (delete folder)", () => {
     expect(szOut).toContain("proj/keep/a.txt");
     expect(szOut).not.toContain("proj/drop");
   });
+
+  it.runIf(haveBinaries())("creates streams 7zz can fully decode for large binaries (Huffman completeness)", async () => {
+    // Regression: skewed symbol distributions in large binaries force
+    // Huffman depths beyond 15; the old clamp + greedy fix could leave an
+    // incomplete table, which 7-Zip's RAR5 decoder rejects with "Data
+    // Error" (while rar-rs's own decoder and The Unarchiver accept it).
+    // The bundled 7zz binary (~3.7 MB) triggers the case reliably.
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5bin-"));
+    const proj = path.join(dir, "proj");
+    fs.mkdirSync(proj, { recursive: true });
+    fs.copyFileSync(BUNDLED_7ZZ, path.join(proj, "7zz.bin"));
+    fs.writeFileSync(path.join(proj, "note.txt"), "hello");
+
+    const archive = path.join(dir, "out.rar");
+    await compressWithRar5(
+      {
+        format: RAR5_FORMAT,
+        outputPath: archive,
+        targets: [{ fsPath: proj }],
+        password: "",
+        level: 3,
+      },
+      undefined,
+      undefined,
+      [],
+    );
+
+    // Full decode test (not just listing): fails on incomplete Huffman
+    // tables in the stream.
+    const testOut = childProcess.execFileSync(BUNDLED_7ZZ, ["t", archive], { encoding: "utf8" });
+    expect(testOut).toContain("Everything is Ok");
+    expect(testOut).not.toContain("Data Error");
+
+    // Rebuild over the same archive must stay 7zz-decodable.
+    await rebuildRarArchive({
+      archivePath: archive,
+      mutate: (root) => {
+        fs.rmSync(path.join(root, "proj", "7zz.bin"), { force: true });
+      },
+    });
+
+    const testOut2 = childProcess.execFileSync(BUNDLED_7ZZ, ["t", archive], { encoding: "utf8" });
+    expect(testOut2).toContain("Everything is Ok");
+  });
 });
