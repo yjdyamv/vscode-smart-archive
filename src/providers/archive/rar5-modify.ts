@@ -51,6 +51,7 @@ export function assertRarModifiable(archivePath: string): void {
     throw new Error(`Not a RAR archive: ${archivePath}`);
   }
   if (isRarVolume(ext) || /\.part\d+\.rar$/i.test(archivePath)) {
+    logger.info({ event: "rar5.rebuild.multivolumeRejected", archivePath, ext });
     throw new Error(t("rar5.modifyMultivolume"));
   }
 }
@@ -95,6 +96,7 @@ export function copyIntoArchive(destDir: string, src: string, exclusions: Exclus
     copyDirFiltered(src, dest, exclusions);
   } else if (stat.isFile()) {
     fs.copyFileSync(src, dest);
+    logger.debug({ event: "rar5.rebuild.copy", src, dest });
   }
 }
 
@@ -108,6 +110,7 @@ function copyDirFiltered(srcDir: string, destDir: string, exclusions: ExclusionS
       copyDirFiltered(src, dst, exclusions);
     } else if (child.isFile()) {
       fs.copyFileSync(src, dst);
+      logger.debug({ event: "rar5.rebuild.copy", src, dst });
     }
   }
 }
@@ -140,12 +143,22 @@ export async function rebuildRarArchive(options: RebuildRarOptions): Promise<voi
       t("rar5.modifyRar4Confirm"),
     );
     if (confirm !== t("rar5.modifyRar4Confirm")) {
+      logger.info({ event: "rar5.rebuild.rar4Declined", archivePath });
       throw new Error(t("rar5.modifyRar4"));
     }
     logger.info({ event: "rar5.rebuild.rar4Convert", archivePath });
   } else if (version !== "rar5") {
+    logger.warn({ event: "rar5.rebuild.unknownSignature", archivePath, version });
     throw new Error(t("rar5.modifyNotRar"));
   }
+
+  logger.info({
+    event: "rar5.rebuild.start",
+    archivePath,
+    version,
+    encrypted: password.length > 0,
+    level: options.level ?? 5,
+  });
 
   const prog = progress ?? { report: () => {} };
   const archiveDir = path.dirname(path.resolve(archivePath));
@@ -170,10 +183,17 @@ export async function rebuildRarArchive(options: RebuildRarOptions): Promise<voi
       .readdirSync(extractRoot)
       .filter((n) => n !== "." && n !== "..")
       .sort();
+    logger.info({
+      event: "rar5.rebuild.extracted",
+      archivePath,
+      topLevelEntries: topLevel.length,
+    });
     if (topLevel.length === 0) {
+      logger.warn({ event: "rar5.rebuild.empty", archivePath });
       throw new Error(t("rar5.modifyEmpty"));
     }
 
+    logger.info({ event: "rar5.rebuild.mutate", archivePath });
     prog.report({ message: t("rar5.modifyRebuilding") });
     await mutate(extractRoot);
 
@@ -192,9 +212,23 @@ export async function rebuildRarArchive(options: RebuildRarOptions): Promise<voi
       [],
     );
 
+    let rebuiltSize = 0;
+    try {
+      rebuiltSize = fs.statSync(rebuiltPath).size;
+    } catch {
+      // stat is best-effort
+    }
+    logger.info({
+      event: "rar5.rebuild.compressed",
+      archivePath,
+      rebuiltSize,
+      topLevelEntries: topLevel.length,
+    });
+
     // Atomic swap with a same-directory backup: a failure restores the
     // original archive instead of destroying it.
     const backupPath = `${archivePath}.rar5bak`;
+    logger.info({ event: "rar5.rebuild.swap", archivePath, backupPath });
     fs.rmSync(backupPath, { force: true });
     fs.renameSync(archivePath, backupPath);
     try {
@@ -212,9 +246,13 @@ export async function rebuildRarArchive(options: RebuildRarOptions): Promise<voi
       }
       throw err;
     }
+  } catch (err) {
+    logger.error({ event: "rar5.rebuild.failed", archivePath, err });
+    throw err;
   } finally {
     try {
       fs.rmSync(workRoot, { recursive: true, force: true });
+      logger.debug({ event: "rar5.rebuild.cleanup", workRoot });
     } catch {
       // best-effort cleanup
     }
