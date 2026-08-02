@@ -177,6 +177,10 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
     if (fs.readSync(fd, sig, 0, 8, 0) < 8 || !sig.equals(RAR5_SIGNATURE)) return undefined;
     let pos = 8;
     for (let i = 0; i < 4096; i++) {
+      // Header-encrypted archives encrypt every block after the type-0x04
+      // encryption header — their headers cannot be sniffed without the
+      // password, so treat them as having no readable recovery record.
+      if (pos < 8 || pos > 1 << 30) return undefined;
       const hsize = readVintAt(pos + 4);
       if (!hsize) return undefined;
       const contentStart = pos + 4 + hsize.len;
@@ -199,6 +203,7 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
         dataSize = v.value;
         p += v.len;
       }
+      if (type.value === 4) return undefined; // encrypted headers — cannot sniff
       if (type.value === 3) {
         // Service header: file flags, unpacked size, attrs, mtime, crc,
         // comp info, host os, name length, name, extra area.
@@ -236,6 +241,7 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
           return pct > 100 ? undefined : pct;
         }
       }
+      if (dataSize > 1 << 30) return undefined; // implausible — malformed header
       pos = contentStart + hsize.value + dataSize;
       if (type.value === 5) return undefined; // end of archive
     }

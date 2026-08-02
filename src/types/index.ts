@@ -52,8 +52,8 @@ export interface CompressOptions {
   encryptHeaders?: boolean;
   /** RAR5 inline recovery record percent (0-100, WinRAR -rr). */
   recoveryPercent?: number;
-  /** RAR5 recovery volumes (.rev) percent (0-100, WinRAR -rv); requires split volumes. */
-  recoveryVolumesPercent?: number;
+  /** RAR5 recovery volumes (.rev) count (WinRAR -rv); auto-capped at the data volume count. */
+  recoveryVolumeCount?: number;
 }
 
 /** Input parameters for a decompression operation */

@@ -65,7 +65,7 @@ interface Rar5Binding {
       password?: string;
       encryptHeaders?: boolean;
       recoveryPercent?: number;
-      recoveryVolumesPercent?: number;
+      recoveryVolumeCount?: number;
       volumeSize?: number;
       maxTotalBytes?: number;
     },
@@ -268,7 +268,7 @@ export async function compressWithRar5(
         password: options.password || undefined,
         encryptHeaders: options.encryptHeaders ?? false,
         recoveryPercent: options.recoveryPercent ?? 0,
-        recoveryVolumesPercent: options.recoveryVolumesPercent ?? 0,
+        recoveryVolumeCount: options.recoveryVolumeCount ?? 0,
         volumeSize: volumeSize && volumeSize > 0 ? volumeSize : undefined,
       },
       (err, p) => {

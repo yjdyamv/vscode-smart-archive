@@ -16,6 +16,7 @@ import * as path from "path";
 import { compressWith7z } from "../engines/js7z-engine";
 import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS } from "../constants";
 import { getVolumeSizes } from "../utils/volume-sizes";
+import { parseSize } from "../utils/security";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
 import { t, compressLevels, formatDuration } from "../i18n";
@@ -260,6 +261,32 @@ async function promptSaveNameWizard(defaultName: string, ext: string): Promise<S
 
 // ── Main command ──
 
+/**
+ * Rough upper bound of the split-volume count for the given targets:
+ * total input bytes ÷ volume size, rounded up. The real count depends on
+ * the compression ratio, so this is only shown as an estimate.
+ */
+function estimateVolumeCount(targets: readonly { fsPath: string }[], volumeSize: string): number {
+  let total = 0;
+  const walk = (p: string): void => {
+    let st;
+    try {
+      st = fs.statSync(p);
+    } catch {
+      return;
+    }
+    if (st.isDirectory()) {
+      for (const child of fs.readdirSync(p)) walk(path.join(p, child));
+    } else {
+      total += st.size;
+    }
+  };
+  for (const t of targets) walk(t.fsPath);
+  const size = parseSize(volumeSize, 0);
+  if (size <= 0) return 1;
+  return Math.max(1, Math.ceil(total / size));
+}
+
 export async function compressCommand(
   uri: vscode.Uri | undefined,
   selectedUris: readonly vscode.Uri[] | undefined,
@@ -317,9 +344,9 @@ export async function compressCommand(
   let password = "";
   let encryptHeaders = false;
   let recoveryPercent = 0;
-  let recoveryVolumesPercent = 0;
+  let recoveryVolumeCount = 0;
 
-  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 55=headers, 56=recovery, 6=save
+  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 56=recovery, 6=save
 
   while (true) {
     switch (step) {
@@ -382,7 +409,14 @@ export async function compressCommand(
           return;
         }
         doEncrypt = r.value;
-        step = doEncrypt ? 5 : format!.label === "rar" ? 56 : 6;
+        if (doEncrypt) {
+          // RAR header encryption is forced: hiding contents while leaving
+          // the file names visible defeats the purpose.
+          encryptHeaders = true;
+          step = 5;
+        } else {
+          step = format!.label === "rar" ? 56 : 6;
+        }
         continue;
       }
 
@@ -400,28 +434,6 @@ export async function compressCommand(
         if (!password) {
           vscode.window.showWarningMessage(t("encrypt.noPassword"));
         }
-        // RAR supports encrypting the structure (file names) too.
-        step = format!.label === "rar" && password ? 55 : format!.label === "rar" ? 56 : 6;
-        continue;
-      }
-
-      // ── 5.5 Encrypt headers (RAR only) ──
-      case 55: {
-        const res = await promptQuickPick(
-          [
-            { label: t("encrypt.no"), value: false },
-            { label: t("encrypt.headersYes"), value: true },
-          ],
-          { placeHolder: t("encrypt.headersTitle"), title: t("encrypt.headersTitle") },
-        );
-        if (res.kind !== "ok") {
-          if (res.kind === "back") {
-            step = 5;
-            continue;
-          }
-          return;
-        }
-        encryptHeaders = res.value.value;
         step = format!.label === "rar" ? 56 : 6;
         continue;
       }
@@ -429,29 +441,76 @@ export async function compressCommand(
       // ── 5.6 Recovery record / recovery volumes (RAR only) ──
       case 56: {
         const isSplitRar = format!.label === "rar" && Boolean(volumeSize);
-        const title = isSplitRar ? t("recovery.volumesTitle") : t("recovery.title");
-        const res = await promptQuickPick(
-          [
-            { label: t("recovery.none"), value: 0 },
-            { label: t("recovery.percent", "1"), value: 1 },
-            { label: t("recovery.percent", "3"), value: 3 },
-            { label: t("recovery.percent", "5"), value: 5 },
-            { label: t("recovery.percent", "10"), value: 10 },
-            { label: t("recovery.percent", "20"), value: 20 },
-          ],
-          { placeHolder: title, title },
-        );
+        if (!isSplitRar) {
+          // Inline recovery record, percent of archive size.
+          const res = await promptQuickPick(
+            [
+              { label: t("recovery.none"), value: 0 },
+              { label: t("recovery.percent", "1"), value: 1 },
+              { label: t("recovery.percent", "3"), value: 3 },
+              { label: t("recovery.percent", "5"), value: 5 },
+              { label: t("recovery.percent", "10"), value: 10 },
+              { label: t("recovery.percent", "20"), value: 20 },
+            ],
+            { placeHolder: t("recovery.title"), title: t("recovery.title") },
+          );
+          if (res.kind !== "ok") {
+            if (res.kind === "back") {
+              step = password ? 5 : 4;
+              continue;
+            }
+            return;
+          }
+          recoveryPercent = res.value.value;
+          step = 6;
+          continue;
+        }
+
+        // Split RAR: recovery volumes (.rev), exact count. The count is
+        // capped at the (estimated) volume count; the encoder silently
+        // caps it at the actual volume count too.
+        const estimatedVolumes = estimateVolumeCount(targets, volumeSize!);
+        const maxFixed = Math.min(10, estimatedVolumes);
+        const items: { label: string; value: number; description?: string }[] = [
+          { label: t("recovery.none"), value: 0 },
+          ...Array.from({ length: maxFixed }, (_, i) => ({
+            label: t("recovery.volumesCount", String(i + 1)),
+            value: i + 1,
+          })),
+          { label: t("recovery.volumesCustom"), value: -1 },
+        ];
+        const res = await promptQuickPick(items, {
+          placeHolder: t("recovery.volumesTitle", String(estimatedVolumes)),
+          title: t("recovery.volumesTitle", String(estimatedVolumes)),
+        });
         if (res.kind !== "ok") {
           if (res.kind === "back") {
-            step = format!.label === "rar" && password ? 55 : 5;
+            step = password ? 5 : 4;
             continue;
           }
           return;
         }
-        if (isSplitRar) {
-          recoveryVolumesPercent = res.value.value;
+        if (res.value.value === -1) {
+          const ibRes = await promptInputBox({
+            prompt: t("recovery.volumesCustomPrompt"),
+            placeholder: String(Math.min(estimatedVolumes, 10)),
+            validate: (v) => {
+              const num = parseInt(v.trim(), 10);
+              if (!/^\d+$/.test(v.trim()) || num < 1 || num > 1000) {
+                return t("recovery.volumesInvalid");
+              }
+              return undefined;
+            },
+          });
+          if (ibRes.kind !== "ok") {
+            if (ibRes.kind === "back") {
+              continue; // re-ask the count list
+            }
+            return;
+          }
+          recoveryVolumeCount = parseInt(ibRes.value, 10);
         } else {
-          recoveryPercent = res.value.value;
+          recoveryVolumeCount = res.value.value;
         }
         step = 6;
         continue;
@@ -529,7 +588,7 @@ export async function compressCommand(
           volumeSize,
           encryptHeaders,
           recoveryPercent,
-          recoveryVolumesPercent,
+          recoveryVolumeCount,
         };
 
         await vscode.window.withProgress(

@@ -70,16 +70,16 @@ async function resolveVersion() {
 // release, then regenerate here:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
-  "darwin-arm64": "bc28bd2b79ed1812610104b8e361072a8a9e80c673c198bd959b2a13a6eeb056",
-  "darwin-x64": "43898fefbf6250d11f01ce455560c396b874d3193ee63582a4f4adec96816756",
-  "linux-arm64-musl": "ca4032d56bfdf08d07cbc7d48fc2719a3fa0a81f8e10013e3bb031b18f996e0c",
-  "linux-arm-gnueabihf": "c5d555e95882b65d6ebf1cd8959c7e261b66f9195c0ce9b44b8247be14826f3f",
-  "linux-x64-gnu": "729d7e63ff07f4ffc53681647efe159621fde76b9c119e7ac159c056e93c34b6",
-  "linux-arm64-gnu": "c9ce67def310a56de542e41e3fb7fdb25676b469dda442e9ab62938972cce1b4",
-  "linux-x64-musl": "6c417c389e9d160d75761e40015b5debdecfbd35c9d862ca98df0c91b156b1b1",
-  "win32-arm64-msvc": "0cd27e5929adabc17ca08e70ee1776a0701ff6d73a009c83aa6a8b48d21fac36",
-  "win32-ia32-msvc": "8a804b3743c6641fabee01fd16c824641464e154daa7b13bc994eeeac3788a8f",
-  "win32-x64-msvc": "23cc3724a78ced6124bb75c19ef5c367a804983338cd7de8e90a2d77c8ed2c16",
+  "linux-x64-gnu": "b6ed2f918ceeb549df8c899fe9108bad52df5c3d6af60a47c55210a7070ba3cb",
+  "linux-x64-musl": "723dbf747ce33bf6ab69f85ff0272b91aade86bbbd233e515b3d0cb5e3bbc01e",
+  "linux-arm64-gnu": "6c59353c1c026c8938daf1d38262139794c6d7d1b52207d6159100824f3ad64e",
+  "linux-arm64-musl": "83fbe7ac63fbefa334b8e82ab2667cc403919a1844bd6db8c5cea0fd4aa792b0",
+  "linux-arm-gnueabihf": "1a3be45e3d4dd8f63de88364bce8f64fdfa068562dcd9ac3b46a8a35d4c82b37",
+  "darwin-x64": "d60ed0cb63328710858524ee315a107bac1b31ece2fa29b647a3df405036193d",
+  "darwin-arm64": "c144de3ee8241afbc7798aa40689af25a0ff9c139da88dc64d9d3df07e5abbf1",
+  "win32-x64-msvc": "f832bc0a62e809d08786b7b84a31a025e1dcb6623fb8997ba901f015201a68ec",
+  "win32-ia32-msvc": "58141c9cf7e19e8670270bc3b8f7db29216d94953c6611edca928e46ede2f445",
+  "win32-arm64-msvc": "adad3ccb05669ea178e366bdc89aa731a90faf5f96168faa98af645a3b4e3546",
 };
 
 // <platform>/<arch> -> napi-rs triples

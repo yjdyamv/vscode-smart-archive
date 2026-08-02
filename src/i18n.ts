@@ -214,9 +214,29 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "歸檔大小的 {0}%",
   },
   "recovery.volumesTitle": {
-    en: "Add recovery volumes (.rev) to protect missing/corrupt volumes?",
-    "zh-cn": "添加恢复卷（.rev）以保护缺失/损坏的分卷？",
-    "zh-tw": "新增恢復卷（.rev）以保護缺失/損壞的分卷？",
+    en: "Recovery volumes (.rev) — about {0} volumes, cap at volume count",
+    "zh-cn": "恢复卷（.rev）— 预计分卷数约 {0} 个，超出自动取分卷数",
+    "zh-tw": "恢復卷（.rev）— 預計分卷數約 {0} 個，超出自動取分卷數",
+  },
+  "recovery.volumesCount": {
+    en: "{0} recovery volume(s)",
+    "zh-cn": "{0} 个恢复卷",
+    "zh-tw": "{0} 個恢復卷",
+  },
+  "recovery.volumesCustom": {
+    en: "Custom count...",
+    "zh-cn": "自定义个数...",
+    "zh-tw": "自訂個數...",
+  },
+  "recovery.volumesCustomPrompt": {
+    en: "Recovery volume count (exceeding the volume count is capped automatically)",
+    "zh-cn": "恢复卷个数（超过分卷数时自动取分卷数）",
+    "zh-tw": "恢復卷個數（超過分卷數時自動取分卷數）",
+  },
+  "recovery.volumesInvalid": {
+    en: "Enter a whole number between 1 and 1000",
+    "zh-cn": "请输入 1 到 1000 之间的整数",
+    "zh-tw": "請輸入 1 到 1000 之間的整數",
   },
   "repair.title": {
     en: "Repair archive",

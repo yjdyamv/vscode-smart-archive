@@ -35,6 +35,14 @@ export const ProgressLocation = {
   Notification: 1,
 };
 
+export const QuickInputButtons = {
+  Back: Symbol("Back"),
+};
+
+export class ThemeIcon {
+  constructor(public id: string) {}
+}
+
 export const Uri = {
   file: (p: string) => ({ fsPath: p }),
 };
@@ -46,6 +54,8 @@ export default {
   window,
   workspace,
   ProgressLocation,
+  QuickInputButtons,
+  ThemeIcon,
   Uri,
   CancellationError,
 };
