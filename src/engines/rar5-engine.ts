@@ -64,12 +64,14 @@ interface Rar5Binding {
       level?: number;
       password?: string;
       encryptHeaders?: boolean;
+      recoveryPercent?: number;
       volumeSize?: number;
       maxTotalBytes?: number;
     },
     onProgress?: (err: Error | null, p: { done: number; total: number }) => void,
     signal?: AbortSignal,
   ): Promise<{ files: string[] }>;
+  repairArchive(inputPath: string, outputPath: string): void;
 }
 
 let binding: Rar5Binding | undefined;
@@ -191,6 +193,12 @@ function totalBytes(entries: CollectedEntry[]): number {
   return total;
 }
 
+/** Repair a damaged RAR5 archive using its inline recovery record. */
+export function repairWithRar5(inputPath: string, outputPath: string): void {
+  const mod = loadBinding();
+  mod.repairArchive(inputPath, outputPath);
+}
+
 export async function compressWithRar5(
   options: CompressOptions,
   progress?: ProgressLike,
@@ -258,6 +266,7 @@ export async function compressWithRar5(
         level: mapLevel(options.level),
         password: options.password || undefined,
         encryptHeaders: options.encryptHeaders ?? false,
+        recoveryPercent: options.recoveryPercent ?? 0,
         volumeSize: volumeSize && volumeSize > 0 ? volumeSize : undefined,
       },
       (err, p) => {

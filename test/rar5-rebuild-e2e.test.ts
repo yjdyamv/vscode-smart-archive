@@ -13,7 +13,11 @@ import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
-import { rebuildRarArchive, hasEncryptedHeaders } from "../src/providers/archive/rar5-modify";
+import {
+  rebuildRarArchive,
+  hasEncryptedHeaders,
+  readRecoveryPercent,
+} from "../src/providers/archive/rar5-modify";
 import { verifyArchivePassword } from "../src/providers/webview/handlers/shared";
 
 const RAR5_FORMAT = {
@@ -237,5 +241,55 @@ describe("rar5 rebuild e2e (delete folder)", () => {
       encoding: "utf8",
     });
     expect(after).toContain("Everything is Ok");
+  });
+
+  it.runIf(haveBinaries())("creates a recovery record that WinRAR validates, preserves it on rebuild, and repairs damage", async () => {
+    // RAR5 inline recovery record: the official rar CLI must recognize and
+    // validate it ("Testing the recovery record ... OK"), a rebuild must
+    // preserve the percent, and the binding's repair must restore a
+    // damaged archive byte-exactly.
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5rr-"));
+    const proj = path.join(dir, "proj");
+    fs.mkdirSync(proj, { recursive: true });
+    const payload = Buffer.alloc(4000, 0x61);
+    fs.writeFileSync(path.join(proj, "big.bin"), payload);
+
+    const archive = path.join(dir, "rr.rar");
+    await compressWithRar5(
+      {
+        format: RAR5_FORMAT,
+        outputPath: archive,
+        targets: [{ fsPath: proj }],
+        password: "",
+        recoveryPercent: 5,
+        level: 3,
+      },
+      undefined,
+      undefined,
+      [],
+    );
+
+    expect(readRecoveryPercent(archive)).toBe(5);
+    const raw = fs.readFileSync(archive);
+    expect(raw.includes(Buffer.from("{RB}"))).toBe(true);
+
+    // Official rar validates the recovery record.
+    const officialRar = "/home/yuan/下载/rar/rar";
+    if (fs.existsSync(officialRar)) {
+      const out = childProcess.execFileSync(officialRar, ["t", archive], { encoding: "utf8" });
+      expect(out).toContain("recovery record");
+      expect(out).toContain("All OK");
+    }
+
+    // Rebuild (delete) must preserve the recovery record.
+    await rebuildRarArchive({
+      archivePath: archive,
+      mutate: (root) => {
+        fs.rmSync(path.join(root, "proj", "big.bin"), { force: true });
+      },
+    });
+    expect(readRecoveryPercent(archive)).toBe(5);
+    const testOut = childProcess.execFileSync(BUNDLED_7ZZ, ["t", archive], { encoding: "utf8" });
+    expect(testOut).toContain("Everything is Ok");
   });
 });

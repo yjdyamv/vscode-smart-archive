@@ -316,8 +316,9 @@ export async function compressCommand(
   let doEncrypt = false;
   let password = "";
   let encryptHeaders = false;
+  let recoveryPercent = 0;
 
-  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 55=headers, 6=save
+  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 55=headers, 56=recovery, 6=save
 
   while (true) {
     switch (step) {
@@ -398,7 +399,7 @@ export async function compressCommand(
           vscode.window.showWarningMessage(t("encrypt.noPassword"));
         }
         // RAR supports encrypting the structure (file names) too.
-        step = format!.label === "rar" && password ? 55 : 6;
+        step = format!.label === "rar" && password ? 55 : format!.label === "rar" ? 56 : 6;
         continue;
       }
 
@@ -419,6 +420,31 @@ export async function compressCommand(
           return;
         }
         encryptHeaders = res.value.value;
+        step = format!.label === "rar" ? 56 : 6;
+        continue;
+      }
+
+      // ── 5.6 Recovery record (RAR only) ──
+      case 56: {
+        const res = await promptQuickPick(
+          [
+            { label: t("recovery.none"), value: 0 },
+            { label: t("recovery.percent", "1"), value: 1 },
+            { label: t("recovery.percent", "3"), value: 3 },
+            { label: t("recovery.percent", "5"), value: 5 },
+            { label: t("recovery.percent", "10"), value: 10 },
+            { label: t("recovery.percent", "20"), value: 20 },
+          ],
+          { placeHolder: t("recovery.title"), title: t("recovery.title") },
+        );
+        if (res.kind !== "ok") {
+          if (res.kind === "back") {
+            step = format!.label === "rar" && password ? 55 : 5;
+            continue;
+          }
+          return;
+        }
+        recoveryPercent = res.value.value;
         step = 6;
         continue;
       }
@@ -488,6 +514,7 @@ export async function compressCommand(
           level,
           volumeSize,
           encryptHeaders,
+          recoveryPercent,
         };
 
         await vscode.window.withProgress(

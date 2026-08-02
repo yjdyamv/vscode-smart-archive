@@ -50,6 +50,8 @@ export interface CompressOptions {
   volumeSize?: string;
   /** Encrypt the archive structure (file names) too — RAR5 header encryption. */
   encryptHeaders?: boolean;
+  /** RAR5 inline recovery record percent (0-100, WinRAR -rr). */
+  recoveryPercent?: number;
 }
 
 /** Input parameters for a decompression operation */

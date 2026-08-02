@@ -150,6 +150,101 @@ function copyDirFiltered(srcDir: string, destDir: string, exclusions: ExclusionS
   }
 }
 
+/**
+ * Sniff the recovery-record percent of a RAR5 archive (0-100) by locating
+ * the "RR" service header and reading its service-data record. Returns
+ * undefined when the archive has no (readable) recovery record.
+ */
+export function readRecoveryPercent(archivePath: string): number | undefined {
+  const fd = fs.openSync(archivePath, "r");
+  try {
+    const readVintAt = (pos: number): { value: number; len: number } | null => {
+      let val = 0;
+      let shift = 0;
+      const buf = Buffer.alloc(10);
+      const n = fs.readSync(fd, buf, 0, 10, pos);
+      for (let i = 0; i < n; i++) {
+        const b = buf[i];
+        val |= (b & 0x7f) << shift;
+        if ((b & 0x80) === 0) return { value: val, len: i + 1 };
+        shift += 7;
+        if (shift > 56) return null;
+      }
+      return null;
+    };
+    // Walk blocks from the signature to find the RR service header.
+    const sig = Buffer.alloc(8);
+    if (fs.readSync(fd, sig, 0, 8, 0) < 8 || !sig.equals(RAR5_SIGNATURE)) return undefined;
+    let pos = 8;
+    for (let i = 0; i < 4096; i++) {
+      const hsize = readVintAt(pos + 4);
+      if (!hsize) return undefined;
+      const contentStart = pos + 4 + hsize.len;
+      const type = readVintAt(contentStart);
+      if (!type) return undefined;
+      const flags = readVintAt(contentStart + type.len);
+      if (!flags) return undefined;
+      let p = contentStart + type.len + flags.len;
+      let extraSize = 0;
+      let dataSize = 0;
+      if (flags.value & 0x0001) {
+        const v = readVintAt(p);
+        if (!v) return undefined;
+        extraSize = v.value;
+        p += v.len;
+      }
+      if (flags.value & 0x0002) {
+        const v = readVintAt(p);
+        if (!v) return undefined;
+        dataSize = v.value;
+        p += v.len;
+      }
+      if (type.value === 3) {
+        // Service header: file flags, unpacked size, attrs, mtime, crc,
+        // comp info, host os, name length, name, extra area.
+        const fflags = readVintAt(p);
+        if (!fflags) return undefined;
+        p += fflags.len;
+        const usize = readVintAt(p);
+        if (!usize) return undefined;
+        p += usize.len;
+        const attrs = readVintAt(p);
+        if (!attrs) return undefined;
+        p += attrs.len;
+        if (fflags.value & 0x0002) p += 4; // mtime
+        if (fflags.value & 0x0004) p += 4; // crc
+        const cinfo = readVintAt(p);
+        if (!cinfo) return undefined;
+        p += cinfo.len;
+        const host = readVintAt(p);
+        if (!host) return undefined;
+        p += host.len;
+        const nlen = readVintAt(p);
+        if (!nlen) return undefined;
+        p += nlen.len;
+        const name = Buffer.alloc(nlen.value);
+        fs.readSync(fd, name, 0, nlen.value, p);
+        if (name.toString("utf8") === "RR") {
+          // Service-data record in the extra area: [size][type=0x07][data].
+          const recSize = readVintAt(p + nlen.value);
+          if (!recSize) return undefined;
+          const recType = readVintAt(p + nlen.value + recSize.len);
+          if (!recType || recType.value !== 0x07) return undefined;
+          const dataByte = Buffer.alloc(1);
+          fs.readSync(fd, dataByte, 0, 1, p + nlen.value + recSize.len + recType.len);
+          const pct = dataByte[0];
+          return pct > 100 ? undefined : pct;
+        }
+      }
+      pos = contentStart + hsize.value + dataSize;
+      if (type.value === 5) return undefined; // end of archive
+    }
+    return undefined;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export interface RebuildRarOptions {
   archivePath: string;
   password?: string;
@@ -241,6 +336,8 @@ export async function rebuildRarArchive(options: RebuildRarOptions): Promise<voi
         // Preserve header encryption (hidden file names) when the source
         // archive had it — the rebuilt archive must not lose it.
         encryptHeaders: hasEncryptedHeaders(archivePath),
+        // Preserve the recovery record when the source archive had one.
+        recoveryPercent: readRecoveryPercent(archivePath) ?? 0,
         level: options.level ?? 5,
       },
       progress,
