@@ -13,7 +13,7 @@ import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
-import { rebuildRarArchive } from "../src/providers/archive/rar5-modify";
+import { rebuildRarArchive, hasEncryptedHeaders } from "../src/providers/archive/rar5-modify";
 import { verifyArchivePassword } from "../src/providers/webview/handlers/shared";
 
 const RAR5_FORMAT = {
@@ -175,5 +175,67 @@ describe("rar5 rebuild e2e (delete folder)", () => {
 
     await expect(verifyArchivePassword(archive, "test123")).resolves.toBe(true);
     await expect(verifyArchivePassword(archive, "wrong")).resolves.toBe(false);
+  });
+
+  it.runIf(haveBinaries())("encrypts headers so file names stay hidden, and preserves them on rebuild", async () => {
+    // RAR5 header encryption: the archive structure must be invisible
+    // without the password, and a rebuild must keep header encryption.
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5hdr-"));
+    const proj = path.join(dir, "proj");
+    fs.mkdirSync(path.join(proj, "secret"), { recursive: true });
+    fs.writeFileSync(path.join(proj, "secret", "hidden.txt"), "classified");
+
+    const archive = path.join(dir, "enc.rar");
+    await compressWithRar5(
+      {
+        format: RAR5_FORMAT,
+        outputPath: archive,
+        targets: [{ fsPath: proj }],
+        password: "test123",
+        encryptHeaders: true,
+        level: 3,
+      },
+      undefined,
+      undefined,
+      [],
+    );
+
+    expect(hasEncryptedHeaders(archive)).toBe(true);
+
+    // Listing without the password must fail; the plaintext file name must
+    // not appear anywhere in the archive.
+    const raw = fs.readFileSync(archive);
+    expect(raw.includes(Buffer.from("hidden.txt"))).toBe(false);
+    let listed: string | undefined;
+    try {
+      listed = childProcess.execFileSync(BUNDLED_7ZZ, ["l", archive], { encoding: "utf8" });
+    } catch {
+      listed = undefined;
+    }
+    expect(listed).toBeUndefined();
+
+    const pwList = childProcess.execFileSync(BUNDLED_7ZZ, ["l", `-ptest123`, archive], {
+      encoding: "utf8",
+    });
+    expect(pwList).toContain("secret/hidden.txt");
+
+    const testOut = childProcess.execFileSync(BUNDLED_7ZZ, ["t", `-ptest123`, archive], {
+      encoding: "utf8",
+    });
+    expect(testOut).toContain("Everything is Ok");
+
+    // Rebuild (delete) must preserve header encryption.
+    await rebuildRarArchive({
+      archivePath: archive,
+      password: "test123",
+      mutate: (root) => {
+        fs.rmSync(path.join(root, "proj", "secret"), { recursive: true, force: true });
+      },
+    });
+    expect(hasEncryptedHeaders(archive)).toBe(true);
+    const after = childProcess.execFileSync(BUNDLED_7ZZ, ["t", `-ptest123`, archive], {
+      encoding: "utf8",
+    });
+    expect(after).toContain("Everything is Ok");
   });
 });

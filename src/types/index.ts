@@ -48,6 +48,8 @@ export interface CompressOptions {
   level: number;
   /** Split archive into volumes of this size (e.g. "100m", "650m", "1g"). Unset = no split. */
   volumeSize?: string;
+  /** Encrypt the archive structure (file names) too — RAR5 header encryption. */
+  encryptHeaders?: boolean;
 }
 
 /** Input parameters for a decompression operation */

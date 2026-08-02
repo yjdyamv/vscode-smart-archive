@@ -71,6 +71,41 @@ export function detectRarVersion(archivePath: string): "rar5" | "rar4" | "unknow
 }
 
 /**
+ * Sniff whether a RAR5 archive encrypts its headers (hidden file names).
+ *
+ * With header encryption the archive-level encryption header (block type 4)
+ * is the first block right after the signature, before the main archive
+ * header. Block layout: `[crc32 (4)] [header-size vint] [block-type vint]`.
+ */
+export function hasEncryptedHeaders(archivePath: string): boolean {
+  const fd = fs.openSync(archivePath, "r");
+  try {
+    const buf = Buffer.alloc(32);
+    const n = fs.readSync(fd, buf, 0, 32, 8);
+    if (n < 5) return false;
+    let pos = 4; // skip crc32
+    const readVint = (): number | null => {
+      let val = 0;
+      let shift = 0;
+      while (pos < n) {
+        const b = buf[pos++];
+        val |= (b & 0x7f) << shift;
+        if ((b & 0x80) === 0) return val;
+        shift += 7;
+        if (shift > 56) return null;
+      }
+      return null;
+    };
+    const hsize = readVint();
+    if (hsize === null) return false;
+    const blockType = readVint();
+    return blockType === 4;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
  * Join an archive-relative path (e.g. `dir/file.txt`) onto the extraction
  * root, rejecting any path that escapes the root.
  */
@@ -203,6 +238,9 @@ export async function rebuildRarArchive(options: RebuildRarOptions): Promise<voi
         outputPath: rebuiltPath,
         targets: topLevel.map((n) => ({ fsPath: path.join(extractRoot, n) })),
         password,
+        // Preserve header encryption (hidden file names) when the source
+        // archive had it — the rebuilt archive must not lose it.
+        encryptHeaders: hasEncryptedHeaders(archivePath),
         level: options.level ?? 5,
       },
       progress,

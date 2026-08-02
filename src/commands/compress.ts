@@ -315,8 +315,9 @@ export async function compressCommand(
   let volumeSize: string | undefined;
   let doEncrypt = false;
   let password = "";
+  let encryptHeaders = false;
 
-  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 6=save
+  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 55=headers, 6=save
 
   while (true) {
     switch (step) {
@@ -396,6 +397,28 @@ export async function compressCommand(
         if (!password) {
           vscode.window.showWarningMessage(t("encrypt.noPassword"));
         }
+        // RAR supports encrypting the structure (file names) too.
+        step = format!.label === "rar" && password ? 55 : 6;
+        continue;
+      }
+
+      // ── 5.5 Encrypt headers (RAR only) ──
+      case 55: {
+        const res = await promptQuickPick(
+          [
+            { label: t("encrypt.no"), value: false },
+            { label: t("encrypt.headersYes"), value: true },
+          ],
+          { placeHolder: t("encrypt.headersTitle"), title: t("encrypt.headersTitle") },
+        );
+        if (res.kind !== "ok") {
+          if (res.kind === "back") {
+            step = 5;
+            continue;
+          }
+          return;
+        }
+        encryptHeaders = res.value.value;
         step = 6;
         continue;
       }
@@ -464,6 +487,7 @@ export async function compressCommand(
           password,
           level,
           volumeSize,
+          encryptHeaders,
         };
 
         await vscode.window.withProgress(
