@@ -46,6 +46,16 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "暂不支持修改 RAR4 归档，仅支持 RAR5 归档。",
     "zh-tw": "暫不支援修改 RAR4 壓縮檔，僅支援 RAR5 壓縮檔。",
   },
+  "rar5.modifyRar4Prompt": {
+    en: "This archive is in the old RAR4 format. Rebuilding it will convert it to RAR5. Continue?",
+    "zh-cn": "该归档是旧的 RAR4 格式，重建后将转换为 RAR5 格式。是否继续？",
+    "zh-tw": "此壓縮檔是舊版 RAR4 格式，重建後將轉換為 RAR5 格式。是否繼續？",
+  },
+  "rar5.modifyRar4Confirm": {
+    en: "Rebuild as RAR5",
+    "zh-cn": "重建为 RAR5",
+    "zh-tw": "重建為 RAR5",
+  },
   "rar5.modifyNotRar": {
     en: "Not a valid RAR archive.",
     "zh-cn": "不是有效的 RAR 归档。",
