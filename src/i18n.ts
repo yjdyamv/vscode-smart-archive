@@ -213,6 +213,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "归档大小的 {0}%",
     "zh-tw": "歸檔大小的 {0}%",
   },
+  "recovery.volumesTitle": {
+    en: "Add recovery volumes (.rev) to protect missing/corrupt volumes?",
+    "zh-cn": "添加恢复卷（.rev）以保护缺失/损坏的分卷？",
+    "zh-tw": "新增恢復卷（.rev）以保護缺失/損壞的分卷？",
+  },
   "repair.title": {
     en: "Repair archive",
     "zh-cn": "修复归档",

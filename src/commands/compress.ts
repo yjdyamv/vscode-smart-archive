@@ -317,6 +317,7 @@ export async function compressCommand(
   let password = "";
   let encryptHeaders = false;
   let recoveryPercent = 0;
+  let recoveryVolumesPercent = 0;
 
   let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 55=headers, 56=recovery, 6=save
 
@@ -425,8 +426,10 @@ export async function compressCommand(
         continue;
       }
 
-      // ── 5.6 Recovery record (RAR only) ──
+      // ── 5.6 Recovery record / recovery volumes (RAR only) ──
       case 56: {
+        const isSplitRar = format!.label === "rar" && Boolean(volumeSize);
+        const title = isSplitRar ? t("recovery.volumesTitle") : t("recovery.title");
         const res = await promptQuickPick(
           [
             { label: t("recovery.none"), value: 0 },
@@ -436,7 +439,7 @@ export async function compressCommand(
             { label: t("recovery.percent", "10"), value: 10 },
             { label: t("recovery.percent", "20"), value: 20 },
           ],
-          { placeHolder: t("recovery.title"), title: t("recovery.title") },
+          { placeHolder: title, title },
         );
         if (res.kind !== "ok") {
           if (res.kind === "back") {
@@ -445,7 +448,11 @@ export async function compressCommand(
           }
           return;
         }
-        recoveryPercent = res.value.value;
+        if (isSplitRar) {
+          recoveryVolumesPercent = res.value.value;
+        } else {
+          recoveryPercent = res.value.value;
+        }
         step = 6;
         continue;
       }
@@ -522,6 +529,7 @@ export async function compressCommand(
           volumeSize,
           encryptHeaders,
           recoveryPercent,
+          recoveryVolumesPercent,
         };
 
         await vscode.window.withProgress(

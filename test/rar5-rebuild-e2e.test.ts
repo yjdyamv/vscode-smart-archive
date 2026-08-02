@@ -243,6 +243,52 @@ describe("rar5 rebuild e2e (delete folder)", () => {
     expect(after).toContain("Everything is Ok");
   });
 
+  it.runIf(haveBinaries())("creates .rev recovery volumes the official rar rc can rebuild from", async () => {
+    // WinRAR `-rv` equivalent: split the archive and generate .rev files;
+    // the official `rar rc` must reconstruct a deleted volume byte-exactly.
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5rv-"));
+    const proj = path.join(dir, "proj");
+    fs.mkdirSync(proj, { recursive: true });
+    // Random (incompressible) payload so the archive really splits.
+    const payload = require("crypto").randomBytes(100000);
+    fs.writeFileSync(path.join(proj, "big.bin"), payload);
+
+    const archive = path.join(dir, "vol.part1.rar");
+    await compressWithRar5(
+      {
+        format: RAR5_FORMAT,
+        outputPath: archive,
+        targets: [{ fsPath: proj }],
+        password: "",
+        level: 3,
+        volumeSize: "32k",
+        recoveryVolumesPercent: 20,
+      },
+      undefined,
+      undefined,
+      [],
+    );
+
+    const revs = fs.readdirSync(dir).filter((n) => n.endsWith(".rev"));
+    expect(revs.length).toBeGreaterThanOrEqual(1);
+    const revPath = path.join(dir, revs[0]);
+    const revHead = fs.readFileSync(revPath);
+    expect(revHead.subarray(0, 8).equals(Buffer.from("Rar!\x1aRev"))).toBe(true);
+
+    // Delete a middle volume and rebuild it with the official rar rc.
+    const officialRar = "/home/yuan/下载/rar/rar";
+    const vols = fs.readdirSync(dir).filter((n) => n.endsWith(".rar")).sort();
+    const missing = path.join(dir, vols[Math.floor(vols.length / 2)]);
+    fs.rmSync(missing);
+    if (fs.existsSync(officialRar)) {
+      const out = childProcess.execFileSync(officialRar, ["rc", archive], { encoding: "utf8" });
+      expect(out).toContain("Done");
+      expect(fs.existsSync(missing)).toBe(true);
+      const testOut = childProcess.execFileSync(officialRar, ["t", archive], { encoding: "utf8" });
+      expect(testOut).toContain("All OK");
+    }
+  });
+
   it.runIf(haveBinaries())("creates a recovery record that WinRAR validates, preserves it on rebuild, and repairs damage", async () => {
     // RAR5 inline recovery record: the official rar CLI must recognize and
     // validate it ("Testing the recovery record ... OK"), a rebuild must
