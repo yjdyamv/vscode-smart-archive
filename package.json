@@ -1,40 +1,90 @@
 {
   "name": "smart-archive",
   "displayName": "Smart Archive",
-  "description": "Compress and decompress files with a bundled native 7-Zip (WASM fallback) + zstd. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
   "version": "1.23.1",
-  "publisher": "yjdyamv",
   "private": true,
+  "description": "Compress and decompress files with a bundled native 7-Zip (WASM fallback) + zstd. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
+  "categories": [
+    "Formatters",
+    "Other"
+  ],
+  "keywords": [
+    "7z",
+    "AES-256",
+    "archive",
+    "bzip2",
+    "compress",
+    "decompress",
+    "encrypt",
+    "gz",
+    "multi-volume",
+    "rar",
+    "tar",
+    "xz",
+    "zip",
+    "zstd"
+  ],
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/yjdyamv/vscode-smart-archive"
   },
-  "icon": "icon_128x128.png",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": [
-    "Other",
-    "Formatters"
-  ],
-  "keywords": [
-    "archive",
-    "compress",
-    "decompress",
-    "7z",
-    "zip",
-    "rar",
-    "tar",
-    "gz",
-    "bzip2",
-    "xz",
-    "zstd",
-    "encrypt",
-    "AES-256",
-    "multi-volume"
-  ],
+  "publisher": "yjdyamv",
   "main": "./out/extension.js",
+  "scripts": {
+    "clean": "node -e \"['out','media/vue','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
+    "postinstall": "npm --prefix webview-ui install",
+    "compile": "vite build --config vite.extension.config.ts",
+    "compile:dev": "cross-env SOURCEMAP=true vite build --config vite.extension.config.ts",
+    "watch": "vite build --config vite.extension.config.ts --watch",
+    "build:webview": "npm --prefix webview-ui run build",
+    "build:webview:dev": "cross-env SOURCEMAP=true npm --prefix webview-ui run build",
+    "dev:webview": "npm --prefix webview-ui run dev",
+    "build": "cross-env SOURCEMAP=false npm run build:webview && cross-env SOURCEMAP=false npm run compile && npm run obfuscate",
+    "obfuscate": "node scripts/obfuscate.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "format": "oxfmt --write src/ test/ webview-ui/src/ scripts/",
+    "format:check": "oxfmt --check src/ test/ webview-ui/src/ scripts/",
+    "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort -A unicorn/consistent-function-scoping -A no-control-regex src/ test/ webview-ui/src/ scripts/",
+    "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort -A unicorn/consistent-function-scoping -A no-control-regex --fix src/ test/ webview-ui/src/ scripts/",
+    "typecheck": "tsc -p . --noEmit",
+    "check": "npm run format:check && npm run lint && npm run typecheck",
+    "release": "npm run build && npm run check && npm run package",
+    "stage:natives": "node scripts/install-snappy-platforms.js && node scripts/install-lz4-platforms.js && node scripts/install-zstd-platforms.js && node scripts/install-7z-platforms.js && node scripts/install-rar5-platforms.js",
+    "package": "vsce package",
+    "package:cross": "npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.js && vsce package",
+    "package:ovsx": "npm run stage:natives && npm run build && npx ovsx package",
+    "publish:ovsx": "npm run stage:natives && npm run build && npx ovsx publish",
+    "vscode:prepublish": "npm run stage:natives && npm run build",
+    "publish": "npm run build && npx vsce publish"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.45",
+    "iconv-lite": "^0.7.3",
+    "js7z-tools": "^2.5.0",
+    "lz4-napi": "^2.9.1",
+    "minimatch": "^10.2.5",
+    "pino": "^10.3.1",
+    "snappy": "^7.2.2",
+    "zstd-napi": "https://github.com/yjdyamv/zstd-napi/archive/refs/tags/v0.0.13.tar.gz"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "cross-env": "^7.0.3",
+    "javascript-obfuscator": "^5.5.0",
+    "oxfmt": "^0.59.0",
+    "oxlint": "^1.74.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.8",
+    "encoding-sniffer": "1.0.2"
+  },
   "contributes": {
     "customEditors": [
       {
@@ -228,6 +278,12 @@
         "command": "yjdyamv.smart-archive.addToArchive",
         "title": "Smart Archive: Add to Archive",
         "shortTitle": "Add to Archive"
+      },
+      {
+        "command": "yjdyamv.smart-archive.repair",
+        "title": "Smart Archive: Repair Archive",
+        "shortTitle": "Repair Archive",
+        "icon": "$(wrench)"
       }
     ],
     "menus": {
@@ -251,6 +307,10 @@
         {
           "command": "yjdyamv.smart-archive.addToArchive",
           "when": "false"
+        },
+        {
+          "command": "yjdyamv.smart-archive.repair",
+          "when": "false"
         }
       ],
       "explorer/context": [
@@ -267,6 +327,11 @@
           "command": "yjdyamv.smart-archive.browse",
           "group": "7_modification",
           "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|tbr|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|tar\\.br|tar\\.sz|tsz|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
+        },
+        {
+          "command": "yjdyamv.smart-archive.repair",
+          "when": "resourceExtname == .rar",
+          "group": "7_modification"
         }
       ]
     },
@@ -524,59 +589,9 @@
       }
     }
   },
-  "scripts": {
-    "clean": "node -e \"['out','media/vue','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
-    "postinstall": "npm --prefix webview-ui install",
-    "compile": "vite build --config vite.extension.config.ts",
-    "compile:dev": "cross-env SOURCEMAP=true vite build --config vite.extension.config.ts",
-    "watch": "vite build --config vite.extension.config.ts --watch",
-    "build:webview": "npm --prefix webview-ui run build",
-    "build:webview:dev": "cross-env SOURCEMAP=true npm --prefix webview-ui run build",
-    "dev:webview": "npm --prefix webview-ui run dev",
-    "build": "cross-env SOURCEMAP=false npm run build:webview && cross-env SOURCEMAP=false npm run compile && npm run obfuscate",
-    "obfuscate": "node scripts/obfuscate.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "format": "oxfmt --write src/ test/ webview-ui/src/ scripts/",
-    "format:check": "oxfmt --check src/ test/ webview-ui/src/ scripts/",
-    "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort -A unicorn/consistent-function-scoping -A no-control-regex src/ test/ webview-ui/src/ scripts/",
-    "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort -A unicorn/consistent-function-scoping -A no-control-regex --fix src/ test/ webview-ui/src/ scripts/",
-    "typecheck": "tsc -p . --noEmit",
-    "check": "npm run format:check && npm run lint && npm run typecheck",
-    "release": "npm run build && npm run check && npm run package",
-    "stage:natives": "node scripts/install-snappy-platforms.js && node scripts/install-lz4-platforms.js && node scripts/install-zstd-platforms.js && node scripts/install-7z-platforms.js && node scripts/install-rar5-platforms.js",
-    "package": "vsce package",
-    "package:cross": "npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.js && vsce package",
-    "package:ovsx": "npm run stage:natives && npm run build && npx ovsx package",
-    "publish:ovsx": "npm run stage:natives && npm run build && npx ovsx publish",
-    "vscode:prepublish": "npm run stage:natives && npm run build",
-    "publish": "npm run build && npx vsce publish"
-  },
-  "overrides": {
-    "encoding-sniffer": "1.0.2",
-    "brace-expansion": "5.0.8"
-  },
-  "dependencies": {
-    "@vscode/codicons": "^0.0.45",
-    "iconv-lite": "^0.7.3",
-    "js7z-tools": "^2.5.0",
-    "lz4-napi": "^2.9.1",
-    "minimatch": "^10.2.5",
-    "pino": "^10.3.1",
-    "snappy": "^7.2.2",
-    "zstd-napi": "https://github.com/yjdyamv/zstd-napi/archive/refs/tags/v0.0.13.tar.gz"
-  },
-  "devDependencies": {
-    "@types/node": "^25.6.0",
-    "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^3.9.2",
-    "cross-env": "^7.0.3",
-    "javascript-obfuscator": "^5.5.0",
-    "oxfmt": "^0.59.0",
-    "oxlint": "^1.74.0",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+  "icon": "icon_128x128.png",
+  "engines": {
+    "vscode": "^1.85.0"
   },
   "allowScripts": {
     "lz4-napi@2.9.1": true,

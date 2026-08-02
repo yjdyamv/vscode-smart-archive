@@ -10,6 +10,7 @@
 
 import * as vscode from "vscode";
 import { compressCommand } from "./commands/compress";
+import { repairCommand } from "./commands/repair";
 import { decompressCommand, browseCommand } from "./commands/decompress";
 import { registerArchiveEditor, pasteCopiedFromArchive } from "./providers/archiveProvider";
 import { runAddToArchive } from "./providers/archive";
@@ -80,6 +81,12 @@ export function activate(context: vscode.ExtensionContext): void {
     pasteCopiedFromArchive(),
   );
 
+  // Register repair command
+  const repairDisposable = vscode.commands.registerCommand(
+    "yjdyamv.smart-archive.repair",
+    (uri: vscode.Uri) => repairCommand(uri),
+  );
+
   // Register add-to-archive command (triggered via command URI from webview)
   const addToArchiveDisposable = vscode.commands.registerCommand(
     "yjdyamv.smart-archive.addToArchive",
@@ -93,6 +100,7 @@ export function activate(context: vscode.ExtensionContext): void {
     browseDisposable,
     pasteDisposable,
     addToArchiveDisposable,
+    repairDisposable,
   );
 }
 

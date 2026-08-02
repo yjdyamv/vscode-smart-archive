@@ -198,6 +198,46 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "同时加密文件名",
     "zh-tw": "同時加密檔名",
   },
+  "recovery.title": {
+    en: "Add a recovery record (repair damaged archives)?",
+    "zh-cn": "添加恢复记录（可修复损坏的归档）？",
+    "zh-tw": "新增恢復記錄（可修復損壞的歸檔）？",
+  },
+  "recovery.none": {
+    en: "No recovery record",
+    "zh-cn": "无恢复记录",
+    "zh-tw": "無恢復記錄",
+  },
+  "recovery.percent": {
+    en: "{0}% of archive size",
+    "zh-cn": "归档大小的 {0}%",
+    "zh-tw": "歸檔大小的 {0}%",
+  },
+  "repair.title": {
+    en: "Repair archive",
+    "zh-cn": "修复归档",
+    "zh-tw": "修復歸檔",
+  },
+  "repair.pick": {
+    en: "Select a damaged RAR archive to repair",
+    "zh-cn": "选择要修复的损坏 RAR 归档",
+    "zh-tw": "選擇要修復的損壞 RAR 歸檔",
+  },
+  "repair.noRecovery": {
+    en: "This archive has no recovery record and cannot be repaired.",
+    "zh-cn": "该归档没有恢复记录，无法修复。",
+    "zh-tw": "該歸檔沒有恢復記錄，無法修復。",
+  },
+  "repair.done": {
+    en: "Repaired archive written to: ",
+    "zh-cn": "修复后的归档已写入：",
+    "zh-tw": "修復後的歸檔已寫入：",
+  },
+  "repair.failed": {
+    en: "Repair failed: ",
+    "zh-cn": "修复失败：",
+    "zh-tw": "修復失敗：",
+  },
 
   // ---- Decompress flow ----
   "decompress.noFile": {
