@@ -7,7 +7,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { spawnCapture, detectSystem7z } from "../../../engines/system7z";
+import { spawnCapture, system7zForExt } from "../../../engines/system7z";
 import { validatePassword } from "../../../utils/security";
 import { getFullExt, COMPRESS_FORMATS, removeVolumeSuffix } from "../../../constants";
 import { getVolumeSizes, toBinaryVolumeSize } from "../../../utils/volume-sizes";
@@ -167,7 +167,10 @@ export async function verifyArchivePassword(
     return false;
   }
 
-  const sz = detectSystem7z();
+  // Resolve a format-capable binary: for RAR, some distro 7-Zip builds lack
+  // RAR support entirely and would fail the test ("Can't open as archive"),
+  // producing a false "wrong password". Prefer the bundled 7zz.
+  const sz = system7zForExt(getFullExt(archivePath));
   if (sz) {
     try {
       const { code } = await spawnCapture(sz, ["t", `-p${password}`, archivePath], 15_000);

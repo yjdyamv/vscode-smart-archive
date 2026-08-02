@@ -14,6 +14,7 @@ import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
 import { rebuildRarArchive } from "../src/providers/archive/rar5-modify";
+import { verifyArchivePassword } from "../src/providers/webview/handlers/shared";
 
 const RAR5_FORMAT = {
   label: "rar",
@@ -145,5 +146,34 @@ describe("rar5 rebuild e2e (delete folder)", () => {
 
     const testOut2 = childProcess.execFileSync(BUNDLED_7ZZ, ["t", archive], { encoding: "utf8" });
     expect(testOut2).toContain("Everything is Ok");
+  });
+
+  it.runIf(haveBinaries())("verifies an encrypted archive's password via the RAR-capable 7zz", async () => {
+    // Regression: verifyArchivePassword used the generic system-7z detection,
+    // which on distros whose 7-Zip build lacks RAR support fails every
+    // verification with "Can't open as archive" → false "wrong password"
+    // (this machine's /usr/bin/7z is exactly such a build). It must resolve
+    // the RAR-capable binary (bundled full-format 7zz) instead.
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5pw-"));
+    const proj = path.join(dir, "proj");
+    fs.mkdirSync(proj, { recursive: true });
+    fs.writeFileSync(path.join(proj, "secret.txt"), "top secret");
+
+    const archive = path.join(dir, "enc.rar");
+    await compressWithRar5(
+      {
+        format: RAR5_FORMAT,
+        outputPath: archive,
+        targets: [{ fsPath: proj }],
+        password: "test123",
+        level: 3,
+      },
+      undefined,
+      undefined,
+      [],
+    );
+
+    await expect(verifyArchivePassword(archive, "test123")).resolves.toBe(true);
+    await expect(verifyArchivePassword(archive, "wrong")).resolves.toBe(false);
   });
 });
