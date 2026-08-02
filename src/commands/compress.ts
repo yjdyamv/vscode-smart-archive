@@ -368,7 +368,8 @@ export async function compressCommand(
       // ── 4. Encryption (if format supports it) ──
       case 4: {
         if (!format!.supportsEncryption) {
-          step = 6; // skip to save
+          // RAR still supports a recovery record without encryption.
+          step = format!.label === "rar" ? 56 : 6;
           continue;
         }
         const r = await promptEncryptWizard();
@@ -380,7 +381,7 @@ export async function compressCommand(
           return;
         }
         doEncrypt = r.value;
-        step = doEncrypt ? 5 : 6;
+        step = doEncrypt ? 5 : format!.label === "rar" ? 56 : 6;
         continue;
       }
 
@@ -461,7 +462,13 @@ export async function compressCommand(
           const r = await promptSaveNameWizard(defaultName, ext);
           if (r.kind !== "ok") {
             if (r.kind === "back") {
-              step = doEncrypt ? 5 : format!.supportsEncryption ? 4 : 3;
+              step = doEncrypt
+                ? 5
+                : format!.label === "rar"
+                  ? 56
+                  : format!.supportsEncryption
+                    ? 4
+                    : 3;
               continue;
             }
             return;
