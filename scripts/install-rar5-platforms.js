@@ -70,16 +70,16 @@ async function resolveVersion() {
 // release, then regenerate here:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "1d77e8428b2f9abbadc582a5a4ea944fd97dc4230be4058b370f55bdc288c291",
-  "linux-x64-musl": "4421f41e27df2c21da29ac33ca27b2038e98409c4cf911b02c59e82915f33d48",
-  "linux-arm64-gnu": "79a78d3c13c0ed7e7ccff7fc40641a6733bda32f7a604e9df19b98750a40ab6d",
-  "linux-arm64-musl": "bad1f17f9cdb0a1ff06eac94b88db1ac44ff92320bc0a2b35912865b93bc3a38",
-  "linux-arm-gnueabihf": "db68b28462cef2a5b777db059e75f7df75bde921dd0e35a640b134eebdd66bc7",
-  "darwin-x64": "e02e80f1a4a98f31d24d81f35fba210f2ae99e72631e521f7e26e2a02d373339",
-  "darwin-arm64": "ecf59bc42dfc7a4aa785c23cb7196bf0074ce4da99877668f3aa1082cf014ca4",
-  "win32-x64-msvc": "1ba51bca7d2c6a6c4b2ea5376930a08c88c4f540691d62b6eb2aa6cd3421a632",
-  "win32-ia32-msvc": "7d4a148c67161d9f8a345cf7c53a4f3d6bd9f7ec68aecb1b9792ea531b2371f6",
-  "win32-arm64-msvc": "fce5411e3f85505e76abda860c77cc3f6d0b6f00d70436ca924a9324cd8e0edd",
+  "linux-x64-gnu": "a36915083ef7ba5a75a2b18a3921b51be26a5a3afaff8f5d158843c7def45f1a",
+  "linux-x64-musl": "4a71fcea1007831454c33d23f656e85ed3858c32c799a20ab15e50136432e486",
+  "linux-arm64-gnu": "5c6962a6f51adb3d8839bc585fc5f9b36409e9e60fe696f601e600f47ab0a9b8",
+  "linux-arm64-musl": "5d8f5b7bc654ac8b7db0df9fc80e53f3c40f1bbb0d8261018999e71bce0a2989",
+  "linux-arm-gnueabihf": "f571c4885f837a31d0460993f0a76e5464e1fc21b07f3883d68bbff0c39b8f30",
+  "darwin-x64": "e5c78bb2cff7ff11605a2a6d29769dfd224e4ae7552e2683080b530c699d5c00",
+  "darwin-arm64": "762790e0b7c4bc34d438df60d4e6057821dce82583a8f2b0414e8e37d3e4ef77",
+  "win32-x64-msvc": "313e39c1db62c0e596206877171294905ab8e023b2ab5af6a5de8fec8ba48380",
+  "win32-ia32-msvc": "a69ca3c027becfce73bb7e04b59375b9dbd0a64d0def7a3aaad56c22c6518f56",
+  "win32-arm64-msvc": "b864f93154a5ede710e0a793dd502408b43e974464355d8f45ca21f67c8ed025",
 };
 
 // <platform>/<arch> -> napi-rs triples
@@ -169,12 +169,16 @@ async function releaseMode(strict) {
         continue;
       }
 
+      const bootstrapping = process.env.SA_HASH_BOOTSTRAP === "1";
       const result = await downloadWithCache({
         cacheDir,
         cacheKey: nodeFileName,
         destPath,
-        expectedSha256: hash,
-        requireHash: !process.env.SA_HASH_BOOTSTRAP && strict,
+        // Bootstrap: no pin yet — download and print the new hash so it can
+        // be pasted into EXPECTED_HASHES. Otherwise the stale pin would
+        // reject the freshly released binaries.
+        expectedSha256: bootstrapping ? undefined : hash,
+        requireHash: bootstrapping || strict,
         label: `rar5 ${triple}`,
         fetch: async () => {
           // Direct download first, mirror fallback (gh-proxy.com, or
