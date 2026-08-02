@@ -15,6 +15,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
+import { isRarExt } from "../../utils/rar";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { t } from "../../i18n";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
@@ -29,6 +30,7 @@ import {
   renameInArchiveSystem7z,
 } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
+import { rebuildRarArchive, archiveJoin } from "./rar5-modify";
 
 export async function createFolderInArchive(
   archivePath: string,
@@ -43,6 +45,20 @@ export async function createFolderInArchive(
     folderName,
     ext: getFullExt(archivePath),
   });
+
+  // 7-Zip cannot create folders inside RAR archives — rebuild instead.
+  if (isRarExt(getFullExt(archivePath))) {
+    logger.info({ event: "createFolder.rar5.rebuild", archivePath, targetDir, folderName });
+    const newDir = targetDir ? `${targetDir.replace(/\\/g, "/")}/${folderName}` : folderName;
+    await rebuildRarArchive({
+      archivePath,
+      password,
+      mutate: (root) => {
+        fs.mkdirSync(archiveJoin(root, newDir), { recursive: true });
+      },
+    });
+    return;
+  }
 
   // No system-7z fast path for folder creation — WASM in the worker.
   await runArchiveOp("modify", {
@@ -286,6 +302,22 @@ export async function renameInArchive(
   logger.info({ event: "rename.start", archivePath, oldPath, newPath });
 
   const ext = getFullExt(archivePath);
+
+  // 7-Zip cannot rename entries inside RAR archives — rebuild instead.
+  if (isRarExt(ext)) {
+    logger.info({ event: "rename.rar5.rebuild", archivePath, oldPath, newPath });
+    await rebuildRarArchive({
+      archivePath,
+      password,
+      mutate: (root) => {
+        const src = archiveJoin(root, oldPath);
+        const dst = archiveJoin(root, newPath);
+        fs.mkdirSync(path.dirname(dst), { recursive: true });
+        fs.renameSync(src, dst);
+      },
+    });
+    return;
+  }
 
   // Wrapped formats always mutate via WASM (worker).
   if (!isWrappedFormat(ext) && hasSystem7zForFormat(ext) && !password) {

@@ -36,6 +36,36 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw":
       "RAR 格式建立不受免費/開源工具支援。\n建議使用 7z 或 ZIP 格式。\nRAR 解壓功能已完整支援。",
   },
+  "rar5.modifyMultivolume": {
+    en: "Multi-volume RAR archives cannot be modified yet.",
+    "zh-cn": "暂不支持修改分卷 RAR 归档。",
+    "zh-tw": "暫不支援修改分卷 RAR 壓縮檔。",
+  },
+  "rar5.modifyRar4": {
+    en: "RAR4 archives cannot be modified — only RAR5 archives are supported.",
+    "zh-cn": "暂不支持修改 RAR4 归档，仅支持 RAR5 归档。",
+    "zh-tw": "暫不支援修改 RAR4 壓縮檔，僅支援 RAR5 壓縮檔。",
+  },
+  "rar5.modifyNotRar": {
+    en: "Not a valid RAR archive.",
+    "zh-cn": "不是有效的 RAR 归档。",
+    "zh-tw": "不是有效的 RAR 壓縮檔。",
+  },
+  "rar5.modifyEmpty": {
+    en: "Archive is empty after extraction.",
+    "zh-cn": "解压后归档为空。",
+    "zh-tw": "解壓後壓縮檔為空。",
+  },
+  "rar5.modifyExtracting": {
+    en: "Extracting archive for modification...",
+    "zh-cn": "正在解压归档以进行修改...",
+    "zh-tw": "正在解壓壓縮檔以進行修改...",
+  },
+  "rar5.modifyRebuilding": {
+    en: "Rebuilding archive...",
+    "zh-cn": "正在重建归档...",
+    "zh-tw": "正在重建壓縮檔...",
+  },
   "compress.progressTitle": {
     en: "Compressing...",
     "zh-cn": "正在压缩...",
