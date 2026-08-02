@@ -19,8 +19,10 @@ vi.mock("../src/engines/rar5-engine", () => ({
 
 import { decompressWithSystem7z } from "../src/engines/system7z";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
+import * as vscode from "vscode";
 import {
-  assertRar5Modifiable,
+  assertRarModifiable,
+  detectRarVersion,
   archiveJoin,
   rebuildRarArchive,
   copyIntoArchive,
@@ -43,34 +45,43 @@ function extractFixtureTree(outputDir: string): void {
   fs.writeFileSync(path.join(outputDir, "top.txt"), "top");
 }
 
-describe("assertRar5Modifiable", () => {
+describe("assertRarModifiable", () => {
   let dir: string;
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5m-"));
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it("accepts a single-volume RAR5 archive", () => {
-    const p = fakeArchive(dir, "a.rar");
-    expect(() => assertRar5Modifiable(p)).not.toThrow();
-  });
-
-  it("rejects RAR4 archives with a clear message", () => {
-    const p = fakeArchive(dir, "old.rar", RAR4_SIG);
-    expect(() => assertRar5Modifiable(p)).toThrow(/RAR4/);
+  it("accepts single-volume RAR files regardless of version", () => {
+    expect(() => assertRarModifiable(fakeArchive(dir, "a.rar"))).not.toThrow();
+    expect(() => assertRarModifiable(fakeArchive(dir, "old.rar", RAR4_SIG))).not.toThrow();
   });
 
   it("rejects multi-volume archives", () => {
     const p = fakeArchive(dir, "a.part1.rar");
-    expect(() => assertRar5Modifiable(p)).toThrow(/volume|分卷/i);
+    expect(() => assertRarModifiable(p)).toThrow(/volume|分卷/i);
     const r00 = fakeArchive(dir, "a.r00");
-    expect(() => assertRar5Modifiable(r00)).toThrow(/volume|分卷/i);
+    expect(() => assertRarModifiable(r00)).toThrow(/volume|分卷/i);
   });
 
-  it("rejects non-RAR files", () => {
-    const p = path.join(dir, "a.rar");
+  it("rejects non-RAR extensions", () => {
+    expect(() => assertRarModifiable(path.join(dir, "a.zip"))).toThrow();
+  });
+});
+
+describe("detectRarVersion", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5v-"));
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it("sniffs RAR5, RAR4 and unknown signatures", () => {
+    expect(detectRarVersion(fakeArchive(dir, "a.rar"))).toBe("rar5");
+    expect(detectRarVersion(fakeArchive(dir, "old.rar", RAR4_SIG))).toBe("rar4");
+    const p = path.join(dir, "junk.rar");
     fs.writeFileSync(p, "not a rar");
-    expect(() => assertRar5Modifiable(p)).toThrow();
+    expect(detectRarVersion(p)).toBe("unknown");
   });
 });
 
@@ -158,12 +169,26 @@ describe("rebuildRarArchive", () => {
     expect(vi.mocked(compressWithRar5).mock.calls[0][0].password).toBe("secret");
   });
 
-  it("rejects RAR4 archives before touching anything", async () => {
+  it("asks before rebuilding a RAR4 archive (declined → aborts)", async () => {
     const old = fakeArchive(dir, "old.rar", RAR4_SIG);
+    const spy = vi.spyOn(vscode.window, "showWarningMessage").mockResolvedValueOnce(undefined);
     await expect(
       rebuildRarArchive({ archivePath: old, mutate: () => {} }),
     ).rejects.toThrow(/RAR4/);
+    expect(spy).toHaveBeenCalledOnce();
     expect(decompressWithSystem7z).not.toHaveBeenCalled();
+  });
+
+  it("converts a RAR4 archive to RAR5 when confirmed", async () => {
+    const old = fakeArchive(dir, "old.rar", RAR4_SIG);
+    vi.spyOn(vscode.window, "showWarningMessage").mockResolvedValueOnce("Rebuild as RAR5");
+    await rebuildRarArchive({ archivePath: old, mutate: () => {} });
+    expect(decompressWithSystem7z).toHaveBeenCalledWith(
+      expect.objectContaining({ inputPath: old }),
+      undefined,
+      undefined,
+    );
+    expect(vi.mocked(compressWithRar5).mock.calls[0][0].format.label).toBe("rar");
   });
 
   it("rejects an empty extraction", async () => {

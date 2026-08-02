@@ -9,15 +9,17 @@
  * original file.
  *
  * Supported: single-volume RAR5 archives, including password-protected
- * ones (re-encrypted with the same password). RAR4 and multi-volume
- * archives are rejected up front with a clear message instead of an
- * opaque 7-Zip error.
+ * ones (re-encrypted with the same password). RAR4 archives are rebuilt
+ * as RAR5 after an explicit user confirmation; multi-volume archives are
+ * rejected up front with a clear message instead of an opaque 7-Zip
+ * error.
  *
  * @module providers/archive/rar5-modify
  */
 
 import * as fs from "fs";
 import * as path from "path";
+import * as vscode from "vscode";
 import { getFullExt } from "../../constants";
 import { isRarExt, isRarVolume } from "../../utils/rar";
 import { isPathExcluded, type ExclusionSet } from "../../utils/exclude";
@@ -39,11 +41,11 @@ const RAR5_FORMAT: FormatInfo = {
 };
 
 /**
- * Reject archives the rebuild cannot faithfully reproduce. Throws a
- * descriptive error for non-RAR5 / multi-volume input instead of letting
- * the caller hit an opaque 7-Zip `E_NOTIMPL`.
+ * Reject archives the rebuild cannot faithfully reproduce (multi-volume,
+ * non-RAR input). RAR4 is allowed here — it is converted to RAR5 after an
+ * explicit user confirmation in `rebuildRarArchive`.
  */
-export function assertRar5Modifiable(archivePath: string): void {
+export function assertRarModifiable(archivePath: string): void {
   const ext = getFullExt(archivePath);
   if (!isRarExt(ext)) {
     throw new Error(`Not a RAR archive: ${archivePath}`);
@@ -51,16 +53,17 @@ export function assertRar5Modifiable(archivePath: string): void {
   if (isRarVolume(ext) || /\.part\d+\.rar$/i.test(archivePath)) {
     throw new Error(t("rar5.modifyMultivolume"));
   }
+}
 
+/** Sniff the RAR signature: "rar5" | "rar4" | "unknown". */
+export function detectRarVersion(archivePath: string): "rar5" | "rar4" | "unknown" {
   const fd = fs.openSync(archivePath, "r");
   try {
     const head = Buffer.alloc(8);
     const n = fs.readSync(fd, head, 0, 8, 0);
-    if (n >= 8 && head.equals(RAR5_SIGNATURE)) return;
-    if (n >= 7 && head.subarray(0, 7).equals(RAR4_SIGNATURE)) {
-      throw new Error(t("rar5.modifyRar4"));
-    }
-    throw new Error(t("rar5.modifyNotRar"));
+    if (n >= 8 && head.equals(RAR5_SIGNATURE)) return "rar5";
+    if (n >= 7 && head.subarray(0, 7).equals(RAR4_SIGNATURE)) return "rar4";
+    return "unknown";
   } finally {
     fs.closeSync(fd);
   }
@@ -125,7 +128,24 @@ export interface RebuildRarOptions {
  */
 export async function rebuildRarArchive(options: RebuildRarOptions): Promise<void> {
   const { archivePath, password = "", mutate, progress, token } = options;
-  assertRar5Modifiable(archivePath);
+  assertRarModifiable(archivePath);
+
+  const version = detectRarVersion(archivePath);
+  if (version === "rar4") {
+    // RAR4 cannot be created by the rar5 engine — converting it to RAR5
+    // is a format change, so ask the user first.
+    const confirm = await vscode.window.showWarningMessage(
+      t("rar5.modifyRar4Prompt"),
+      { modal: true },
+      t("rar5.modifyRar4Confirm"),
+    );
+    if (confirm !== t("rar5.modifyRar4Confirm")) {
+      throw new Error(t("rar5.modifyRar4"));
+    }
+    logger.info({ event: "rar5.rebuild.rar4Convert", archivePath });
+  } else if (version !== "rar5") {
+    throw new Error(t("rar5.modifyNotRar"));
+  }
 
   const prog = progress ?? { report: () => {} };
   const archiveDir = path.dirname(path.resolve(archivePath));
