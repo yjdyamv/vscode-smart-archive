@@ -70,16 +70,16 @@ async function resolveVersion() {
 // release, then regenerate here:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "db7ba3bb67d0f3c243a381aca085fd22488e3ae03d21269b19a8fae91826d255",
-  "linux-x64-musl": "266f77b1184337cd70606ebaf51fbdc967e6a7559f68b9a8da76850571bb20dd",
-  "linux-arm64-gnu": "b2b2e19f5d223734e0cbfaf67a26359c5978e22cf5a7254602dcf8f7d97eb02d",
-  "linux-arm64-musl": "e3c0d2bd2982971dcd02a813ba226470f0903b5e734e28115870a321492ba3ea",
-  "linux-arm-gnueabihf": "5c6fc245345349dee92bbdf78112c79ab63d4648b3aaea80acb41f9e4541177d",
-  "darwin-x64": "a20ff9cd9081e4382f428e3e674d7553cec215efcc8de5f30d05fa556911d864",
-  "darwin-arm64": "7cfd668eec72b63b8fc80c464616ff319f02c454e223c0bef633d825591cbc73",
-  "win32-x64-msvc": "004b3dabdc60f26b8d91d8dd44d5d3b245449677ad79fafda7788c762180558c",
-  "win32-ia32-msvc": "2f709dbdb59b9f368c5bf898d46ddb49f83e0e52f1d42a287b4bc970e3cd09ef",
-  "win32-arm64-msvc": "b4f5b9bae704d72df77c70663f4b831eb202f86a36c20af9ed6a57dc34b1bd01",
+  "linux-x64-gnu": "e2f1fe0b525a34da0aa02cd67bd4fa77fa4fe7100cfda5393729b519c58ba82f",
+  "linux-x64-musl": "05f36518f91853a15bab542bd5489891488b697befed17f7487cb87834ca9927",
+  "linux-arm64-gnu": "b4d7dd223cc0943024299e024fd7b419b996242118fd2ccbdf0b4bd2fa9f8d0b",
+  "linux-arm64-musl": "050119be093de881a333533016b1affbe25780e31e9a2b107151e3fa7abc8ef9",
+  "linux-arm-gnueabihf": "4447b1915bb695e224fd0bcec68f45ad5ee3394baec8b11a58eaee239cfb9b65",
+  "darwin-x64": "1377635d2074d639c98dbc78716e83686b750f87bc420968ac7afb350b5cf21b",
+  "darwin-arm64": "e742e2bc0a641280075524427bec4e6dcc33d3485d3e9f9e695e3b3c7a45c6df",
+  "win32-x64-msvc": "0b14ecfbc57757ef142db615fde3c3babcc7c223d9c2121a3ff69cf98bae5257",
+  "win32-ia32-msvc": "34653c8263c8263430b6e560352f24bf20311c7c3f729db38701071ea4135f2b",
+  "win32-arm64-msvc": "8b7c587ef6e142c02f07d613c79d2c554711483c72a29064ff72186b6e9777dc",
 };
 
 // <platform>/<arch> -> napi-rs triples
@@ -226,8 +226,7 @@ async function main() {
   // (with a documented fallback only when the API is unreachable).
   const version = await resolveVersion();
   releaseBase =
-    process.env.SA_RAR5_RELEASE_BASE ||
-    `https://github.com/${REPO}/releases/download/v${version}`;
+    process.env.SA_RAR5_RELEASE_BASE || `https://github.com/${REPO}/releases/download/v${version}`;
   console.log(`rar5: resolving bindings from ${releaseBase}`);
 
   if (process.env.SA_RAR5_REQUIRE === "1") {
