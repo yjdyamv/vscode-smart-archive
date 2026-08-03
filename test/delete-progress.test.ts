@@ -22,7 +22,7 @@ function makeArchive(name: string, sizeMb = 64): string {
   // Random data: LZMA2 at mx9 takes real time to (re)compress, so the
   // 7z stderr progress parser has something to emit.
   const chunk = Buffer.alloc(sizeMb * 1024 * 1024);
-  for (let i = 0; i < chunk.length; i += 4096) {
+  for (let i = 0; i < chunk.length; i += 4) {
     chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
   }
   fs.writeFileSync(a, chunk);

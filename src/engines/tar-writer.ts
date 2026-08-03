@@ -12,7 +12,7 @@ import * as path from "path";
 import { prepareExclusions, isPathExcluded } from "../utils/exclude";
 import { TAR_IO_BUFFER } from "../constants";
 import { CancelledError } from "../utils/cancellation";
-import type { TokenLike } from "../utils/cancellation";
+import type { TokenLike, ProgressLike } from "../utils/cancellation";
 
 const BLOCK = 512;
 
@@ -129,11 +129,52 @@ function needsLongLink(name: string): boolean {
   return Buffer.byteLength(name.slice(lastSlash + 1)) > 100;
 }
 
+/**
+ * Pre-walk the inputs to estimate the tar's total on-disk byte size.
+ * Mirrors the writer's semantics closely enough for progress estimation:
+ * top-level entries are stat'd with symlink following (like the writer),
+ * inner entries exclude symlinks (the writer skips them) and honour the
+ * exclusion patterns.
+ */
+function computeTotalBytes(
+  localPaths: readonly string[],
+  exclusions: ReturnType<typeof prepareExclusions>,
+  token?: TokenLike,
+): number {
+  const rootDir = path.dirname(localPaths[0]);
+  let total = 0;
+  for (const loc of localPaths) {
+    if (token?.isCancellationRequested) throw new CancelledError();
+    const st = fs.statSync(loc);
+    if (!st.isDirectory()) {
+      total += st.size;
+      continue;
+    }
+    const stack = [loc];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const entries = fs.readdirSync(current, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(current, e.name);
+        const rel = path.relative(rootDir, full).replace(/\\/g, "/");
+        if (isPathExcluded(rel, exclusions)) continue;
+        if (e.isDirectory()) {
+          stack.push(full);
+        } else if (e.isFile()) {
+          total += fs.statSync(full).size;
+        }
+      }
+    }
+  }
+  return total;
+}
+
 export async function createTarFile(
   outputPath: string,
   localPaths: readonly string[],
   token?: TokenLike,
   excludePatterns: string[] = [],
+  progress?: ProgressLike,
 ): Promise<void> {
   if (localPaths.length === 0) {
     throw new Error("No files to add to TAR archive");
@@ -144,6 +185,18 @@ export async function createTarFile(
   const fd = fs.openSync(outputPath, "w");
 
   const exclusions = prepareExclusions(excludePatterns);
+  const totalBytes = progress ? computeTotalBytes(localPaths, exclusions, token) : 0;
+  let written = 0;
+  let lastPct = 0;
+
+  const reportProgress = () => {
+    if (!progress || totalBytes <= 0) return;
+    const pct = Math.min(99, Math.floor((written / totalBytes) * 100));
+    if (pct > lastPct && pct > 0) {
+      progress.report({ message: `${pct}%`, increment: pct - lastPct });
+      lastPct = pct;
+    }
+  };
 
   try {
     const rootDir = path.dirname(localPaths[0]);
@@ -182,12 +235,14 @@ export async function createTarFile(
             try {
               const buf = Buffer.alloc(TAR_IO_BUFFER);
               let bytesRead: number;
-              let written = 0;
+              let fileWritten = 0;
               while ((bytesRead = fs.readSync(rfd, buf, 0, buf.length, null)) > 0) {
                 fs.writeSync(fd, buf, 0, bytesRead);
+                fileWritten += bytesRead;
                 written += bytesRead;
+                reportProgress();
               }
-              const pad = padSize(written) - written;
+              const pad = padSize(fileWritten) - fileWritten;
               if (pad > 0) fs.writeSync(fd, Buffer.alloc(pad));
             } finally {
               fs.closeSync(rfd);
@@ -201,12 +256,14 @@ export async function createTarFile(
         try {
           const buf = Buffer.alloc(TAR_IO_BUFFER);
           let bytesRead: number;
-          let written = 0;
+          let fileWritten = 0;
           while ((bytesRead = fs.readSync(rfd, buf, 0, buf.length, null)) > 0) {
             fs.writeSync(fd, buf, 0, bytesRead);
+            fileWritten += bytesRead;
             written += bytesRead;
+            reportProgress();
           }
-          const pad = padSize(written) - written;
+          const pad = padSize(fileWritten) - fileWritten;
           if (pad > 0) fs.writeSync(fd, Buffer.alloc(pad));
         } finally {
           fs.closeSync(rfd);

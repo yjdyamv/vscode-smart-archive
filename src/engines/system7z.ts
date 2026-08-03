@@ -31,6 +31,7 @@ import { logger } from "../utils/logger";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
+import { scaleProgress } from "../utils/progress-scale";
 import { getBaseName } from "../utils/path";
 import {
   BINARY_DETECT_TIMEOUT,
@@ -624,6 +625,7 @@ export async function compressWithSystem7z(
         options.targets.map((tg) => tg.fsPath),
         token,
         excludePatterns ?? [],
+        progress ? scaleProgress(progress, 0, 50) : undefined,
       );
 
       // Step 2: compress the tar
@@ -632,13 +634,29 @@ export async function compressWithSystem7z(
         validatePassword(options.password);
         compressArgs.splice(1, 0, `-p${options.password}`);
       }
+      // 7-Zip only prints live percentages when stderr is a console; when
+      // piped it silently buffers the archive and writes it at the end.
+      // -bsp1 forces the progress stream onto stdout so it stays parseable.
+      if (progress) compressArgs.splice(1, 0, "-bsp1");
       logger.info({
         event: "system7z.compress.wrap",
         output: options.outputPath,
         argsPreview: compressArgs.filter((a) => !a.startsWith("-p")).join(" "),
       });
       prog.report({ message: t("compress.compressingTar", typeFlag) });
-      await run7z(sz, compressArgs, progress, token);
+      await run7z(
+        sz,
+        compressArgs,
+        progress ? scaleProgress(progress, 50, 100) : undefined,
+        token,
+        undefined,
+        progress
+          ? {
+              outputPath: options.outputPath,
+              totalInputBytes: fs.statSync(tarPath).size,
+            }
+          : undefined,
+      );
     } finally {
       try {
         fs.unlinkSync(tarPath);
@@ -656,6 +674,9 @@ export async function compressWithSystem7z(
 
   // Non-wrapped: one-step with all flags
   const args: string[] = ["a", `-t${typeFlag}`, `-mx${options.level}`, "-mmt=on"];
+  // Force progress to stdout (see wrapped path above) so the percentage
+  // parser works even when the archive is buffered until the end.
+  if (progress) args.push("-bsp1");
 
   if (options.password) {
     validatePassword(options.password);
@@ -698,7 +719,19 @@ export async function compressWithSystem7z(
   prog.report({ message: t("compress.inProgress") });
 
   try {
-    await run7z(sz, args, progress, token);
+    const monitorOutput = progress
+      ? {
+          outputPath: options.outputPath,
+          totalInputBytes: sumTargetBytes(targets),
+        }
+      : undefined;
+    logger.info({
+      event: "system7z.compress.monitor",
+      progress: !!progress,
+      outputPath: options.outputPath,
+      totalInputBytes: monitorOutput?.totalInputBytes,
+    });
+    await run7z(sz, args, progress, token, undefined, monitorOutput);
   } catch (err) {
     logger.error({ event: "system7z.compress.failed", err }, "System 7z compression failed");
     throw err;
@@ -1126,17 +1159,112 @@ export function spawnCapture(
  *   8   - not enough memory
  *   255 - user stopped the process
  */
+const SIZE_MONITOR_INTERVAL_MS = 200;
+
+/**
+ * Sum the on-disk bytes of compress targets (files + directory trees).
+ * Used as the denominator for file-size-based progress estimation.
+ * Symlinks are followed via statSync; unreadable entries are skipped.
+ */
+function sumTargetBytes(targets: readonly { fsPath: string }[]): number {
+  let total = 0;
+  const stack = [...targets];
+  while (stack.length > 0) {
+    const p = stack.pop()!.fsPath;
+    try {
+      const st = fs.statSync(p);
+      if (st.isDirectory()) {
+        for (const e of fs.readdirSync(p)) stack.push({ fsPath: path.join(p, e) });
+      } else {
+        total += st.size;
+      }
+    } catch {
+      // best effort — an unreadable entry just skews the estimate
+    }
+  }
+  return total;
+}
+
+/**
+ * Progress fallback for `7z a`: modern 7-Zip (>= 22) suppresses live
+ * percentage output when stderr is not a console, so stderr parsing alone
+ * never yields progress. Monitor the output archive's growth on disk
+ * instead. Takes effect only until a real `%` from stderr arrives.
+ */
+function startSizeMonitor(
+  outputPath: string,
+  totalInputBytes: number,
+  prog: ProgressLike,
+  isSettled: () => boolean,
+  sawRealPct: () => boolean,
+): ReturnType<typeof setInterval> | null {
+  if (totalInputBytes <= 0) {
+    logger.info({
+      event: "system7z.sizeMonitor.skip",
+      reason: "totalInputBytes<=0",
+      outputPath,
+      totalInputBytes,
+    });
+    return null;
+  }
+  logger.info({
+    event: "system7z.sizeMonitor.start",
+    outputPath,
+    totalInputBytes,
+  });
+  let lastPct = 0;
+  return setInterval(() => {
+    if (isSettled() || sawRealPct()) return;
+    let bytes = 0;
+    try {
+      // Non-volume: the archive itself. Volume mode (-v): the base file is
+      // never created; 7-Zip writes <base>.NNN for completed volumes and
+      // keeps the volume currently being written as <base>.NNN.tmp (the
+      // first volume stays .001.tmp until the whole set is finished).
+      // Scan both so a stale/empty base file can never block progress.
+      try {
+        const st = fs.statSync(outputPath);
+        if (st.isFile()) bytes += st.size;
+      } catch {
+        // no base archive in volume mode
+      }
+      const dir = path.dirname(outputPath);
+      const prefix = `${path.basename(outputPath)}.`;
+      const volumeSuffixRe = /^\d{3}(\.tmp)?$/;
+      for (const name of fs.readdirSync(dir)) {
+        if (!name.startsWith(prefix)) continue;
+        const suffix = name.slice(prefix.length);
+        if (!volumeSuffixRe.test(suffix)) continue;
+        const vol = fs.statSync(path.join(dir, name));
+        if (vol.isFile()) bytes += vol.size;
+      }
+    } catch {
+      return;
+    }
+    if (bytes <= 0) return;
+    const pct = Math.min(99, Math.floor((bytes / totalInputBytes) * 100));
+    if (pct !== lastPct && pct > 0) {
+      const delta = pct - lastPct;
+      lastPct = pct;
+      logger.info({ event: "system7z.sizeMonitor.pct", bytes, pct });
+      prog.report({ message: `${pct}%`, increment: delta });
+    }
+  }, SIZE_MONITOR_INTERVAL_MS);
+}
+
 function run7z(
   binary: string,
   args: string[],
   progress?: ProgressLike,
   token?: TokenLike,
   cwd?: string,
+  monitorOutput?: { outputPath: string; totalInputBytes: number },
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
   return new Promise<void>((resolve, reject) => {
     const combinedChunks: Buffer[] = [];
     let lastPct = -1;
+    let sawRealPct = false;
     const startTime = Date.now();
     let settled = false;
 
@@ -1158,6 +1286,7 @@ function run7z(
     const timeoutTimer = setTimeout(() => {
       if (!settled) {
         settled = true;
+        stopSizeMonitor();
         proc.kill("SIGTERM");
         if (process.platform === "win32" && proc.pid) {
           try {
@@ -1183,16 +1312,52 @@ function run7z(
       }
     });
 
+    const sizeTimer = monitorOutput && progress
+      ? startSizeMonitor(
+          monitorOutput.outputPath,
+          monitorOutput.totalInputBytes,
+          prog,
+          () => settled,
+          () => sawRealPct,
+        )
+      : null;
+    logger.info({
+      event: "system7z.run.monitor",
+      started: !!sizeTimer,
+      monitorOutput: !!monitorOutput,
+      hasProgress: !!progress,
+    });
+    const stopSizeMonitor = () => {
+      if (sizeTimer) clearInterval(sizeTimer);
+    };
+
     proc.stdout?.on("data", (d: Buffer) => {
       combinedChunks.push(d);
       runBytes += d.length;
       if (runBytes > MAX_RUN_BYTES) {
         proc.kill();
         settled = true;
+        stopSizeMonitor();
         clearTimeout(timeoutTimer);
         cancelSub?.dispose();
         reject(new Error("7z output exceeded 500 MB limit"));
         return;
+      }
+
+      // With -bsp1 (compress) progress is streamed to stdout as
+      // " 45% 12 - file.txt" with backspace overprints; parse it exactly
+      // like stderr so the bar advances on 7-Zip versions that suppress
+      // console output when piped.
+      const text = decodeBuffer(d);
+      const m = text.match(/(\d{1,3})%/);
+      if (m) {
+        const pct = parseInt(m[1], 10);
+        if (pct !== lastPct && pct > 0) {
+          const delta = pct - (lastPct < 0 ? 0 : lastPct);
+          lastPct = pct;
+          sawRealPct = true;
+          prog.report({ message: `${pct}%`, increment: delta });
+        }
       }
     });
 
@@ -1203,6 +1368,7 @@ function run7z(
       if (runBytes > MAX_RUN_BYTES) {
         proc.kill();
         settled = true;
+        stopSizeMonitor();
         clearTimeout(timeoutTimer);
         cancelSub?.dispose();
         reject(new Error("7z output exceeded 500 MB limit"));
@@ -1210,12 +1376,16 @@ function run7z(
       }
 
       // Parse progress: 7z outputs lines like " 45% 12 - file.txt" to stderr
+      // Report the increment (like the WASM engine path) so VS Code renders
+      // a determinate progress bar instead of an indeterminate spinner.
       const m = text.match(/(\d{1,3})%/);
       if (m) {
         const pct = parseInt(m[1], 10);
-        if (pct !== lastPct) {
+        if (pct !== lastPct && pct > 0) {
+          const delta = pct - (lastPct < 0 ? 0 : lastPct);
           lastPct = pct;
-          prog.report({ message: `${pct}%` });
+          sawRealPct = true;
+          prog.report({ message: `${pct}%`, increment: delta });
         }
       }
     });
@@ -1223,6 +1393,7 @@ function run7z(
     proc.on("error", (err) => {
       if (settled) return;
       settled = true;
+      stopSizeMonitor();
       clearTimeout(timeoutTimer);
       cancelSub?.dispose();
       const elapsed = Date.now() - startTime;
@@ -1243,6 +1414,7 @@ function run7z(
     proc.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
+      stopSizeMonitor();
       clearTimeout(timeoutTimer);
       cancelSub?.dispose();
       const elapsed = Date.now() - startTime;

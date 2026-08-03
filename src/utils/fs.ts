@@ -64,19 +64,59 @@ export function copyDirToFS(
   localDir: string,
   fsDir: string,
   token?: TokenLike,
-): void {
+  onProgress?: (cumulativeBytes: number) => void,
+  offsetBytes = 0,
+): number {
   const entries = fs.readdirSync(localDir, { withFileTypes: true });
+  let copied = 0;
+  let offset = offsetBytes;
   for (const entry of entries) {
     if (token?.isCancellationRequested) throw new CancelledError();
     const localEntry = path.join(localDir, entry.name);
     const fsEntry = `${fsDir}/${entry.name}`;
     if (entry.isDirectory()) {
       js7z.FS.mkdir(fsEntry);
-      copyDirToFS(js7z, localEntry, fsEntry, token);
+      const sub = copyDirToFS(js7z, localEntry, fsEntry, token, onProgress, offset);
+      copied += sub;
+      offset += sub;
     } else {
-      streamToVFS(js7z, localEntry, fsEntry);
+      const size = fs.statSync(localEntry).size;
+      streamToVFS(js7z, localEntry, fsEntry, onProgress, offset);
+      copied += size;
+      offset += size;
     }
   }
+  return copied;
+}
+
+/**
+ * Sum the on-disk bytes of a set of local paths (files + directory trees),
+ * matching the traversal of copyDirToFS/streamToVFS closely enough for
+ * progress estimation. Symlinked files are counted via their target size.
+ */
+export function sumTreeBytes(localPaths: readonly string[]): number {
+  let total = 0;
+  for (const localPath of localPaths) {
+    const st = fs.statSync(localPath);
+    if (!st.isDirectory()) {
+      total += st.size;
+      continue;
+    }
+    const stack = [localPath];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const entries = fs.readdirSync(current, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(current, e.name);
+        if (e.isDirectory()) {
+          stack.push(full);
+        } else {
+          total += fs.statSync(full).size;
+        }
+      }
+    }
+  }
+  return total;
 }
 
 export const MAX_DIR_DEPTH = 100;
