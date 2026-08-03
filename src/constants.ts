@@ -296,15 +296,44 @@ export const FORMAT_TABLE: FormatMeta[] = [
 /** All extensions that the extension can read/extract */
 export const DECOMPRESS_EXTENSIONS: readonly string[] = FORMAT_TABLE.flatMap((f) => f.exts);
 
+/** Compression wizard display order — most commonly used formats first. */
+const COMPRESS_FORMAT_ORDER: readonly string[] = [
+  "7z",
+  "zip",
+  "rar",
+  "tar.zst",
+  "tar.gz",
+  "tar.xz",
+  "tar",
+  "gz",
+  "xz",
+  "bz2",
+  "tar.bz2",
+  "tar.lz4",
+  "tar.br",
+  "tar.sz",
+  "tar.lz",
+  "tar.lzma",
+  "wim",
+];
+
 /** Formats available for compression (canCreate === true) */
-export const COMPRESS_FORMATS: FormatInfo[] = FORMAT_TABLE.filter((f) => f.canCreate).map(
-  (f): FormatInfo => ({
-    label: f.label,
-    description: f.description,
-    canCreate: f.canCreate,
-    supportsEncryption: f.supportsEncryption,
-  }),
-);
+export const COMPRESS_FORMATS: FormatInfo[] = FORMAT_TABLE.filter((f) => f.canCreate)
+  .map(
+    (f): FormatInfo => ({
+      label: f.label,
+      description: f.description,
+      canCreate: f.canCreate,
+      supportsEncryption: f.supportsEncryption,
+    }),
+  )
+  .sort((a, b) => {
+    const ia = COMPRESS_FORMAT_ORDER.indexOf(a.label);
+    const ib = COMPRESS_FORMAT_ORDER.indexOf(b.label);
+    return (
+      (ia < 0 ? COMPRESS_FORMAT_ORDER.length : ia) - (ib < 0 ? COMPRESS_FORMAT_ORDER.length : ib)
+    );
+  });
 
 /** Regex for RAR-family extensions (including multi-volume .r00–.r99) */
 export { isRarExt } from "./utils/rar";
