@@ -17,7 +17,7 @@ import { RUN7Z_TIMEOUT, MEMORY_CHECK_EVERY_PRINT } from "../constants";
 import { logger } from "../utils/logger-core";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
-import { streamToVFS } from "./vfs-io";
+import { copyToVFS } from "./vfs-io";
 import { checkWorkerMemory } from "./worker/memory-guard";
 
 // Canonical cleanup re-exported from the pool module for convenience
@@ -30,8 +30,10 @@ function copyInputsToFS(
   js7z: JS7zInstance,
   localPaths: readonly string[],
   token?: TokenLike,
+  onProgress?: (cumulativeBytes: number) => void,
 ): string[] {
   const fsPaths: string[] = [];
+  let offset = 0;
   for (const localPath of localPaths) {
     if (token?.isCancellationRequested) throw new CancelledError();
     const name = getBaseName(localPath);
@@ -40,9 +42,9 @@ function copyInputsToFS(
 
     if (stat.isDirectory()) {
       js7z.FS.mkdir(fsTarget);
-      copyDirToFS(js7z, localPath, fsTarget, token);
+      offset += copyDirToFS(js7z, localPath, fsTarget, token, onProgress, offset);
     } else {
-      streamToVFS(js7z, localPath, fsTarget);
+      offset += copyToVFS(js7z, localPath, fsTarget, onProgress, offset);
     }
     fsPaths.push(fsTarget);
   }
@@ -53,45 +55,91 @@ function sanitizeArgs(args: string[]): string[] {
   return args.map((a) => (/^-p.+/.test(a) ? "-p***" : a));
 }
 
+/**
+ * Construction-time stdout bridge for the WASM 7z engine.
+ *
+ * Emscripten binds `Module.print` to its internal `out` variable once at
+ * module init, so overriding `js7z.print` after `JS7z()` has no effect.
+ * Pass these handlers into `JS7z({ print, printErr })` instead, and let
+ * `run7z` point `bridge.progress` at the active reporter while running.
+ */
+export interface PrintBridge {
+  progress?: ProgressLike;
+  print: (text: string) => void;
+  printErr: (text: string) => void;
+}
+
+export function createPrintBridge(): PrintBridge {
+  let lastPct = -1;
+  let printCount = 0;
+  const bridge: PrintBridge = {
+    print(text) {
+      if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
+      if (!bridge.progress) return;
+      const m = text.match(/(\d{1,3})%/);
+      if (m) {
+        const pct = parseInt(m[1], 10);
+        if (pct !== lastPct && pct > 0) {
+          const delta = pct - (lastPct < 0 ? 0 : lastPct);
+          lastPct = pct;
+          bridge.progress.report({ message: `${pct}%`, increment: delta });
+        }
+      }
+    },
+    printErr() {},
+  };
+  return bridge;
+}
+
 function run7z(
   js7z: JS7zInstance,
   args: string[],
   progress?: ProgressLike,
   onStdout?: (text: string) => void,
   timeoutMs = RUN7Z_TIMEOUT,
+  printBridge?: PrintBridge,
 ): Promise<void> {
   logger.info({ event: "run7z.enter", args: sanitizeArgs(args) });
+  if (printBridge) printBridge.progress = progress;
   const prevPrint = js7z.print;
   const prevPrintErr = js7z.printErr;
   let stderr = "";
   let lastPct = -1;
   let printCount = 0;
-  js7z.print = (text: string) => {
-    if (onStdout) onStdout(text);
-    // RSS guard: check every ~10th print tick (7z prints steadily while
-    // working). Throws synchronously — caught by the callMain try/catch.
-    if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
-    const m = text.match(/(\d{1,3})%/);
-    if (m && progress) {
-      const pct = parseInt(m[1], 10);
-      if (pct !== lastPct && pct > 0) {
-        const delta = pct - (lastPct < 0 ? 0 : lastPct);
-        lastPct = pct;
-        progress.report({ message: `${pct}%`, increment: delta });
+  if (!printBridge) {
+    js7z.print = (text: string) => {
+      if (onStdout) onStdout(text);
+      // RSS guard: check every ~10th print tick (7z prints steadily while
+      // working). Throws synchronously — caught by the callMain try/catch.
+      if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
+      const m = text.match(/(\d{1,3})%/);
+      if (m && progress) {
+        const pct = parseInt(m[1], 10);
+        if (pct !== lastPct && pct > 0) {
+          const delta = pct - (lastPct < 0 ? 0 : lastPct);
+          lastPct = pct;
+          progress.report({ message: `${pct}%`, increment: delta });
+        }
       }
-    }
-  };
-  js7z.printErr = (text: string) => {
-    stderr += text + "\n";
-  };
+    };
+    js7z.printErr = (text: string) => {
+      stderr += text + "\n";
+    };
+  }
 
   return new Promise<void>((resolve, reject) => {
     let settled = false;
+    const cleanup = () => {
+      if (printBridge) printBridge.progress = undefined;
+      if (!printBridge) {
+        js7z.print = prevPrint;
+        js7z.printErr = prevPrintErr;
+      }
+    };
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
-        js7z.print = prevPrint;
-        js7z.printErr = prevPrintErr;
+        cleanup();
         logger.warn({ event: "run7z.timeout", timeoutMs }, "WASM 7z operation timed out");
         reject(new Error(`7z operation timed out after ${Math.round(timeoutMs / 1000)}s`));
       }
@@ -101,8 +149,7 @@ function run7z(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      js7z.print = prevPrint;
-      js7z.printErr = prevPrintErr;
+      cleanup();
       logger.info({ event: "run7z.exit", exitCode });
       if (exitCode === 0) {
         resolve();

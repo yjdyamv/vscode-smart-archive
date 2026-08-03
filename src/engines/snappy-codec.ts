@@ -1,5 +1,6 @@
 import { logger } from "../utils/logger-core";
 import { checkFileSize, checkTotalSize } from "../utils/security";
+import type { ProgressLike } from "../utils/cancellation";
 import * as fs from "fs";
 import { CODEC_CHUNK } from "../constants";
 import { isMusl } from "../utils/platform";
@@ -41,10 +42,13 @@ export async function snappyCompressFile(
   input: string,
   output: string,
   _level: number,
+  progress?: ProgressLike,
 ): Promise<void> {
   const CHUNK = CODEC_CHUNK;
   const rfd = fs.openSync(input, "r");
   const out = fs.openSync(output, "w");
+  const total = fs.fstatSync(rfd).size;
+  let lastPct = 0;
   try {
     const buf = Buffer.alloc(CHUNK);
     let pos = 0;
@@ -57,6 +61,13 @@ export async function snappyCompressFile(
       fs.writeSync(out, lenBuf);
       fs.writeSync(out, frame);
       pos += n;
+      if (progress && total > 0) {
+        const pct = Math.min(99, Math.floor((pos / total) * 100));
+        if (pct > lastPct && pct > 0) {
+          progress.report({ message: `${pct}%`, increment: pct - lastPct });
+          lastPct = pct;
+        }
+      }
     }
     logger.info({ event: "snappy.compress.ok", input, output });
   } finally {

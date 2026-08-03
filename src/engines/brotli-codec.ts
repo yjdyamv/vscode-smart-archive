@@ -11,8 +11,10 @@
 
 import { logger } from "../utils/logger-core";
 import { checkFileSize, checkTotalSize } from "../utils/security";
+import type { ProgressLike } from "../utils/cancellation";
 import * as zlib from "node:zlib";
 import * as fs from "fs";
+import { PassThrough } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { CODEC_CHUNK } from "../constants";
 
@@ -83,14 +85,36 @@ export async function brotliCompressFile(
   input: string,
   output: string,
   level: number,
+  progress?: ProgressLike,
 ): Promise<void> {
   const params = makeCompressParams(level);
+  const total = fs.statSync(input).size;
   try {
-    await pipeline(
-      fs.createReadStream(input, { highWaterMark: CODEC_CHUNK }),
-      zlib.createBrotliCompress(params),
-      fs.createWriteStream(output),
-    );
+    if (progress && total > 0) {
+      const counter = new PassThrough();
+      let bytes = 0;
+      let lastPct = 0;
+      counter.on("data", (chunk: Buffer) => {
+        bytes += chunk.length;
+        const pct = Math.min(99, Math.floor((bytes / total) * 100));
+        if (pct > lastPct && pct > 0) {
+          progress.report({ message: `${pct}%`, increment: pct - lastPct });
+          lastPct = pct;
+        }
+      });
+      await pipeline(
+        fs.createReadStream(input, { highWaterMark: CODEC_CHUNK }),
+        counter,
+        zlib.createBrotliCompress(params),
+        fs.createWriteStream(output),
+      );
+    } else {
+      await pipeline(
+        fs.createReadStream(input, { highWaterMark: CODEC_CHUNK }),
+        zlib.createBrotliCompress(params),
+        fs.createWriteStream(output),
+      );
+    }
     logger.info({ event: "brotli.compress.ok", input, output, level });
   } catch (err) {
     cleanup(output);

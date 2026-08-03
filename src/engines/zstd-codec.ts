@@ -13,6 +13,7 @@
 
 import { logger } from "../utils/logger-core";
 import { checkFileSize } from "../utils/security";
+import type { ProgressLike } from "../utils/cancellation";
 import { t } from "../i18n";
 import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
@@ -124,7 +125,48 @@ function resolveSystemZstd(): string | null {
   return sysZstdPath || null;
 }
 
-export function zstdCompressFile(input: string, output: string, level: number): Promise<void> {
+/**
+ * Progress fallback for the system zstd CLI: like 7-Zip, zstd only prints
+ * live progress on a console; when stderr is piped its "Read: X / Y" line
+ * is emitted once at the end. Monitor the output file's growth instead.
+ */
+function monitorOutputGrowth(
+  inputPath: string,
+  outputPath: string,
+  prog: ProgressLike,
+  isSettled: () => boolean,
+): ReturnType<typeof setInterval> | null {
+  let total = 0;
+  try {
+    total = fs.statSync(inputPath).size;
+  } catch {
+    return null;
+  }
+  if (total <= 0) return null;
+  let lastPct = 0;
+  return setInterval(() => {
+    if (isSettled()) return;
+    let bytes = 0;
+    try {
+      bytes = fs.statSync(outputPath).size;
+    } catch {
+      return;
+    }
+    if (bytes <= 0) return;
+    const pct = Math.min(99, Math.floor((bytes / total) * 100));
+    if (pct > lastPct && pct > 0) {
+      prog.report({ message: `${pct}%`, increment: pct - lastPct });
+      lastPct = pct;
+    }
+  }, 200);
+}
+
+export function zstdCompressFile(
+  input: string,
+  output: string,
+  level: number,
+  progress?: ProgressLike,
+): Promise<void> {
   const zstdPath = resolveSystemZstd();
   if (zstdPath) {
     logger.info({ event: "zstd.compress.system", path: zstdPath });
@@ -134,6 +176,10 @@ export function zstdCompressFile(input: string, output: string, level: number): 
         timeout: 120_000,
       });
 
+      const sizeTimer = progress
+        ? monitorOutputGrowth(input, output, progress, () => settled)
+        : null;
+
       const stderrChunks: Buffer[] = [];
       proc.stderr?.on("data", (d: Buffer) => {
         stderrChunks.push(d);
@@ -142,6 +188,7 @@ export function zstdCompressFile(input: string, output: string, level: number): 
       proc.on("close", (code) => {
         if (settled) return;
         settled = true;
+        if (sizeTimer) clearInterval(sizeTimer);
         if (code === 0) {
           logger.info({ event: "zstd.compress.system.ok", input, output, level });
           resolve();
@@ -161,12 +208,14 @@ export function zstdCompressFile(input: string, output: string, level: number): 
 
       proc.on("error", () => {
         if (settled) return;
+        settled = true;
+        if (sizeTimer) clearInterval(sizeTimer);
         cleanup(output);
         logger.warn(
           { event: "zstd.system.failed", path: zstdPath },
           "System zstd failed, falling back to native",
         );
-        nativeCompressFile(input, output, level).then(
+        nativeCompressFile(input, output, level, progress).then(
           () => {
             settled = true;
             resolve();
@@ -181,14 +230,21 @@ export function zstdCompressFile(input: string, output: string, level: number): 
   }
 
   logger.info({ event: "zstd.compress.native" });
-  return nativeCompressFile(input, output, level);
+  return nativeCompressFile(input, output, level, progress);
 }
 
-function nativeCompressFile(input: string, output: string, level: number): Promise<void> {
+function nativeCompressFile(
+  input: string,
+  output: string,
+  level: number,
+  progress?: ProgressLike,
+): Promise<void> {
   return Promise.resolve().then(() => {
     const CHUNK = CODEC_CHUNK;
     const rfd = fs.openSync(input, "r");
     const out = fs.openSync(output, "w");
+    const total = fs.fstatSync(rfd).size;
+    let lastPct = 0;
     try {
       const native = requireZstdNative();
       const buf = Buffer.alloc(CHUNK);
@@ -200,6 +256,13 @@ function nativeCompressFile(input: string, output: string, level: number): Promi
         const frame = native.compress(Buffer.from(buf.slice(0, n)), { compressionLevel: zlevel });
         fs.writeSync(out, frame);
         pos += n;
+        if (progress && total > 0) {
+          const pct = Math.min(99, Math.floor((pos / total) * 100));
+          if (pct > lastPct && pct > 0) {
+            progress.report({ message: `${pct}%`, increment: pct - lastPct });
+            lastPct = pct;
+          }
+        }
       }
       logger.info({ event: "zstd.compress.native.ok", input, output, level });
     } catch (err) {

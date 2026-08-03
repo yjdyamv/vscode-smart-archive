@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import { compressWithSystem7z } from "../src/engines/system7z";
 
 const { spawnSync } = require("child_process") as {
   spawnSync: (cmd: string, args: string[], opts?: Record<string, unknown>) => {
@@ -222,6 +223,73 @@ describe("system 7-Zip", () => {
     expect(fs.existsSync(outSrc)).toBe(true);
     expect(fs.existsSync(outReadme)).toBe(true);
     expect(fs.readFileSync(outSrc, "utf-8")).toBe("hello world");
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  itOrSkip("reports determinate progress (message + increment) while compressing", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_prog_"));
+    const src = path.join(tmpDir, "data.bin");
+    // Random data: incompressible, so LZMA2 takes long enough for the
+    // size-based progress fallback to emit multiple percentage updates.
+    const chunk = Buffer.alloc(64 * 1024 * 1024);
+    for (let i = 0; i < chunk.length; i += 4) {
+      chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
+    }
+    fs.writeFileSync(src, chunk);
+    const archive = path.join(tmpDir, "progress.7z");
+
+    const reports: { message?: string; increment?: number }[] = [];
+    await compressWithSystem7z(
+      {
+        targets: [{ fsPath: src }],
+        format: { label: "7z", description: "", canCreate: true, supportsEncryption: true },
+        outputPath: archive,
+        password: "",
+        level: 5,
+      },
+      { report: (r) => reports.push(r) },
+    );
+
+    expect(fs.existsSync(archive)).toBe(true);
+    const pctReports = reports.filter((r) => r.message?.match(/^\d+%$/));
+    expect(pctReports.length).toBeGreaterThan(0);
+    expect(pctReports.some((r) => (r.increment ?? 0) > 0)).toBe(true);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  itOrSkip("reports determinate progress for multi-volume compression", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_sz_volprog_"));
+    const src = path.join(tmpDir, "data.bin");
+    // Incompressible random data split into several 1m volumes; the size
+    // monitor must follow .001/.002/… because the base archive is never
+    // written in volume mode.
+    const chunk = Buffer.alloc(8 * 1024 * 1024);
+    for (let i = 0; i < chunk.length; i += 4) {
+      chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
+    }
+    fs.writeFileSync(src, chunk);
+    const archive = path.join(tmpDir, "progress.7z");
+
+    const reports: { message?: string; increment?: number }[] = [];
+    await compressWithSystem7z(
+      {
+        targets: [{ fsPath: src }],
+        format: { label: "7z", description: "", canCreate: true, supportsEncryption: true },
+        outputPath: archive,
+        password: "",
+        level: 5,
+        volumeSize: "1m",
+      },
+      { report: (r) => reports.push(r) },
+    );
+
+    expect(fs.existsSync(`${archive}.001`)).toBe(true);
+    expect(fs.existsSync(`${archive}.002`)).toBe(true);
+    const pctReports = reports.filter((r) => r.message?.match(/^\d+%$/));
+    expect(pctReports.length).toBeGreaterThan(0);
+    expect(pctReports.some((r) => (r.increment ?? 0) > 0)).toBe(true);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

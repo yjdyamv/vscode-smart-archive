@@ -30,12 +30,19 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function copyToVFS(js7z: JS7zInstance, filePath: string, vfsPath: string): void {
+export function copyToVFS(
+  js7z: JS7zInstance,
+  filePath: string,
+  vfsPath: string,
+  onProgress?: (cumulativeBytes: number) => void,
+  offsetBytes = 0,
+): number {
   const stat = fs.statSync(filePath);
   if (stat.size <= MAX_BUFFER) {
     const data = fs.readFileSync(filePath);
     js7z.FS.writeFile(vfsPath, data);
-    return;
+    onProgress?.(offsetBytes + stat.size);
+    return stat.size;
   }
 
   // Stream in chunks via VFS open/write/close
@@ -53,6 +60,7 @@ export function copyToVFS(js7z: JS7zInstance, filePath: string, vfsPath: string)
         if (n === 0) break;
         js7z.FS.write(vfsStream, new Uint8Array(buf.slice(0, n)), 0, n, pos);
         pos += n;
+        onProgress?.(offsetBytes + pos);
       }
     } finally {
       js7z.FS.close(vfsStream);
@@ -60,6 +68,7 @@ export function copyToVFS(js7z: JS7zInstance, filePath: string, vfsPath: string)
   } finally {
     fs.closeSync(rfd);
   }
+  return stat.size;
 }
 
 interface SplitVolumePattern {
@@ -189,7 +198,13 @@ export function checkArchiveInputSize(filePath: string): void {
   }
 }
 
-export function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: string): string {
+export function streamToVFS(
+  js7z: JS7zInstance,
+  filePath: string,
+  vfsPath?: string,
+  onProgress?: (cumulativeBytes: number) => void,
+  offsetBytes = 0,
+): string {
   const archiveName = getBaseName(filePath);
   const target = vfsPath ?? `/${archiveName}`;
 
@@ -270,7 +285,7 @@ export function streamToVFS(js7z: JS7zInstance, filePath: string, vfsPath?: stri
     if (result) return result;
   }
 
-  copyToVFS(js7z, filePath, target);
+  copyToVFS(js7z, filePath, target, onProgress, offsetBytes);
   return target;
 }
 

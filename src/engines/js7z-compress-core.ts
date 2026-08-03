@@ -16,8 +16,17 @@ import { CancelledError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import type { CompressOptions, FormatInfo, JS7zInstance } from "../types";
 import { JS7z } from "./js7z-factory";
-import { disposeJS7z, INPUT_DIR, OUTPUT_DIR, copyInputsToFS, run7z } from "./js7z-helpers";
+import {
+  createPrintBridge,
+  disposeJS7z,
+  INPUT_DIR,
+  OUTPUT_DIR,
+  copyInputsToFS,
+  run7z,
+} from "./js7z-helpers";
 import { streamToVFS } from "./vfs-io";
+import { sumTreeBytes } from "../utils/fs";
+import { scaleProgress } from "../utils/progress-scale";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -103,7 +112,8 @@ export async function compressWith7z(
 
   prog.report({ message: t("compress.initEngine") });
 
-  const js7z = await JS7z();
+  const printBridge = createPrintBridge();
+  const js7z = await JS7z({ print: printBridge.print, printErr: printBridge.printErr });
 
   // Convert gitignore patterns to 7z -xr! flags.
   // Single target: skip patterns matching the target's basename (prevents
@@ -161,37 +171,49 @@ export async function compressWith7z(
           options.targets.map((target) => target.fsPath),
           token,
           filteredExcludes,
+          progress ? scaleProgress(progress, 0, 50) : undefined,
         );
         if (token?.isCancellationRequested) throw new CancelledError();
 
+        const compressProgress = progress ? scaleProgress(progress, 50, 100) : undefined;
         let compressedData: Uint8Array | undefined;
         if (wrapExt === "zst") {
           prog.report({ message: t("compress.compressingTar", wrapExt) });
           const zstOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.zst");
-          await zstdCompressFile(tarDiskPath, zstOut, options.level);
+          await zstdCompressFile(tarDiskPath, zstOut, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(zstOut));
         } else if (wrapExt === "lz4") {
           prog.report({ message: t("compress.compressingTar", wrapExt) });
           const lz4Out = path.join(path.dirname(tarDiskPath), "_tmp.tar.lz4");
-          await lz4CompressFile(tarDiskPath, lz4Out, options.level);
+          await lz4CompressFile(tarDiskPath, lz4Out, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(lz4Out));
         } else if (wrapExt === "br") {
           prog.report({ message: t("compress.compressingTar", wrapExt) });
           const brOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.br");
-          await brotliCompressFile(tarDiskPath, brOut, options.level);
+          await brotliCompressFile(tarDiskPath, brOut, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(brOut));
         } else if (wrapExt === "sz") {
           prog.report({ message: t("compress.compressingTar", wrapExt) });
           const szOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.sz");
-          await snappyCompressFile(tarDiskPath, szOut, options.level);
+          await snappyCompressFile(tarDiskPath, szOut, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(szOut));
         } else {
           prog.report({ message: t("compress.compressingTar", wrapExt) });
-          const js7z2 = await JS7z();
+          const js7z2 = await JS7z({
+            print: printBridge.print,
+            printErr: printBridge.printErr,
+          });
           try {
             js7z2.FS.mkdir(OUTPUT_DIR);
             streamToVFS(js7z2, tarDiskPath, `/${innerName}`);
-            await run7z(js7z2, ["a", archiveFsPath, `/${innerName}`, "-mmt=on"], progress);
+            await run7z(
+              js7z2,
+              ["a", archiveFsPath, `/${innerName}`, "-mmt=on"],
+              compressProgress,
+              undefined,
+              undefined,
+              printBridge,
+            );
             compressedData = new Uint8Array(
               js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }),
             );
@@ -231,7 +253,17 @@ export async function compressWith7z(
     js7z.FS.mkdir(INPUT_DIR);
     js7z.FS.mkdir(OUTPUT_DIR);
 
-    const allInputPaths = copyInputsToFS(js7z, filteredPaths, token);
+    const copyTotal = progress ? sumTreeBytes(filteredPaths) : 0;
+    const copyProgress = progress ? scaleProgress(progress, 0, 40) : undefined;
+    let prevCopyPct = 0;
+    const allInputPaths = copyInputsToFS(js7z, filteredPaths, token, (cumulative) => {
+      if (!copyProgress || copyTotal <= 0) return;
+      const pct = Math.min(99, Math.floor((cumulative / copyTotal) * 100));
+      if (pct > prevCopyPct && pct > 0) {
+        copyProgress.report({ message: `${pct}%`, increment: pct - prevCopyPct });
+        prevCopyPct = pct;
+      }
+    });
     if (token?.isCancellationRequested) throw new CancelledError();
     prog.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
@@ -243,7 +275,14 @@ export async function compressWith7z(
       options.level,
       options.volumeSize,
     );
-    await run7z(js7z, [...args, ...excludeArgs], progress);
+    await run7z(
+      js7z,
+      [...args, ...excludeArgs],
+      progress ? scaleProgress(progress, 40, 100) : undefined,
+      undefined,
+      undefined,
+      printBridge,
+    );
 
     if (options.volumeSize) {
       writeVolumeFiles(js7z, OUTPUT_DIR, options.outputPath);
