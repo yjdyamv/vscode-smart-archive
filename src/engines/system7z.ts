@@ -1312,15 +1312,16 @@ function run7z(
       }
     });
 
-    const sizeTimer = monitorOutput && progress
-      ? startSizeMonitor(
-          monitorOutput.outputPath,
-          monitorOutput.totalInputBytes,
-          prog,
-          () => settled,
-          () => sawRealPct,
-        )
-      : null;
+    const sizeTimer =
+      monitorOutput && progress
+        ? startSizeMonitor(
+            monitorOutput.outputPath,
+            monitorOutput.totalInputBytes,
+            prog,
+            () => settled,
+            () => sawRealPct,
+          )
+        : null;
     logger.info({
       event: "system7z.run.monitor",
       started: !!sizeTimer,

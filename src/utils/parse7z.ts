@@ -8,8 +8,8 @@
  * @module utils/parse7z
  */
 
-import { fixArchiveEncoding } from "./path";
-import { getSplitVolumeBase } from "../constants";
+import { fixArchiveEncoding, getBaseName } from "./path";
+import { getFullExt, getFormatByExt, getSplitVolumeBase } from "../constants";
 
 export interface ArchiveEntry {
   path: string;
@@ -75,7 +75,7 @@ export function parse7zListing(
   }
 
   const volBase = getSplitVolumeBase(archiveName);
-  return results.filter((r) => {
+  const filtered = results.filter((r) => {
     const p = r.path;
     if (p === `/${archiveName}` || p === archiveName) return false;
     if (volBase && (p === `/${volBase}` || p === volBase)) return false;
@@ -86,4 +86,22 @@ export function parse7zListing(
     }
     return true;
   });
+
+  // Single-file stream formats (gz/xz/bz2): `7z l -slt` emits no `Path`
+  // entry for the inner file, so synthesize the single built-in entry
+  // (the archive name minus the stream extension, e.g. data.xz → data).
+  if (filtered.length === 0) {
+    const ext = getFullExt(archiveName);
+    if (getFormatByExt(ext)?.category === "stream") {
+      const base = getBaseName(archiveName);
+      const inner = ext ? base.slice(0, -ext.length) || base : base;
+      const sizeMatch = stdout.match(/^\s*Size = (\d+)\s*$/m);
+      filtered.push({
+        path: fixArchiveEncoding(inner),
+        size: sizeMatch ? parseInt(sizeMatch[1], 10) : 0,
+        type: "REGULAR_FILE",
+      });
+    }
+  }
+  return filtered;
 }
