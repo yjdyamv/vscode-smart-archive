@@ -31,7 +31,7 @@ const REPO = process.env.SA_RAR5_REPO || "yjdyamv/smart-archive-rar";
 // Fallback version used only when the GitHub API is unreachable. Prefer
 // SA_RAR5_VERSION (explicit) — otherwise the latest release tag is resolved
 // automatically (cached for 1 h under .cache/rar5-platforms/).
-const PKG_VERSION_FALLBACK = "0.2.9";
+const PKG_VERSION_FALLBACK = "0.2.10";
 
 const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -65,21 +65,22 @@ async function resolveVersion() {
   }
 }
 
-// SHA-256 of each platform .node release asset; fail-closed. Verify against
-// the official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test) after a new
+// SHA-256 of each platform .node release asset (smart-archive-rar 0.2.10,
+// which fixes RAR progress accounting); fail-closed. Verify against the
+// official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test) after a new
 // release, then regenerate here:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "fc43518e00e1c227ec9aa1bf23c03b4a5d4fd58b5d94d760dfcf1bd70938aedc",
-  "linux-x64-musl": "691a1e70ae897bf9a5ac6374e681513a55629fb1e2e9138b7ad7c04252d6347d",
-  "linux-arm64-gnu": "b58de778e9ec17d319cb20c059b99807b1c48c46a1f33e13b5deb6fb4e857f5c",
-  "linux-arm64-musl": "0cc6cff05c8b1bf554dfabc37bfd6d1681211a21d06a951287f5543ceae58004",
-  "linux-arm-gnueabihf": "f6642d89992c6723a3647a710c00f4423a70186a3efc3e407e3018bfcc12d5f0",
-  "darwin-x64": "f3b461d25b30a5702e01e4e90c515056f65e2161e4333d24d4f7ba82654e6589",
-  "darwin-arm64": "c4c39428f56dcb3f91b84ee459b13de1e9f8092ce7c330fad7bd644d8d5e8ecf",
-  "win32-x64-msvc": "628c67545a511130e17a828db149962db6ab95121fec93ac74ef551dc704fd91",
-  "win32-ia32-msvc": "c5b7f3c5eee7ff4649cc40e524ea450fe4c1ea4de49eaa65f891b4540c56f7c1",
-  "win32-arm64-msvc": "9c6460f90b026b90c589ae34bbbc06051f0d7e15bcbb4003c9097a829a48384b",
+  "linux-x64-gnu": "6b8c4c6a7d8bfdd129e565b6399150b18128af23e3b829fe94ea70c50d7b8644",
+  "linux-x64-musl": "9d6c9b234cdc9d40dae5c89d7c1d7f994aafd8f326282f32a156ec41291e7b84",
+  "linux-arm64-gnu": "ad3993d5524369e10e2e47129fd96f9463ee0f55f3b2ecf9a230a2502e93ad9c",
+  "linux-arm64-musl": "791dc00b66516f0f2fd7fa0ec5a21e016bbaff61455e98b437407432d8122f06",
+  "linux-arm-gnueabihf": "375fa539c5fdd4a322a6820ae5003b7fc87ceb08b4b0a261609d9435df447544",
+  "darwin-x64": "edee4e69b2369e919432252359bf6ab6f32d76820b8e4a7eaca1000dadd3c540",
+  "darwin-arm64": "979e63581b5b01ce9897a768011fbcf3d3b29dc6f421cbcf30502e4fba4e9c92",
+  "win32-x64-msvc": "ea30f0904570362d7b9b7980d7b1a3b832a0d6072cbb5d686a4bbe9899831fa1",
+  "win32-ia32-msvc": "5d526648c86107480d848887f96c6d3d1158b00db2705feb1d418395178e90bb",
+  "win32-arm64-msvc": "d0ef901649ac0a5b4f283df60ab58874a278ea525f8f512c7d95bd9d314abda7",
 };
 
 // <platform>/<arch> -> napi-rs triples
@@ -179,7 +180,10 @@ async function releaseMode(strict) {
     const bootstrapping = process.env.SA_HASH_BOOTSTRAP === "1";
     const result = await downloadWithCache({
       cacheDir,
-      cacheKey: job.nodeFileName,
+      // Version-scoped key: a release bump must never reuse bytes cached for
+      // an older release (the pinned hash would reject them anyway, but the
+      // key keeps the cache honest and avoids repeated failed downloads).
+      cacheKey: `${resolvedVersion}/${job.nodeFileName}`,
       destPath: job.destPath,
       // Bootstrap: no pin yet — download and print the new hash so it can
       // be pasted into EXPECTED_HASHES. Otherwise the stale pin would
@@ -248,6 +252,7 @@ async function main() {
   // Version resolution: SA_RAR5_VERSION > cached latest-release > GitHub API
   // (with a documented fallback only when the API is unreachable).
   const version = await resolveVersion();
+  resolvedVersion = version;
   releaseBase =
     process.env.SA_RAR5_RELEASE_BASE || `https://github.com/${REPO}/releases/download/v${version}`;
   console.log(`rar5: resolving bindings from ${releaseBase}`);
@@ -277,6 +282,7 @@ async function main() {
 }
 
 let releaseBase = "";
+let resolvedVersion = "";
 
 if (require.main === module) {
   main();
