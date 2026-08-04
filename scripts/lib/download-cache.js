@@ -178,17 +178,48 @@ async function downloadWithCache({
   requireHash,
   label,
 }) {
-  if (fs.existsSync(destPath)) return { status: "skipped" };
-
   const name = label || cacheKey;
+
+  // A staged destination is only reusable when it already matches the
+  // pinned hash. Anything else (local dev build, previous release, partial
+  // write) must be replaced, otherwise a version bump silently ships stale
+  // binaries. Bootstrap mode re-downloads fresh so the printed hash always
+  // describes the current release asset.
+  if (fs.existsSync(destPath)) {
+    const existing = fs.readFileSync(destPath);
+    if (expectedSha256 && sha256(existing) === expectedSha256) {
+      return { status: "skipped" };
+    }
+    if (!expectedSha256 && !requireHash) {
+      // No pin and not fail-closed: keep whatever a local/dev stage left.
+      return { status: "skipped" };
+    }
+    fs.rmSync(destPath, { force: true });
+  }
+
   const cachedFile = path.join(cacheDir, cacheKey);
 
   if (fs.existsSync(cachedFile)) {
     const cached = fs.readFileSync(cachedFile);
-    checkHash(cached, expectedSha256, requireHash, name); // throws (not swallowed) on mismatch/missing
-    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-    fs.copyFileSync(cachedFile, destPath);
-    return { status: "cached" };
+    if (expectedSha256) {
+      if (sha256(cached) !== expectedSha256) {
+        // Stale cache from an older release (cache keys are versioned, but a
+        // manually seeded cache may still collide): drop and download fresh.
+        fs.rmSync(cachedFile, { force: true });
+      } else {
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.copyFileSync(cachedFile, destPath);
+        return { status: "cached" };
+      }
+    } else if (requireHash) {
+      // Bootstrap mode: ignore any cached bytes so the printed hash comes
+      // from the current release asset.
+      fs.rmSync(cachedFile, { force: true });
+    } else {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.copyFileSync(cachedFile, destPath);
+      return { status: "cached" };
+    }
   }
 
   let data;
@@ -196,9 +227,7 @@ async function downloadWithCache({
     data = await fetch();
   } catch {
     try {
-      fs.rmSync(path.dirname(destPath), { recursive: true, force: true });
-    } catch {}
-    try {
+      fs.rmSync(destPath, { force: true });
       fs.rmSync(cachedFile, { force: true });
     } catch {}
     return { status: "failed" };

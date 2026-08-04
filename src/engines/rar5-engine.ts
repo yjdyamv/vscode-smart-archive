@@ -253,7 +253,9 @@ export async function compressWithRar5(
   // as an indeterminate spinner that can lag/stall on fast compressions).
   let lastPct = -1;
   const reportPct = (pct: number) => {
-    if (pct <= 0 || pct === lastPct) return;
+    // Ignore zero, repeats and any out-of-order report so the VS Code bar
+    // never stalls on 0 or moves backwards.
+    if (pct <= 0 || pct <= lastPct) return;
     const delta = pct - (lastPct < 0 ? 0 : lastPct);
     lastPct = pct;
     prog.report({ message: `${pct}%`, increment: delta });
