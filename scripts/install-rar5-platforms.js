@@ -31,7 +31,7 @@ const REPO = process.env.SA_RAR5_REPO || "yjdyamv/smart-archive-rar";
 // Fallback version used only when the GitHub API is unreachable. Prefer
 // SA_RAR5_VERSION (explicit) — otherwise the latest release tag is resolved
 // automatically (cached for 1 h under .cache/rar5-platforms/).
-const PKG_VERSION_FALLBACK = "0.1.0";
+const PKG_VERSION_FALLBACK = "0.2.9";
 
 const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -70,16 +70,16 @@ async function resolveVersion() {
 // release, then regenerate here:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "b6ed2f918ceeb549df8c899fe9108bad52df5c3d6af60a47c55210a7070ba3cb",
-  "linux-x64-musl": "723dbf747ce33bf6ab69f85ff0272b91aade86bbbd233e515b3d0cb5e3bbc01e",
-  "linux-arm64-gnu": "6c59353c1c026c8938daf1d38262139794c6d7d1b52207d6159100824f3ad64e",
-  "linux-arm64-musl": "83fbe7ac63fbefa334b8e82ab2667cc403919a1844bd6db8c5cea0fd4aa792b0",
-  "linux-arm-gnueabihf": "1a3be45e3d4dd8f63de88364bce8f64fdfa068562dcd9ac3b46a8a35d4c82b37",
-  "darwin-x64": "d60ed0cb63328710858524ee315a107bac1b31ece2fa29b647a3df405036193d",
-  "darwin-arm64": "c144de3ee8241afbc7798aa40689af25a0ff9c139da88dc64d9d3df07e5abbf1",
-  "win32-x64-msvc": "f832bc0a62e809d08786b7b84a31a025e1dcb6623fb8997ba901f015201a68ec",
-  "win32-ia32-msvc": "58141c9cf7e19e8670270bc3b8f7db29216d94953c6611edca928e46ede2f445",
-  "win32-arm64-msvc": "adad3ccb05669ea178e366bdc89aa731a90faf5f96168faa98af645a3b4e3546",
+  "linux-x64-gnu": "fc43518e00e1c227ec9aa1bf23c03b4a5d4fd58b5d94d760dfcf1bd70938aedc",
+  "linux-x64-musl": "691a1e70ae897bf9a5ac6374e681513a55629fb1e2e9138b7ad7c04252d6347d",
+  "linux-arm64-gnu": "b58de778e9ec17d319cb20c059b99807b1c48c46a1f33e13b5deb6fb4e857f5c",
+  "linux-arm64-musl": "0cc6cff05c8b1bf554dfabc37bfd6d1681211a21d06a951287f5543ceae58004",
+  "linux-arm-gnueabihf": "f6642d89992c6723a3647a710c00f4423a70186a3efc3e407e3018bfcc12d5f0",
+  "darwin-x64": "f3b461d25b30a5702e01e4e90c515056f65e2161e4333d24d4f7ba82654e6589",
+  "darwin-arm64": "c4c39428f56dcb3f91b84ee459b13de1e9f8092ce7c330fad7bd644d8d5e8ecf",
+  "win32-x64-msvc": "628c67545a511130e17a828db149962db6ab95121fec93ac74ef551dc704fd91",
+  "win32-ia32-msvc": "c5b7f3c5eee7ff4649cc40e524ea450fe4c1ea4de49eaa65f891b4540c56f7c1",
+  "win32-arm64-msvc": "9c6460f90b026b90c589ae34bbbc06051f0d7e15bcbb4003c9097a829a48384b",
 };
 
 // <platform>/<arch> -> napi-rs triples
@@ -141,79 +141,102 @@ async function releaseMode(strict) {
   const platforms = process.env.SA_RAR5_PLATFORMS
     ? process.env.SA_RAR5_PLATFORMS.split(",").map((s) => s.trim())
     : Object.keys(TRIPLES);
-  let installed = 0;
-  let cached = 0;
-  let skipped = 0;
-  let failed = 0;
-
+  const jobs = [];
   for (const key of platforms) {
     const [platform, arch] = key.split("/");
     const triples = TRIPLES[key] || [];
     for (const triple of triples) {
-      console.log(`[rar5 ${triple}]`);
-      const nodeFileName = `smart-archive-rar.${triple}.node`;
-      const destPath = path.join(destDir, platform, arch, nodeFileName);
-      const hash = EXPECTED_HASHES[triple];
-
-      if (!hash && !process.env.SA_HASH_BOOTSTRAP) {
-        if (strict) {
-          throw new Error(
-            `no pinned SHA-256 for ${triple} — add it to EXPECTED_HASHES after releasing, ` +
-              `or use SA_RAR5_DEV=1 for local builds`,
-          );
-        }
-        console.warn(
-          `  no pinned SHA-256 for ${triple} — skipping (run SA_HASH_BOOTSTRAP=1 after releasing)`,
-        );
-        skipped++;
-        continue;
-      }
-
-      const bootstrapping = process.env.SA_HASH_BOOTSTRAP === "1";
-      const result = await downloadWithCache({
-        cacheDir,
-        cacheKey: nodeFileName,
-        destPath,
-        // Bootstrap: no pin yet — download and print the new hash so it can
-        // be pasted into EXPECTED_HASHES. Otherwise the stale pin would
-        // reject the freshly released binaries.
-        expectedSha256: bootstrapping ? undefined : hash,
-        requireHash: bootstrapping || strict,
-        label: `rar5 ${triple}`,
-        fetch: async () => {
-          // Direct download first, mirror fallback (gh-proxy.com, or
-          // SA_GITHUB_MIRRORS) on failure. SHA-256 pinning below keeps the
-          // fail-closed guarantee regardless of the source.
-          const url = `${releaseBase}/${nodeFileName}`;
-          return httpGetMirrored(url);
-        },
+      jobs.push({
+        key,
+        platform,
+        arch,
+        triple,
+        nodeFileName: `smart-archive-rar.${triple}.node`,
+        destPath: path.join(destDir, platform, arch, `smart-archive-rar.${triple}.node`),
+        hash: EXPECTED_HASHES[triple],
       });
-
-      if (result.status === "skipped") {
-        console.log("  skipped (already staged)");
-        skipped++;
-      } else if (result.status === "cached") {
-        console.log("  from cache");
-        cached++;
-      } else if (result.status === "downloaded") {
-        console.log("  downloaded + cached");
-        installed++;
-      } else {
-        if (strict) {
-          console.error("  FAILED");
-          failed++;
-        } else {
-          console.warn("  not available (release not published yet)");
-          skipped++;
-        }
-      }
     }
   }
 
+  // Download concurrently (bounded) — 10 platform assets staged in ~one
+  // round-trip instead of ten sequential downloads.
+  const CONCURRENCY = 5;
+  const statuses = await mapLimit(jobs, CONCURRENCY, async (job) => {
+    console.log(`[rar5 ${job.triple}]`);
+    if (!job.hash && !process.env.SA_HASH_BOOTSTRAP) {
+      if (strict) {
+        throw new Error(
+          `no pinned SHA-256 for ${job.triple} — add it to EXPECTED_HASHES after releasing, ` +
+            `or use SA_RAR5_DEV=1 for local builds`,
+        );
+      }
+      console.warn(
+        `  no pinned SHA-256 for ${job.triple} — skipping (run SA_HASH_BOOTSTRAP=1 after releasing)`,
+      );
+      return "skipped";
+    }
+
+    const bootstrapping = process.env.SA_HASH_BOOTSTRAP === "1";
+    const result = await downloadWithCache({
+      cacheDir,
+      cacheKey: job.nodeFileName,
+      destPath: job.destPath,
+      // Bootstrap: no pin yet — download and print the new hash so it can
+      // be pasted into EXPECTED_HASHES. Otherwise the stale pin would
+      // reject the freshly released binaries.
+      expectedSha256: bootstrapping ? undefined : job.hash,
+      requireHash: bootstrapping || strict,
+      label: `rar5 ${job.triple}`,
+      fetch: async () => {
+        // Direct download first, mirror fallback (gh-proxy.com, or
+        // SA_GITHUB_MIRRORS) on failure. SHA-256 pinning below keeps the
+        // fail-closed guarantee regardless of the source.
+        const url = `${releaseBase}/${job.nodeFileName}`;
+        return httpGetMirrored(url);
+      },
+    });
+
+    if (result.status === "skipped") {
+      console.log("  skipped (already staged)");
+      return "skipped";
+    }
+    if (result.status === "cached") {
+      console.log("  from cache");
+      return "cached";
+    }
+    if (result.status === "downloaded") {
+      console.log("  downloaded + cached");
+      return "downloaded";
+    }
+    if (strict) {
+      console.error("  FAILED");
+      return "failed";
+    }
+    console.warn("  not available (release not published yet)");
+    return "skipped";
+  });
+
+  const installed = statuses.filter((s) => s === "downloaded").length;
+  const cached = statuses.filter((s) => s === "cached").length;
+  const skipped = statuses.filter((s) => s === "skipped").length;
+  const failed = statuses.filter((s) => s === "failed").length;
   console.log(
     `rar5: ${installed} installed, ${cached} from cache, ${skipped} skipped, ${failed} failed`,
   );
   if (failed > 0) process.exitCode = 1;
+}
+
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 async function main() {
