@@ -31,7 +31,7 @@ const REPO = process.env.SA_RAR5_REPO || "yjdyamv/smart-archive-rar";
 // Fallback version used only when the GitHub API is unreachable. Prefer
 // SA_RAR5_VERSION (explicit) — otherwise the latest release tag is resolved
 // automatically (cached for 1 h under .cache/rar5-platforms/).
-const PKG_VERSION_FALLBACK = "0.2.10";
+const PKG_VERSION_FALLBACK = "0.2.11";
 
 const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -65,22 +65,23 @@ async function resolveVersion() {
   }
 }
 
-// SHA-256 of each platform .node release asset (smart-archive-rar 0.2.10,
-// which fixes RAR progress accounting); fail-closed. Verify against the
+// SHA-256 of each platform .node release asset (smart-archive-rar 0.2.11,
+// which removes the writer-side auto-filter slowdown and adds chunk-level
+// parallel compression for large files); fail-closed. Verify against the
 // official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test) after a new
 // release, then regenerate here:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "6b8c4c6a7d8bfdd129e565b6399150b18128af23e3b829fe94ea70c50d7b8644",
-  "linux-x64-musl": "9d6c9b234cdc9d40dae5c89d7c1d7f994aafd8f326282f32a156ec41291e7b84",
-  "linux-arm64-gnu": "ad3993d5524369e10e2e47129fd96f9463ee0f55f3b2ecf9a230a2502e93ad9c",
-  "linux-arm64-musl": "791dc00b66516f0f2fd7fa0ec5a21e016bbaff61455e98b437407432d8122f06",
-  "linux-arm-gnueabihf": "375fa539c5fdd4a322a6820ae5003b7fc87ceb08b4b0a261609d9435df447544",
-  "darwin-x64": "edee4e69b2369e919432252359bf6ab6f32d76820b8e4a7eaca1000dadd3c540",
-  "darwin-arm64": "979e63581b5b01ce9897a768011fbcf3d3b29dc6f421cbcf30502e4fba4e9c92",
-  "win32-x64-msvc": "ea30f0904570362d7b9b7980d7b1a3b832a0d6072cbb5d686a4bbe9899831fa1",
-  "win32-ia32-msvc": "5d526648c86107480d848887f96c6d3d1158b00db2705feb1d418395178e90bb",
-  "win32-arm64-msvc": "d0ef901649ac0a5b4f283df60ab58874a278ea525f8f512c7d95bd9d314abda7",
+  "linux-x64-gnu": "45b218be97f7a7c80bee5e92420572abd7bbacda1de8c69f247c7cb46edc7717",
+  "linux-x64-musl": "4e49bd3b43240be13c7c69a4940aa63742393aa8fd96711139348934f1c9bd7a",
+  "linux-arm64-gnu": "7068c4c81cbc7def79f9517245a58f9936caa510a250b7e69a255a176a254ba9",
+  "linux-arm64-musl": "2263904c9223e427ae708ffce9f3bce66ee532b7083af53efa33b7b92cf25176",
+  "linux-arm-gnueabihf": "c8a8be70000341474edc436cc8d093d98924f8453e2e0c7b6a904eb72dcb0c1f",
+  "darwin-x64": "5c867a6fd480e0311d4eee9c10f6935e643ce14355c75cdf69f5d0d35d8e8797",
+  "darwin-arm64": "1dc4b35eb03bc93cdafa74c8140c544a521b9460f7e2b6ebad70666c20589552",
+  "win32-x64-msvc": "c0c1edb96300b7af8d69dc9d9cd11b27997b5969625b38db25a0c38c4c39b6e9",
+  "win32-ia32-msvc": "bf1f651b727a0e77831f6755d33483afacab1c1e98defeebee7b97530c94dff0",
+  "win32-arm64-msvc": "3a65570e976bf86f31e24710fd5e117a0fe463ef0960d3886dbca35ff22e1870",
 };
 
 // <platform>/<arch> -> napi-rs triples
