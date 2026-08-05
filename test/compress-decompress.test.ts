@@ -22,6 +22,7 @@ import {
   disposeJS7z,
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
+import { copyDirToFS } from "../src/utils/fs";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -37,6 +38,34 @@ const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
 describe("js7z compress/decompress", () => {
 
   // ── 7z ──
+
+  it("follows symlinked directories when copying into the WASM VFS", async () => {
+    const j = await trackedJS7z();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_symdir_"));
+    try {
+      fs.mkdirSync(path.join(tmp, "real"));
+      fs.writeFileSync(path.join(tmp, "real", "a.txt"), "hello");
+      try {
+        fs.symlinkSync(path.join(tmp, "real"), path.join(tmp, "link"));
+      } catch {
+        return; // filesystem without symlink support
+      }
+      j.FS.mkdir("/in");
+      j.FS.mkdir("/in/tmp");
+      copyDirToFS(j, tmp, "/in/tmp");
+
+      const viaReal = Buffer.from(
+        j.FS.readFile("/in/tmp/real/a.txt", { encoding: "binary" }),
+      ).toString();
+      const viaLink = Buffer.from(
+        j.FS.readFile("/in/tmp/link/a.txt", { encoding: "binary" }),
+      ).toString();
+      expect(viaReal).toBe("hello");
+      expect(viaLink).toBe("hello");
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 
   it("7z single file", async () => {
     const b = await j7zCompress({ "/a.txt": "hello" }, "/x.7z");
