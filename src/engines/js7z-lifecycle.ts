@@ -1,8 +1,9 @@
 /**
  * JS7z WASM lifecycle — Smart Archive VSCode Extension
  *
- * The ONLY JS7z cleanup function. Always frees the WASM heap via
- * destroy / _cleanup.
+ * The ONLY JS7z cleanup function. With the shared 7zz instance the
+ * destroy/_cleanup hooks are no-ops (see engines/js7z-factory); keeping the
+ * call site uniform lets callers dispose without leaking a second instance.
  *
  * @module engines/js7z-lifecycle
  */

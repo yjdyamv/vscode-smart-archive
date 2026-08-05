@@ -1,0 +1,8 @@
+{
+  "name": "7zz-wasm",
+  "version": "26.02.0",
+  "private": true,
+  "description": "7-Zip ZS 26.02 WebAssembly engine (multi-threaded)",
+  "main": "7zz.js",
+  "license": "LGPL-2.1-or-later"
+}

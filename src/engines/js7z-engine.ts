@@ -1,7 +1,7 @@
 /**
  * js7z engine — Smart Archive VSCode Extension
  *
- * Barrel re-export for js7z-tools engine wrappers.
+ * Barrel re-export for the bundled 7zz WASM engine wrappers.
  * Split into compress, decompress, and list/inspect modules.
  *
  * @module engines/js7z-engine

@@ -163,8 +163,8 @@ describe("CJK encoding", () => {
     const cjkName = "中文文件.txt";
     j.FS.writeFile("/in/" + cjkName, new Uint8Array(Buffer.from("world")));
     await run7z(j, ["a", "/cjk.7z", "/in/" + cjkName]);
-    const j2 = await trackedJS7z();
     const buf = Buffer.from(j.FS.readFile("/cjk.7z", { encoding: "binary" }));
+    const j2 = await trackedJS7z();
     j2.FS.writeFile("/cjk.7z", new Uint8Array(buf));
     await run7z(j2, ["l", "-slt", "/cjk.7z"]);
     expect(true).toBe(true); // no throw = success
@@ -196,4 +196,3 @@ describe("RAR utilities", () => {
 // ════════════════════════════════════════════════════════════════════
 // Wrapped format round-trips
 // ════════════════════════════════════════════════════════════════════
-

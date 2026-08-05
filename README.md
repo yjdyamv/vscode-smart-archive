@@ -120,7 +120,7 @@ npm run release          # build + check + package
 
 | Package | Purpose |
 |---------|---------|
-| [js7z-tools](https://github.com/GMH-Code/JS7z) | 7-Zip 25.01 WebAssembly (all compression & extraction) |
+| [7-Zip ZS 26.02 WebAssembly](https://github.com/yjdyamv/7-Zip-zstd-wasm) | Bundled WASM fallback (`vendor/7zz-wasm`, downloaded at install; all compression & extraction) |
 | [zstd-napi](https://github.com/drakedevel/zstd-napi) | Zstandard compression |
 | [lz4-napi](https://github.com/antoniomuso/lz4-napi) | LZ4 compression |
 | Node.js `zlib` (built-in) | Brotli compression |

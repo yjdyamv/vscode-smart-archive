@@ -1,7 +1,7 @@
 /**
  * Shared test setup — Smart Archive VSCode Extension
  *
- * Code shared across test files that test against js7z-tools WASM engine.
+ * Code shared across test files that test against the bundled 7zz WASM engine.
  * Imports: vitest globals, path/fs/os, helpers, codec modules, inline security
  * re-implementations (avoiding vscode dependency).
  */

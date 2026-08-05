@@ -3,9 +3,9 @@
  *
  * Detects a local 7-Zip installation and uses it for
  * compress/decompress/list operations with better performance
- * than the bundled js7z-tools WASM engine.
+ * than the bundled 7zz WASM engine.
  *
- * Falls back to js7z-tools when no system 7-Zip is found.
+ * Falls back to the bundled 7zz WASM engine when no system 7-Zip is found.
  *
  * Cross-platform notes:
  *   - Windows: code page may be CP936/CP932/CP65001 etc. stderr is decoded

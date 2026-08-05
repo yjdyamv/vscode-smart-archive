@@ -2,7 +2,7 @@
 /**
  * Stage full 7-Zip (7zz) console binaries for ALL platforms under 7z-bin/, so
  * the extension can bundle a native fast-path engine cross-platform (the WASM
- * js7z engine remains the universal fallback).
+ * 7zz WASM engine remains the universal fallback).
  *
  *   Linux / macOS : a single static `7zz` binary from the official .tar.xz.
  *                   (macOS ships a universal binary → used for x64 and arm64.)
@@ -26,7 +26,7 @@ const os = require("os");
 const { execFileSync } = require("child_process");
 const { downloadWithCache } = require("./lib/download-cache");
 
-// Keep in sync with the js7z WASM engine version (README: 7-Zip 26.02).
+// Keep in sync with the 7zz-wasm WASM engine version (README: 7-Zip 26.02).
 const VER = "26.02";
 const TAG = "2602"; // filename token: 26.02 -> "2602"
 const BASE = `https://github.com/ip7z/7zip/releases/download/${VER}`;

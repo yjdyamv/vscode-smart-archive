@@ -2,7 +2,7 @@
  * js7z decompress core — vscode-free pipeline, runs inside the
  * worker thread (engines/worker). Dispatcher: js7z-decompress.
  *
- * Full decompression pipeline using js7z-tools: read archive to virtual FS,
+ * Full decompression pipeline using the bundled 7zz WASM engine: read archive to virtual FS,
  * run 7z x, copy results to local disk, and auto-unwrap inner .tar files.
  *
  * @module engines/js7z-decompress-core

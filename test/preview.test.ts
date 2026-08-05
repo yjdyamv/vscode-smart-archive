@@ -20,13 +20,13 @@ import {
   walkFS,
   disposeJS7z,
 } from "./helpers";
-import type { JS7zInstance, TreeNode, FlatEntry } from "./helpers";
+import type { TreeNode, FlatEntry } from "./helpers";
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
 import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
 import { brotliCompressFile, brotliDecompressFile, brotliCompress, brotliDecompress } from "../src/engines/brotli-codec";
 import * as zlib from "node:zlib";
+import { JS7z } from "../src/engines/js7z-factory";
 
-const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
 const zstd: {
   compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
   decompress: (data: Buffer) => Buffer;

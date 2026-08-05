@@ -7,7 +7,7 @@ Smart Archive uses the following third-party libraries, each under its own licen
 | Package | License | Source |
 |---------|---------|--------|
 | @vscode/codicons | CC-BY-4.0 | https://github.com/microsoft/vscode-codicons |
-| js7z-tools | LGPL-2.1+ (7-Zip) | https://github.com/yjdyamv/js7z-tools |
+| 7-Zip ZS (7zz-wasm, vendor/7zz-wasm/) | LGPL-2.1+ (7-Zip) | https://github.com/yjdyamv/7-Zip-zstd-wasm |
 | lz4-napi | MIT | https://github.com/yjdyamv/lz4-napi |
 | zstd-napi | Apache-2.0 | https://github.com/yjdyamv/zstd-napi |
 | 7-Zip (7zz / 7z.exe + 7z.dll, bundled under 7z-bin/) | LGPL-2.1+ with unRAR restriction | https://github.com/ip7z/7zip |

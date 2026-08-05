@@ -6,7 +6,7 @@
  * zstd-napi when the system zstd binary is unavailable.
  *
  * Decompression (in-memory) is handled by zstd-napi; archive-level
- * decompression goes through js7z-tools (7z v24.01+).
+ * decompression goes through the bundled 7zz WASM engine.
  *
  * @module engines/zstd-codec
  */
