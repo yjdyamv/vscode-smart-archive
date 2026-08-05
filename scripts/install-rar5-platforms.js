@@ -28,6 +28,7 @@ const {
   httpGetMirrored,
   downloadWithCache,
   writeFileAtomic,
+  persistBootstrapHash,
 } = require("./lib/download-cache");
 
 // Binding repo, overridable (e.g. a fork):
@@ -75,7 +76,7 @@ async function resolveVersion() {
 // which removes the writer-side auto-filter slowdown and adds chunk-level
 // parallel compression for large files); fail-closed. Verify against the
 // official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test) after a new
-// release, then regenerate here:
+// release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
 const EXPECTED_HASHES = {
   "linux-x64-gnu": "45b218be97f7a7c80bee5e92420572abd7bbacda1de8c69f247c7cb46edc7717",
@@ -217,6 +218,7 @@ async function releaseMode(strict) {
     }
     if (result.status === "downloaded") {
       console.log("  downloaded + cached");
+      persistBootstrapHash(__filename, job.destPath, job.triple);
       return "downloaded";
     }
     if (strict) {

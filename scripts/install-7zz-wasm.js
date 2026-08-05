@@ -18,12 +18,17 @@
  *   3. mirror prefixes        (gh-proxy.com etc., last resort)
  * Every file is verified against a pinned SHA-256 (fail-closed, so neither
  * mirrors nor the API fallback can inject binaries). To (re)generate hashes
- * after a release bump, run once with SA_HASH_BOOTSTRAP=1 and paste the
- * printed values into EXPECTED_HASHES below.
+ * after a release bump, run once with SA_HASH_BOOTSTRAP=1: the script prints
+ * and persists the new hashes into EXPECTED_HASHES below, then stages them.
  */
 const fs = require("fs");
 const path = require("path");
-const { downloadWithCache, httpGet, httpGetRetry } = require("./lib/download-cache");
+const {
+  downloadWithCache,
+  httpGet,
+  httpGetRetry,
+  persistBootstrapHash,
+} = require("./lib/download-cache");
 
 // Keep in sync with install-7z-platforms.js (7-Zip version) and the latest
 // 7-Zip-zstd-wasm release tag.
@@ -116,6 +121,9 @@ async function main() {
       fetch: () => fetchWithFallback(name),
     });
     console.log(`[7zz-wasm ${name}] ${result.status}`);
+    if (result.status === "downloaded") {
+      persistBootstrapHash(__filename, destPath, name);
+    }
   }
 
   const pkg = path.join(OUT, "package.json");

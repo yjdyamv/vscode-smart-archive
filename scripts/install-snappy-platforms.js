@@ -14,7 +14,7 @@
  *
  * To (re)generate hashes after a snappy version bump, run once:
  *   SA_HASH_BOOTSTRAP=1 node scripts/install-snappy-platforms.js
- * then paste the printed values into EXPECTED_HASHES.
+ * The script prints the new hashes and persists them into EXPECTED_HASHES.
  */
 const zlib = require("zlib");
 const fs = require("fs");
@@ -24,6 +24,7 @@ const {
   httpGetJson,
   downloadWithCache,
   extractNodeFromTgz,
+  persistBootstrapHash,
 } = require("./lib/download-cache");
 
 function getSnappyVersion() {
@@ -75,7 +76,7 @@ async function resolvePackage(pkg) {
   const destPath = path.join(destDir, nodeFileName);
   const npmName = `@napi-rs/snappy-${pkg}`;
 
-  return downloadWithCache({
+  const result = await downloadWithCache({
     cacheDir,
     cacheKey: nodeFileName,
     destPath,
@@ -95,6 +96,12 @@ async function resolvePackage(pkg) {
       return nodeData;
     },
   });
+
+  if (result.status === "downloaded") {
+    persistBootstrapHash(__filename, destPath, pkg);
+  }
+
+  return result;
 }
 
 async function main() {
