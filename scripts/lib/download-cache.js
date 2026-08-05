@@ -139,6 +139,31 @@ function checkHash(data, expected, requireHash, label) {
 }
 
 /**
+ * Atomically replace a file (temp + rename). A previously staged binary may
+ * still be running/loaded (ETXTBSY on POSIX if written in place); renaming
+ * over it lets the old inode finish while the new file takes over the path.
+ */
+function writeFileAtomic(destPath, data) {
+  const dir = path.dirname(destPath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = path.join(dir, `.${path.basename(destPath)}.${process.pid}.${Date.now()}.tmp`);
+  fs.writeFileSync(tmp, data);
+  try {
+    fs.renameSync(tmp, destPath);
+  } catch (err) {
+    if (process.platform !== "win32") throw err;
+    // Windows cannot rename over an existing file — remove then swap.
+    fs.rmSync(destPath, { force: true });
+    fs.renameSync(tmp, destPath);
+  }
+}
+
+/** Copy a source file into place atomically (see writeFileAtomic). */
+function copyFileAtomic(srcPath, destPath) {
+  writeFileAtomic(destPath, fs.readFileSync(srcPath));
+}
+
+/**
  * Extract the first file ending with ".node" from a gzipped npm tarball (tgz).
  * Returns the raw .node data, or null if not found.
  */
@@ -208,7 +233,7 @@ async function downloadWithCache({
         fs.rmSync(cachedFile, { force: true });
       } else {
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
-        fs.copyFileSync(cachedFile, destPath);
+        copyFileAtomic(cachedFile, destPath);
         return { status: "cached" };
       }
     } else if (requireHash) {
@@ -217,7 +242,7 @@ async function downloadWithCache({
       fs.rmSync(cachedFile, { force: true });
     } else {
       fs.mkdirSync(path.dirname(destPath), { recursive: true });
-      fs.copyFileSync(cachedFile, destPath);
+      copyFileAtomic(cachedFile, destPath);
       return { status: "cached" };
     }
   }
@@ -241,8 +266,7 @@ async function downloadWithCache({
   fs.mkdirSync(path.dirname(cachedFile), { recursive: true });
   fs.writeFileSync(cachedFile, data);
 
-  fs.mkdirSync(path.dirname(destPath), { recursive: true });
-  fs.writeFileSync(destPath, data);
+  writeFileAtomic(destPath, data);
   return { status: "downloaded" };
 }
 
@@ -256,4 +280,6 @@ module.exports = {
   verifySha256,
   checkHash,
   extractNodeFromTgz,
+  writeFileAtomic,
+  copyFileAtomic,
 };

@@ -2,7 +2,7 @@
 const zlib = require("zlib");
 const fs = require("fs");
 const path = require("path");
-const { httpGet, httpGetJson, downloadWithCache } = require("./lib/download-cache");
+const { httpGet, httpGetJson, downloadWithCache, copyFileAtomic } = require("./lib/download-cache");
 
 function getLz4Version() {
   const pkgPath = path.join(__dirname, "..", "node_modules", "lz4-napi", "package.json");
@@ -185,7 +185,7 @@ async function main() {
 
       const destPath = path.join(lz4Dir, nodeFileName);
       if (!fs.existsSync(destPath)) {
-        fs.copyFileSync(srcPath, destPath);
+        copyFileAtomic(srcPath, destPath);
       }
     }
   }
