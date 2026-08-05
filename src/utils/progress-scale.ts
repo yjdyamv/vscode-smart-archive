@@ -13,7 +13,7 @@
  * @module utils/progress-scale
  */
 
-import type { ProgressLike } from "./cancellation";
+import type { ProgressLike, ProgressStage } from "./cancellation";
 
 export function scaleProgress(prog: ProgressLike, startPct: number, endPct: number): ProgressLike {
   const span = endPct - startPct;
@@ -32,6 +32,19 @@ export function scaleProgress(prog: ProgressLike, startPct: number, endPct: numb
       } else {
         prog.report({ message: r.message });
       }
+    },
+  };
+}
+
+/**
+ * Stamps every report with a pipeline stage so the host can route it to
+ * that stage's own progress notification. Percentages stay unscaled —
+ * each stage's bar runs its own 0–100%.
+ */
+export function withStage(prog: ProgressLike, stage: ProgressStage): ProgressLike {
+  return {
+    report(r) {
+      prog.report({ ...r, stage });
     },
   };
 }

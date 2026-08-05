@@ -121,6 +121,41 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "正在将 TAR 压缩为 {0}...",
     "zh-tw": "正在將 TAR 壓縮為 {0}...",
   },
+  "compress.stage.copy": {
+    en: "Copying files...",
+    "zh-cn": "正在复制文件...",
+    "zh-tw": "正在複製檔案...",
+  },
+  "compress.stage.pack": {
+    en: "Packing files...",
+    "zh-cn": "正在打包...",
+    "zh-tw": "正在打包...",
+  },
+  "compress.stage.compress": {
+    en: "Compressing...",
+    "zh-cn": "正在压缩...",
+    "zh-tw": "正在壓縮...",
+  },
+  "compress.stage.copyShort": {
+    en: "Copy",
+    "zh-cn": "复制",
+    "zh-tw": "複製",
+  },
+  "compress.stage.packShort": {
+    en: "Pack",
+    "zh-cn": "打包",
+    "zh-tw": "打包",
+  },
+  "compress.stage.compressShort": {
+    en: "Compress",
+    "zh-cn": "压缩",
+    "zh-tw": "壓縮",
+  },
+  "compress.stageTimes": {
+    en: " (stages: {0})",
+    "zh-cn": "（各阶段：{0}）",
+    "zh-tw": "（各階段：{0}）",
+  },
   "compress.selectLevel": {
     en: "Select compression level",
     "zh-cn": "选择压缩级别",

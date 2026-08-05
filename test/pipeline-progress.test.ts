@@ -14,24 +14,26 @@ import { compressWith7z } from "../src/engines/js7z-compress";
 import { compressWithSystem7z, detectSystem7z } from "../src/engines/system7z";
 
 interface Report {
+  stage?: "copy" | "pack" | "compress";
   message?: string;
   increment?: number;
 }
 
-function pctReports(reports: Report[]): number[] {
+function stagePcts(reports: Report[], stage: Report["stage"]): number[] {
   return reports
+    .filter((r) => r.stage === stage)
     .filter((r) => r.message?.match(/^\d+%$/))
     .map((r) => parseInt(r.message!, 10));
 }
 
-function expectContinuous(pcts: number[]): void {
+function expectStageProgress(pcts: number[]): void {
   expect(pcts.length).toBeGreaterThan(2);
   for (let i = 1; i < pcts.length; i++) {
     expect(pcts[i]).toBeGreaterThanOrEqual(pcts[i - 1]);
   }
-  // The bar must reach the codec/compression phase (second half), proving
-  // the whole pipeline — not just the first phase — reports progress.
-  expect(pcts[pcts.length - 1]).toBeGreaterThanOrEqual(90);
+  // Each stage's own bar must reach the end of that stage. The system-7z
+  // size-monitor may stop a few points early when the process finishes.
+  expect(pcts[pcts.length - 1]).toBeGreaterThanOrEqual(85);
 }
 
 describe("full-pipeline compress progress", () => {
@@ -55,7 +57,9 @@ describe("full-pipeline compress progress", () => {
     );
 
     expect(fs.existsSync(out)).toBe(true);
-    expectContinuous(pctReports(reports));
+    // Both pipeline stages report their own 0–100% bar: packing and codec.
+    expectStageProgress(stagePcts(reports, "pack"));
+    expectStageProgress(stagePcts(reports, "compress"));
     fs.rmSync(td, { recursive: true, force: true });
   });
 
@@ -85,9 +89,12 @@ describe("full-pipeline compress progress", () => {
     );
 
     expect(fs.existsSync(`${out}.001`)).toBe(true);
-    // Copy phase scales to 0–40%; the compression phase must continue
-    // reporting past 40% (regression: print bridge installed too late).
-    expect(pctReports(reports).some((p) => p > 50)).toBe(true);
+    // Copy opens its own bar, then the compression stage keeps reporting
+    // to 100% (regression: print bridge installed too late).
+    expect(stagePcts(reports, "copy").length).toBeGreaterThan(0);
+    const compressPcts = stagePcts(reports, "compress");
+    expect(compressPcts.length).toBeGreaterThan(0);
+    expect(compressPcts[compressPcts.length - 1]).toBeGreaterThanOrEqual(90);
     fs.rmSync(td, { recursive: true, force: true });
   });
 
@@ -119,7 +126,8 @@ describe("full-pipeline compress progress", () => {
     );
 
     expect(fs.existsSync(out)).toBe(true);
-    expectContinuous(pctReports(reports));
+    expectStageProgress(stagePcts(reports, "pack"));
+    expectStageProgress(stagePcts(reports, "compress"));
     fs.rmSync(td, { recursive: true, force: true });
   });
 });

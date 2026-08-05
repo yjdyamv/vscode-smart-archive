@@ -401,6 +401,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
           slot.current?.progress?.report({
             message: message.message,
             increment: message.increment,
+            stage: message.stage,
           });
           break;
         case "log":

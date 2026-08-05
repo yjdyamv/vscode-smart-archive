@@ -43,6 +43,31 @@ export class ThemeIcon {
   constructor(public id: string) {}
 }
 
+export class CancellationTokenSource {
+  private cancelled = false;
+  private readonly listeners = new Set<() => void>();
+
+  readonly token = {
+    get isCancellationRequested(): boolean {
+      return this.cancelled;
+    },
+    onCancellationRequested: (listener: () => void) => {
+      if (this.cancelled) listener();
+      this.listeners.add(listener);
+      return { dispose: () => this.listeners.delete(listener) };
+    },
+  };
+
+  cancel(): void {
+    this.cancelled = true;
+    for (const listener of this.listeners) listener();
+  }
+
+  dispose(): void {
+    this.listeners.clear();
+  }
+}
+
 export const Uri = {
   file: (p: string) => ({ fsPath: p }),
 };
@@ -56,6 +81,7 @@ export default {
   ProgressLocation,
   QuickInputButtons,
   ThemeIcon,
+  CancellationTokenSource,
   Uri,
   CancellationError,
 };
