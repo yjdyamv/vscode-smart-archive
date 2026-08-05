@@ -14,8 +14,8 @@
  *
  * Source: official ip7z/7zip GitHub releases. Each downloaded ARCHIVE is
  * verified against a pinned SHA-256 (fail-closed). To (re)generate hashes after
- * a version bump, run once with SA_HASH_BOOTSTRAP=1 and paste the printed values
- * into EXPECTED_HASHES.
+ * a version bump, run once with SA_HASH_BOOTSTRAP=1: the script prints and
+ * persists the new hashes into EXPECTED_HASHES.
  *
  * NOTE: exact asset filenames / archive layout for a given release must be
  * confirmed on first run — a wrong name fails loudly (download or extract
@@ -25,7 +25,11 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { execFileSync } = require("child_process");
-const { downloadWithCache, writeFileAtomic } = require("./lib/download-cache");
+const {
+  downloadWithCache,
+  writeFileAtomic,
+  persistBootstrapHash,
+} = require("./lib/download-cache");
 
 // Keep in sync with the 7zz-wasm WASM engine version (README: 7-Zip 26.02).
 const VER = "26.02";
@@ -227,6 +231,9 @@ async function processTarget(t) {
     throw new Error(
       `Failed to download ${t.asset} — refusing to build an incomplete cross-platform package`,
     );
+  }
+  if (result.status === "downloaded") {
+    persistBootstrapHash(__filename, archivePath, t.asset);
   }
 
   fs.mkdirSync(unpackDir, { recursive: true });

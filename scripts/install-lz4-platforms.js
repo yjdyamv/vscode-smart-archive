@@ -2,7 +2,13 @@
 const zlib = require("zlib");
 const fs = require("fs");
 const path = require("path");
-const { httpGet, httpGetJson, downloadWithCache, copyFileAtomic } = require("./lib/download-cache");
+const {
+  httpGet,
+  httpGetJson,
+  downloadWithCache,
+  copyFileAtomic,
+  persistBootstrapHash,
+} = require("./lib/download-cache");
 
 function getLz4Version() {
   const pkgPath = path.join(__dirname, "..", "node_modules", "lz4-napi", "package.json");
@@ -39,8 +45,8 @@ const PLATFORM_META = {
 
 // SHA-256 of each platform's .node, verified on download (fail-closed).
 // This map MUST be populated before release: with requireHash the build refuses
-// any binary lacking a pinned hash. To (re)generate after an lz4-napi bump, run
-// once and paste the printed values keyed by package name:
+// any binary lacking a pinned hash. To (re)generate after an lz4-napi bump,
+// run once; the script prints and persists the hashes keyed by package name:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-lz4-platforms.js
 const EXPECTED_HASHES = {
   "lz4-napi-linux-x64-gnu": "6af66541006fbbbf54374179bcb13252f25d0b394b38dc217b567a966992cc18",
@@ -147,6 +153,9 @@ async function resolvePackage(pkg) {
 
   if (result.status === "downloaded" || result.status === "cached") {
     writePkgJson(pkgDir, pkg, nodeFileName);
+  }
+  if (result.status === "downloaded") {
+    persistBootstrapHash(__filename, destPath, pkg);
   }
 
   return result;
