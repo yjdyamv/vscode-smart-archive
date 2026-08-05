@@ -24,7 +24,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { execFileSync } = require("child_process");
-const { downloadWithCache } = require("./lib/download-cache");
+const { downloadWithCache, writeFileAtomic } = require("./lib/download-cache");
 
 // Keep in sync with the 7zz-wasm WASM engine version (README: 7-Zip 26.02).
 const VER = "26.02";
@@ -240,7 +240,10 @@ async function processTarget(t) {
         const destDir = path.join(OUT, plat, arch);
         fs.mkdirSync(destDir, { recursive: true });
         const dest = path.join(destDir, outName);
-        fs.writeFileSync(dest, bytes);
+        // Atomic replace: a previous 7zz may still be running (ETXTBSY if
+        // written in place). Rename lets the old inode finish while the new
+        // binary takes over the path.
+        writeFileAtomic(dest, bytes);
         if (plat !== "win32") fs.chmodSync(dest, 0o755);
       }
       console.log(`  ${srcName} -> ${t.dests.map(([p, a]) => `${p}/${a}/${outName}`).join(", ")}`);

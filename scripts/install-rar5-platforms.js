@@ -22,7 +22,12 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { httpGet, httpGetMirrored, downloadWithCache } = require("./lib/download-cache");
+const {
+  httpGet,
+  httpGetMirrored,
+  downloadWithCache,
+  writeFileAtomic,
+} = require("./lib/download-cache");
 
 // Binding repo, overridable (e.g. a fork):
 //   SA_RAR5_REPO=me/smart-archive-rar
@@ -110,7 +115,7 @@ function stageNode(nodeData, triple) {
   const [platform, arch] = found[0].split("/");
   const destPath = path.join(destDir, platform, arch, `smart-archive-rar.${triple}.node`);
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
-  fs.writeFileSync(destPath, nodeData);
+  writeFileAtomic(destPath, nodeData);
   console.log(`  staged ${triple} -> rar5-bin/${platform}/${arch}/`);
 }
 
