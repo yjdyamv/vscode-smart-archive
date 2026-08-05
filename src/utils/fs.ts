@@ -79,6 +79,21 @@ export function copyDirToFS(
       const sub = copyDirToFS(js7z, localEntry, fsEntry, token, onProgress, offset);
       copied += sub;
       offset += sub;
+    } else if (entry.isSymbolicLink()) {
+      // Follow symlinks (like sumTreeBytes and the rar5 engine do): a link
+      // to a directory must be copied recursively, not read as a file
+      // (fs.readFileSync on a symlinked directory throws EISDIR).
+      const st = fs.statSync(localEntry);
+      if (st.isDirectory()) {
+        js7z.FS.mkdir(fsEntry);
+        const sub = copyDirToFS(js7z, localEntry, fsEntry, token, onProgress, offset);
+        copied += sub;
+        offset += sub;
+      } else {
+        streamToVFS(js7z, localEntry, fsEntry, onProgress, offset);
+        copied += st.size;
+        offset += st.size;
+      }
     } else {
       const size = fs.statSync(localEntry).size;
       streamToVFS(js7z, localEntry, fsEntry, onProgress, offset);
@@ -110,6 +125,10 @@ export function sumTreeBytes(localPaths: readonly string[]): number {
         const full = path.join(current, e.name);
         if (e.isDirectory()) {
           stack.push(full);
+        } else if (e.isSymbolicLink()) {
+          const linkStat = fs.statSync(full);
+          if (linkStat.isDirectory()) stack.push(full);
+          else total += linkStat.size;
         } else {
           total += fs.statSync(full).size;
         }
