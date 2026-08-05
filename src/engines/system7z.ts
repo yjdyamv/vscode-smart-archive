@@ -130,14 +130,14 @@ export function detectSystem7z(): string | null {
 }
 
 /**
- * Resolve the full-format 7-Zip console binary bundled under 7z-bin/ for the
+ * Resolve the full-format 7-Zip console binary bundled under vendor/7z-bin/ for the
  * current platform/arch (staged by scripts/install-7z-platforms.js). On Unix
  * the file may lose its execute bit when the VSIX is unpacked, so restore it.
  * Returns null when no binary is bundled for this platform (→ WASM fallback).
  */
 function bundled7zPath(): string | null {
   const bin = process.platform === "win32" ? "7z.exe" : "7zz";
-  const rel = path.join("7z-bin", process.platform, process.arch, bin);
+  const rel = path.join("vendor", "7z-bin", process.platform, process.arch, bin);
   // Compiled bundle (out/extension.js) resolves from <root>/out; source
   // modules (src/engines, vitest) resolve from <root>/src/engines. Try both.
   const p =

@@ -26,6 +26,7 @@ const RAR5_FORMAT = {
 const BINDING = path.join(
   __dirname,
   "..",
+  "vendor",
   "rar5-bin",
   "linux",
   "x64",

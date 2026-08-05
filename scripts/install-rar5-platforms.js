@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Stage the rar5 native binding (smart-archive-rar, napi-rs) under rar5-bin/
+ * Stage the rar5 native binding (smart-archive-rar, napi-rs) under
+ * vendor/rar5-bin/
  * for all desktop platforms, so the extension can create RAR5 archives
  * without any external binary.
  *
@@ -17,7 +18,7 @@
  *      release build where every platform must stage.
  *
  * The loader (src/engines/rar5-engine.ts) resolves
- * rar5-bin/<platform>/<arch>/smart-archive-rar.<triple>.node
+ * vendor/rar5-bin/<platform>/<arch>/smart-archive-rar.<triple>.node
  */
 const fs = require("fs");
 const path = require("path");
@@ -105,7 +106,7 @@ function devProject() {
   return process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "smart-archive-rar");
 }
 
-const destDir = path.join(__dirname, "..", "rar5-bin");
+const destDir = path.join(__dirname, "..", "vendor", "rar5-bin");
 const cacheDir = path.join(__dirname, "..", ".cache", "rar5-platforms");
 fs.mkdirSync(cacheDir, { recursive: true });
 
@@ -116,7 +117,7 @@ function stageNode(nodeData, triple) {
   const destPath = path.join(destDir, platform, arch, `smart-archive-rar.${triple}.node`);
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
   writeFileAtomic(destPath, nodeData);
-  console.log(`  staged ${triple} -> rar5-bin/${platform}/${arch}/`);
+  console.log(`  staged ${triple} -> vendor/rar5-bin/${platform}/${arch}/`);
 }
 
 function devMode() {

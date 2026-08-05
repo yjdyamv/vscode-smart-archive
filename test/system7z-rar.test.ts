@@ -44,6 +44,7 @@ describe("system7zForExt (RAR)", () => {
   const bundled = path.join(
     __dirname,
     "..",
+    "vendor",
     "7z-bin",
     process.platform,
     process.arch,

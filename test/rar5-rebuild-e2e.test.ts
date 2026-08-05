@@ -30,6 +30,7 @@ const RAR5_FORMAT = {
 const BUNDLED_7ZZ = path.join(
   __dirname,
   "..",
+  "vendor",
   "7z-bin",
   "linux",
   "x64",
@@ -37,7 +38,7 @@ const BUNDLED_7ZZ = path.join(
 );
 const RAR_CLI = path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "rar");
 const UNRAR_CLI = path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "unrar");
-const BINDING = path.join(__dirname, "..", "rar5-bin", "linux", "x64", "smart-archive-rar.linux-x64-gnu.node");
+const BINDING = path.join(__dirname, "..", "vendor", "rar5-bin", "linux", "x64", "smart-archive-rar.linux-x64-gnu.node");
 
 function haveBinaries(): boolean {
   return (

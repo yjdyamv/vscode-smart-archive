@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Stage full 7-Zip (7zz) console binaries for ALL platforms under 7z-bin/, so
+ * Stage full 7-Zip (7zz) console binaries for ALL platforms under
+ * vendor/7z-bin/, so
  * the extension can bundle a native fast-path engine cross-platform (the WASM
  * 7zz WASM engine remains the universal fallback).
  *
@@ -44,12 +45,12 @@ const EXPECTED_HASHES = {
   "7z2602.exe": "17d894c17b04984b6ffcc1b31926b39c42d315cd861c3adbf7f34bd941d529ac",
 };
 
-const OUT = path.join(__dirname, "..", "7z-bin");
+const OUT = path.join(__dirname, "..", "vendor", "7z-bin");
 const cacheDir = path.join(__dirname, "..", ".cache", "7z-platforms");
 
 // asset : release file to download
 // kind  : "txz" (tar.xz, extract via system tar) | "win" (SFX, extract via 7zz)
-// dests : [ [nodePlatform, nodeArch], ... ] dirs under 7z-bin/ to populate
+// dests : [ [nodePlatform, nodeArch], ... ] dirs under vendor/7z-bin/ to populate
 // pick  : { <path-inside-archive-basename>: <output-basename> }
 const TARGETS = [
   {
