@@ -67,13 +67,13 @@ export interface DecompressOptions {
 }
 
 /**
- * Simplified interface for a js7z-tools instance.
- * js7z-tools is an Emscripten port of 7-Zip; `JS7z()` returns
+ * Simplified interface for the bundled 7-Zip ZS WASM instance.
+ * `JS7z()` returns
  * an object with an Emscripten-style virtual file system and CLI runner.
  */
 export interface JS7zInstance {
   /** Run a 7z command (arguments mirror the CLI) */
-  callMain(args: string[]): void;
+  callMain(args: string[]): number;
   /** Exit callback — receives the 7z process exit code (0 = success) */
   onExit: ((exitCode: number) => void) | null;
   /** stdout callback */
@@ -96,8 +96,10 @@ export interface JS7zInstance {
  * Emscripten virtual file system API (subset used by this extension).
  */
 export interface EmscriptenFS {
+  chdir(path: string): void;
   mkdir(path: string): void;
   rmdir(path: string): void;
+  unlink(path: string): void;
   writeFile(path: string, data: Uint8Array): void;
   readFile(path: string, options?: { encoding: "binary" }): ArrayBuffer;
   readdir(path: string): string[];
@@ -124,5 +126,5 @@ export interface EmscriptenFS {
   close(stream: unknown): void;
 }
 
-/** js7z-tools factory function signature */
+/** 7zz-wasm factory function signature */
 export type JS7zFactory = (options?: Record<string, unknown>) => Promise<JS7zInstance>;

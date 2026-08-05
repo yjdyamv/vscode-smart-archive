@@ -5,6 +5,9 @@ test/out/
 .vscode/settings.json
 media/vue/
 7z-bin/
+vendor/7zz-wasm/7zz.js
+vendor/7zz-wasm/7zz.wasm
+vendor/7zz-wasm/LICENSE
 rar5-bin/
 **/*.tsbuildinfo
 .cache/

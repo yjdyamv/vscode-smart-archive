@@ -8,8 +8,10 @@
 
 import * as path from "path";
 
-// js7z-tools is a CommonJS module
-const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
+import { JS7z as createJS7z } from "../src/engines/js7z-factory";
+
+// Bundled 7zz WASM engine (see src/engines/js7z-factory.ts).
+const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = createJS7z;
 
 // Track all WASM instances created in each test so they can be
 // cleaned up in afterEach, preventing vitest worker OOM crashes.
@@ -54,7 +56,7 @@ export interface JS7zInstance {
     write(stream: unknown, buffer: Uint8Array, offset: number, length: number, position: number): void;
     close(stream: unknown): void;
   };
-  callMain(args: string[]): void;
+  callMain(args: string[]): number;
   onExit: ((ec: number) => void) | null;
   printErr?: (t: string) => void;
   print?: (t: string) => void;
@@ -109,17 +111,14 @@ export function run7z(j: JS7zInstance, args: string[]): Promise<void> {
 }
 
 export function disposeJS7z(j: JS7zInstance): void {
-  // Release WASM memory — same logic as the production disposeJS7z
+  // Shared 7zz instance: destroy/_cleanup are no-ops. Never null the shared
+  // callbacks — other tracked aliases of the same instance may still be live.
   try {
     if (typeof j.destroy === "function") j.destroy();
     else if (typeof (j as any)._cleanup === "function") (j as any)._cleanup();
   } catch {
     // best effort
   }
-  // Null callbacks to prevent stale handlers from firing
-  j.onExit = null;
-  j.print = undefined;
-  j.printErr = undefined;
 }
 
 export async function j7zCompress(

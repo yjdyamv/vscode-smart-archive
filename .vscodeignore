@@ -20,10 +20,6 @@ skills-lock.json
 node_modules/
 !node_modules/@vscode/codicons/dist/**
 !node_modules/@vscode/codicons/LICENSE
-!node_modules/js7z-tools/js7z.js
-!node_modules/js7z-tools/js7z.wasm
-!node_modules/js7z-tools/package.json
-!node_modules/js7z-tools/LICENSE
 !node_modules/lz4-napi/index.js
 !node_modules/lz4-napi/lz4-napi.*.node
 !node_modules/lz4-napi/package.json

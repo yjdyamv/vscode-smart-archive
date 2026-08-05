@@ -29,8 +29,10 @@ export default defineConfig({
         "zstd-napi",
         "lz4-napi",
         "snappy",
-        "js7z-tools",
         "@vscode/codicons",
+        // vendored wasm engine — loaded at runtime via relative require so
+        // 7zz.js can resolve 7zz.wasm next to itself (__dirname)
+        /\/vendor\/7zz-wasm\//,
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
       ],

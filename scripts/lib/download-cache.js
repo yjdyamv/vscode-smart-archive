@@ -47,11 +47,11 @@ function httpGet(url, redirects = 5, timeoutMs = 30000, headers = {}) {
  * httpGet with exponential-backoff retries (transient network failures,
  * timeouts and 5xx). 3 attempts: 500ms / 1s / 2s delays.
  */
-async function httpGetRetry(url, { timeoutMs = 30000, retries = 3 } = {}) {
+async function httpGetRetry(url, { timeoutMs = 30000, retries = 3, headers = {} } = {}) {
   let lastErr;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await httpGet(url, 5, timeoutMs);
+      return await httpGet(url, 5, timeoutMs, headers);
     } catch (err) {
       lastErr = err;
       const msg = err && err.message ? err.message : String(err);

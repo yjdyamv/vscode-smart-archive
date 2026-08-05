@@ -1,7 +1,7 @@
 /**
  * js7z helpers — Smart Archive VSCode Extension
  *
- * Shared infrastructure for js7z-tools: cleanup, virtual-FS I/O,
+ * Shared infrastructure for the bundled 7zz WASM engine: cleanup, virtual-FS I/O,
  * and the generic 7z command runner with progress reporting.
  *
  * @module engines/js7z-helpers
@@ -58,9 +58,9 @@ function sanitizeArgs(args: string[]): string[] {
 /**
  * Construction-time stdout bridge for the WASM 7z engine.
  *
- * Emscripten binds `Module.print` to its internal `out` variable once at
- * module init, so overriding `js7z.print` after `JS7z()` has no effect.
- * Pass these handlers into `JS7z({ print, printErr })` instead, and let
+ * The factory accepts construction-time handlers and also supports assigning
+ * `js7z.print` / `js7z.printErr` afterwards — both route to the active
+ * callbacks. Pass these handlers into `JS7z({ print, printErr })` and let
  * `run7z` point `bridge.progress` at the active reporter while running.
  */
 export interface PrintBridge {
@@ -72,21 +72,23 @@ export interface PrintBridge {
 export function createPrintBridge(): PrintBridge {
   let lastPct = -1;
   let printCount = 0;
-  const bridge: PrintBridge = {
-    print(text) {
-      if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
-      if (!bridge.progress) return;
-      const m = text.match(/(\d{1,3})%/);
-      if (m) {
-        const pct = parseInt(m[1], 10);
-        if (pct !== lastPct && pct > 0) {
-          const delta = pct - (lastPct < 0 ? 0 : lastPct);
-          lastPct = pct;
-          bridge.progress.report({ message: `${pct}%`, increment: delta });
-        }
+  const handle = (text: string): void => {
+    if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
+    if (!bridge.progress) return;
+    const m = text.match(/(\d{1,3})%/);
+    if (m) {
+      const pct = parseInt(m[1], 10);
+      if (pct !== lastPct && pct > 0) {
+        const delta = pct - (lastPct < 0 ? 0 : lastPct);
+        lastPct = pct;
+        bridge.progress.report({ message: `${pct}%`, increment: delta });
       }
-    },
-    printErr() {},
+    }
+  };
+  const bridge: PrintBridge = {
+    print: handle,
+    // 7zz sends its progress bar to stderr (-bsp2); parse it like stdout.
+    printErr: handle,
   };
   return bridge;
 }
@@ -124,6 +126,17 @@ function run7z(
     };
     js7z.printErr = (text: string) => {
       stderr += text + "\n";
+      // 7zz sends progress to stderr via -bsp2; keep reporting it live.
+      if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
+      const m = text.match(/(\d{1,3})%/);
+      if (m && progress) {
+        const pct = parseInt(m[1], 10);
+        if (pct !== lastPct && pct > 0) {
+          const delta = pct - (lastPct < 0 ? 0 : lastPct);
+          lastPct = pct;
+          progress.report({ message: `${pct}%`, increment: delta });
+        }
+      }
     };
   }
 
@@ -166,7 +179,8 @@ function run7z(
       }
     };
     try {
-      js7z.callMain(args);
+      // -bsp2: the ZS wasm build only emits its progress bar on stderr.
+      js7z.callMain(["-bsp2", ...args]);
     } catch (err) {
       if (settled) return;
       settled = true;

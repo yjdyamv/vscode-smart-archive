@@ -2,7 +2,7 @@
  * js7z compress core — vscode-free pipeline, runs inside the
  * worker thread (engines/worker). Dispatcher: js7z-compress.
  *
- * Full compression pipeline using js7z-tools: copy inputs to virtual FS,
+ * Full compression pipeline using the bundled 7zz WASM engine: copy inputs to virtual FS,
  * build 7z arguments, run compression, read result back to local disk.
  * Handles wrapped formats (tar.gz etc.) as two-step tar + compress.
  *
@@ -264,7 +264,16 @@ export async function compressWith7z(
         prevCopyPct = pct;
       }
     });
-    if (token?.isCancellationRequested) throw new CancelledError();
+    // Yield briefly so queued worker messages (e.g. cancel) can run after the
+    // synchronous VFS copy and before callMain blocks the event loop. The
+    // window is bounded so fast operations are not delayed meaningfully.
+    const cancelDeadline = Date.now() + 80;
+    let cancelled = token?.isCancellationRequested ?? false;
+    while (!cancelled && Date.now() < cancelDeadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      cancelled = token?.isCancellationRequested ?? false;
+    }
+    if (cancelled) throw new CancelledError();
     prog.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
     const args = buildCompressArgs(

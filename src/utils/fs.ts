@@ -2,7 +2,7 @@
  * File system utilities — 7z VSCode Extension
  *
  * Provides bidirectional copy between the local Node.js file system
- * and the Emscripten virtual file system used by js7z-tools.
+ * and the Emscripten virtual file system used by the bundled 7zz WASM engine.
  *
  * IMPORTANT: All virtual FS paths must use forward slashes (/),
  * even on Windows. path.join() MUST NOT be used for FS paths —

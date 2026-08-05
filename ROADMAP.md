@@ -80,7 +80,7 @@ Keeps the project maintainable and contributor-friendly as it grows.
 | 4.2 | **`CONTRIBUTING.md` + architecture note** | 🟡 | S | Document the `engines → services → providers → webview` layering (it is clean but undocumented) so future changes respect the seams that Phase 2/3 depend on. |
 | 4.3 | **CI matrix on Windows + macOS** for the native codecs (`zstd-napi`, `lz4-napi`) and system-7z detection | 🟡 | M | `package:cross` handles multi-platform binaries, but tests only run on `ubuntu-latest`. The system-tool detection and path logic are exactly the code most likely to break per-OS. |
 | 4.4 | **Coverage reporting** in CI (Vitest `--coverage`) with a non-blocking threshold badge | 🟢 | S | Visibility, not a gate. |
-| 4.5 | **Dependency & WASM-binary update cadence** (Dependabot or scheduled job, plus a bump path for js7z-tools / 7-Zip version) | 🟢 | S | js7z tracks upstream 7-Zip; a documented, low-friction bump keeps format support and security current. |
+| 4.5 | **Dependency & WASM-binary update cadence** (Dependabot or scheduled job, plus a bump path for 7zz-wasm / 7-Zip version) | 🟢 | S | 7zz-wasm tracks upstream 7-Zip; a documented, low-friction bump keeps format support and security current. |
 
 **Exit criteria:** a PR runs unit + E2E tests on all three OSes; contributors have a map of the codebase.
 

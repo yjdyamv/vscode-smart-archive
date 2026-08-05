@@ -233,10 +233,12 @@ describe("merge/split operations", () => {
     const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_m.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
+    const partsData = parts.map((p) =>
+      Buffer.from(j1.FS.readFile("/" + p, { encoding: "binary" })),
+    );
     const j2 = await trackedJS7z();
-    for (const p of parts) {
-      const data = j1.FS.readFile("/" + p, { encoding: "binary" });
-      j2.FS.writeFile("/" + p, new Uint8Array(data));
+    for (const [idx, p] of parts.entries()) {
+      j2.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
     }
     j2.FS.mkdir("/o");
     await run7z(j2, ["x", "/_m.7z.001", "-o/o"]);
@@ -261,9 +263,9 @@ describe("merge/split operations", () => {
     j2.FS.mkdir("/_t");
     await run7z(j2, ["x", "/_s.7z", "-o/_t"]);
 
-    const j3 = await trackedJS7z();
     const files: Record<string, string> = {};
     copyFS(j2, "/_t", "", files);
+    const j3 = await trackedJS7z();
     for (const [k, v] of Object.entries(files)) {
       const d = path.posix.dirname(k);
       if (d && d !== ".") mkdirP(j3, "/" + d);
@@ -276,10 +278,12 @@ describe("merge/split operations", () => {
     const parts = j3.FS.readdir("/_o").filter((e) => e.startsWith("_d.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
+    const partsData = parts.map((p) =>
+      Buffer.from(j3.FS.readFile("/_o/" + p, { encoding: "binary" })),
+    );
     const j4 = await trackedJS7z();
-    for (const p of parts) {
-      const data = j3.FS.readFile("/_o/" + p, { encoding: "binary" });
-      j4.FS.writeFile("/" + p, new Uint8Array(data));
+    for (const [idx, p] of parts.entries()) {
+      j4.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
     }
     j4.FS.mkdir("/chk");
     await run7z(j4, ["x", "/_d.7z.001", "-o/chk"]);
@@ -354,10 +358,12 @@ describe("encrypt/decrypt", () => {
     const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_es.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
+    const partsData = parts.map((p) =>
+      Buffer.from(j1.FS.readFile("/" + p, { encoding: "binary" })),
+    );
     const j2 = await trackedJS7z();
-    for (const p of parts) {
-      const d = j1.FS.readFile("/" + p, { encoding: "binary" });
-      j2.FS.writeFile("/" + p, new Uint8Array(d));
+    for (const [idx, p] of parts.entries()) {
+      j2.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
     }
     j2.FS.mkdir("/o");
     await run7z(j2, ["x", "/_es.7z.001", "-o/o", `-p${pw}`]);
@@ -378,10 +384,12 @@ describe("encrypt/decrypt", () => {
     const newParts = j3.FS.readdir("/oo").filter((e) => e.startsWith("_ds.7z."));
     expect(newParts.length).toBeGreaterThanOrEqual(2);
 
+    const newPartsData = newParts.map((p) =>
+      Buffer.from(j3.FS.readFile("/oo/" + p, { encoding: "binary" })),
+    );
     const j4 = await trackedJS7z();
-    for (const p of newParts) {
-      const d = j3.FS.readFile("/oo/" + p, { encoding: "binary" });
-      j4.FS.writeFile("/" + p, new Uint8Array(d));
+    for (const [idx, p] of newParts.entries()) {
+      j4.FS.writeFile("/" + p, new Uint8Array(newPartsData[idx]));
     }
     j4.FS.mkdir("/chk2");
     await run7z(j4, ["x", "/_ds.7z.001", "-o/chk2"]);
@@ -398,10 +406,12 @@ describe("encrypt/decrypt", () => {
     const parts = j1.FS.readdir("/").filter((e) => e.startsWith("_ps.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
+    const partsData = parts.map((p) =>
+      Buffer.from(j1.FS.readFile("/" + p, { encoding: "binary" })),
+    );
     const j2 = await trackedJS7z();
-    for (const p of parts) {
-      const d = j1.FS.readFile("/" + p, { encoding: "binary" });
-      j2.FS.writeFile("/" + p, new Uint8Array(d));
+    for (const [idx, p] of parts.entries()) {
+      j2.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
     }
     j2.FS.mkdir("/o2");
     await run7z(j2, ["x", "/_ps.7z.001", "-o/o2"]);
@@ -421,18 +431,19 @@ describe("encrypt/decrypt", () => {
     const newParts = j3.FS.readdir("/oo2").filter((e) => e.startsWith("_es2.7z."));
     expect(newParts.length).toBeGreaterThanOrEqual(2);
 
+    const newPartsData = newParts.map((p) =>
+      Buffer.from(j3.FS.readFile("/oo2/" + p, { encoding: "binary" })),
+    );
     const j4 = await trackedJS7z();
-    for (const p of newParts) {
-      const d = j3.FS.readFile("/oo2/" + p, { encoding: "binary" });
-      j4.FS.writeFile("/" + p, new Uint8Array(d));
+    for (const [idx, p] of newParts.entries()) {
+      j4.FS.writeFile("/" + p, new Uint8Array(newPartsData[idx]));
     }
     j4.FS.mkdir("/chk3");
     await expect(run7z(j4, ["x", "-p-", "/_es2.7z.001", "-o/chk3"])).rejects.toThrow(/7z exit/);
 
     const j5 = await trackedJS7z();
-    for (const p of newParts) {
-      const d = j3.FS.readFile("/oo2/" + p, { encoding: "binary" });
-      j5.FS.writeFile("/" + p, new Uint8Array(d));
+    for (const [idx, p] of newParts.entries()) {
+      j5.FS.writeFile("/" + p, new Uint8Array(newPartsData[idx]));
     }
     j5.FS.mkdir("/chk3b");
     await run7z(j5, ["x", "/_es2.7z.001", "-o/chk3b", `-p${pw}`]);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Stage platform-specific snappy native binaries for all desktop platforms so
- * the extension can bundle them cross-platform (the WASM js7z engine remains
+ * the extension can bundle them cross-platform (the WASM 7zz engine remains
  * the universal fallback for non-wrapped formats, but tar.sz requires the
  * native snappy binding for both create and extract).
  *

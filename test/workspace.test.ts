@@ -6,9 +6,7 @@ import { describe, it, expect } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import { j7zCompressDir, disposeJS7z } from "./helpers";
-import type { JS7zInstance } from "./helpers";
-
-const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = require("js7z-tools");
+import { JS7z } from "../src/engines/js7z-factory";
 
 const td = fs.mkdtempSync(path.join(require("os").tmpdir(), "sat_"));
 
