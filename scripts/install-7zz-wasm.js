@@ -38,7 +38,7 @@ const API_BASE = `https://api.github.com/repos/${REPO}`;
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-7zz-wasm.js
 const EXPECTED_HASHES = {
   "7zz.js": "c90601e3456f0ee7732ea6df47220a1d6498361cd9d898e18deff13d88303df4",
-  "7zz.wasm": "2d21b67bddfc1b1ef68d8f68394819ac2e219b1ce366f56db8546603bc8b650d",
+  "7zz.wasm": "bc9dede75844c7142d63b9eccfcbdb71f02dc171484170f877fed711d24504e5",
   LICENSE: "efd01ecf087d0345468c57f7146879952c39c8daf4c461876a95de1c0d1722f3",
 };
 
