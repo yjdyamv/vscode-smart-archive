@@ -281,7 +281,6 @@ export async function compressWith7z(
       cancelled = token?.isCancellationRequested ?? false;
     }
     if (cancelled) throw new CancelledError();
-    prog.report({ message: t("compress.addedItems", String(localPaths.length)) });
 
     const args = buildCompressArgs(
       archiveFsPath,

@@ -101,11 +101,6 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "正在读取文件...",
     "zh-tw": "正在讀取檔案...",
   },
-  "compress.addedItems": {
-    en: "Added {0} item(s)",
-    "zh-cn": "已添加 {0} 个项目",
-    "zh-tw": "已新增 {0} 個項目",
-  },
   "compress.inProgress": {
     en: "Compressing...",
     "zh-cn": "正在压缩...",
@@ -926,7 +921,7 @@ function detectLocale(): Locale {
  *
  * @example
  *   t('compress.done') + outputPath
- *   t('compress.addedItems', String(count))
+ *   t('compress.inProgress')
  */
 export function t(key: string, ...args: string[]): string {
   const locale = detectLocale();

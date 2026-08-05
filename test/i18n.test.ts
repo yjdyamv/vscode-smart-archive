@@ -22,7 +22,6 @@ describe("t()", () => {
   });
 
   it("substitutes a single placeholder {0}", () => {
-    expect(t("compress.addedItems", "5")).toBe("Added 5 item(s)");
     expect(t("archive.copied", "3")).toBe("Copied 3 item(s) from archive");
   });
 
@@ -34,7 +33,7 @@ describe("t()", () => {
   });
 
   it("handles missing optional args — placeholder remains", () => {
-    expect(t("compress.addedItems")).toBe("Added {0} item(s)");
+    expect(t("archive.copied")).toBe("Copied {0} item(s) from archive");
   });
 
   it("extra args are ignored gracefully", () => {
