@@ -50,6 +50,16 @@ function buildCompressArgs(
 ): string[] {
   const args: string[] = ["a", outputFile];
 
+  // The bundled 7zz-wasm build ships Fast LZMA2 (FLZMA2) — 20–100% faster
+  // than stock LZMA2 at higher levels with a slightly lower ratio. Use it as
+  // the default method for .7z creation. FLZMA2 must get an explicit thread
+  // count: -mmt=on (auto threads + dual buffer) in this wasm build balloons
+  // past the 2 GiB memory ceiling and aborts, while explicit counts are fine.
+  if (format.label === "7z") {
+    args.push("-m0=FLZMA2");
+    args.push("-mmt=4");
+  }
+
   if (password) {
     validatePassword(password);
     args.push(`-p${password}`);
@@ -59,7 +69,9 @@ function buildCompressArgs(
   }
 
   args.push(`-mx${level}`);
-  args.push("-mmt=on");
+  if (format.label !== "7z") {
+    args.push("-mmt=on");
+  }
   if (volumeSize) {
     args.push(`-v${toBinaryVolumeSize(volumeSize)}`);
   }
