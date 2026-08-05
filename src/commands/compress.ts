@@ -23,10 +23,22 @@ import { t, compressLevels, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 import { lookupFormat, resolveSaveName } from "../api/compress";
 import { isCancellationError } from "../utils/cancellation";
+import { StageProgress, type ProgressStage, type StageDuration } from "../ui/stage-progress";
 
 // ── Shared helpers for back-navigable QuickPick / InputBox ──
 
 type StepResult<T> = { kind: "ok"; value: T } | { kind: "back" } | { kind: "cancel" };
+
+function formatStageSummary(durations: StageDuration[]): string {
+  if (durations.length < 2) return "";
+  const labels: Record<ProgressStage, string> = {
+    copy: t("compress.stage.copyShort"),
+    pack: t("compress.stage.packShort"),
+    compress: t("compress.stage.compressShort"),
+  };
+  const parts = durations.map(({ stage, ms }) => `${labels[stage]} ${formatDuration(ms)}`);
+  return t("compress.stageTimes", parts.join(" · "));
+}
 
 function promptQuickPick<T extends vscode.QuickPickItem>(
   items: readonly T[],
@@ -281,7 +293,7 @@ function estimateVolumeCount(targets: readonly { fsPath: string }[], volumeSize:
       total += st.size;
     }
   };
-  for (const t of targets) walk(t.fsPath);
+  for (const target of targets) walk(target.fsPath);
   const size = parseSize(volumeSize, 0);
   if (size <= 0) return 1;
   return Math.max(1, Math.ceil(total / size));
@@ -591,42 +603,43 @@ export async function compressCommand(
           recoveryVolumeCount,
         };
 
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: t("compress.progressTitle"),
-            cancellable: true,
-          },
-          async (progress, token) => {
-            try {
-              const excludePatterns: string[] =
-                vscode.workspace
-                  .getConfiguration("smart-archive")
-                  .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
-              const startTime = Date.now();
-              await compressWith7z(options, progress, token, excludePatterns);
-              logger.info({ event: "compress.command.done", outputPath: options.outputPath });
-              vscode.window.showInformationMessage(
-                t("compress.done") +
-                  options.outputPath +
-                  t("time.elapsed", formatDuration(Date.now() - startTime)),
-              );
-            } catch (err) {
-              logger.error({ event: "compress.command.failed", err }, "Compression failed");
-              try {
-                if (fs.existsSync(options.outputPath)) fs.unlinkSync(options.outputPath);
-              } catch {
-                logger.warn(
-                  { event: "compress.cleanup.failed" },
-                  "Failed to clean up partial output file",
-                );
-              }
-              if (!isCancellationError(err)) {
-                vscode.window.showErrorMessage(t("compress.failed") + (err as Error).message);
-              }
-            }
-          },
-        );
+        const excludePatterns: string[] =
+          vscode.workspace
+            .getConfiguration("smart-archive")
+            .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
+        const startTime = Date.now();
+        const stages = new StageProgress();
+        let error: unknown;
+        try {
+          await compressWith7z(options, stages.progress, stages.token, excludePatterns);
+        } catch (err) {
+          error = err;
+        } finally {
+          await stages.dispose();
+        }
+
+        if (error) {
+          logger.error({ event: "compress.command.failed", err: error }, "Compression failed");
+          try {
+            if (fs.existsSync(options.outputPath)) fs.unlinkSync(options.outputPath);
+          } catch {
+            logger.warn(
+              { event: "compress.cleanup.failed" },
+              "Failed to clean up partial output file",
+            );
+          }
+          if (!isCancellationError(error)) {
+            vscode.window.showErrorMessage(t("compress.failed") + (error as Error).message);
+          }
+        } else {
+          logger.info({ event: "compress.command.done", outputPath: options.outputPath });
+          vscode.window.showInformationMessage(
+            t("compress.done") +
+              options.outputPath +
+              t("time.elapsed", formatDuration(Date.now() - startTime)) +
+              formatStageSummary(stages.stageDurations()),
+          );
+        }
         return;
       }
     }

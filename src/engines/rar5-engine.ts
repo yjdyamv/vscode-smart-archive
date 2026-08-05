@@ -18,6 +18,7 @@ import * as path from "path";
 import type { CompressOptions } from "../types";
 import { CancelledError, isCancellationError } from "../utils/cancellation";
 import type { ProgressLike, TokenLike } from "../utils/cancellation";
+import { withStage } from "../utils/progress-scale";
 import { prepareExclusions, isPathExcluded, isTargetExcluded } from "../utils/exclude";
 import { isMusl } from "../utils/platform";
 import { checkFileSize, checkTotalSize, parseSize } from "../utils/security";
@@ -207,7 +208,7 @@ export async function compressWithRar5(
   token?: TokenLike,
   excludePatterns?: string[],
 ): Promise<void> {
-  const prog: ProgressLike = progress ?? { report: () => {} };
+  const prog: ProgressLike = withStage(progress ?? { report: () => {} }, "compress");
   const mod = loadBinding();
 
   const singleTarget = options.targets.length === 1;

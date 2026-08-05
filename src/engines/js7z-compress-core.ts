@@ -26,7 +26,7 @@ import {
 } from "./js7z-helpers";
 import { streamToVFS } from "./vfs-io";
 import { sumTreeBytes } from "../utils/fs";
-import { scaleProgress } from "../utils/progress-scale";
+import { withStage } from "../utils/progress-scale";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
 import { isWrappedFormat, getWrapExtension } from "../constants";
@@ -162,7 +162,8 @@ export async function compressWith7z(
       const tarDiskPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
 
       try {
-        prog.report({ message: t("compress.creatingTar") });
+        const packProgress = progress ? withStage(progress, "pack") : undefined;
+        packProgress?.report({ message: t("compress.creatingTar") });
         // Apply single-target exclusion filter for wrapped formats (tar.gz, etc.).
         // Single target: skip patterns matching the target's basename to prevent
         // excluding the only item the user selected (e.g. a folder named "node_modules").
@@ -178,34 +179,34 @@ export async function compressWith7z(
           options.targets.map((target) => target.fsPath),
           token,
           filteredExcludes,
-          progress ? scaleProgress(progress, 0, 50) : undefined,
+          packProgress,
         );
         if (token?.isCancellationRequested) throw new CancelledError();
 
-        const compressProgress = progress ? scaleProgress(progress, 50, 100) : undefined;
+        const compressProgress = progress ? withStage(progress, "compress") : undefined;
         let compressedData: Uint8Array | undefined;
         if (wrapExt === "zst") {
-          prog.report({ message: t("compress.compressingTar", wrapExt) });
+          compressProgress?.report({ message: t("compress.compressingTar", wrapExt) });
           const zstOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.zst");
           await zstdCompressFile(tarDiskPath, zstOut, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(zstOut));
         } else if (wrapExt === "lz4") {
-          prog.report({ message: t("compress.compressingTar", wrapExt) });
+          compressProgress?.report({ message: t("compress.compressingTar", wrapExt) });
           const lz4Out = path.join(path.dirname(tarDiskPath), "_tmp.tar.lz4");
           await lz4CompressFile(tarDiskPath, lz4Out, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(lz4Out));
         } else if (wrapExt === "br") {
-          prog.report({ message: t("compress.compressingTar", wrapExt) });
+          compressProgress?.report({ message: t("compress.compressingTar", wrapExt) });
           const brOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.br");
           await brotliCompressFile(tarDiskPath, brOut, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(brOut));
         } else if (wrapExt === "sz") {
-          prog.report({ message: t("compress.compressingTar", wrapExt) });
+          compressProgress?.report({ message: t("compress.compressingTar", wrapExt) });
           const szOut = path.join(path.dirname(tarDiskPath), "_tmp.tar.sz");
           await snappyCompressFile(tarDiskPath, szOut, options.level, compressProgress);
           compressedData = new Uint8Array(fs.readFileSync(szOut));
         } else {
-          prog.report({ message: t("compress.compressingTar", wrapExt) });
+          compressProgress?.report({ message: t("compress.compressingTar", wrapExt) });
           const js7z2 = await JS7z({
             print: printBridge.print,
             printErr: printBridge.printErr,
@@ -247,7 +248,8 @@ export async function compressWith7z(
     }
 
     // Non-wrapped formats: copy inputs to VFS for 7z
-    prog.report({ message: t("compress.readingFiles") });
+    const copyProgress = progress ? withStage(progress, "copy") : undefined;
+    copyProgress?.report({ message: t("compress.readingFiles") });
 
     // Multi-target: pre-filter targets matching exclusion patterns
     // (e.g. node_modules, .git selected alongside src at project root)
@@ -261,7 +263,6 @@ export async function compressWith7z(
     js7z.FS.mkdir(OUTPUT_DIR);
 
     const copyTotal = progress ? sumTreeBytes(filteredPaths) : 0;
-    const copyProgress = progress ? scaleProgress(progress, 0, 40) : undefined;
     let prevCopyPct = 0;
     const allInputPaths = copyInputsToFS(js7z, filteredPaths, token, (cumulative) => {
       if (!copyProgress || copyTotal <= 0) return;
@@ -293,7 +294,7 @@ export async function compressWith7z(
     await run7z(
       js7z,
       [...args, ...excludeArgs],
-      progress ? scaleProgress(progress, 40, 100) : undefined,
+      progress ? withStage(progress, "compress") : undefined,
       undefined,
       undefined,
       printBridge,

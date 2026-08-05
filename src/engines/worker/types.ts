@@ -12,6 +12,7 @@
 
 import type { CompressOptions, DecompressOptions } from "../../types";
 import type { LogLevel } from "../../utils/logger-core";
+import type { ProgressStage } from "../../utils/cancellation";
 
 export type ArchiveOp = "compress" | "decompress" | "list" | "isEncrypted" | "modify" | "unwrap";
 
@@ -149,6 +150,7 @@ export interface ProgressMessage {
   id: number;
   message?: string;
   increment?: number;
+  stage?: ProgressStage;
 }
 
 export interface LogMessage {

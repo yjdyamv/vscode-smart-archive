@@ -38,7 +38,7 @@ import { setZstdConfig, resetZstdDetectionCache } from "../zstd-codec";
 import { setLoggerSink } from "../../utils/logger-core";
 import { setWorkerMemoryLimitMb } from "./memory-guard";
 import { isCancellationError } from "../../utils/cancellation";
-import type { TokenLike, ProgressLike } from "../../utils/cancellation";
+import type { TokenLike, ProgressLike, ProgressStage } from "../../utils/cancellation";
 import { logger } from "../../utils/logger-core";
 
 export interface WorkerPort {
@@ -86,8 +86,14 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
 
   function makeProgress(requestId: number): ProgressLike {
     return {
-      report(v: { message?: string; increment?: number }) {
-        post({ type: "progress", id: requestId, message: v.message, increment: v.increment });
+      report(v: { message?: string; increment?: number; stage?: ProgressStage }) {
+        post({
+          type: "progress",
+          id: requestId,
+          message: v.message,
+          increment: v.increment,
+          stage: v.stage,
+        });
       },
     };
   }

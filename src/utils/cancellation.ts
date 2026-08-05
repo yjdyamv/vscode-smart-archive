@@ -38,7 +38,10 @@ export interface TokenLike {
   onCancellationRequested?(listener: () => void): { dispose(): void };
 }
 
+/** Compression pipeline stages reported by engines. */
+export type ProgressStage = "copy" | "pack" | "compress";
+
 /** Minimal progress shape (matches vscode.Progress<T>). */
-export interface ProgressLike<T = { message?: string; increment?: number }> {
+export interface ProgressLike<T = { message?: string; increment?: number; stage?: ProgressStage }> {
   report(value: T): void;
 }
