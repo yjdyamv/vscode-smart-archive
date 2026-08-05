@@ -3,7 +3,7 @@
  *
  * Three layers of protection around scripts/install-rar5-platforms.js:
  *   1. config sanity: every staged triple has a pinned SHA-256, in valid form;
- *   2. staged binaries: any .node already staged under rar5-bin/ must match
+ *   2. staged binaries: any .node already staged under vendor/rar5-bin/ must match
  *      its pinned hash (or be byte-identical to a local dev build);
  *   3. official digest (optional): with SA_VERIFY_RAR5_HASHES=1, compares
  *      EXPECTED_HASHES against the GitHub Release API's `digest` field —
@@ -33,7 +33,7 @@ function allTriples(): string[] {
 }
 
 function stagedNodes(): { triple: string; file: string }[] {
-  const root = path.join(__dirname, "..", "rar5-bin");
+  const root = path.join(__dirname, "..", "vendor", "rar5-bin");
   if (!fs.existsSync(root)) return [];
   return fs
     .readdirSync(root, { recursive: true })

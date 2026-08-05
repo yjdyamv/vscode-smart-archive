@@ -7,7 +7,7 @@
  * reporting — no external binary required, and passwords never touch
  * the command line.
  *
- * The platform .node binary is staged under rar5-bin/<platform>/<arch>/
+ * The platform .node binary is staged under vendor/rar5-bin/<platform>/<arch>/
  * by scripts/install-rar5-platforms.js.
  *
  * @module engines/rar5-engine
@@ -84,13 +84,14 @@ function loadBinding(): Rar5Binding {
   try {
     const triple = resolveRarTriple();
     const rel = path.join(
+      "vendor",
       "rar5-bin",
       process.platform,
       process.arch,
       `smart-archive-rar.${triple}.node`,
     );
-    // Compiled bundle: out/extension.js → <root>/rar5-bin. Vitest/dev (source
-    // modules): src/engines/... → <root>/rar5-bin. Try both layouts.
+    // Compiled bundle: out/extension.js → <root>/vendor/rar5-bin. Vitest/dev
+    // (source modules): src/engines/... → <root>/vendor/rar5-bin. Try both.
     const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
     const nodePath = candidates.find((c) => fs.existsSync(c));
     if (!nodePath) {
