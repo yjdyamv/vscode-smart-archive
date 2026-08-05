@@ -40,12 +40,23 @@ const RAR_CLI = path.join(os.homedir(), "桌面", "rar-rs", "target", "release",
 const UNRAR_CLI = path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "unrar");
 const BINDING = path.join(__dirname, "..", "vendor", "rar5-bin", "linux", "x64", "smart-archive-rar.linux-x64-gnu.node");
 
+function canSpawn(bin: string): boolean {
+  try {
+    const r = childProcess.spawnSync(bin, ["--help"], { encoding: "utf8", timeout: 5000 });
+    if (r.status === null || r.status === undefined) return false;
+    const out = (r.stdout || "") + (r.stderr || "");
+    return out.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function haveBinaries(): boolean {
   return (
     process.platform === "linux" &&
-    fs.existsSync(BUNDLED_7ZZ) &&
-    fs.existsSync(RAR_CLI) &&
-    fs.existsSync(UNRAR_CLI) &&
+    canSpawn(BUNDLED_7ZZ) &&
+    canSpawn(RAR_CLI) &&
+    canSpawn(UNRAR_CLI) &&
     fs.existsSync(BINDING)
   );
 }
@@ -281,7 +292,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
     const vols = fs.readdirSync(dir).filter((n) => n.endsWith(".rar")).sort();
     const missing = path.join(dir, vols[Math.floor(vols.length / 2)]);
     fs.rmSync(missing);
-    if (fs.existsSync(officialRar)) {
+    if (canSpawn(officialRar)) {
       const out = childProcess.execFileSync(officialRar, ["rc", archive], { encoding: "utf8" });
       expect(out).toContain("Done");
       expect(fs.existsSync(missing)).toBe(true);
@@ -322,7 +333,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
 
     // Official rar validates the recovery record.
     const officialRar = "/home/yuan/下载/rar/rar";
-    if (fs.existsSync(officialRar)) {
+    if (canSpawn(officialRar)) {
       const out = childProcess.execFileSync(officialRar, ["t", archive], { encoding: "utf8" });
       expect(out).toContain("recovery record");
       expect(out).toContain("All OK");

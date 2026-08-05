@@ -96,7 +96,13 @@ describe("rar5 compress progress", () => {
       const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5prog2_"));
       try {
         const big = path.join(td, "big.bin");
-        const chunk = Buffer.alloc(4 * 1024 * 1024, 7);
+        // Incompressible pseudo-random data: the streaming (>64 MiB) path
+        // emits intermediate progress events instead of finishing in one
+        // chunk, which is what this regression test needs to observe.
+        const chunk = Buffer.alloc(4 * 1024 * 1024);
+        for (let i = 0; i < chunk.length; i += 4) {
+          chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
+        }
         const fd = fs.openSync(big, "w");
         for (let i = 0; i < 17; i++) fs.writeSync(fd, chunk);
         fs.closeSync(fd);

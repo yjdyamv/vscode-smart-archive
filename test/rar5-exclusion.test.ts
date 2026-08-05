@@ -5,8 +5,8 @@
  * default noisy-dir patterns (COMPRESS_EXCLUDE_DEFAULTS) and custom
  * patterns must keep excluded files AND directories out of the produced
  * archive, empty directories must be preserved, and symlinks must be
- * followed. Listing is done with the rar-rs CLI (built from the pinned
- * fork), the same binary the binding wraps.
+ * followed. Listing is done with the bundled full-format 7zz, which can
+ * read RAR5.
  */
 import * as childProcess from "child_process";
 import * as fs from "fs";
@@ -16,14 +16,33 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compress } from "../src/api/compress";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../src/constants";
 
-const RAR_CLI = path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "rar");
+const BUNDLED_7ZZ = path.join(
+  __dirname,
+  "..",
+  "vendor",
+  "7z-bin",
+  process.platform,
+  process.arch,
+  process.platform === "win32" ? "7z.exe" : "7zz",
+);
 
-function haveRarCli(): boolean {
-  return fs.existsSync(RAR_CLI);
+function canSpawn(bin: string): boolean {
+  try {
+    const r = childProcess.spawnSync(bin, ["--help"], { encoding: "utf8", timeout: 5000 });
+    if (r.status === null || r.status === undefined) return false;
+    const out = (r.stdout || "") + (r.stderr || "");
+    return out.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function have7zz(): boolean {
+  return fs.existsSync(BUNDLED_7ZZ) && canSpawn(BUNDLED_7ZZ);
 }
 
 function listArchive(rarPath: string): string[] {
-  const out = childProcess.execFileSync(RAR_CLI, ["l", rarPath], { encoding: "utf8" });
+  const out = childProcess.execFileSync(BUNDLED_7ZZ, ["l", rarPath], { encoding: "utf8" });
   return out
     .split("\n")
     .map((l) => l.trim())
@@ -59,7 +78,7 @@ describe("rar5 exclusion pipeline", () => {
   });
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it.runIf(haveRarCli())(
+  it.runIf(have7zz())(
     "default noisy-dir patterns keep node_modules/.git/dist/__pycache__ out",
     async () => {
       const outPath = path.join(dir, "defaults.rar");
@@ -82,7 +101,7 @@ describe("rar5 exclusion pipeline", () => {
     },
   );
 
-  it.runIf(haveRarCli())("custom patterns exclude files and directories", async () => {
+  it.runIf(have7zz())("custom patterns exclude files and directories", async () => {
     const outPath = path.join(dir, "custom.rar");
     await compress({
       targets: [proj],
@@ -100,7 +119,7 @@ describe("rar5 exclusion pipeline", () => {
     expect(joined).toContain("src/main.js");
   });
 
-  it.runIf(haveRarCli())("multi-target: noisy dirs still excluded", async () => {
+  it.runIf(have7zz())("multi-target: noisy dirs still excluded", async () => {
     const outPath = path.join(dir, "multi.rar");
     await compress({
       targets: [proj, path.join(dir, "extra.txt")],
@@ -114,7 +133,7 @@ describe("rar5 exclusion pipeline", () => {
     expect(joined).toContain("extra.txt");
   });
 
-  it.runIf(haveRarCli())("empty directories are preserved", async () => {
+  it.runIf(have7zz())("empty directories are preserved", async () => {
     const outPath = path.join(dir, "empty.rar");
     await compress({
       targets: [proj],
@@ -124,10 +143,10 @@ describe("rar5 exclusion pipeline", () => {
       excludePatterns: COMPRESS_EXCLUDE_DEFAULTS,
     });
     const joined = listArchive(outPath).join("\n");
-    expect(joined).toContain("empty/");
+    expect(joined).toContain("empty");
   });
 
-  it.runIf(haveRarCli())("symlinks are followed (file and directory)", async () => {
+  it.runIf(have7zz())("symlinks are followed (file and directory)", async () => {
     const linkedFile = path.join(proj, "src", "link.txt");
     const linkedDir = path.join(proj, "keep", "linkdir");
     try {
