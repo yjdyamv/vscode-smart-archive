@@ -23,7 +23,7 @@ const BUNDLED_7ZZ = path.join(
   "7z-bin",
   process.platform,
   process.arch,
-  process.platform === "win32" ? "7z.exe" : "7zz",
+  process.platform === "win32" ? "7zz.exe" : "7zz",
 );
 
 function canSpawn(bin: string): boolean {

@@ -1,25 +1,27 @@
 #!/usr/bin/env node
 /**
- * Stage full 7-Zip (7zz) console binaries for ALL platforms under
- * vendor/7z-bin/, so
- * the extension can bundle a native fast-path engine cross-platform (the WASM
- * 7zz WASM engine remains the universal fallback).
+ * Stage native 7-Zip ZS (7zz) console binaries for the platforms that have
+ * builds under vendor/7z-bin/, so the extension can bundle a native fast-path
+ * engine (the WASM 7zz engine remains the universal fallback).
  *
- *   Linux / macOS : a single static `7zz` binary from the official .tar.xz.
- *                   (macOS ships a universal binary → used for x64 and arm64.)
- *   Windows       : the FULL-format `7z.exe` + `7z.dll` (the RAR codec lives in
- *                   7z.dll). The standalone `7za.exe` is reduced and lacks RAR,
- *                   so we extract 7z.exe/7z.dll from the official installer
- *                   (itself a 7-Zip SFX archive) using the Linux 7zz we stage.
+ *   linux x64/arm64, macOS arm64, Windows x64/arm64: native 7-Zip ZS
+ *   binaries from yjdyamv/7-Zip-zstd-native (mcmilk fork). Single static
+ *   binaries (`7zz` on Linux/macOS, `7zz.exe` on Windows — one consistent
+ *   name across platforms, all codecs included).
  *
- * Source: official ip7z/7zip GitHub releases. Each downloaded ARCHIVE is
- * verified against a pinned SHA-256 (fail-closed). To (re)generate hashes after
- * a version bump, run once with SA_HASH_BOOTSTRAP=1: the script prints and
- * persists the new hashes into EXPECTED_HASHES.
+ * Platforms without a native build (linux arm, macOS x64, Windows ia32) get
+ * no bundled binary — system7z.ts returns null there and the WASM engine
+ * takes over.
+ *
+ * Source: yjdyamv/7-Zip-zstd-native GitHub releases. Each downloaded
+ * ARCHIVE is verified against a pinned SHA-256 (fail-closed). To
+ * (re)generate hashes after a version bump, run once with
+ * SA_HASH_BOOTSTRAP=1: the script prints and persists the new hashes into
+ * EXPECTED_HASHES.
  *
  * NOTE: exact asset filenames / archive layout for a given release must be
  * confirmed on first run — a wrong name fails loudly (download or extract
- * error), never silently. Requires `tar` (with xz) on the build host.
+ * error), never silently. Requires `tar` (with xz/gzip) on the build host.
  */
 const fs = require("fs");
 const path = require("path");
@@ -32,77 +34,64 @@ const {
 } = require("./lib/download-cache");
 
 // Keep in sync with the 7zz-wasm WASM engine version (README: 7-Zip 26.02).
-const VER = "26.02";
-const TAG = "2602"; // filename token: 26.02 -> "2602"
-const BASE = `https://github.com/ip7z/7zip/releases/download/${VER}`;
+// Native 7-Zip ZS (mcmilk/7-Zip-zstd fork) release published in our own repo.
+const TAG = "v26.02-v1.5.7-R2";
+const BASE = `https://github.com/yjdyamv/7-Zip-zstd-native/releases/download/${TAG}`;
 
 // SHA-256 of each downloaded ARCHIVE, keyed by asset filename. Fail-closed:
 // with no pinned hash the build refuses the binary unless SA_HASH_BOOTSTRAP=1.
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-7z-platforms.js
 const EXPECTED_HASHES = {
-  "7z2602-linux-x64.tar.xz": "41aaba7b1235304ab5aa0624530c67ae829496cd29e875925271efdccc28c03e",
-  "7z2602-linux-arm64.tar.xz": "70ea6cc737ae1495ea2d7eb20ef3120fe579bd3f1a83a9d2362b62ec5bde2bba",
-  "7z2602-linux-arm.tar.xz": "81b7f04b3528852fac10f5becf9f15870a5da4cb94fbcb8a138197eb937468bf",
-  "7z2602-mac.tar.xz": "1cf6760579502f87e591ff5c73a005ec50b3e4d6f507e8b038382d563c3175b9",
-  "7z2602-x64.exe": "6745fa76dc2ea031596d8678f6f6b99c3c1b435b4164a63485adbbc7b8d82ef0",
-  "7z2602-arm64.exe": "7c6fde79ed5e11b81c7bb6573b7962d3b6322aa5fce69c33ed19f672b55173ab",
-  "7z2602.exe": "17d894c17b04984b6ffcc1b31926b39c42d315cd861c3adbf7f34bd941d529ac",
+  "7zz-linux-x64.tar.gz": "4b8185422d870425862c410854d352af30ab9c7e3b284589d14778236db32e96",
+  "7zz-linux-arm64.tar.gz": "eb766d7a642241ded7c4544f43ea48b3c80a41aac344fd4fe10685b0be4eb476",
+  "7zz-macos-arm64.tar.gz": "ff50ad7541a4124f276f9172e22b59dae6c777063b80883ead530f163c10c4a1",
+  "7zz-windows-x64.zip": "02c72574b7b6cf53380f210b411bcacba5830c4d46deaf90c501fb79c0d62df4",
+  "7zz-windows-arm64.zip": "67b0dac184c2ba13fec818140b513fd06edc195992d4598ed5b0dbe131256250",
 };
 
 const OUT = path.join(__dirname, "..", "vendor", "7z-bin");
 const cacheDir = path.join(__dirname, "..", ".cache", "7z-platforms");
 
 // asset : release file to download
-// kind  : "txz" (tar.xz, extract via system tar) | "win" (SFX, extract via 7zz)
+// kind  : "tgz" (tar.gz, extract via system tar) | "zip" (extract via 7zz)
 // dests : [ [nodePlatform, nodeArch], ... ] dirs under vendor/7z-bin/ to populate
 // pick  : { <path-inside-archive-basename>: <output-basename> }
 const TARGETS = [
   {
-    asset: `7z${TAG}-linux-x64.tar.xz`,
-    kind: "txz",
+    asset: "7zz-linux-x64.tar.gz",
+    kind: "tgz",
     dests: [["linux", "x64"]],
-    pick: { "7zzs": "7zz" },
-  },
-  {
-    asset: `7z${TAG}-linux-arm64.tar.xz`,
-    kind: "txz",
-    dests: [["linux", "arm64"]],
-    pick: { "7zzs": "7zz" },
-  },
-  {
-    asset: `7z${TAG}-linux-arm.tar.xz`,
-    kind: "txz",
-    dests: [["linux", "arm"]],
-    pick: { "7zzs": "7zz" },
-  },
-  // macOS: universal binary → one download serves both arches
-  {
-    asset: `7z${TAG}-mac.tar.xz`,
-    kind: "txz",
-    dests: [
-      ["darwin", "x64"],
-      ["darwin", "arm64"],
-    ],
     pick: { "7zz": "7zz" },
+    native: true,
   },
-  // Windows: extract full-format console binary + codec dll from the installer
   {
-    asset: `7z${TAG}-x64.exe`,
-    kind: "win",
+    asset: "7zz-linux-arm64.tar.gz",
+    kind: "tgz",
+    dests: [["linux", "arm64"]],
+    pick: { "7zz": "7zz" },
+    native: true,
+  },
+  {
+    asset: "7zz-macos-arm64.tar.gz",
+    kind: "tgz",
+    dests: [["darwin", "arm64"]],
+    pick: { "7zz": "7zz" },
+    native: true,
+  },
+  {
+    asset: "7zz-windows-x64.zip",
+    kind: "zip",
     dests: [["win32", "x64"]],
-    pick: { "7z.exe": "7z.exe", "7z.dll": "7z.dll" },
+    // Keep the native 7zz.exe name — mac/linux/win all use `7zz`.
+    pick: { "7zz.exe": "7zz.exe" },
+    native: true,
   },
   {
-    asset: `7z${TAG}-arm64.exe`,
-    kind: "win",
+    asset: "7zz-windows-arm64.zip",
+    kind: "zip",
     dests: [["win32", "arm64"]],
-    pick: { "7z.exe": "7z.exe", "7z.dll": "7z.dll" },
-  },
-  {
-    asset: `7z${TAG}.exe`,
-    kind: "win",
-    dests: [["win32", "ia32"]],
-    pick: { "7z.exe": "7z.exe", "7z.dll": "7z.dll" },
+    pick: { "7zz.exe": "7zz.exe" },
+    native: true,
   },
 ];
 
@@ -177,10 +166,13 @@ function hostSevenZip() {
     } catch {
       /* not on PATH */
     }
-    // Fall back to just-staged win32 binary
+    // Fall back to just-staged win32 binary (7zz.exe; 7z.exe covers stale
+    // vendor dirs from older staging runs)
     for (const a of ["x64", "arm64", "ia32"]) {
-      const p = path.join(OUT, "win32", a, "7z.exe");
-      if (fs.existsSync(p)) return p;
+      for (const bin of ["7zz.exe", "7z.exe"]) {
+        const p = path.join(OUT, "win32", a, bin);
+        if (fs.existsSync(p)) return p;
+      }
     }
     return null;
   }
@@ -189,8 +181,8 @@ function hostSevenZip() {
 
 function extract(kind, archivePath, tmpDir) {
   fs.mkdirSync(tmpDir, { recursive: true });
-  if (kind === "txz") {
-    execFileSync("tar", ["-xJf", archivePath, "-C", tmpDir], { stdio: "inherit" });
+  if (kind === "tgz") {
+    execFileSync("tar", ["-xzf", archivePath, "-C", tmpDir], { stdio: "inherit" });
   } else {
     const sz = hostSevenZip();
     if (!sz) {
@@ -219,12 +211,12 @@ async function processTarget(t) {
     destPath: archivePath,
     expectedSha256: EXPECTED_HASHES[t.asset],
     requireHash: true,
-    label: t.asset,
-    fetch: async () => {
-      const url = `${BASE}/${t.asset}`;
-      const { httpGetMirrored } = require("./lib/download-cache");
-      return httpGetMirrored(url);
-    },
+      label: t.asset,
+      fetch: async () => {
+        const url = `${BASE}/${t.asset}`;
+        const { httpGetMirrored } = require("./lib/download-cache");
+        return httpGetMirrored(url);
+      },
   });
 
   if (result.status === "failed") {
@@ -256,11 +248,20 @@ async function processTarget(t) {
       }
       console.log(`  ${srcName} -> ${t.dests.map(([p, a]) => `${p}/${a}/${outName}`).join(", ")}`);
     }
-    // Ship the 7-Zip license once (LGPL compliance).
-    const lic = findFile(unpackDir, "License.txt");
+    // Ship the 7-Zip license once (LGPL compliance); native archives carry
+    // it as LICENSE, official ones as License.txt.
+    const lic = findFile(unpackDir, "License.txt") || findFile(unpackDir, "LICENSE");
     if (lic && !fs.existsSync(path.join(OUT, "License.txt"))) {
       fs.mkdirSync(OUT, { recursive: true });
       fs.copyFileSync(lic, path.join(OUT, "License.txt"));
+    }
+    // Keep the native build provenance (tag + upstream commit) in the bundle.
+    if (t.native) {
+      const ver = findFile(unpackDir, "VERSION");
+      if (ver) {
+        fs.mkdirSync(OUT, { recursive: true });
+        writeFileAtomic(path.join(OUT, "VERSION-native"), fs.readFileSync(ver));
+      }
     }
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -268,11 +269,22 @@ async function processTarget(t) {
 }
 
 async function main() {
-  console.log(`Staging 7-Zip ${VER} binaries into ${path.relative(process.cwd(), OUT)}/`);
+  console.log(`Staging 7-Zip ZS ${TAG} binaries into ${path.relative(process.cwd(), OUT)}/`);
+  // Start from a clean slate: previous staging runs may have left platform
+  // dirs that no longer exist (old official 7-Zip layout, dropped platforms,
+  // stray DLLs) — they must never end up in the VSIX.
+  if (fs.existsSync(OUT)) {
+    for (const entry of fs.readdirSync(OUT, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        fs.rmSync(path.join(OUT, entry.name), { recursive: true, force: true });
+        console.log(`  cleared ${entry.name}/`);
+      }
+    }
+  }
   // Linux x64 must be processed first — its 7zz is the host tool used to
-  // unpack the Windows SFX installers on Linux build hosts.
+  // unpack the Windows zip archives on Linux build hosts.
   const linuxX64 = TARGETS.find(
-    (t) => t.kind === "txz" && t.dests.some(([p, a]) => p === "linux" && a === "x64"),
+    (t) => t.kind === "tgz" && t.dests.some(([p, a]) => p === "linux" && a === "x64"),
   );
   if (linuxX64) {
     await processTarget(linuxX64);
@@ -291,12 +303,12 @@ async function main() {
   const staged = [];
   for (const t of TARGETS) {
     for (const [plat, arch] of t.dests) {
-      const bin = plat === "win32" ? "7z.exe" : "7zz";
+      const bin = plat === "win32" ? "7zz.exe" : "7zz";
       const f = path.join(OUT, plat, arch, bin);
       if (fs.existsSync(f)) staged.push(`${plat}/${arch}`);
     }
   }
-  console.log(`\n=== 7-Zip ${VER}: staged ${new Set(staged).size} platform dirs ===`);
+  console.log(`\n=== 7-Zip ZS ${TAG}: staged ${new Set(staged).size} platform dirs ===`);
 }
 
 main().catch((err) => {

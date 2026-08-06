@@ -19,6 +19,7 @@ import { getVolumeSizes } from "../utils/volume-sizes";
 import { parseSize } from "../utils/security";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
+import { normalizeSevenZipMethod } from "../utils/sevenZipMethod";
 import { t, compressLevels, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 import { lookupFormat, resolveSaveName } from "../api/compress";
@@ -601,6 +602,11 @@ export async function compressCommand(
           encryptHeaders,
           recoveryPercent,
           recoveryVolumeCount,
+          sevenZipMethod: normalizeSevenZipMethod(
+            vscode.workspace
+              .getConfiguration("smart-archive")
+              .get<string>("sevenZipMethod", "flzma2"),
+          ),
         };
 
         const excludePatterns: string[] =

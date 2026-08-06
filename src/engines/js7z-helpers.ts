@@ -102,7 +102,20 @@ function run7z(
   printBridge?: PrintBridge,
 ): Promise<void> {
   logger.info({ event: "run7z.enter", args: sanitizeArgs(args) });
-  if (printBridge) printBridge.progress = progress;
+  // Track cumulative reported percentage so fast/small operations still land
+  // on 100% at completion even when no intermediate % is printed.
+  let reportedPct = 0;
+  const trackProgress: ProgressLike | undefined = progress
+    ? {
+        report(r) {
+          if (typeof r.increment === "number" && r.increment > 0) {
+            reportedPct = Math.min(100, reportedPct + r.increment);
+          }
+          progress.report(r);
+        },
+      }
+    : undefined;
+  if (printBridge) printBridge.progress = trackProgress;
   const prevPrint = js7z.print;
   const prevPrintErr = js7z.printErr;
   let stderr = "";
@@ -115,12 +128,12 @@ function run7z(
       // working). Throws synchronously — caught by the callMain try/catch.
       if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
       const m = text.match(/(\d{1,3})%/);
-      if (m && progress) {
+      if (m && trackProgress) {
         const pct = parseInt(m[1], 10);
         if (pct !== lastPct && pct > 0) {
           const delta = pct - (lastPct < 0 ? 0 : lastPct);
           lastPct = pct;
-          progress.report({ message: `${pct}%`, increment: delta });
+          trackProgress.report({ message: `${pct}%`, increment: delta });
         }
       }
     };
@@ -129,12 +142,12 @@ function run7z(
       // 7zz sends progress to stderr via -bsp2; keep reporting it live.
       if (++printCount % MEMORY_CHECK_EVERY_PRINT === 0) checkWorkerMemory();
       const m = text.match(/(\d{1,3})%/);
-      if (m && progress) {
+      if (m && trackProgress) {
         const pct = parseInt(m[1], 10);
         if (pct !== lastPct && pct > 0) {
           const delta = pct - (lastPct < 0 ? 0 : lastPct);
           lastPct = pct;
-          progress.report({ message: `${pct}%`, increment: delta });
+          trackProgress.report({ message: `${pct}%`, increment: delta });
         }
       }
     };
@@ -165,10 +178,16 @@ function run7z(
       cleanup();
       logger.info({ event: "run7z.exit", exitCode });
       if (exitCode === 0) {
+        if (trackProgress && reportedPct < 100) {
+          trackProgress.report({ message: "100%", increment: 100 - reportedPct });
+        }
         resolve();
       } else if (exitCode === 1) {
         // 7-Zip exit code 1 = Warning (Non fatal error).
         // Match system7z.ts behaviour: resolve rather than reject.
+        if (trackProgress && reportedPct < 100) {
+          trackProgress.report({ message: "100%", increment: 100 - reportedPct });
+        }
         logger.warn(
           { event: "run7z.warning", exitCode, stderrTail: stderr.slice(-200) },
           "7z exited with warning (code 1)",

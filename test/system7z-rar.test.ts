@@ -48,7 +48,7 @@ describe("system7zForExt (RAR)", () => {
     "7z-bin",
     process.platform,
     process.arch,
-    process.platform === "win32" ? "7z.exe" : "7zz",
+    process.platform === "win32" ? "7zz.exe" : "7zz",
   );
 
   it.runIf(fs.existsSync(bundled))(

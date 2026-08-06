@@ -39,6 +39,12 @@ import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger-core";
 import { validatePassword } from "../utils/security";
 import { prepareExclusions, isTargetExcluded } from "../utils/exclude";
+import type { SevenZipMethod } from "../types";
+import {
+  mapLizardLevel,
+  normalizeSevenZipMethod,
+  SEVEN_ZIP_METHOD_CODECS,
+} from "../utils/sevenZipMethod";
 
 function buildCompressArgs(
   outputFile: string,
@@ -47,14 +53,21 @@ function buildCompressArgs(
   password: string,
   level: number,
   volumeSize?: string,
+  sevenZipMethod?: SevenZipMethod,
 ): string[] {
   const args: string[] = ["a", outputFile];
+  const method = format.label === "7z" ? normalizeSevenZipMethod(sevenZipMethod) : undefined;
 
-  // The bundled 7zz-wasm build ships Fast LZMA2 (FLZMA2) — 20–100% faster
-  // than stock LZMA2 at higher levels with a slightly lower ratio. Use it as
-  // the default method for .7z creation.
+  // The bundled 7zz-wasm build ships FLZMA2/ZSTD/BROTLI/LZ4/LIZARD etc.
+  // Default to FLZMA2; the user picks via smart-archive.sevenZipMethod.
+  // Level 0 means store — force Copy because the fork maps -mx0 of its new
+  // codecs to "fastest" (still compressing).
   if (format.label === "7z") {
-    args.push("-m0=FLZMA2");
+    if (level === 0) {
+      args.push("-m0=Copy");
+    } else {
+      args.push(`-m0=${SEVEN_ZIP_METHOD_CODECS[method!]}`);
+    }
   }
 
   if (password) {
@@ -65,7 +78,9 @@ function buildCompressArgs(
     }
   }
 
-  args.push(`-mx${level}`);
+  // LizardMT speaks levels 10–49; map the UI's 0–9 scale onto it.
+  const mxLevel = method === "lizard" && level > 0 ? mapLizardLevel(level) : level;
+  args.push(`-mx${mxLevel}`);
   args.push("-mmt=on");
   if (volumeSize) {
     args.push(`-v${toBinaryVolumeSize(volumeSize)}`);
@@ -290,6 +305,7 @@ export async function compressWith7z(
       options.password,
       options.level,
       options.volumeSize,
+      options.sevenZipMethod,
     );
     await run7z(
       js7z,
