@@ -12,7 +12,7 @@
 import * as vscode from "vscode";
 import type { DecompressOptions } from "../types";
 import { runArchiveOp } from "./worker/runner";
-import { hasSystem7zForFormat, decompressWithSystem7z } from "./system7z";
+import { hasSystem7zForFormat, decompressWithSystem7z, system7zCanDecompress } from "./system7z";
 import { isCancellationError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import { logger } from "../utils/logger";
@@ -34,7 +34,8 @@ export async function decompressWith7z(
   // a known copyDirFromFS issue (separate bug). The password risk on
   // decompress is the same (CLI exposure), but the user already knows
   // the password — it was just entered — so the window is narrow.
-  if (hasSystem7zForFormat(getFullExt(options.inputPath), true)) {
+  const useSystem = hasSystem7zForFormat(getFullExt(options.inputPath), true);
+  if (useSystem && system7zCanDecompress(options.inputPath)) {
     logger.info({ event: "decompress.usingSystem7z" });
     await decompressWithSystem7z(options, progress, token);
     // Inner-tar unwrap also runs in the worker — the system-7z fast path
@@ -46,6 +47,13 @@ export async function decompressWith7z(
       token as TokenLike | undefined,
     );
     return;
+  }
+  if (useSystem) {
+    logger.info({
+      event: "decompress.wasm.fallback",
+      reason: "system7z-unsupported-methods",
+      inputPath: options.inputPath,
+    });
   }
 
   try {
