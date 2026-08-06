@@ -25,15 +25,7 @@ import { markNoisyDirs } from "../src/utils/noisy-patterns";
 import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
 import { brotliCompressFile, brotliDecompressFile, brotliCompress, brotliDecompress } from "../src/engines/brotli-codec";
 import { JS7z } from "../src/engines/js7z-factory";
-
-const zstd: {
-  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
-  decompress: (data: Buffer) => Buffer;
-} = require("zstd-napi");
-const lz4: {
-  compressFrame: (data: Uint8Array) => Promise<Buffer>;
-  decompressFrame: (data: Uint8Array) => Promise<Buffer>;
-} = require("lz4-napi");
+import { wasmCompress, wasmDecompress } from "../src/engines/js7z-codec";
 
 
 // ── Format matrix (mirrors FORMAT_TABLE from constants.ts) ──
@@ -264,7 +256,7 @@ describe("selective extraction", () => {
     const b = await createWrapped(stdFiles, "tar.zst");
     expect(b.length).toBeLessThan(4096);
 
-    const dec = zstd.decompress(b);
+    const dec = await wasmDecompress(b, "zst");
     expect(dec.length).toBeGreaterThan(100);
 
     const j = await JS7z();
@@ -290,7 +282,7 @@ describe("selective extraction", () => {
 
   it("lz4 init and basic compress", async () => {
     const data = new TextEncoder().encode("hello world lz4 test data");
-    const compressed = await lz4.compressFrame(data);
+    const compressed = await wasmCompress(data, "lz4", 5);
     expect(compressed.length).toBeGreaterThan(0);
     expect(compressed.length).toBeLessThan(data.length + 64);
     // LZ4 frame magic: 0x04224D18 in little-endian
@@ -311,11 +303,11 @@ describe("selective extraction", () => {
     expect(tarBuf.length).toBe(2048);
 
     // Compress with LZ4
-    const compressed = await lz4.compressFrame(new Uint8Array(tarBuf));
+    const compressed = await wasmCompress(new Uint8Array(tarBuf), "lz4", 5);
     expect(compressed.length).toBeGreaterThan(0);
 
     // Decompress with LZ4 to get inner tar
-    const dec = await lz4.decompressFrame(compressed);
+    const dec = await wasmDecompress(compressed, "lz4");
     expect(dec.length).toBe(tarBuf.length);
 
     // Extract the tar with 7z to verify contents
@@ -350,13 +342,13 @@ describe("selective extraction", () => {
     const frames: Uint8Array[] = [];
     for (let pos = 0; pos < data.length; pos += CHUNK) {
       const chunk = data.subarray(pos, pos + CHUNK);
-      const frame = await lz4.compressFrame(chunk);
+      const frame = await wasmCompress(chunk, "lz4", 5);
       frames.push(frame);
     }
     const compressed = Buffer.concat(frames.map((f) => Buffer.from(f)));
     expect(compressed.length).toBeGreaterThan(0);
 
-    // Decompress all frames using lz4.decompressFrame
+    // Decompress all frames via the WASM engine
     const parts: Uint8Array[] = [];
     let offset = 0;
     const buf = Buffer.from(compressed);
@@ -367,7 +359,7 @@ describe("selective extraction", () => {
       let end = offset + 4;
       while (end + 4 <= buf.length && buf.readUInt32LE(end) !== MAGIC) end++;
       if (end + 4 > buf.length) end = buf.length;
-      parts.push(await lz4.decompressFrame(buf.subarray(offset, end)));
+      parts.push(await wasmDecompress(buf.subarray(offset, end), "lz4"));
       offset = end;
     }
 
