@@ -23,13 +23,11 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const {
-  httpGet,
-  httpGetMirrored,
-  downloadWithCache,
-  writeFileAtomic,
-  persistBootstrapHash,
-} = require("./lib/download-cache");
+const { fetchReleaseAsset, resolveLatestReleaseTag } = require("./lib/github");
+const { downloadWithCache, countStatuses } = require("./lib/download");
+const { writeFileAtomic } = require("./lib/fs");
+const { persistBootstrapHash } = require("./lib/hash-pins");
+const { mapLimit } = require("./lib/async");
 
 // Binding repo, overridable (e.g. a fork):
 //   SA_RAR5_REPO=me/smart-archive-rar
@@ -44,32 +42,12 @@ const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
 
 async function resolveVersion() {
   if (process.env.SA_RAR5_VERSION) return process.env.SA_RAR5_VERSION.replace(/^v/, "");
-  const cacheFile = path.join(cacheDir, "latest-version.txt");
-  try {
-    if (fs.existsSync(cacheFile)) {
-      const age = Date.now() - fs.statSync(cacheFile).mtimeMs;
-      if (age < VERSION_CACHE_TTL_MS) {
-        const cached = fs.readFileSync(cacheFile, "utf8").trim();
-        if (cached) return cached;
-      }
-    }
-    const url = `https://api.github.com/repos/${REPO}/releases/latest`;
-    const body = await httpGet(url, 5, 15000, {
-      "User-Agent": "smart-archive-vscode",
-      Accept: "application/vnd.github+json",
-    });
-    const tag = String(JSON.parse(body.toString("utf8")).tag_name).replace(/^v/, "");
-    if (!/^\d+\.\d+\.\d+/.test(tag)) throw new Error(`unexpected release tag: ${tag}`);
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(cacheFile, tag);
-    return tag;
-  } catch (err) {
-    console.warn(
-      `  cannot resolve latest release of ${REPO} (${err.message}); ` +
-        `falling back to ${PKG_VERSION_FALLBACK} — set SA_RAR5_VERSION to pin`,
-    );
-    return PKG_VERSION_FALLBACK;
-  }
+  return resolveLatestReleaseTag(REPO, {
+    cacheDir,
+    ttlMs: VERSION_CACHE_TTL_MS,
+    fallback: PKG_VERSION_FALLBACK,
+    pinHint: "set SA_RAR5_VERSION to pin",
+  });
 }
 
 // SHA-256 of each platform .node release asset (smart-archive-rar 0.2.11,
@@ -200,11 +178,15 @@ async function releaseMode(strict) {
       requireHash: bootstrapping || strict,
       label: `rar5 ${job.triple}`,
       fetch: async () => {
-        // Direct download first, mirror fallback (gh-proxy.com, or
-        // SA_GITHUB_MIRRORS) on failure. SHA-256 pinning below keeps the
-        // fail-closed guarantee regardless of the source.
-        const url = `${releaseBase}/${job.nodeFileName}`;
-        return httpGetMirrored(url);
+        // Shared GitHub fetch: direct first, then assets API, then mirrors.
+        // SHA-256 pinning below keeps the fail-closed guarantee regardless
+        // of the source.
+        return fetchReleaseAsset({
+          repo: REPO,
+          tag: `v${resolvedVersion}`,
+          assetName: job.nodeFileName,
+          expectedSha256: bootstrapping ? undefined : job.hash,
+        });
       },
     });
 
@@ -229,27 +211,11 @@ async function releaseMode(strict) {
     return "skipped";
   });
 
-  const installed = statuses.filter((s) => s === "downloaded").length;
-  const cached = statuses.filter((s) => s === "cached").length;
-  const skipped = statuses.filter((s) => s === "skipped").length;
-  const failed = statuses.filter((s) => s === "failed").length;
+  const { installed, cached, skipped, failed } = countStatuses(statuses);
   console.log(
     `rar5: ${installed} installed, ${cached} from cache, ${skipped} skipped, ${failed} failed`,
   );
   if (failed > 0) process.exitCode = 1;
-}
-
-async function mapLimit(items, limit, fn) {
-  const results = Array.from({ length: items.length });
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await fn(items[i]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
 }
 
 async function main() {

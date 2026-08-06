@@ -19,13 +19,10 @@
 const zlib = require("zlib");
 const fs = require("fs");
 const path = require("path");
-const {
-  httpGet,
-  httpGetJson,
-  downloadWithCache,
-  extractNodeFromTgz,
-  persistBootstrapHash,
-} = require("./lib/download-cache");
+const { httpGet, httpGetJson } = require("./lib/http");
+const { extractNodeFromTgz } = require("./lib/archive");
+const { downloadWithCache, countStatuses } = require("./lib/download");
+const { persistBootstrapHash } = require("./lib/hash-pins");
 
 function getSnappyVersion() {
   const pkgPath = path.join(__dirname, "..", "node_modules", "snappy", "package.json");
@@ -105,10 +102,7 @@ async function resolvePackage(pkg) {
 }
 
 async function main() {
-  let installed = 0;
-  let cached = 0;
-  let skipped = 0;
-  let failed = 0;
+  const statuses = [];
 
   for (const pkg of PACKAGES) {
     console.log(`[snappy ${pkg}]`);
@@ -116,18 +110,17 @@ async function main() {
 
     if (result.status === "skipped") {
       console.log("  skipped (already installed)");
-      skipped++;
     } else if (result.status === "cached") {
       console.log("  from cache");
-      cached++;
     } else if (result.status === "downloaded") {
       console.log("  downloaded + cached");
-      installed++;
     } else {
       console.error("  FAILED");
-      failed++;
     }
+    statuses.push(result.status);
   }
+
+  const { installed, cached, skipped, failed } = countStatuses(statuses);
 
   const nodeFiles = [];
   for (const pkg of PACKAGES) {
@@ -151,7 +144,15 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  PACKAGES,
+  EXPECTED_HASHES,
+  getSnappyVersion,
+};
