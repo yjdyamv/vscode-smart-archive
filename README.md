@@ -31,6 +31,14 @@ npm run build             # build Vue frontend + extension
 
 Press `F5` in VS Code to launch the Extension Development Host.
 
+> **Development note:** building/developing this repository runs
+> `stage:natives`, which downloads and unpacks the bundled 7-Zip binaries.
+> A fresh checkout therefore needs 7-Zip installed locally to bootstrap the
+> staging — **required on Windows** (install from
+> https://www.7-zip.org/), recommended on Linux/macOS (`p7zip`/`7zz` via
+> your package manager). End users do **not** need a local 7-Zip: the VSIX
+> already bundles the binaries.
+
 ## Usage
 
 | Action | How |

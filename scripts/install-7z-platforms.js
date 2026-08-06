@@ -13,11 +13,11 @@
  * no bundled binary — system7z.ts returns null there and the WASM engine
  * takes over.
  *
- * Source: yjdyamv/7-Zip-zstd-native GitHub releases. Each downloaded
- * ARCHIVE is verified against a pinned SHA-256 (fail-closed). To
- * (re)generate hashes after a version bump, run once with
- * SA_HASH_BOOTSTRAP=1: the script prints and persists the new hashes into
- * EXPECTED_HASHES.
+ * Source: yjdyamv/7-Zip-zstd-native GitHub releases (shared release constants
+ * live in scripts/lib/releases.js). Each downloaded ARCHIVE is verified
+ * against a pinned SHA-256 (fail-closed). To (re)generate hashes after a
+ * version bump, run once with SA_HASH_BOOTSTRAP=1: the script prints and
+ * persists the new hashes into EXPECTED_HASHES.
  *
  * NOTE: exact asset filenames / archive layout for a given release must be
  * confirmed on first run — a wrong name fails loudly (download or extract
@@ -26,17 +26,16 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { execFileSync } = require("child_process");
-const {
-  downloadWithCache,
-  writeFileAtomic,
-  persistBootstrapHash,
-} = require("./lib/download-cache");
+const { fetchReleaseAsset } = require("./lib/github");
+const { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } = require("./lib/releases");
+const { downloadWithCache } = require("./lib/download");
+const { persistBootstrapHash } = require("./lib/hash-pins");
+const { writeFileAtomic } = require("./lib/fs");
+const { findFileInTree, extractArchive } = require("./lib/archive");
 
-// Keep in sync with the 7zz-wasm WASM engine version (README: 7-Zip 26.02).
 // Native 7-Zip ZS (mcmilk/7-Zip-zstd fork) release published in our own repo.
-const TAG = "v26.02-v1.5.7-R2";
-const BASE = `https://github.com/yjdyamv/7-Zip-zstd-native/releases/download/${TAG}`;
+const REPO = SEVEN_ZIP_ZSTD_REPO;
+const TAG = SEVEN_ZIP_ZSTD_TAG;
 
 // SHA-256 of each downloaded ARCHIVE, keyed by asset filename. Fail-closed:
 // with no pinned hash the build refuses the binary unless SA_HASH_BOOTSTRAP=1.
@@ -95,112 +94,11 @@ const TARGETS = [
   },
 ];
 
-/** Recursively find a file by basename under a directory. */
-function findFile(root, basename) {
-  const stack = [root];
-  while (stack.length > 0) {
-    const dir = stack.pop();
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) stack.push(full);
-      else if (e.isFile() && e.name === basename) return full;
-    }
-  }
-  return null;
-}
-
-/** Find a 7z/7zz binary usable on the current host to unpack Windows SFX. */
-function hostSevenZip() {
-  // Linux: use the just-staged linux-x64 7zz
-  if (process.platform === "linux") {
-    const p = path.join(OUT, "linux", "x64", "7zz");
-    return fs.existsSync(p) ? p : null;
-  }
-  // macOS: look for system 7z (brew, etc.), then staged binary
-  if (process.platform === "darwin") {
-    for (const p of [
-      "/opt/homebrew/bin/7zz",
-      "/opt/homebrew/bin/7z",
-      "/usr/local/bin/7zz",
-      "/usr/local/bin/7z",
-    ]) {
-      if (fs.existsSync(p)) return p;
-    }
-    try {
-      execFileSync("command", ["-v", "7zz"], { stdio: "pipe" });
-      return "7zz";
-    } catch {
-      /* not on PATH */
-    }
-    try {
-      execFileSync("command", ["-v", "7z"], { stdio: "pipe" });
-      return "7z";
-    } catch {
-      /* not on PATH */
-    }
-    // Fall back to just-staged darwin binary
-    for (const a of ["arm64", "x64"]) {
-      const p = path.join(OUT, "darwin", a, "7zz");
-      if (fs.existsSync(p)) return p;
-    }
-    return null;
-  }
-  // Windows: check common install paths + PATH, then staged binary
-  if (process.platform === "win32") {
-    for (const p of [
-      path.join(process.env.LOCALAPPDATA || "", "Programs", "7-Zip", "7z.exe"),
-      "C:\\Program Files\\7-Zip\\7z.exe",
-      "C:\\Program Files (x86)\\7-Zip\\7z.exe",
-    ]) {
-      if (fs.existsSync(p)) return p;
-    }
-    try {
-      execFileSync("where", ["7z.exe"], { stdio: "pipe" });
-      return "7z.exe";
-    } catch {
-      /* not on PATH */
-    }
-    try {
-      execFileSync("where", ["7zz.exe"], { stdio: "pipe" });
-      return "7zz.exe";
-    } catch {
-      /* not on PATH */
-    }
-    // Fall back to just-staged win32 binary (7zz.exe; 7z.exe covers stale
-    // vendor dirs from older staging runs)
-    for (const a of ["x64", "arm64", "ia32"]) {
-      for (const bin of ["7zz.exe", "7z.exe"]) {
-        const p = path.join(OUT, "win32", a, bin);
-        if (fs.existsSync(p)) return p;
-      }
-    }
-    return null;
-  }
-  return null;
-}
-
-function extract(kind, archivePath, tmpDir) {
-  fs.mkdirSync(tmpDir, { recursive: true });
-  if (kind === "tgz") {
-    execFileSync("tar", ["-xzf", archivePath, "-C", tmpDir], { stdio: "inherit" });
-  } else {
-    const sz = hostSevenZip();
-    if (!sz) {
-      throw new Error(
-        `Cannot extract Windows SFX on ${process.platform}-${process.arch}: no 7z/7zz found. ` +
-          "On Linux/macOS install p7zip; on Windows install 7-Zip from https://www.7-zip.org/.",
-      );
-    }
-    if (process.platform !== "win32") fs.chmodSync(sz, 0o755);
-    execFileSync(sz, ["x", "-y", `-o${tmpDir}`, archivePath], { stdio: "inherit" });
-  }
-}
-
 async function processTarget(t) {
   console.log(`[7z ${t.asset}]`);
 
   // Use downloadWithCache for the archive's on-disk path (a temp dir) — the
-  // cache key is the asset name, so re-builds reuse the cached archive.tar.xz.
+  // cache key is the asset name, so re-builds reuse the cached archive.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7zdl_"));
   const archivePath = path.join(tmpDir, t.asset);
   const unpackDir = path.join(tmpDir, "unpacked");
@@ -211,12 +109,14 @@ async function processTarget(t) {
     destPath: archivePath,
     expectedSha256: EXPECTED_HASHES[t.asset],
     requireHash: true,
-      label: t.asset,
-      fetch: async () => {
-        const url = `${BASE}/${t.asset}`;
-        const { httpGetMirrored } = require("./lib/download-cache");
-        return httpGetMirrored(url);
-      },
+    label: t.asset,
+    fetch: () =>
+      fetchReleaseAsset({
+        repo: REPO,
+        tag: TAG,
+        assetName: t.asset,
+        expectedSha256: EXPECTED_HASHES[t.asset],
+      }),
   });
 
   if (result.status === "failed") {
@@ -231,9 +131,9 @@ async function processTarget(t) {
   fs.mkdirSync(unpackDir, { recursive: true });
 
   try {
-    extract(t.kind, archivePath, unpackDir);
+    extractArchive(t.kind, archivePath, unpackDir, { stagedRoot: OUT });
     for (const [srcName, outName] of Object.entries(t.pick)) {
-      const src = findFile(unpackDir, srcName);
+      const src = findFileInTree(unpackDir, srcName);
       if (!src) throw new Error(`"${srcName}" not found inside ${t.asset}`);
       const bytes = fs.readFileSync(src);
       for (const [plat, arch] of t.dests) {
@@ -250,14 +150,14 @@ async function processTarget(t) {
     }
     // Ship the 7-Zip license once (LGPL compliance); native archives carry
     // it as LICENSE, official ones as License.txt.
-    const lic = findFile(unpackDir, "License.txt") || findFile(unpackDir, "LICENSE");
+    const lic = findFileInTree(unpackDir, "License.txt") || findFileInTree(unpackDir, "LICENSE");
     if (lic && !fs.existsSync(path.join(OUT, "License.txt"))) {
       fs.mkdirSync(OUT, { recursive: true });
       fs.copyFileSync(lic, path.join(OUT, "License.txt"));
     }
     // Keep the native build provenance (tag + upstream commit) in the bundle.
     if (t.native) {
-      const ver = findFile(unpackDir, "VERSION");
+      const ver = findFileInTree(unpackDir, "VERSION");
       if (ver) {
         fs.mkdirSync(OUT, { recursive: true });
         writeFileAtomic(path.join(OUT, "VERSION-native"), fs.readFileSync(ver));
@@ -289,9 +189,28 @@ async function main() {
   if (linuxX64) {
     await processTarget(linuxX64);
   }
-  for (const t of TARGETS) {
-    if (t === linuxX64) continue;
-    await processTarget(t);
+  const rest = TARGETS.filter((t) => t !== linuxX64);
+  // On macOS hosts the staged darwin 7zz is the tool used to unpack the
+  // Windows zips, so stage it before parallelizing the remaining targets.
+  const darwin =
+    process.platform === "darwin"
+      ? rest.find((t) => t.dests.some(([p]) => p === "darwin"))
+      : undefined;
+  if (darwin) {
+    await processTarget(darwin);
+  }
+  // The remaining targets are independent — download/extract in parallel.
+  await Promise.all(rest.filter((t) => t !== darwin).map((t) => processTarget(t)));
+  // Prune cache entries for assets that are no longer staged (e.g. the old
+  // official 7-Zip archives) so version/platform changes leave no junk.
+  if (fs.existsSync(cacheDir)) {
+    const expected = new Set(TARGETS.map((t) => t.asset));
+    for (const f of fs.readdirSync(cacheDir)) {
+      if (!expected.has(f)) {
+        fs.rmSync(path.join(cacheDir, f), { force: true });
+        console.log(`  pruned stale cache ${f}`);
+      }
+    }
   }
   // LGPL compliance is mandatory — fail closed if the license text was not staged.
   if (!fs.existsSync(path.join(OUT, "License.txt"))) {
@@ -311,7 +230,16 @@ async function main() {
   console.log(`\n=== 7-Zip ZS ${TAG}: staged ${new Set(staged).size} platform dirs ===`);
 }
 
-main().catch((err) => {
-  console.error(err.message || err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  REPO,
+  TAG,
+  TARGETS,
+  EXPECTED_HASHES,
+};

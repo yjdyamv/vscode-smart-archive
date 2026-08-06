@@ -81,8 +81,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VER=$(sed -n 's/.*const VER = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
-          TAG=$(sed -n 's/.*const TAG = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
+          TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
+          VER=${TAG#v}; VER=${VER%%-*}
           echo "Testing 7-Zip $VER on $(uname -m) — macOS $(sw_vers -productVersion)"
 
           curl -fsSL -o 7zmac.tar.xz "https://github.com/ip7z/7zip/releases/download/${VER}/7z${TAG}-mac.tar.xz"
@@ -136,8 +136,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VER=$(sed -n 's/.*const VER = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
-          TAG=$(sed -n 's/.*const TAG = "\([^"]*\)".*/\1/p' scripts/install-7z-platforms.js)
+          TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
+          VER=${TAG#v}; VER=${VER%%-*}
           echo "Testing 7-Zip $VER on Windows"
           curl -fsSL -o inst.exe "https://github.com/ip7z/7zip/releases/download/${VER}/7z${TAG}-x64.exe"
           # Extract 7z.exe + 7z.dll from the SFX installer using the runner's preinstalled 7-Zip.

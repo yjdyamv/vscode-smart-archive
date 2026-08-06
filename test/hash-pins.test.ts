@@ -8,7 +8,7 @@ import {
   persistBootstrapHash,
   sha256,
   updatePinnedHash,
-} from "../scripts/lib/download-cache";
+} from "../scripts/lib/hash-pins";
 
 describe("checkHash bootstrap", () => {
   const data = Buffer.from("hello world");
