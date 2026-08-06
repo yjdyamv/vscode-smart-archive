@@ -454,22 +454,22 @@ describe("API compress round-trips", () => {
   });
 
   it("creates a RAR5 archive via the native engine", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar_"));
+    const rarTmp = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar_"));
     try {
-      fs.mkdirSync(path.join(tmpDir, "proj", "sub"), { recursive: true });
-      fs.writeFileSync(path.join(tmpDir, "proj", "a.txt"), "hello rar");
-      fs.writeFileSync(path.join(tmpDir, "proj", "sub", "b.bin"), Buffer.alloc(5000, 3));
+      fs.mkdirSync(path.join(rarTmp, "proj", "sub"), { recursive: true });
+      fs.writeFileSync(path.join(rarTmp, "proj", "a.txt"), "hello rar");
+      fs.writeFileSync(path.join(rarTmp, "proj", "sub", "b.bin"), Buffer.alloc(5000, 3));
 
-      const outPath = path.join(tmpDir, "out.rar");
-      await compress({ targets: [path.join(tmpDir, "proj")], format: "rar", level: 5, outputPath: outPath });
+      const outPath = path.join(rarTmp, "out.rar");
+      await compress({ targets: [path.join(rarTmp, "proj")], format: "rar", level: 5, outputPath: outPath });
 
       const head = fs.readFileSync(outPath).subarray(0, 8);
       expect(Buffer.from(head).equals(Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]))).toBe(true);
 
       // Encrypted + multi-volume
-      const encPath = path.join(tmpDir, "enc.rar");
+      const encPath = path.join(rarTmp, "enc.rar");
       await compress({
-        targets: [path.join(tmpDir, "proj")],
+        targets: [path.join(rarTmp, "proj")],
         format: "rar",
         level: 3,
         password: "hunter2",
@@ -477,7 +477,7 @@ describe("API compress round-trips", () => {
       });
       expect(fs.statSync(encPath).size).toBeGreaterThan(0);
     } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(rarTmp, { recursive: true, force: true });
     }
   });
 

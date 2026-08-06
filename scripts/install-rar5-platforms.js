@@ -240,7 +240,7 @@ async function releaseMode(strict) {
 }
 
 async function mapLimit(items, limit, fn) {
-  const results = new Array(items.length);
+  const results = Array.from({ length: items.length });
   let next = 0;
   async function worker() {
     while (next < items.length) {

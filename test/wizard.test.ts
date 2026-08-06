@@ -159,7 +159,7 @@ describe("compress wizard (RAR)", () => {
   });
 
   it("non-split RAR offers the inline recovery record percent", async () => {
-    const { qps, ibs } = installDriver();
+    const { qps } = installDriver();
     const uri = vscode.Uri.file(dir);
 
     const p = compressCommand(uri, []);
