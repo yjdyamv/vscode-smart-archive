@@ -189,12 +189,10 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
       const flags = readVintAt(contentStart + type.len);
       if (!flags) return undefined;
       let p = contentStart + type.len + flags.len;
-      let extraSize = 0;
       let dataSize = 0;
       if (flags.value & 0x0001) {
         const v = readVintAt(p);
         if (!v) return undefined;
-        extraSize = v.value;
         p += v.len;
       }
       if (flags.value & 0x0002) {
