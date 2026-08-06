@@ -336,6 +336,79 @@ function hasCodec(caps: SevenZipCapabilities | null, name: string): boolean {
   return !!caps && new RegExp(`\\b${name}\\b`).test(caps.codecsText);
 }
 
+/** Extract codec names / hex IDs from `7z l -slt` Method lines. */
+function parseMethodTokens(listOutput: string): string[] {
+  const tokens = new Set<string>();
+  const tokenRe = /[A-Za-z][A-Za-z0-9]*|[0-9A-Fa-f]{6,8}/g;
+  for (const line of listOutput.split("\n")) {
+    const m = line.match(/^\s*Method\s*=\s*(.+)$/i);
+    if (!m) continue;
+    let t: RegExpExecArray | null;
+    while ((t = tokenRe.exec(m[1]))) tokens.add(t[0]);
+  }
+  return [...tokens];
+}
+
+/** Known codec names + hex IDs from a `7z i` probe, normalized for lookup. */
+function codecTable(caps: SevenZipCapabilities | null): { names: Set<string>; ids: Set<string> } {
+  const names = new Set<string>();
+  const ids = new Set<string>();
+  if (!caps) return { names, ids };
+  const start = caps.codecsText.indexOf("Codecs:");
+  const end = caps.codecsText.indexOf("Hashers:", start);
+  const section = caps.codecsText.slice(start >= 0 ? start : 0, end >= 0 ? end : undefined);
+  const lineRe = /^\s*(?:\d+\s+)?[A-Za-z0-9]*\s+([0-9A-Fa-f]+)\s+([A-Za-z0-9]+)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = lineRe.exec(section))) {
+    ids.add(m[1].replace(/^0+/, "").toLowerCase());
+    names.add(m[2]);
+  }
+  return { names, ids };
+}
+
+/**
+ * Whether the currently selected system 7-Zip can decode every method used in
+ * an archive. `7z l -slt` can list archives whose codecs the binary does not
+ * know — unknown methods appear as hex IDs (e.g. `04F71101` for ZSTD) — so we
+ * parse the Method lines and check each token against the binary's codec
+ * table. FLZMA2 shows up as `LZMA2` (same method ID) and extracts fine.
+ * Returns true when listing fails for unrelated reasons (e.g. encrypted), so
+ * genuine errors still surface from the extraction attempt itself.
+ */
+export function system7zCanDecompress(inputPath: string): boolean {
+  const sz = detectSystem7z();
+  if (!sz) return false;
+  let r;
+  try {
+    r = spawnSync(sz, ["l", "-slt", inputPath], {
+      stdio: "pipe",
+      input: "",
+      timeout: BINARY_DETECT_TIMEOUT * 2,
+      windowsHide: true,
+    });
+  } catch {
+    return true;
+  }
+  const out = (r.stdout?.toString() ?? "") + (r.stderr?.toString() ?? "");
+  if (r.status !== 0) {
+    return !/unsupported method|cannot open the file as archive|can not open the file as archive/i.test(
+      out,
+    );
+  }
+  const { names, ids } = codecTable(probe7z(sz));
+  for (const token of parseMethodTokens(out)) {
+    if (/^[0-9A-Fa-f]+$/.test(token)) {
+      if (!ids.has(token.replace(/^0+/, "").toLowerCase())) return false;
+    } else if (!names.has(token)) {
+      // Method lines also carry free-text parameters (e.g. "ZSTD v1 l3",
+      // "Lizard v2 l10", "LZMA2:12k"). The listing binary prints a name only
+      // for codecs it knows, so unknown words are parameters — ignore them.
+      continue;
+    }
+  }
+  return true;
+}
+
 /** True when `candidate` exposes at least the codecs and version of `reference`. */
 function isAtLeastAsCapable(candidate: string, reference: string): boolean {
   const a = probe7z(candidate);
