@@ -83,7 +83,8 @@ function run7zz(args: string[]): Promise<void> {
     proc.stderr?.on("data", (d: Buffer) => stderr.push(d));
     proc.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`7zz exited ${code}: ${Buffer.concat(stderr).toString().slice(0, 200)}`));
+      else
+        reject(new Error(`7zz exited ${code}: ${Buffer.concat(stderr).toString().slice(0, 200)}`));
     });
     proc.on("error", (err) => reject(err));
   });
@@ -134,7 +135,9 @@ export async function nativeCompressFile(
         } else {
           cleanup(output);
           reject(
-            new Error(`7zz codec compress exited ${code}: ${Buffer.concat(stderr).toString().slice(0, 200)}`),
+            new Error(
+              `7zz codec compress exited ${code}: ${Buffer.concat(stderr).toString().slice(0, 200)}`,
+            ),
           );
         }
       });

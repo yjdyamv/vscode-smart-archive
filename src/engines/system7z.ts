@@ -134,7 +134,12 @@ export function detectSystem7z(): string | null {
   }
 
   _cachedPath = system;
-  logger.info({ event: "system7z.detected", path: system, method: "system", platform: process.platform });
+  logger.info({
+    event: "system7z.detected",
+    path: system,
+    method: "system",
+    platform: process.platform,
+  });
   return system;
 }
 
@@ -270,8 +275,8 @@ function parseMethodTokens(listOutput: string): string[] {
   for (const line of listOutput.split("\n")) {
     const m = line.match(/^\s*Method\s*=\s*(.+)$/i);
     if (!m) continue;
-    let t: RegExpExecArray | null;
-    while ((t = tokenRe.exec(m[1]))) tokens.add(t[0]);
+    let token: RegExpExecArray | null;
+    while ((token = tokenRe.exec(m[1]))) tokens.add(token[0]);
   }
   return [...tokens];
 }
@@ -749,7 +754,8 @@ export async function compressWithSystem7z(
     }
   }
   // LizardMT speaks levels 10–49; map the UI's 0–9 scale onto it.
-  const mxLevel = method === "lizard" && options.level > 0 ? mapLizardLevel(options.level) : options.level;
+  const mxLevel =
+    method === "lizard" && options.level > 0 ? mapLizardLevel(options.level) : options.level;
   args.push(`-mx${mxLevel}`);
   // Force progress to stdout (see wrapped path above) so the percentage
   // parser works even when the archive is buffered until the end.
