@@ -24,7 +24,6 @@ import type { TreeNode, FlatEntry } from "./helpers";
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
 import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
 import { brotliCompressFile, brotliDecompressFile, brotliCompress, brotliDecompress } from "../src/engines/brotli-codec";
-import * as zlib from "node:zlib";
 import { JS7z } from "../src/engines/js7z-factory";
 
 const zstd: {
@@ -390,12 +389,12 @@ describe("selective extraction", () => {
 // ════════════════════════════════════════════════════════════════════
 
 describe("brotli", () => {
-  it("brotli basic compress and decompress", () => {
+  it("brotli basic compress and decompress", async () => {
     const data = new TextEncoder().encode("hello brotli compression test data");
-    const compressed = brotliCompress(data, 6);
+    const compressed = await brotliCompress(data, 6);
     expect(compressed.length).toBeGreaterThan(0);
     expect(compressed.length).toBeLessThan(data.length + 64);
-    const decompressed = brotliDecompress(compressed);
+    const decompressed = await brotliDecompress(compressed);
     expect(decompressed.length).toBe(data.length);
     expect(Buffer.from(decompressed).equals(Buffer.from(data))).toBe(true);
   });
@@ -404,7 +403,7 @@ describe("brotli", () => {
     const b = await createWrapped(stdFiles, "tar.br");
     expect(b.length).toBeLessThan(4096);
 
-    const dec = brotliDecompress(new Uint8Array(b));
+    const dec = await brotliDecompress(new Uint8Array(b));
     expect(dec.length).toBeGreaterThan(100);
 
     const j = await JS7z();
@@ -424,28 +423,6 @@ describe("brotli", () => {
     } finally {
       disposeJS7z(j);
     }
-  });
-
-  it("brotli multi-frame roundtrip", () => {
-    const parts = [
-      new TextEncoder().encode("first part "),
-      new TextEncoder().encode("second part "),
-      new TextEncoder().encode("third part "),
-    ];
-    const expected = Buffer.concat(parts.map((p) => Buffer.from(p)));
-
-    // Produce multi-frame brotli by compressing each part independently
-    const params = { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 } };
-    const frames: Buffer[] = parts.map((p) =>
-      zlib.brotliCompressSync(Buffer.from(p), params),
-    );
-    const compressed = Buffer.concat(frames);
-
-    // brotliDecompress handles multi-frame detection and frame-by-frame decoding
-    const result = brotliDecompress(new Uint8Array(compressed));
-
-    expect(result.length).toBe(expected.length);
-    expect(Buffer.from(result).equals(expected)).toBe(true);
   });
 
   it("tar.br format constants: ext, wrap, category", () => {

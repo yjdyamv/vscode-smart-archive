@@ -35,6 +35,7 @@ import { setLocale } from "../../i18n";
 import { WORKER_MEMORY_LIMIT_DEFAULT_MB } from "../../constants";
 import { setSecurityLimits } from "../../utils/security";
 import { setZstdConfig, resetZstdDetectionCache } from "../zstd-codec";
+import { setBrotliConfig } from "../brotli-codec";
 import { setLoggerSink } from "../../utils/logger-core";
 import { setWorkerMemoryLimitMb } from "./memory-guard";
 import { isCancellationError } from "../../utils/cancellation";
@@ -60,6 +61,10 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
     setSecurityLimits(config.limits ?? {});
     setZstdConfig({
       useSystemZstd: config.useSystemZstd ?? "auto",
+      warn: (message) => post({ type: "notify", message }),
+    });
+    setBrotliConfig({
+      backend: config.brotliBackend ?? "node",
       warn: (message) => post({ type: "notify", message }),
     });
     // A setting change may flip the system-zstd decision — drop the cached

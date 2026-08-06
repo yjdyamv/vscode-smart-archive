@@ -3,10 +3,12 @@
  *
  * Uses zstd-napi (C++ Node-API, static zstd 1.5.7) for zstd compression.
  * Prioritises system zstd CLI for file compression; falls back to
- * zstd-napi when the system zstd binary is unavailable.
+ * zstd-napi when the system zstd binary is unavailable, and finally to
+ * the bundled 7zz WASM engine (7-Zip ZS, zstd support) when the native
+ * binding is missing or fails.
  *
- * Decompression (in-memory) is handled by zstd-napi; archive-level
- * decompression goes through the bundled 7zz WASM engine.
+ * Decompression (in-memory) is handled by the bundled 7zz WASM engine
+ * (parallel -mmt); archive-level decompression goes through 7zz as well.
  *
  * @module engines/zstd-codec
  */
@@ -18,6 +20,7 @@ import { t } from "../i18n";
 import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import { CODEC_CHUNK } from "../constants";
+import { shouldUseWasmCodec, wasmCompress, wasmCompressFile, wasmDecompress } from "./js7z-codec";
 
 type ZstdNative = {
   compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
@@ -57,12 +60,26 @@ function mapZstdLevel(uiLevel: number): number {
 }
 
 export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Array> {
-  return requireZstdNative().compress(Buffer.from(data), { compressionLevel: mapZstdLevel(level) });
+  if (!shouldUseWasmCodec()) {
+    try {
+      return requireZstdNative().compress(Buffer.from(data), {
+        compressionLevel: mapZstdLevel(level),
+      });
+    } catch (err) {
+      logger.warn(
+        { event: "zstd.native.failed", err },
+        "zstd-napi unavailable or failed, falling back to WASM",
+      );
+    }
+  }
+  logger.info({ event: "zstd.compress.wasm" });
+  return wasmCompress(data, "zst", level);
 }
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
   checkFileSize(data.byteLength);
-  const result = requireZstdNative().decompress(Buffer.from(data));
+  logger.info({ event: "zstd.decompress.wasm" });
+  const result = await wasmDecompress(data, "zst");
   checkFileSize(result.byteLength);
   return result;
 }
@@ -167,6 +184,11 @@ export function zstdCompressFile(
   level: number,
   progress?: ProgressLike,
 ): Promise<void> {
+  if (shouldUseWasmCodec()) {
+    logger.info({ event: "zstd.compress.wasm.forced" });
+    return wasmCompressFile(input, output, "zst", level, progress);
+  }
+
   const zstdPath = resolveSystemZstd();
   if (zstdPath) {
     logger.info({ event: "zstd.compress.system", path: zstdPath });
@@ -213,9 +235,9 @@ export function zstdCompressFile(
         cleanup(output);
         logger.warn(
           { event: "zstd.system.failed", path: zstdPath },
-          "System zstd failed, falling back to native",
+          "System zstd failed, falling back to native then WASM",
         );
-        nativeCompressFile(input, output, level, progress).then(
+        nativeCompressFileWithWasmFallback(input, output, level, progress).then(
           () => {
             settled = true;
             resolve();
@@ -230,7 +252,22 @@ export function zstdCompressFile(
   }
 
   logger.info({ event: "zstd.compress.native" });
-  return nativeCompressFile(input, output, level, progress);
+  return nativeCompressFileWithWasmFallback(input, output, level, progress);
+}
+
+function nativeCompressFileWithWasmFallback(
+  input: string,
+  output: string,
+  level: number,
+  progress?: ProgressLike,
+): Promise<void> {
+  return nativeCompressFile(input, output, level, progress).catch((err) => {
+    logger.warn(
+      { event: "zstd.native.compress.failed", err },
+      "zstd-napi compression failed, falling back to WASM",
+    );
+    return wasmCompressFile(input, output, "zst", level, progress);
+  });
 }
 
 function nativeCompressFile(

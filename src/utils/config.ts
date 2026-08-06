@@ -17,6 +17,7 @@ import {
 } from "../constants";
 import { setLocale } from "../i18n";
 import { setZstdConfig } from "../engines/zstd-codec";
+import { setBrotliConfig } from "../engines/brotli-codec";
 import { logger, setHistoryBudget } from "./logger";
 import type { EngineConfig } from "../engines/worker/types";
 import {
@@ -40,6 +41,7 @@ export function readEngineConfig(): EngineConfig {
       maxTotalSize: parseSize(config.get<string | number>("maxTotalSize"), DEFAULT_MAX_TOTAL_SIZE),
     },
     useSystemZstd: config.get<string>("useSystemZstd", "auto"),
+    brotliBackend: config.get<string>("brotliBackend", "node"),
     compressionLevel: config.get<number>("defaultCompressionLevel", 5),
     workerMemoryMb:
       typeof memMb === "number" && Number.isFinite(memMb)
@@ -68,6 +70,12 @@ export function applyHostConfig(): void {
 
   setZstdConfig({
     useSystemZstd: config.useSystemZstd,
+    warn: (message) => {
+      void vscode.window.showWarningMessage(message);
+    },
+  });
+  setBrotliConfig({
+    backend: config.brotliBackend,
     warn: (message) => {
       void vscode.window.showWarningMessage(message);
     },

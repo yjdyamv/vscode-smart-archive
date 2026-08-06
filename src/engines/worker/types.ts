@@ -20,6 +20,8 @@ export interface EngineConfig {
   locale: string;
   limits: { maxFileSize?: number; maxTotalSize?: number };
   useSystemZstd?: string;
+  /** Brotli backend: node | wasm | 7z (bundled 7z planned) */
+  brotliBackend?: string;
   /** Worker RSS memory guard threshold in MiB (0 = disabled) */
   workerMemoryMb?: number;
   /** Default compression level (0-9) for wrapped-format mutations */

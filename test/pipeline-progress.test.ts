@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import * as crypto from "node:crypto";
 import { compressWith7z } from "../src/engines/js7z-compress";
 import { compressWithSystem7z, detectSystem7z } from "../src/engines/system7z";
 
@@ -40,8 +41,10 @@ describe("full-pipeline compress progress", () => {
   it("WASM wrapped pipeline (tar.br) scales progress across tar + codec", async () => {
     const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_full_"));
     const src = path.join(td, "data.bin");
-    // 3 × 50 MiB codec chunks → multiple reports in both phases.
-    fs.writeFileSync(src, Buffer.alloc(120 * 1024 * 1024));
+    // 5 × 50 MiB codec chunks → multiple reports in both phases. Random
+    // data keeps the WASM brotli phase emitting percent updates
+    // (zeros finish too fast, and 120 MiB yields only two percent ticks).
+    fs.writeFileSync(src, crypto.randomBytes(250 * 1024 * 1024));
     const out = path.join(td, "data.tar.br");
 
     const reports: Report[] = [];

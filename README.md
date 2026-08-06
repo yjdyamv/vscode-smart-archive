@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml)
 
-VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4 codecs** plus Node.js built-in **brotli**. Works out of the box with no local 7-Zip install, at near-desktop speed.
+VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4 codecs** plus Node.js built-in **brotli**, with the bundled 7-Zip ZS WASM engine as the final fallback for zstd/brotli/lz4. Works out of the box with no local 7-Zip install, at near-desktop speed.
 
 ## Features
 
@@ -120,10 +120,10 @@ npm run release          # build + check + package
 
 | Package | Purpose |
 |---------|---------|
-| [7-Zip ZS 26.02 WebAssembly](https://github.com/yjdyamv/7-Zip-zstd-wasm) | Bundled WASM fallback (`vendor/7zz-wasm`, downloaded at install; all compression & extraction) |
-| [zstd-napi](https://github.com/drakedevel/zstd-napi) | Zstandard compression |
-| [lz4-napi](https://github.com/antoniomuso/lz4-napi) | LZ4 compression |
-| Node.js `zlib` (built-in) | Brotli compression |
+| [7-Zip ZS 26.02 WebAssembly](https://github.com/yjdyamv/7-Zip-zstd-wasm) | Bundled WASM fallback (`vendor/7zz-wasm`, downloaded at install; all compression & extraction; parallel zstd, standard lz4; brotli backend configurable — node:zlib default / WASM / bundled 7z planned) |
+| [zstd-napi](https://github.com/drakedevel/zstd-napi) | Zstandard compression fast path (decompression runs on WASM) |
+| [lz4-napi](https://github.com/antoniomuso/lz4-napi) | LZ4 native binding used by tests/verification; runtime codec is WASM |
+| Node.js `zlib` (built-in) | Brotli native binding used by tests/verification; runtime codec is WASM |
 | [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding recovery |
 | [Vue 3](https://vuejs.org/) | Archive browser UI |
 | [TanStack Virtual](https://tanstack.com/virtual) | Virtual scrolling for large archives |

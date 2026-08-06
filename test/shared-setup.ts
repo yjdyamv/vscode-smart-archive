@@ -50,7 +50,7 @@ export const lz4 = require("lz4-napi") as {
 // brotli: migrated to node:zlib; in-memory helper uses brotli-codec engine
 import { brotliDecompress } from "../src/engines/brotli-codec";
 
-export function decompressBrotliFrames(data: Buffer): Uint8Array {
+export async function decompressBrotliFrames(data: Buffer): Promise<Uint8Array> {
   return brotliDecompress(new Uint8Array(data));
 }
 

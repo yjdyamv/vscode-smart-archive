@@ -68,27 +68,32 @@ export async function withWrappedArchiveCore(
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
     const tmpDir = VFS_TMP_WRAP1;
-    js7z.FS.mkdir(tmpDir);
     let innerTarName: string;
 
-    // js7z WASM doesn't support Brotli or LZ4. Decompress the outer
-    // layer manually and place the inner .tar directly into VFS.
+    // Brotli/LZ4 outer layers are unwrapped by the codec engine (native
+    // first, WASM fallback). The codec may call JS7z() itself, which
+    // resets the shared VFS — so tmpDir is created only after the codec
+    // call, never before it.
     if (ext === ".tar.br" || ext === ".tbr") {
-      const innerTar = brotliDecompress(new Uint8Array(data));
+      const innerTar = await brotliDecompress(new Uint8Array(data));
       innerTarName = path.basename(archivePath, ext) + ".tar";
+      js7z.FS.mkdir(tmpDir);
       js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       js7z.FS.writeFile(`${tmpDir}/${innerTarName}`, innerTar);
     } else if (ext === ".tar.lz4" || ext === ".tlz4") {
       const innerTar = await lz4Decompress(new Uint8Array(data));
       innerTarName = path.basename(archivePath, ext) + ".tar";
+      js7z.FS.mkdir(tmpDir);
       js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       js7z.FS.writeFile(`${tmpDir}/${innerTarName}`, innerTar);
     } else if (ext === ".tar.sz" || ext === ".tsz") {
       const innerTar = await snappyDecompress(new Uint8Array(data));
       innerTarName = path.basename(archivePath, ext) + ".tar";
+      js7z.FS.mkdir(tmpDir);
       js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       js7z.FS.writeFile(`${tmpDir}/${innerTarName}`, innerTar);
     } else {
+      js7z.FS.mkdir(tmpDir);
       js7z.FS.writeFile(`/${archiveName}`, data);
 
       const xArgs = ["x", `/${archiveName}`, `-o${tmpDir}`, "-y"];
@@ -123,7 +128,7 @@ export async function withWrappedArchiveCore(
       } else if (wrapExt === "lz4") {
         compressedData = await lz4Compress(new Uint8Array(modifiedTar));
       } else if (wrapExt === "br") {
-        compressedData = brotliCompress(new Uint8Array(modifiedTar), _compressionLevel);
+        compressedData = await brotliCompress(new Uint8Array(modifiedTar), _compressionLevel);
       } else if (wrapExt === "sz") {
         compressedData = await snappyCompress(new Uint8Array(modifiedTar));
       } else {
@@ -646,8 +651,8 @@ export async function previewFileCore(
   try {
     let archiveFsPath: string;
 
-    // js7z WASM doesn't support LZ4. For .tar.lz4, decompress manually
-    // and feed the inner tar to 7z.
+    // For .tar.lz4, the codec engine (native first, WASM fallback)
+    // decompresses to a raw tar, which 7z then extracts.
     if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
       const buf = fs.readFileSync(archivePath);
       const innerTar = await decompressLz4Frames(Buffer.from(buf));
@@ -655,10 +660,10 @@ export async function previewFileCore(
       archiveFsPath = `/${tarName}`;
       writeLargeVFS(js7z, archiveFsPath, innerTar);
     } else if (archiveExt === ".tar.br" || archiveExt === ".tbr") {
-      // js7z WASM doesn't support Brotli. Decompress with node:zlib,
-      // then feed the inner tar to 7z for extraction.
+      // Brotli is unwrapped by the codec engine (node:zlib for
+      // decompression), then the inner tar is fed to 7z for extraction.
       const buf = fs.readFileSync(archivePath);
-      const innerTar = brotliDecompress(new Uint8Array(buf));
+      const innerTar = await brotliDecompress(new Uint8Array(buf));
       const tarName = path.basename(archivePath, archiveExt) + ".tar";
       archiveFsPath = `/${tarName}`;
       writeLargeVFS(js7z, archiveFsPath, innerTar);
