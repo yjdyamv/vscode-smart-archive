@@ -1,85 +1,166 @@
 /**
  * Brotli codec wrapper — Smart Archive VSCode Extension
  *
- * Uses node:zlib for brotli compression/decompression.
- * 7z WASM does not support brotli, so we handle both compression
- * and decompression entirely through Node.js native brotli bindings,
- * feeding only the inner .tar to 7z for extraction/listing.
+ * Backend is configurable via `smart-archive.brotliBackend`:
+ * - node (default): Node.js built-in zlib (native, no WASM heap)
+ * - wasm: bundled 7zz WASM engine (standard single-stream brotli)
+ * - 7z: bundled native 7-Zip binary (planned, not implemented yet)
  *
  * @module engines/brotli-codec
  */
 
-import { logger } from "../utils/logger-core";
-import { checkFileSize, checkTotalSize } from "../utils/security";
-import type { ProgressLike } from "../utils/cancellation";
 import * as zlib from "node:zlib";
 import * as fs from "fs";
-import { PassThrough } from "node:stream";
-import { pipeline } from "node:stream/promises";
-import { CODEC_CHUNK } from "../constants";
+import { checkFileSize } from "../utils/security";
+import type { ProgressLike } from "../utils/cancellation";
+import { t } from "../i18n";
+import {
+  shouldUseWasmCodec,
+  wasmCompress,
+  wasmCompressFile,
+  wasmDecompress,
+  wasmDecompressFile,
+} from "./js7z-codec";
 
-// ── Level mapping ──
+type BrotliBackend = "node" | "wasm" | "7z";
 
-function mapBrotliLevel(uiLevel: number): number {
-  if (uiLevel <= 0) return 0;
-  if (uiLevel <= 1) return 1;
-  if (uiLevel <= 3) return 4;
-  if (uiLevel <= 5) return 6;
-  if (uiLevel <= 7) return 9;
-  return 11;
+/** Injected config: brotliBackend setting + optional warning hook (host shows it). */
+let brotliConfig: { backend?: string; warn?: (message: string) => void } = {};
+
+/**
+ * Inject the brotliBackend setting and a warning callback. The host wires
+ * warn → vscode.window.showWarningMessage; worker threads receive the
+ * setting at init and forward warnings as notify messages.
+ */
+export function setBrotliConfig(config: {
+  backend?: string;
+  warn?: (message: string) => void;
+}): void {
+  brotliConfig = config;
 }
 
-function makeCompressParams(level: number): zlib.BrotliOptions {
-  return {
-    params: {
-      [zlib.constants.BROTLI_PARAM_QUALITY]: mapBrotliLevel(level),
-    },
-  };
-}
-
-// ── In-memory compression / decompression ──
-
-interface BrotliDecompressInfoResult {
-  buffer: Buffer;
-  engine: { bytesWritten: number };
-}
-
-export function brotliCompress(data: Uint8Array, level = 5): Uint8Array {
-  const params = makeCompressParams(level);
-  return zlib.brotliCompressSync(Buffer.from(data), params);
-}
-
-export function brotliDecompress(data: Uint8Array): Uint8Array {
-  checkFileSize(data.byteLength);
-  const buf = Buffer.from(data);
-
-  const frames: Buffer[] = [];
-  let offset = 0;
-
-  while (offset < buf.length) {
-    const result = zlib.brotliDecompressSync(buf.subarray(offset), {
-      info: true,
-    }) as unknown as BrotliDecompressInfoResult;
-
-    const consumed = result.engine.bytesWritten;
-    if (consumed <= 0) {
-      throw new Error("Brotli decompression stalled at offset " + offset);
-    }
-
-    checkFileSize(result.buffer.length);
-    frames.push(result.buffer);
-    offset += consumed;
+function resolveBrotliBackend(): BrotliBackend {
+  if (shouldUseWasmCodec()) return "wasm";
+  const backend = brotliConfig.backend ?? "node";
+  if (backend === "wasm") return "wasm";
+  if (backend === "7z") {
+    // Bundled-7z brotli is planned but not implemented yet; stay usable
+    // with node:zlib instead of failing the operation.
+    brotliConfig.warn?.(t("brotli.7zUnavailable"));
+    return "node";
   }
-
-  if (frames.length === 1) return new Uint8Array(frames[0]);
-
-  const total = frames.reduce((s, f) => s + f.length, 0);
-  checkFileSize(total);
-  const merged = Buffer.concat(frames);
-  return new Uint8Array(merged);
+  return "node";
 }
 
-// ── File-to-file streaming compression / decompression ──
+function nodeCompressFile(
+  input: string,
+  output: string,
+  level: number,
+  progress?: ProgressLike,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let total = 0;
+    try {
+      total = fs.statSync(input).size;
+    } catch {
+      // Progress stays disabled when the input is unreadable; the stream
+      // error path below still fails the operation.
+    }
+    const read = fs.createReadStream(input);
+    const write = fs.createWriteStream(output);
+    const comp = zlib.createBrotliCompress({
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: level },
+    });
+    let processed = 0;
+    let lastPct = 0;
+    read.on("data", (chunk: Buffer) => {
+      processed += chunk.length;
+      if (progress && total > 0) {
+        const pct = Math.min(99, Math.floor((processed / total) * 100));
+        if (pct > lastPct) {
+          progress.report({ message: `${pct}%`, increment: pct - lastPct });
+          lastPct = pct;
+        }
+      }
+    });
+    const cleanup = () => {
+      try {
+        fs.unlinkSync(output);
+      } catch {
+        // best-effort cleanup
+      }
+    };
+    read.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+    comp.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+    write.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+    write.on("finish", () => {
+      if (progress && total > 0 && lastPct < 100) {
+        progress.report({ message: "100%", increment: 100 - lastPct });
+      }
+      resolve();
+    });
+    read.pipe(comp).pipe(write);
+  });
+}
+
+function nodeDecompressFile(input: string, output: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const read = fs.createReadStream(input);
+    const write = fs.createWriteStream(output);
+    const dec = zlib.createBrotliDecompress();
+    const cleanup = () => {
+      try {
+        fs.unlinkSync(output);
+      } catch {
+        // best-effort cleanup
+      }
+    };
+    read.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+    dec.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+    write.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+    write.on("finish", () => resolve());
+    read.pipe(dec).pipe(write);
+  });
+}
+
+export async function brotliCompress(data: Uint8Array, level = 5): Promise<Uint8Array> {
+  if (resolveBrotliBackend() === "node") {
+    return zlib.brotliCompressSync(Buffer.from(data), {
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: level },
+    });
+  }
+  return wasmCompress(data, "br", level);
+}
+
+export async function brotliDecompress(data: Uint8Array): Promise<Uint8Array> {
+  checkFileSize(data.byteLength);
+  if (resolveBrotliBackend() === "node") {
+    const result = zlib.brotliDecompressSync(Buffer.from(data));
+    checkFileSize(result.byteLength);
+    return result;
+  }
+  const result = await wasmDecompress(data, "br");
+  checkFileSize(result.byteLength);
+  return result;
+}
 
 export async function brotliCompressFile(
   input: string,
@@ -87,101 +168,17 @@ export async function brotliCompressFile(
   level: number,
   progress?: ProgressLike,
 ): Promise<void> {
-  const params = makeCompressParams(level);
-  const total = fs.statSync(input).size;
-  try {
-    if (progress && total > 0) {
-      const counter = new PassThrough();
-      let bytes = 0;
-      let lastPct = 0;
-      counter.on("data", (chunk: Buffer) => {
-        bytes += chunk.length;
-        const pct = Math.min(99, Math.floor((bytes / total) * 100));
-        if (pct > lastPct && pct > 0) {
-          progress.report({ message: `${pct}%`, increment: pct - lastPct });
-          lastPct = pct;
-        }
-      });
-      await pipeline(
-        fs.createReadStream(input, { highWaterMark: CODEC_CHUNK }),
-        counter,
-        zlib.createBrotliCompress(params),
-        fs.createWriteStream(output),
-      );
-    } else {
-      await pipeline(
-        fs.createReadStream(input, { highWaterMark: CODEC_CHUNK }),
-        zlib.createBrotliCompress(params),
-        fs.createWriteStream(output),
-      );
-    }
-    logger.info({ event: "brotli.compress.ok", input, output, level });
-  } catch (err) {
-    cleanup(output);
-    throw err;
+  if (resolveBrotliBackend() === "node") {
+    await nodeCompressFile(input, output, level, progress);
+    return;
   }
+  await wasmCompressFile(input, output, "br", level, progress);
 }
 
 export async function brotliDecompressFile(input: string, output: string): Promise<void> {
-  let streamDecompressed = 0;
-
-  try {
-    const decompress = zlib.createBrotliDecompress();
-
-    decompress.on("data", (chunk: Buffer) => {
-      streamDecompressed = checkTotalSize(streamDecompressed, chunk.length);
-    });
-
-    await pipeline(
-      fs.createReadStream(input, { highWaterMark: CODEC_CHUNK }),
-      decompress,
-      fs.createWriteStream(output),
-    );
-
-    // The streaming decompression produces at least the first brotli frame.
-    // Verify completeness against a full in-memory decompression. Guard
-    // against OOM by only doing this for compressed files under 200 MB.
-    const MAX_IN_MEMORY = 200 * 1024 * 1024;
-    const inputStat = fs.statSync(input);
-
-    if (inputStat.size > 0 && inputStat.size <= MAX_IN_MEMORY) {
-      try {
-        const compressedBuf = fs.readFileSync(input);
-        const fullOutput = brotliDecompress(compressedBuf);
-
-        if (fullOutput.length > streamDecompressed) {
-          // Multi-frame detected — overwrite with complete output
-          fs.writeFileSync(output, Buffer.from(fullOutput));
-          streamDecompressed = fullOutput.length;
-          logger.info({
-            event: "brotli.decompress.multiFrameFallback",
-            input,
-            size: fullOutput.length,
-          });
-        }
-      } catch (verifyErr) {
-        // Full verification failed (corrupt data / OOM). The streaming
-        // output already written is valid best-effort — keep it.
-        logger.warn(
-          { event: "brotli.decompress.verifyFallbackFailed", input, error: String(verifyErr) },
-          "Multi-frame verification failed, keeping streaming output",
-        );
-      }
-    }
-
-    logger.info({ event: "brotli.decompress.ok", input, output });
-  } catch (err) {
-    cleanup(output);
-    throw err;
+  if (resolveBrotliBackend() === "node") {
+    await nodeDecompressFile(input, output);
+    return;
   }
-}
-
-// ── Helpers ──
-
-function cleanup(path: string): void {
-  try {
-    fs.unlinkSync(path);
-  } catch {
-    logger.warn({ event: "brotli.cleanup.failed", path }, "Failed to remove temp file");
-  }
+  await wasmDecompressFile(input, output, "br");
 }

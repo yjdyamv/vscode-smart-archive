@@ -223,7 +223,7 @@ export async function extractSelectedCore(
         js7z.FS.writeFile(`/${innerTarName}`, new Uint8Array(innerTar));
       } else if (ext === ".tar.br" || ext === ".tbr") {
         const buf = fs.readFileSync(archivePath);
-        const innerTar = brotliDecompress(new Uint8Array(buf));
+        const innerTar = await brotliDecompress(new Uint8Array(buf));
         innerTarName = path.basename(archivePath, ext) + ".tar";
         js7z.FS.writeFile(`/${innerTarName}`, innerTar);
       } else if (ext === ".tar.sz" || ext === ".tsz") {

@@ -856,11 +856,18 @@ const messages: Record<string, Record<Locale, string>> = {
       "zstd 不可用。請安裝: winget install zstd (Win), brew install zstd (Mac), apt/dnf install zstd (Linux)",
   },
   "zstd.nativeUnavailable": {
-    en: "Built-in zstd is unavailable on this platform. Install a system zstd (winget/brew/apt install zstd) to compress .tar.zst here.",
+    en: "Built-in zstd is unavailable on this platform and the WASM engine could not complete the operation. Install a system zstd (winget/brew/apt install zstd) to compress .tar.zst here.",
     "zh-cn":
-      "本平台无内置 zstd。请安装系统 zstd (winget/brew/apt install zstd) 以在此压缩 .tar.zst。",
+      "本平台无内置 zstd，且 WASM 引擎未能完成操作。请安装系统 zstd (winget/brew/apt install zstd) 以在此压缩 .tar.zst。",
     "zh-tw":
-      "本平台無內建 zstd。請安裝系統 zstd (winget/brew/apt install zstd) 以在此壓縮 .tar.zst。",
+      "本平台無內建 zstd，且 WASM 引擎未能完成操作。請安裝系統 zstd (winget/brew/apt install zstd) 以在此壓縮 .tar.zst。",
+  },
+
+  // ---- Brotli ----
+  "brotli.7zUnavailable": {
+    en: "The bundled 7-Zip brotli backend is not implemented yet; using Node.js zlib instead.",
+    "zh-cn": "捆绑 7-Zip 的 brotli 后端尚未实现，已改用 Node.js zlib。",
+    "zh-tw": "綁定 7-Zip 的 brotli 後端尚未實作，已改用 Node.js zlib。",
   },
 
   // ---- Archive operations ----

@@ -293,7 +293,8 @@ const SNAPPY_EXTS = new Set([".tar.sz", ".tsz"]);
 /**
  * Check whether system 7-Zip is usable for a given archive format.
  * tar.zst / tar.lz4 creation is impossible (7z only unpacks these),
- * tar.br and tar.lz4 are handled entirely by WASM codecs (system 7z bypassed).
+ * tar.br / tar.lz4 / tar.sz are handled by the codec engine
+ * (native first, WASM fallback), so system 7z is bypassed for them.
  * tar.zst decompression requires v24+.
  * everything else uses system 7z when available (wrapped formats use
  * outer type: gzip/bzip2/xz).
@@ -344,8 +345,9 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
   const isSnappy =
     SNAPPY_EXTS.has(extOrLabel.toLowerCase()) || SNAPPY_EXTS.has("." + extOrLabel.toLowerCase());
 
-  // Snappy, Brotli and LZ4 are handled entirely by WASM codecs, bypass system
-  // 7z — system 7z cannot decompress these formats at all.
+  // Snappy, Brotli and LZ4 are handled by the codec engine (native first,
+  // WASM fallback), bypassing system 7z — system 7z cannot decompress
+  // these formats at all.
   if (isBrotli || isLz4 || isSnappy) {
     logger.info({
       event: "system7z.skipCodec",

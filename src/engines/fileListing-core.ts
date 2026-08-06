@@ -127,10 +127,10 @@ export async function listViaExtract(
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
-    // js7z WASM doesn't support LZ4 decompression. Decompress manually,
-    // then extract the inner tar to VFS and read entries — unified with
-    // the generic path below. Avoids 7z l -slt which doesn't support
-    // ustar prefix / LongLink in WASM.
+    // LZ4 is unwrapped by the codec engine (native first, WASM fallback),
+    // then the inner tar is extracted to VFS and read — unified with the
+    // generic path below. Avoids 7z l -slt which doesn't support ustar
+    // prefix / LongLink in WASM.
     if (ext === ".tar.lz4" || ext === ".tlz4") {
       const innerTar = await decompressLz4Frames(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
@@ -139,7 +139,7 @@ export async function listViaExtract(
     }
 
     if (ext === ".tar.br" || ext === ".tbr") {
-      const innerTar = brotliDecompress(new Uint8Array(buf));
+      const innerTar = await brotliDecompress(new Uint8Array(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "listViaExtract.brotliDecompressed", size: innerTar.length });
       return extractAndList(innerName, innerTar);

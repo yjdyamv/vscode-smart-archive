@@ -3,7 +3,7 @@
   "displayName": "Smart Archive",
   "version": "1.24.0",
   "private": true,
-  "description": "Compress and decompress files with a bundled native 7-Zip (WASM fallback) + zstd. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
+  "description": "Compress and decompress files with a bundled native 7-Zip (WASM fallback) + zstd/brotli/lz4 with WASM fallback. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
   "categories": [
     "Formatters",
     "Other"
@@ -547,6 +547,21 @@
             "%config.useSystemZstd.never%"
           ],
           "description": "%config.useSystemZstd.description%"
+        },
+        "smart-archive.brotliBackend": {
+          "type": "string",
+          "default": "node",
+          "enum": [
+            "node",
+            "wasm",
+            "7z"
+          ],
+          "enumDescriptions": [
+            "%config.brotliBackend.node%",
+            "%config.brotliBackend.wasm%",
+            "%config.brotliBackend.7z%"
+          ],
+          "description": "%config.brotliBackend.description%"
         },
         "smart-archive.workerMemoryMb": {
           "type": "integer",

@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import * as crypto from "node:crypto";
 import { lz4CompressFile } from "../src/engines/lz4-codec";
 import { snappyCompressFile } from "../src/engines/snappy-codec";
 import { brotliCompressFile } from "../src/engines/brotli-codec";
@@ -18,13 +19,15 @@ import {
   setZstdConfig,
   resetZstdDetectionCache,
 } from "../src/engines/zstd-codec";
+import { setForceWasmCodec } from "../src/engines/js7z-codec";
 
-function makeInput(name: string, sizeMb = 120): string {
+function makeInput(name: string, sizeMb = 120, random = false): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_codec_"));
   const input = path.join(dir, name);
   // 3 × 50 MiB codec chunks → multiple progress reports. Zeros compress
   // quickly so the tests stay fast.
-  fs.writeFileSync(input, Buffer.alloc(sizeMb * 1024 * 1024));
+  const size = sizeMb * 1024 * 1024;
+  fs.writeFileSync(input, random ? crypto.randomBytes(size) : Buffer.alloc(size));
   return input;
 }
 
@@ -37,7 +40,9 @@ function expectDeterminateProgress(reports: { message?: string; increment?: numb
 
 describe("codec compress progress", () => {
   it("lz4 reports message + increment", async () => {
-    const input = makeInput("in.tar");
+    // Default lz4 compression runs through the WASM engine;
+    // random data keeps the 7zz progress bar emitting percents.
+    const input = makeInput("in.tar", 120, true);
     const output = input + ".lz4";
     const reports: { message?: string; increment?: number }[] = [];
     await lz4CompressFile(input, output, 5, { report: (r) => reports.push(r) });
@@ -57,7 +62,9 @@ describe("codec compress progress", () => {
   });
 
   it("brotli reports message + increment", async () => {
-    const input = makeInput("in.tar");
+    // Default brotli compression runs through the WASM
+    // engine; random data keeps the 7zz progress bar emitting percents.
+    const input = makeInput("in.tar", 120, true);
     const output = input + ".br";
     const reports: { message?: string; increment?: number }[] = [];
     await brotliCompressFile(input, output, 1, { report: (r) => reports.push(r) });
@@ -82,4 +89,46 @@ describe("codec compress progress", () => {
       resetZstdDetectionCache();
     }
   });
+});
+
+describe("codec compress progress (WASM fallback)", () => {
+  afterEach(() => {
+    setForceWasmCodec(false);
+  });
+
+  for (const [label, codec, run] of [
+    [
+      "zst",
+      "zst",
+      (input: string, output: string, progress: { report: (r: { message?: string }) => void }) =>
+        zstdCompressFile(input, output, 5, progress),
+    ],
+    [
+      "br",
+      "br",
+      (input: string, output: string, progress: { report: (r: { message?: string }) => void }) =>
+        brotliCompressFile(input, output, 1, progress),
+    ],
+    [
+      "lz4",
+      "lz4",
+      (input: string, output: string, progress: { report: (r: { message?: string }) => void }) =>
+        lz4CompressFile(input, output, 5, progress),
+    ],
+  ] as const) {
+    it(`${label} reports message + increment through WASM`, async () => {
+      setForceWasmCodec(true);
+      // Random data keeps the wasm compression phase long enough for the
+      // 7zz progress bar to emit percent updates (zeros finish too fast).
+      const input = makeInput(`in-${codec}.tar`, 120, true);
+      const output = `${input}.${codec}`;
+      const reports: { message?: string; increment?: number }[] = [];
+      await run(input, output, {
+        report: (r: { message?: string; increment?: number }) => reports.push(r),
+      } as never);
+      expect(fs.existsSync(output)).toBe(true);
+      expectDeterminateProgress(reports);
+      fs.rmSync(path.dirname(input), { recursive: true, force: true });
+    });
+  }
 });
