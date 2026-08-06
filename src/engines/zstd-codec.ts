@@ -67,7 +67,10 @@ function systemCompressBuffer(data: Buffer, level: number): Buffer | null {
       "System zstd buffer compression failed, falling back to WASM",
     );
   } catch (err) {
-    logger.warn({ event: "zstd.system.buffer.error", err }, "System zstd buffer compression failed");
+    logger.warn(
+      { event: "zstd.system.buffer.error", err },
+      "System zstd buffer compression failed",
+    );
   }
   return null;
 }
@@ -88,7 +91,10 @@ function systemDecompressBuffer(data: Buffer): Buffer | null {
       "System zstd buffer decompression failed, falling back",
     );
   } catch (err) {
-    logger.warn({ event: "zstd.system.buffer.decompress.error", err }, "System zstd decompression failed");
+    logger.warn(
+      { event: "zstd.system.buffer.decompress.error", err },
+      "System zstd decompression failed",
+    );
   }
   return null;
 }
