@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as zlib from "node:zlib";
+import { spawnSync } from "child_process";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
 import {
   wasmCompress,
@@ -21,14 +22,34 @@ import {
 import { brotliDecompressFile } from "../src/engines/brotli-codec";
 import { lz4DecompressFile } from "../src/engines/lz4-codec";
 
-const zstd = require("zstd-napi") as {
-  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
-  decompress: (data: Buffer) => Buffer;
-};
-const lz4 = require("lz4-napi") as {
-  compressFrame: (data: Uint8Array) => Promise<Buffer>;
-  decompressFrame: (data: Uint8Array) => Promise<Buffer>;
-};
+/** Independent zstd reference: the system CLI, when present. */
+function systemZstdAvailable(): boolean {
+  try {
+    return spawnSync("zstd", ["--version"], { timeout: 3000 }).status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function systemZstdCompress(data: Buffer, level = 9): Buffer {
+  const r = spawnSync("zstd", ["-q", "-c", "-f", `-${level}`], {
+    input: data,
+    maxBuffer: 512 * 1024 * 1024,
+    timeout: 120_000,
+  });
+  if (r.status !== 0) throw new Error(`zstd CLI failed: ${r.stderr?.toString()}`);
+  return r.stdout;
+}
+
+function systemZstdDecompress(data: Buffer): Buffer {
+  const r = spawnSync("zstd", ["-q", "-d", "-c"], {
+    input: data,
+    maxBuffer: 512 * 1024 * 1024,
+    timeout: 120_000,
+  });
+  if (r.status !== 0) throw new Error(`zstd CLI failed: ${r.stderr?.toString()}`);
+  return r.stdout;
+}
 
 function makeData(size = 512 * 1024): Buffer {
   const buf = Buffer.alloc(size);
@@ -80,26 +101,27 @@ describe("7zz-wasm codec fallback", () => {
     });
   }
 
-  it("WASM zstd output is decodable by zstd-napi and vice versa", async () => {
-    const data = makeData();
-    const wasmOut = await wasmCompress(data, "zst", 5);
-    expect(Buffer.compare(zstd.decompress(Buffer.from(wasmOut)), data)).toBe(0);
+  it.runIf(systemZstdAvailable())(
+    "WASM zstd output is decodable by system zstd and vice versa",
+    async () => {
+      const data = makeData();
+      const wasmOut = await wasmCompress(data, "zst", 5);
+      // Standard zstd frame magic.
+      expect([...wasmOut.subarray(0, 4)]).toEqual([0x28, 0xb5, 0x2f, 0xfd]);
+      expect(systemZstdDecompress(Buffer.from(wasmOut))).toEqual(data);
 
-    const nativeOut = zstd.compress(data, { compressionLevel: 9 });
-    expect(Buffer.from(await wasmDecompress(nativeOut, "zst"))).toEqual(data);
-  });
+      const systemOut = systemZstdCompress(data);
+      expect(Buffer.from(await wasmDecompress(systemOut, "zst"))).toEqual(data);
+    },
+  );
 
   it("WASM lz4 output is a standard frame and round-trips through wasm", async () => {
     const data = makeData();
     const wasmOut = await wasmCompress(data, "lz4", 5);
     // Standard LZ4 frame magic (no 7-Zip ZS MT container).
     expect([...wasmOut.subarray(0, 4)]).toEqual([0x04, 0x22, 0x4d, 0x18]);
-    // Native lz4-napi and the WASM engine both decode it.
-    expect(Buffer.from(await lz4.decompressFrame(wasmOut))).toEqual(data);
+    // The WASM engine decodes its own standard frame.
     expect(Buffer.from(await wasmDecompress(wasmOut, "lz4"))).toEqual(data);
-
-    const nativeOut = Buffer.from(await lz4.compressFrame(data));
-    expect(Buffer.from(await wasmDecompress(nativeOut, "lz4"))).toEqual(data);
   });
 
   it("WASM brotli output is a standard stream and round-trips through wasm", async () => {
@@ -134,7 +156,9 @@ describe("7zz-wasm codec fallback", () => {
     const data = makeData(300 * 1024);
     const frames: Buffer[] = [];
     for (let pos = 0; pos < data.length; pos += 64 * 1024) {
-      frames.push(zstd.compress(data.subarray(pos, pos + 64 * 1024), { compressionLevel: 3 }));
+      frames.push(
+        Buffer.from(await wasmCompress(data.subarray(pos, pos + 64 * 1024), "zst", 3)),
+      );
     }
     const restored = await wasmDecompress(Buffer.concat(frames), "zst");
     expect(Buffer.from(restored)).toEqual(data);
@@ -144,7 +168,9 @@ describe("7zz-wasm codec fallback", () => {
     const data = makeData(300 * 1024);
     const frames: Buffer[] = [];
     for (let pos = 0; pos < data.length; pos += 64 * 1024) {
-      frames.push(Buffer.from(await lz4.compressFrame(new Uint8Array(data.subarray(pos, pos + 64 * 1024)))));
+      frames.push(
+        Buffer.from(await wasmCompress(data.subarray(pos, pos + 64 * 1024), "lz4", 5)),
+      );
     }
     const restored = await wasmDecompress(Buffer.concat(frames), "lz4");
     expect(Buffer.from(restored)).toEqual(data);

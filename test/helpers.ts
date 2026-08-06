@@ -9,6 +9,7 @@
 import * as path from "path";
 
 import { JS7z as createJS7z } from "../src/engines/js7z-factory";
+import { wasmCompress } from "../src/engines/js7z-codec";
 
 // Bundled 7zz WASM engine (see src/engines/js7z-factory.ts).
 const JS7z: (opts?: Record<string, unknown>) => Promise<JS7zInstance> = createJS7z;
@@ -223,16 +224,6 @@ export async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string
 
 // ── Wrapped archive helpers ──
 
-const zstd: {
-  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
-  decompress: (data: Buffer) => Buffer;
-} = require("zstd-napi");
-
-const lz4: {
-  compressFrame: (data: Uint8Array) => Promise<Buffer>;
-  decompressFrame: (data: Uint8Array) => Promise<Buffer>;
-} = require("lz4-napi");
-
 import * as zlib from "node:zlib";
 
 const snappy: {
@@ -252,10 +243,10 @@ export async function createWrapped(files: Record<string, string>, ext: string):
     await run7z(j1, ["a", "/_t.tar", ...tops]);
     const tb = Buffer.from(j1.FS.readFile("/_t.tar", { encoding: "binary" }));
     if (ext === "tar.zst" || ext === "tzst") {
-      return zstd.compress(tb, { compressionLevel: 3 });
+      return Buffer.from(await wasmCompress(tb, "zst", 3));
     }
     if (ext === "tar.lz4" || ext === "tlz4") {
-      return Buffer.from(await lz4.compressFrame(new Uint8Array(tb)));
+      return Buffer.from(await wasmCompress(tb, "lz4", 5));
     }
     if (ext === "tar.br" || ext === "tbr") {
       return Buffer.from(zlib.brotliCompressSync(Buffer.from(tb), {

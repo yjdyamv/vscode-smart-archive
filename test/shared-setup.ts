@@ -35,16 +35,25 @@ export { testCompress, testDecompress } from "./test-helpers";
 
 export type { JS7zInstance, FlatEntry } from "./helpers";
 
-// ── Codec modules (lazy init) ──
+// ── Codec modules (WASM-based; no native addons anymore) ──
 
-export const zstd = require("zstd-napi") as {
-  compress: (data: Buffer, opts?: { compressionLevel?: number }) => Buffer;
-  decompress: (data: Buffer) => Buffer;
+import { wasmCompress, wasmDecompress } from "../src/engines/js7z-codec";
+
+export const zstd = {
+  compress: async (
+    data: Uint8Array,
+    opts?: { compressionLevel?: number },
+  ): Promise<Buffer> =>
+    Buffer.from(await wasmCompress(data, "zst", opts?.compressionLevel ?? 3)),
+  decompress: async (data: Uint8Array): Promise<Buffer> =>
+    Buffer.from(await wasmDecompress(data, "zst")),
 };
 
-export const lz4 = require("lz4-napi") as {
-  compressFrame: (data: Uint8Array) => Promise<Buffer>;
-  decompressFrame: (data: Uint8Array) => Promise<Buffer>;
+export const lz4 = {
+  compressFrame: async (data: Uint8Array): Promise<Buffer> =>
+    Buffer.from(await wasmCompress(data, "lz4", 5)),
+  decompressFrame: async (data: Uint8Array): Promise<Buffer> =>
+    Buffer.from(await wasmDecompress(data, "lz4")),
 };
 
 // brotli: migrated to node:zlib; in-memory helper uses brotli-codec engine
