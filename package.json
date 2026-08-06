@@ -52,7 +52,7 @@
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
     "release": "npm run build && npm run check && npm run package",
-    "stage:natives": "node scripts/install-7zz-wasm.js && node scripts/install-snappy-platforms.js && node scripts/install-lz4-platforms.js && node scripts/install-zstd-platforms.js && node scripts/install-7z-platforms.js && node scripts/install-rar5-platforms.js",
+    "stage:natives": "node scripts/install-7zz-wasm.js && node scripts/install-snappy-platforms.js && node scripts/install-7z-platforms.js && node scripts/install-rar5-platforms.js",
     "package": "vsce package",
     "package:cross": "npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts && node scripts/install-7zz-wasm.js && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.js && vsce package",
     "package:ovsx": "npm run stage:natives && npm run build && npx ovsx package",
@@ -63,11 +63,9 @@
   "dependencies": {
     "@vscode/codicons": "^0.0.45",
     "iconv-lite": "^0.7.3",
-    "lz4-napi": "^2.9.1",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1",
-    "snappy": "^7.2.2",
-    "zstd-napi": "https://github.com/yjdyamv/zstd-napi/archive/refs/tags/v0.0.13.tar.gz"
+    "snappy": "^7.2.2"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
@@ -633,7 +631,6 @@
     "vscode": "^1.85.0"
   },
   "allowScripts": {
-    "lz4-napi@2.9.1": true,
     "snappy@7.2.2": true
   }
 }
