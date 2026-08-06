@@ -26,8 +26,6 @@ export default defineConfig({
       },
       external: [
         "vscode",
-        "zstd-napi",
-        "lz4-napi",
         "snappy",
         "@vscode/codicons",
         // vendored wasm engine — loaded at runtime via relative require so

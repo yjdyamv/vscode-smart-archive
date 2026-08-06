@@ -20,21 +20,11 @@ skills-lock.json
 node_modules/
 !node_modules/@vscode/codicons/dist/**
 !node_modules/@vscode/codicons/LICENSE
-!node_modules/lz4-napi/index.js
-!node_modules/lz4-napi/lz4-napi.*.node
-!node_modules/lz4-napi/package.json
-!node_modules/lz4-napi/LICENSE
 !node_modules/snappy/index.js
 !node_modules/snappy/index.d.ts
 !node_modules/snappy/snappy.*.node
 !node_modules/snappy/package.json
 !node_modules/snappy/LICENSE
-!node_modules/zstd-napi/dist/**
-!node_modules/zstd-napi/binding.js
-!node_modules/zstd-napi/build/Release/*-*/binding.node
-node_modules/zstd-napi/build/Release/obj.target/**
-!node_modules/zstd-napi/package.json
-!node_modules/zstd-napi/LICENSE
 
 # ── 输出 & 杂项 ──
 .cache/**
