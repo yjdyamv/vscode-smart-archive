@@ -54,7 +54,20 @@ export interface CompressOptions {
   recoveryPercent?: number;
   /** RAR5 recovery volumes (.rev) count (WinRAR -rv); auto-capped at the data volume count. */
   recoveryVolumeCount?: number;
+  /** 7z compression method (lzma2 | flzma2 | zstd); default flzma2. */
+  sevenZipMethod?: SevenZipMethod;
 }
+
+/** 7-Zip compression method for new .7z archives. */
+export type SevenZipMethod =
+  | "lzma2"
+  | "flzma2"
+  | "zstd"
+  | "brotli"
+  | "lz4"
+  | "deflate"
+  | "bzip2"
+  | "lizard";
 
 /** Input parameters for a decompression operation */
 export interface DecompressOptions {

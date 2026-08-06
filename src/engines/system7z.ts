@@ -25,7 +25,12 @@ import { spawn, spawnSync } from "child_process";
 import * as vscode from "vscode";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import * as iconv from "iconv-lite";
-import type { CompressOptions, DecompressOptions } from "../types";
+import type { CompressOptions, DecompressOptions, SevenZipMethod } from "../types";
+import {
+  mapLizardLevel,
+  normalizeSevenZipMethod,
+  SEVEN_ZIP_METHOD_CODECS,
+} from "../utils/sevenZipMethod";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
@@ -62,10 +67,19 @@ export function detectSystem7z(): string | null {
     .getConfiguration("smart-archive")
     .get<string>("useSystem7z", "auto");
 
-  // "bundled": skip system detection entirely and force the VSIX-bundled 7zz
+  // "never": disable the native engine entirely (→ WASM).
+  if (setting === "never") {
+    logger.debug({ event: "system7z.disabledBySetting" });
+    _cachedPath = null;
+    return null;
+  }
+
+  const bundled = bundled7zPath();
+
+  // "bundled": skip system detection and force the VSIX-bundled 7zz
   // (→ null / WASM when it is missing or cannot run on this platform).
   if (setting === "bundled") {
-    _cachedPath = bundled7zPath();
+    _cachedPath = bundled;
     logger.info({
       event: _cachedPath ? "system7z.detected" : "system7z.notFound",
       path: _cachedPath ?? undefined,
@@ -75,6 +89,49 @@ export function detectSystem7z(): string | null {
     return _cachedPath;
   }
 
+  const system = findSystem7z();
+
+  // "always": force the system install (warn when it is missing).
+  if (setting === "always") {
+    if (!system) {
+      vscode.window.showWarningMessage(t("system7z.notInstalled"));
+    }
+    _cachedPath = system;
+    return system;
+  }
+
+  // "auto": bundled 7-Zip ZS is the reference. Platforms without a bundled
+  // binary (macOS x64, linux arm, Windows ia32) go straight to the WASM
+  // engine. A system install is used only when it is at least as capable as
+  // the bundled fork (stock 7-Zip lacks FLZMA2/ZSTD/BROTLI → bundled wins).
+  if (!bundled) {
+    _cachedPath = null;
+    logger.info({
+      event: "system7z.notFound",
+      reason: "no-bundled",
+      platform: process.platform,
+    });
+    return null;
+  }
+  if (!system || !isAtLeastAsCapable(system, bundled)) {
+    _cachedPath = bundled;
+    logger.info({
+      event: "system7z.detected",
+      path: bundled,
+      method: "bundled",
+      reason: system ? "system-inferior" : "no-system",
+      platform: process.platform,
+    });
+    return bundled;
+  }
+
+  _cachedPath = system;
+  logger.info({ event: "system7z.detected", path: system, method: "system", platform: process.platform });
+  return system;
+}
+
+/** Find a system-installed 7-Zip binary: known paths first, then PATH. */
+function findSystem7z(): string | null {
   const candidates: string[] = [];
 
   if (process.platform === "win32") {
@@ -95,37 +152,16 @@ export function detectSystem7z(): string | null {
   }
 
   for (const c of candidates) {
-    if (fs.existsSync(c) && testBinary(c)) {
-      // Check version before accepting — skip old p7zip if newer 7z/7zz is also present
-      if (!versionOk(c)) continue;
-      _cachedPath = c;
-      logger.info({ event: "system7z.detected", path: c, method: "known-path" });
-      return _cachedPath;
-    }
+    // Check version before accepting — skip old p7zip if newer 7z/7zz is also present.
+    if (fs.existsSync(c) && testBinary(c) && versionOk(c)) return c;
   }
 
   const names =
     process.platform === "win32" ? ["7z.exe", "7za.exe", "7zz.exe"] : ["7z", "7za", "7zz"];
   for (const name of names) {
     const found = resolveFromPath(name);
-    if (found && testBinary(found) && versionOk(found)) {
-      _cachedPath = found;
-      logger.info({ event: "system7z.detected", path: found, method: "PATH" });
-      return _cachedPath;
-    }
+    if (found && testBinary(found) && versionOk(found)) return found;
   }
-
-  // Fall back to the 7-Zip binary bundled in the VSIX (guarantees availability
-  // even when nothing is installed). A user-installed 7z is preferred above.
-  const bundled = bundled7zPath();
-  if (bundled) {
-    _cachedPath = bundled;
-    logger.info({ event: "system7z.detected", path: bundled, method: "bundled" });
-    return _cachedPath;
-  }
-
-  _cachedPath = null;
-  logger.info({ event: "system7z.notFound", platform: process.platform });
   return null;
 }
 
@@ -136,14 +172,16 @@ export function detectSystem7z(): string | null {
  * Returns null when no binary is bundled for this platform (→ WASM fallback).
  */
 function bundled7zPath(): string | null {
-  const bin = process.platform === "win32" ? "7z.exe" : "7zz";
-  const rel = path.join("vendor", "7z-bin", process.platform, process.arch, bin);
   // Compiled bundle (out/extension.js) resolves from <root>/out; source
   // modules (src/engines, vitest) resolve from <root>/src/engines. Try both.
-  const p =
-    [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)].find((c) =>
-      fs.existsSync(c),
-    ) ?? null;
+  // All platforms use the same `7zz` name (Windows: 7zz.exe); the 7z.exe
+  // fallback only covers stale vendor dirs from older staging runs.
+  const names = process.platform === "win32" ? ["7zz.exe", "7z.exe"] : ["7zz"];
+  const candidates = names.flatMap((bin) => {
+    const rel = path.join("vendor", "7z-bin", process.platform, process.arch, bin);
+    return [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
+  });
+  const p = candidates.find((c) => fs.existsSync(c)) ?? null;
   if (!p) return null;
   if (process.platform !== "win32") {
     try {
@@ -237,6 +275,25 @@ const MIN_VERSION_ZSTD = 24;
 
 let _cachedVersion: number | undefined;
 
+interface SevenZipCapabilities {
+  version: number;
+  /** Raw `7zz i` output; codec support is matched by name. */
+  codecsText: string;
+}
+
+const METHOD_FALLBACK: Record<SevenZipMethod, SevenZipMethod> = {
+  zstd: "flzma2",
+  brotli: "flzma2",
+  lz4: "lzma2",
+  deflate: "lzma2",
+  bzip2: "lzma2",
+  lizard: "lzma2",
+  flzma2: "lzma2",
+  lzma2: "lzma2",
+};
+
+const _probeCache = new Map<string, SevenZipCapabilities | null>();
+
 /**
  * Reset the cached engine detection so a changed `smart-archive.useSystem7z`
  * setting takes effect without a window reload. Wired to onDidChangeConfiguration
@@ -245,7 +302,61 @@ let _cachedVersion: number | undefined;
 export function resetDetectionCache(): void {
   _cachedPath = undefined;
   _cachedVersion = undefined;
+  _probeCache.clear();
   _macPrepared = false;
+}
+
+/** Probe one 7z binary's capabilities (`7zz i`), cached per path. */
+function probe7z(binaryPath: string): SevenZipCapabilities | null {
+  const cached = _probeCache.get(binaryPath);
+  if (cached !== undefined) return cached;
+  let caps: SevenZipCapabilities | null = null;
+  try {
+    const r = spawnSync(binaryPath, ["i"], {
+      stdio: "pipe",
+      timeout: BINARY_DETECT_TIMEOUT,
+      windowsHide: true,
+    });
+    const out = (r.stdout?.toString() ?? "") + (r.stderr?.toString() ?? "");
+    const m = out.match(/7-Zip\s+(?:\(z\)\s+)?(\d+)\.(\d+)/i);
+    if (m) {
+      caps = {
+        version: parseInt(m[1], 10) + parseInt(m[2], 10) / 100,
+        codecsText: out,
+      };
+    }
+  } catch {
+    caps = null;
+  }
+  _probeCache.set(binaryPath, caps);
+  return caps;
+}
+
+function hasCodec(caps: SevenZipCapabilities | null, name: string): boolean {
+  return !!caps && new RegExp(`\\b${name}\\b`).test(caps.codecsText);
+}
+
+/** True when `candidate` exposes at least the codecs and version of `reference`. */
+function isAtLeastAsCapable(candidate: string, reference: string): boolean {
+  const a = probe7z(candidate);
+  const b = probe7z(reference);
+  if (!a || !b) return false;
+  if (a.version < b.version) return false;
+  // The bundled fork's extra codecs are the ones stock 7-Zip lacks.
+  for (const codec of ["FLZMA2", "ZSTD", "BROTLI", "LZ4", "LIZARD"]) {
+    if (hasCodec(b, codec) && !hasCodec(a, codec)) return false;
+  }
+  return true;
+}
+
+/** Pick the best supported method for a binary via the fallback chain. */
+function resolveMethodForBinary(binaryPath: string, wanted: SevenZipMethod): SevenZipMethod {
+  const caps = probe7z(binaryPath);
+  let method = wanted;
+  while (method !== "lzma2" && !hasCodec(caps, SEVEN_ZIP_METHOD_CODECS[method])) {
+    method = METHOD_FALLBACK[method];
+  }
+  return method;
 }
 
 function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
@@ -675,8 +786,30 @@ export async function compressWithSystem7z(
     return;
   }
 
-  // Non-wrapped: one-step with all flags
-  const args: string[] = ["a", `-t${typeFlag}`, `-mx${options.level}`, "-mmt=on"];
+  // Non-wrapped: one-step with all flags. .7z uses the configured method
+  // (default Fast LZMA2). Level 0 means store (Copy) — stock 7-Zip only
+  // stores at -mx0 when no method is named, and the fork maps -mx0 of its
+  // new codecs to "fastest" (still compressing), so force -m0=Copy.
+  const args: string[] = ["a", `-t${typeFlag}`, "-mmt=on"];
+  let method: SevenZipMethod | undefined;
+  if (options.format.label === "7z") {
+    if (options.level === 0) {
+      args.push("-m0=Copy");
+    } else {
+      const wanted = normalizeSevenZipMethod(options.sevenZipMethod);
+      method = resolveMethodForBinary(sz, wanted);
+      if (method !== wanted) {
+        logger.warn(
+          { event: "system7z.methodFallback", wanted, method, binary: sz },
+          `7z method ${wanted} unsupported by ${sz}; using ${method}`,
+        );
+      }
+      args.push(`-m0=${SEVEN_ZIP_METHOD_CODECS[method]}`);
+    }
+  }
+  // LizardMT speaks levels 10–49; map the UI's 0–9 scale onto it.
+  const mxLevel = method === "lizard" && options.level > 0 ? mapLizardLevel(options.level) : options.level;
+  args.push(`-mx${mxLevel}`);
   // Force progress to stdout (see wrapped path above) so the percentage
   // parser works even when the archive is buffered until the end.
   if (progress) args.push("-bsp1");
@@ -1264,7 +1397,19 @@ function run7z(
   cwd?: string,
   monitorOutput?: { outputPath: string; totalInputBytes: number },
 ): Promise<void> {
-  const prog = progress ?? { report: () => {} };
+  const rawProg = progress ?? { report: () => {} };
+  // Track cumulative reported percentage: fast/small operations may finish
+  // before any intermediate % is parsed or the size monitor ticks, so we can
+  // still land the bar on 100% at completion.
+  let reportedPct = 0;
+  const prog: ProgressLike = {
+    report(r) {
+      if (typeof r.increment === "number" && r.increment > 0) {
+        reportedPct = Math.min(100, reportedPct + r.increment);
+      }
+      rawProg.report(r);
+    },
+  };
   return new Promise<void>((resolve, reject) => {
     const combinedChunks: Buffer[] = [];
     let lastPct = -1;
@@ -1439,6 +1584,9 @@ function run7z(
       }
 
       if (code === 0) {
+        if (progress && reportedPct < 100) {
+          prog.report({ message: "100%", increment: 100 - reportedPct });
+        }
         logger.info(logMeta);
         resolve();
         return;
@@ -1448,6 +1596,9 @@ function run7z(
       // Some files may have failed but the archive was processed successfully.
       // This is not a fatal error, so resolve rather than reject.
       if (code === 1) {
+        if (progress && reportedPct < 100) {
+          prog.report({ message: "100%", increment: 100 - reportedPct });
+        }
         logger.warn(
           { ...logMeta, event: "system7z.run.warning", stderrTail: combinedOutput.slice(-200) },
           "7z exited with warning (code 1)",
