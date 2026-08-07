@@ -3,20 +3,13 @@ import type { TreeNodeData, FlatNode, ArchiveProps } from "../types";
 import type { WebviewToHost, HostToWebview } from "../protocol";
 import type { DescCount } from "../bootstrap";
 import { isCoveredByAncestor } from "./useSelection";
-import { useTreeFlatten } from "./useTree";
-import { useSelection } from "./useSelection";
-import { useSearch } from "./useSearch";
-import { resolveRowHeight } from "../utils/dom";
-import {
-  TOAST_SUCCESS_MS,
-  TOAST_ERROR_MS,
-  SEARCH_DEBOUNCE_MS,
-  DEFAULT_PAGE_SIZE,
-} from "../constants";
-
-type TreeController = ReturnType<typeof useTreeFlatten>;
-type SelectionController = ReturnType<typeof useSelection>;
-type SearchController = ReturnType<typeof useSearch>;
+import type { SelectionController } from "./useSelection";
+import type { SearchController } from "./useSearch";
+import type { TreeController } from "./useTree";
+import { createHostOps } from "./archiveOps";
+import { createMessageDispatcher } from "./messageDispatcher";
+import { createKeyboardNav } from "./keyboardNav";
+import { TOAST_SUCCESS_MS, TOAST_ERROR_MS, SEARCH_DEBOUNCE_MS } from "../constants";
 
 export interface ArchiveViewContext {
   post: (msg: WebviewToHost) => void;
@@ -42,6 +35,11 @@ export interface ArchiveViewContext {
   scrollToPath: (path: string) => void;
 }
 
+/**
+ * Archive view composition root: wires the internal seams (host ops, message
+ * dispatch, keyboard navigation) to the shared controllers and exposes the
+ * single interface App.vue binds to.
+ */
 export function useArchiveView(ctx: ArchiveViewContext) {
   const { post, tree, treeData, selection, search, visibleFlatNodes, viewState, loadingMsg } = ctx;
 
@@ -116,7 +114,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
 
   function handleRowDblClick(path: string, isDir: boolean) {
     if (isDir) expandOrLoad(path);
-    else previewFile(path);
+    else ops.previewFile(path);
   }
 
   function handleExpandClick(path: string) {
@@ -128,38 +126,49 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     selection.state.anchorPath = path;
   }
 
-  // ── Selection helpers ──────────────────────────────────────────────
+  // ── Context menu state (ops.newFolder reads the target dir) ────────
 
-  function isAnyDirSelected(paths: string[]): boolean {
-    for (const p of paths) {
-      const node = tree.findNode(p);
-      if (node && node.kind === "DIRECTORY") return true;
-    }
-    return false;
-  }
+  const ctxMenu = reactive({ show: false, x: 0, y: 0, paths: [] as string[], dirPath: "" });
 
-  function getEffectivePaths(): { paths: string[]; excludes: string[] } {
-    const raw = [...selection.state.selected];
-    const paths = new Set<string>();
-    const excludes = new Set<string>();
-    for (const p of raw) {
-      const node = tree.findNode(p);
-      if (node && node.kind === "DIRECTORY" && node.children && node.children.length > 0) {
-        const hasAnyChildSelected = node.children.some((c) => selection.state.selected.has(c.path));
-        if (hasAnyChildSelected) {
-          paths.add(p);
-          for (const child of node.children) {
-            if (!selection.state.selected.has(child.path)) excludes.add(child.path);
-          }
-        } else {
-          paths.add(p);
-        }
-      } else {
-        if (!isCoveredByAncestor(p, selection.state.selected)) paths.add(p);
-      }
-    }
-    return { paths: [...paths], excludes: [...excludes] };
-  }
+  // ── Internal seams ─────────────────────────────────────────────────
+
+  const ops = createHostOps({
+    post,
+    tree,
+    selection,
+    showToast,
+    viewState,
+    loadingMsg,
+    pwError: ctx.pwError,
+    getCtxDir: () => ctxMenu.dirPath,
+  });
+
+  const dispatcher = createMessageDispatcher({
+    onMessage: ctx.onMessage,
+    tree,
+    selection,
+    showToast,
+    viewState,
+    loadingMsg,
+    pwError: ctx.pwError,
+    isEncrypted: ctx.isEncrypted,
+    loadExpandedPaths,
+  });
+
+  const keyboard = createKeyboardNav({
+    visibleFlatNodes,
+    selection,
+    tree,
+    post,
+    scrollToPath: ctx.scrollToPath,
+    containerEl: ctx.containerEl,
+    closeContextMenu,
+    expandAllAndLoad: () => {
+      tree.expandAll();
+      loadExpandedPaths();
+    },
+    ops,
+  });
 
   // ── Selection counts ───────────────────────────────────────────────
 
@@ -247,83 +256,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     selection.state.anchorPath = path;
   }
 
-  // ── Operations ─────────────────────────────────────────────────────
-
-  function extAll() {
-    post({ c: "extAll" });
-    showToast("Extracting all files...", true);
-  }
-
-  function extSel() {
-    const { paths, excludes } = getEffectivePaths();
-    if (!paths.length) return;
-    post({ c: "extSel", paths, excludes, flat: !isAnyDirSelected(paths) });
-    showToast("Extracting " + paths.length + " item(s)...", true);
-  }
-
-  function copySel() {
-    const { paths } = getEffectivePaths();
-    if (!paths.length) return;
-    post({ c: "copy", paths, flat: !isAnyDirSelected(paths) });
-    showToast("Copied " + paths.length + " item(s)", true);
-  }
-
-  function delSel() {
-    const { paths } = getEffectivePaths();
-    if (!paths.length) return;
-    post({ c: "delSel", paths });
-    loadingMsg.value = "Deleting " + paths.length + " item(s)...";
-    viewState.value = "loading";
-  }
-
-  function addFiles() {
-    const dir = selection.state.lastAddDir;
-    post({ c: "addFiles", dir });
-    showToast("Adding to " + (dir || "archive root"), true);
-  }
-
-  function previewFile(path: string) {
-    post({ c: "preview", path });
-  }
-  function renameFile(path: string) {
-    post({ c: "renamePrompt", path });
-  }
-
-  function newFolder() {
-    const dir = selection.state.lastAddDir || ctxMenu.dirPath || "";
-    post({ c: "newFolderPrompt", dir });
-  }
-
-  function testArchive() {
-    post({ c: "test" });
-    showToast("Testing archive integrity...", true);
-  }
-  function convertFormat() {
-    post({ c: "convert" });
-  }
-  function mergeVolumes() {
-    post({ c: "merge" });
-    showToast("Merging split volumes...", true);
-  }
-  function splitVolumes() {
-    post({ c: "split" });
-  }
-  function encryptArchive() {
-    post({ c: "encrypt" });
-    showToast("Adding encryption...", true);
-  }
-  function decryptArchive() {
-    post({ c: "decrypt" });
-    showToast("Removing encryption...", true);
-  }
-  function submitPassword(pw: string) {
-    ctx.pwError.value = false;
-    post({ c: "pw", pw });
-  }
-
-  // ── Context menu ───────────────────────────────────────────────────
-
-  const ctxMenu = reactive({ show: false, x: 0, y: 0, paths: [] as string[], dirPath: "" });
+  // ── Context menu handlers ──────────────────────────────────────────
 
   function handleContextMenu(e: MouseEvent, path: string, dirPath: string) {
     if (!selection.state.selected.has(path)) {
@@ -332,7 +265,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
       selection.state.anchorPath = path;
     }
     selection.state.lastAddDir = dirPath;
-    const { paths: selectedPaths } = getEffectivePaths();
+    const { paths: selectedPaths } = ops.getEffectivePaths();
     if (!selectedPaths.length) return;
     ctxMenu.show = true;
     ctxMenu.x = e.clientX;
@@ -346,15 +279,15 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     ctxMenu.show = false;
   }
   function ctxExtract() {
-    extSel();
+    ops.extSel();
     closeContextMenu();
   }
   function ctxDelete() {
-    delSel();
+    ops.delSel();
     closeContextMenu();
   }
   function ctxCopy() {
-    copySel();
+    ops.copySel();
     closeContextMenu();
   }
   function ctxAddHere() {
@@ -366,167 +299,11 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     closeContextMenu();
   }
   function ctxRename() {
-    if (ctxMenu.paths.length === 1) renameFile(ctxMenu.paths[0]);
+    if (ctxMenu.paths.length === 1) ops.renameFile(ctxMenu.paths[0]);
     closeContextMenu();
   }
 
-  // ── Keyboard ───────────────────────────────────────────────────────
-
-  function navigateRows(delta: number, shift: boolean) {
-    const flatList = visibleFlatNodes.value;
-    if (!flatList.length) return;
-    let idx = selection.state.anchorPath
-      ? flatList.findIndex((f) => f.path === selection.state.anchorPath)
-      : -1;
-    if (idx < 0) idx = delta > 0 ? -1 : flatList.length;
-    idx = Math.max(0, Math.min(idx + delta, flatList.length - 1));
-    const targetPath = flatList[idx].path;
-    const targetIsDir = flatList[idx].node.kind === "DIRECTORY";
-    if (!shift) selection.clearAll();
-    selection.toggle(targetPath, targetIsDir);
-    selection.state.anchorPath = targetPath;
-    ctx.scrollToPath(targetPath);
-  }
-
-  function getPageSize(): number {
-    const el = ctx.containerEl.value;
-    if (!el) return DEFAULT_PAGE_SIZE;
-    return Math.max(1, Math.floor(el.clientHeight / resolveRowHeight()));
-  }
-
-  function handleKeyboard(e: KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-    if ((e.ctrlKey || e.metaKey) && e.key === "a") {
-      e.preventDefault();
-      tree.expandAll();
-      loadExpandedPaths();
-      for (const fn of visibleFlatNodes.value) selection.state.selected.add(fn.path);
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === "c" && selection.hasSelected()) {
-      const ts = window.getSelection();
-      if (ts && ts.toString().length > 0) return;
-      e.preventDefault();
-      copySel();
-    }
-    if (e.key === "F2" && selection.state.selected.size === 1) {
-      e.preventDefault();
-      const paths = selection.getSelectedPaths();
-      if (paths.length === 1) post({ c: "renamePrompt", path: paths[0] });
-    }
-    if (e.key === "Enter" && selection.hasSelected()) {
-      e.preventDefault();
-      extSel();
-    }
-    if (e.key === "Escape") {
-      selection.clearAll();
-      ctxMenu.show = false;
-    }
-    if (e.key === " " && selection.state.anchorPath) {
-      e.preventDefault();
-      selection.toggle(selection.state.anchorPath);
-    }
-    if (e.key === "Delete" && selection.hasSelected()) {
-      e.preventDefault();
-      delSel();
-    }
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      navigateRows(1, e.shiftKey);
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      navigateRows(-1, e.shiftKey);
-    }
-    if (e.key === "PageDown") {
-      e.preventDefault();
-      const page = getPageSize();
-      ctx.containerEl.value?.scrollBy({
-        top: ctx.containerEl.value.clientHeight,
-        behavior: "auto",
-      });
-      navigateRows(page, e.shiftKey);
-    }
-    if (e.key === "PageUp") {
-      e.preventDefault();
-      const page = getPageSize();
-      ctx.containerEl.value?.scrollBy({
-        top: -ctx.containerEl.value.clientHeight,
-        behavior: "auto",
-      });
-      navigateRows(-page, e.shiftKey);
-    }
-    if (e.key === "Home") {
-      e.preventDefault();
-      const flatList = visibleFlatNodes.value;
-      if (!flatList.length) return;
-      if (!e.shiftKey) selection.clearAll();
-      selection.toggle(flatList[0].path, flatList[0].node.kind === "DIRECTORY");
-      selection.state.anchorPath = flatList[0].path;
-      ctx.scrollToPath(flatList[0].path);
-    }
-    if (e.key === "End") {
-      e.preventDefault();
-      const flatList = visibleFlatNodes.value;
-      if (!flatList.length) return;
-      const last = flatList[flatList.length - 1];
-      if (!e.shiftKey) selection.clearAll();
-      selection.toggle(last.path, last.node.kind === "DIRECTORY");
-      selection.state.anchorPath = last.path;
-      ctx.scrollToPath(last.path);
-    }
-  }
-
-  // ── Message handler ────────────────────────────────────────────────
-
-  function setupMessageHandler() {
-    return ctx.onMessage((msg: HostToWebview) => {
-      switch (msg.c) {
-        case "ok":
-          showToast(msg.t, true);
-          viewState.value = "content";
-          break;
-        case "err":
-          showToast(msg.t, false);
-          viewState.value = "content";
-          break;
-        case "loading":
-          if (typeof msg.t === "string") {
-            loadingMsg.value = msg.t;
-            viewState.value = "loading";
-          } else {
-            viewState.value = msg.t ? "loading" : "content";
-          }
-          break;
-        case "pwerr":
-          ctx.pwError.value = true;
-          break;
-        case "encState":
-          ctx.isEncrypted.value = !!msg.v;
-          break;
-        case "dirChildren": {
-          const parentPath = msg.path;
-          const children = msg.children;
-          if (parentPath && Array.isArray(children)) {
-            const childPaths = tree.insertChildren(parentPath, children);
-            for (const c of children) {
-              if (c.kind === "DIRECTORY" && (c.hasMore || (c.children?.length ?? 0) > 0)) {
-                if (!c.collapsed && tree.shouldAutoExpandChild(c.path)) {
-                  tree.expandedPaths.value.add(c.path);
-                }
-              }
-            }
-            if (selection.state.selected.has(parentPath)) {
-              for (const childPath of childPaths) selection.state.selected.add(childPath);
-            }
-            loadExpandedPaths();
-          }
-          break;
-        }
-      }
-    });
-  }
-
-  // ── Cleanup ────────────────────────────────────────────────────────
+  // ── Lifecycle ──────────────────────────────────────────────────────
 
   function cleanup() {
     if (toastTimer) clearTimeout(toastTimer);
@@ -545,28 +322,28 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     // Selection
     selectionBreakdown,
     selectedCount,
-    getEffectivePaths,
+    getEffectivePaths: ops.getEffectivePaths,
     // Row handlers
     handleRowClick,
     handleRowDblClick,
     handleExpandClick,
     handleCheckClick,
     // Operations
-    extAll,
-    extSel,
-    copySel,
-    delSel,
-    addFiles,
-    previewFile,
-    renameFile,
-    newFolder,
-    testArchive,
-    convertFormat,
-    mergeVolumes,
-    splitVolumes,
-    encryptArchive,
-    decryptArchive,
-    submitPassword,
+    extAll: ops.extAll,
+    extSel: ops.extSel,
+    copySel: ops.copySel,
+    delSel: ops.delSel,
+    addFiles: ops.addFiles,
+    previewFile: ops.previewFile,
+    renameFile: ops.renameFile,
+    newFolder: ops.newFolder,
+    testArchive: ops.testArchive,
+    convertFormat: ops.convertFormat,
+    mergeVolumes: ops.mergeVolumes,
+    splitVolumes: ops.splitVolumes,
+    encryptArchive: ops.encryptArchive,
+    decryptArchive: ops.decryptArchive,
+    submitPassword: ops.submitPassword,
     // Context menu
     ctxMenu,
     handleContextMenu,
@@ -578,9 +355,9 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     ctxNewFolder,
     ctxRename,
     // Keyboard
-    handleKeyboard,
+    handleKeyboard: keyboard.handleKeyboard,
     // Lifecycle
-    setupMessageHandler,
+    setupMessageHandler: dispatcher.setup,
     cleanup,
     loadExpandedPaths,
     expandOrLoad,

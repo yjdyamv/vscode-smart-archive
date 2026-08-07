@@ -116,6 +116,8 @@ export function collectMatches(
   return any;
 }
 
+export type SearchController = ReturnType<typeof useSearch>;
+
 export function useSearch() {
   const query = ref("");
   const isRegex = ref(false);

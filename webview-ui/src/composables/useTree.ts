@@ -5,6 +5,8 @@ import { DEFAULT_EXPAND_DEPTH } from "../constants";
 
 export type { FlatNode };
 
+export type TreeController = ReturnType<typeof useTreeFlatten>;
+
 export function buildNodeMap(nodes: TreeNodeData[]): Map<string, TreeNodeData> {
   const map = new Map<string, TreeNodeData>();
   function walk(ns: TreeNodeData[]) {
