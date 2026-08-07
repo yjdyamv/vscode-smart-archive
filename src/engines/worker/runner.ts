@@ -15,23 +15,9 @@ import { Worker } from "worker_threads";
 import * as path from "path";
 import * as vscode from "vscode";
 import type { ArchiveOp, EngineConfig, RequestPayload, WorkerMessage } from "./types";
-import { compressWith7z as compressCore } from "../js7z-compress-core";
-import { decompressWith7z as decompressCore } from "../js7z-decompress-core";
+import { dispatchOp } from "./dispatch";
 import { writeHostLog, logger } from "../../utils/logger";
 import { readEngineConfig } from "../../utils/config";
-import { fetchFileListCore } from "../fileListing-core";
-import { isEncryptedWasm } from "../js7z-list-core";
-import { unwrapInnerTar } from "../js7z-decompress-core";
-import {
-  addToArchiveCore,
-  deleteFromArchiveCore,
-  renameInArchiveCore,
-  createFolderInArchiveCore,
-  previewFileCore,
-  testArchiveCore,
-} from "../modify-core";
-import { extractSelectedCore } from "../extract-core";
-import type { ModifyPayload } from "./types";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
 
 // ── Worker lifecycle constants ─────────────────────────────────────
@@ -127,59 +113,10 @@ export class InProcessRunner implements ArchiveRunner {
     progress?: ProgressLike,
     token?: TokenLike,
   ): Promise<unknown> {
-    if (op === "compress") {
-      const p = payload as {
-        options: Parameters<typeof compressCore>[0];
-        excludePatterns?: string[];
-      };
-      return compressCore(p.options, progress, token, p.excludePatterns);
-    }
-    if (op === "list") {
-      const p = payload as { inputPath: string; password?: string; data?: Uint8Array };
-      return fetchFileListCore(p.inputPath, p.password ?? "", p.data);
-    }
-    if (op === "isEncrypted") {
-      const p = payload as { inputPath: string };
-      return isEncryptedWasm(p.inputPath);
-    }
-    if (op === "unwrap") {
-      const p = payload as { outputDir: string };
-      return unwrapInnerTar(p.outputDir);
-    }
-    if (op === "modify") {
-      const p = payload as ModifyPayload;
-      switch (p.action) {
-        case "add":
-          return addToArchiveCore(
-            p.archivePath,
-            p.localPaths,
-            p.targetDir,
-            p.password,
-            p.excludePatterns,
-          );
-        case "delete":
-          return deleteFromArchiveCore(p.archivePath, p.paths, p.password);
-        case "rename":
-          return renameInArchiveCore(p.archivePath, p.oldPath, p.newPath, p.password);
-        case "createFolder":
-          return createFolderInArchiveCore(p.archivePath, p.targetDir, p.folderName, p.password);
-        case "preview":
-          return previewFileCore(p.archivePath, p.filePath, p.password, p.outputPath);
-        case "test":
-          return testArchiveCore(p.archivePath, p.password);
-        case "extract":
-          return extractSelectedCore(
-            p.archivePath,
-            p.paths,
-            p.password,
-            p.flat,
-            p.outputDir,
-            p.excludes,
-          );
-      }
-    }
-    const p = payload as { options: Parameters<typeof decompressCore>[0] };
-    return decompressCore(p.options, progress, token);
+    // Same op → core mapping the worker handler executes (engines/worker/
+    // dispatch) — one table, two adapters, so the in-process path can
+    // never drift from the worker.
+    return dispatchOp(op, payload, progress, token);
   }
 
   dispose(): void {

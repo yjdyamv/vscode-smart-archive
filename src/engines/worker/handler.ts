@@ -8,28 +8,8 @@
  * @module engines/worker/handler
  */
 
-import type {
-  HostMessage,
-  EngineConfig,
-  RequestMessage,
-  CompressPayload,
-  DecompressPayload,
-} from "./types";
-import { compressWith7z as compressCore } from "../js7z-compress-core";
-import { decompressWith7z as decompressCore } from "../js7z-decompress-core";
-import { fetchFileListCore } from "../fileListing-core";
-import { isEncryptedWasm } from "../js7z-list-core";
-import {
-  addToArchiveCore,
-  deleteFromArchiveCore,
-  renameInArchiveCore,
-  createFolderInArchiveCore,
-  previewFileCore,
-  testArchiveCore,
-} from "../modify-core";
-import { extractSelectedCore } from "../extract-core";
-import { unwrapInnerTar } from "../js7z-decompress-core";
-import type { ModifyPayload } from "./types";
+import type { HostMessage, EngineConfig, RequestMessage } from "./types";
+import { dispatchOp } from "./dispatch";
 import { applyEngineConfig } from "../engine-config";
 import { setLoggerSink } from "../../utils/logger-core";
 import { isCancellationError } from "../../utils/cancellation";
@@ -90,70 +70,7 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
     const { id, op, payload } = message;
     logger.info({ event: "worker.request.start", id, op });
     try {
-      let result: unknown;
-      if (op === "compress") {
-        const p = payload as CompressPayload;
-        await compressCore(p.options, makeProgress(id), makeToken(id), p.excludePatterns);
-      } else if (op === "decompress") {
-        const p = payload as DecompressPayload;
-        await decompressCore(p.options, makeProgress(id), makeToken(id));
-      } else if (op === "list") {
-        const p = payload as { inputPath: string; password?: string; data?: Uint8Array };
-        result = await fetchFileListCore(p.inputPath, p.password ?? "", p.data);
-      } else if (op === "isEncrypted") {
-        const p = payload as { inputPath: string };
-        result = await isEncryptedWasm(p.inputPath);
-      } else if (op === "unwrap") {
-        const p = payload as { outputDir: string };
-        await unwrapInnerTar(p.outputDir, makeProgress(id), makeToken(id));
-      } else if (op === "modify") {
-        const p = payload as ModifyPayload;
-        const token = makeToken(id);
-        switch (p.action) {
-          case "add":
-            await addToArchiveCore(
-              p.archivePath,
-              p.localPaths,
-              p.targetDir,
-              p.password,
-              p.excludePatterns,
-              token,
-            );
-            break;
-          case "delete":
-            await deleteFromArchiveCore(p.archivePath, p.paths, p.password, token);
-            break;
-          case "rename":
-            await renameInArchiveCore(p.archivePath, p.oldPath, p.newPath, p.password, token);
-            break;
-          case "createFolder":
-            await createFolderInArchiveCore(
-              p.archivePath,
-              p.targetDir,
-              p.folderName,
-              p.password,
-              token,
-            );
-            break;
-          case "preview":
-            await previewFileCore(p.archivePath, p.filePath, p.password, p.outputPath);
-            break;
-          case "test":
-            result = await testArchiveCore(p.archivePath, p.password);
-            break;
-          case "extract":
-            await extractSelectedCore(
-              p.archivePath,
-              p.paths,
-              p.password,
-              p.flat,
-              p.outputDir,
-              p.excludes,
-              token,
-            );
-            break;
-        }
-      }
+      const result = await dispatchOp(op, payload, makeProgress(id), makeToken(id));
       post({ type: "done", id, result });
     } catch (err) {
       post({
