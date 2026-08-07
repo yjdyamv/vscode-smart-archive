@@ -58,15 +58,15 @@ jobs:
           generate_release_notes: true
 
   # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
-  # Downloads the same official (universal) binary the install script stages,
-  # replicates the extension's runtime prep (quarantine strip + ad-hoc sign
-  # fallback), and does a compress/extract round-trip — i.e. the exact execve the
-  # extension performs via spawn.
+  # Downloads the same 7-Zip ZS arm64 binary the install script stages from
+  # yjdyamv/7-Zip-zstd-native, replicates the extension's runtime prep
+  # (quarantine strip + ad-hoc sign fallback), and does a compress/extract
+  # round-trip — i.e. the exact execve the extension performs via spawn.
   #
   # macos-15 (arm64) is free for public repos and is the higher-risk arch
-  # (unsigned arm64 is SIGKILLed). The Intel slice of the same universal binary
-  # is lower-risk (Intel does not kill unsigned) — free Intel runners are gone
-  # (macos-13 retired), so to also cover Intel add the billable larger runner:
+  # (unsigned arm64 is SIGKILLed). The ZS fork publishes arm64-only mac builds,
+  # so there is no free Intel runner to cover — add the billable larger runner
+  # if Intel coverage is ever needed:
   #     matrix: { os: [macos-15, macos-15-large] }   # macos-15-large = Intel, costs minutes
   test-macos-7z:
     name: Validate bundled mac 7zz
@@ -81,12 +81,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          REPO=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_REPO")
           TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
           VER=${TAG#v}; VER=${VER%%-*}
           echo "Testing 7-Zip $VER on $(uname -m) — macOS $(sw_vers -productVersion)"
 
-          curl -fsSL -o 7zmac.tar.xz "https://github.com/ip7z/7zip/releases/download/${VER}/7z${TAG}-mac.tar.xz"
-          mkdir -p extract && tar -xf 7zmac.tar.xz -C extract
+          curl -fsSL -o 7zz-macos-arm64.tar.gz "https://github.com/${REPO}/releases/download/${TAG}/7zz-macos-arm64.tar.gz"
+          mkdir -p extract && tar -xf 7zz-macos-arm64.tar.gz -C extract
           BIN="$(find extract -type f -name 7zz | head -1)"
           test -n "$BIN" || { echo "::error::7zz not found in mac tarball"; exit 1; }
           chmod +x "$BIN"
@@ -122,33 +123,37 @@ jobs:
           diff -r src out/src
           echo "✅ mac 7zz executed and round-tripped OK on $(uname -m)"
 
-  # Validate the bundled Windows 7z.exe + 7z.dll on real Windows. The critical
-  # check is DLL co-location: 7z.exe must find its adjacent 7z.dll (RAR etc. live
-  # in the dll). Extracts the same official installer the install script uses and
-  # runs the extracted 7z.exe for a compress/extract round-trip. windows-latest is
-  # free for public repos.
+  # Validate the bundled Windows 7zz.exe on real Windows. The ZS fork ships a
+  # single static 7zz.exe (all codecs included, no adjacent 7z.dll), so this
+  # downloads the same archive the install script stages from
+  # yjdyamv/7-Zip-zstd-native, confirms the RAR codec is present, and runs a
+  # compress/extract round-trip. windows-latest is free for public repos.
   test-windows-7z:
-    name: Validate bundled Windows 7z
+    name: Validate bundled Windows 7zz.exe
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Download & validate Windows 7z.exe + 7z.dll
+      - name: Download & validate Windows 7zz.exe
         shell: bash
         run: |
           set -euo pipefail
+          REPO=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_REPO")
           TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
           VER=${TAG#v}; VER=${VER%%-*}
           echo "Testing 7-Zip $VER on Windows"
-          curl -fsSL -o inst.exe "https://github.com/ip7z/7zip/releases/download/${VER}/7z${TAG}-x64.exe"
-          # Extract 7z.exe + 7z.dll from the SFX installer using the runner's preinstalled 7-Zip.
-          SZ=$(command -v 7z || echo "/c/Program Files/7-Zip/7z.exe")
-          "$SZ" x -y -obin inst.exe 7z.exe 7z.dll >/dev/null
-          ls -l bin/7z.exe bin/7z.dll
-          # Round-trip using OUR extracted 7z.exe — proves it loads the adjacent 7z.dll.
+          curl -fsSL -o 7zz-windows-x64.zip "https://github.com/${REPO}/releases/download/${TAG}/7zz-windows-x64.zip"
+          mkdir -p bin && tar -xf 7zz-windows-x64.zip -C bin
+          BIN="$(find bin -type f -name 7zz.exe | head -1)"
+          test -n "$BIN" || { echo "::error::7zz.exe not found in windows zip"; exit 1; }
+          ls -l "$BIN"
+          # The ZS fork statically links its codecs — confirm RAR is in the exe.
+          "$BIN" i | grep -q 'Rar5' || { echo "::error::RAR5 codec missing from 7zz.exe"; exit 1; }
+          "$BIN" | head -2
+          # Round-trip using the exact bundled 7zz.exe.
           mkdir -p src out
           printf 'hello world\n' > src/a.txt
           mkdir -p src/sub && printf 'nested\n' > src/sub/b.txt
-          ./bin/7z.exe a -t7z test.7z ./src >/dev/null
-          ./bin/7z.exe x -y -oout test.7z >/dev/null
+          "$BIN" a -t7z test.7z ./src >/dev/null
+          "$BIN" x -y -oout test.7z >/dev/null
           diff -r src out/src
-          echo "✅ Windows 7z.exe executed with adjacent 7z.dll"
+          echo "✅ Windows 7zz.exe executed and round-tripped OK"
