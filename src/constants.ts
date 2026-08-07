@@ -587,6 +587,23 @@ export const BINARY_DETECT_TIMEOUT = 5000;
 export const SPAWN_CAPTURE_TIMEOUT = 30_000;
 /** default run7z timeout (ms) — compression / extraction */
 export const RUN7Z_TIMEOUT = 600_000;
+/** Hard cap on child-process stdout/stderr capture (system 7z) */
+export const CHILD_CAPTURE_MAX_BYTES = 500 * 1024 * 1024;
+/** spawnSync maxBuffer for codec CLI probing (zstd) */
+export const CODEC_SPAWN_MAX_BUFFER = 512 * 1024 * 1024;
+/** spawnSync timeout for codec CLI probing (zstd) */
+export const CODEC_SPAWN_TIMEOUT_MS = 120_000;
+/** Timeout for the system-7z archive test used to verify a password */
+export const PASSWORD_VERIFY_TIMEOUT_MS = 15_000;
+/** Worker: time to wait for a freshly spawned worker to report ready */
+export const WORKER_READY_TIMEOUT_MS = 30_000;
+/** Worker: JS-heap cap backstop (WASM memory is guarded separately) */
+export const WORKER_JS_HEAP_CAP_MB = 4096;
+/** Worker: delay before force-terminating after dispose/shutdown */
+export const WORKER_TERMINATE_DELAY_MS = 1000;
+/** Worker: default pool size and hard cap (single worker = serialized) */
+export const WORKER_POOL_SIZE_DEFAULT = 1;
+export const WORKER_POOL_SIZE_MAX = 2;
 
 // ── Shared size/time limits (single source of truth) ───────────────
 

@@ -18,16 +18,14 @@ import type { ArchiveOp, EngineConfig, RequestPayload, WorkerMessage } from "./t
 import { dispatchOp } from "./dispatch";
 import { writeHostLog, logger } from "../../utils/logger";
 import { readEngineConfig } from "../../utils/config";
+import {
+  WORKER_JS_HEAP_CAP_MB,
+  WORKER_POOL_SIZE_DEFAULT,
+  WORKER_POOL_SIZE_MAX,
+  WORKER_READY_TIMEOUT_MS,
+  WORKER_TERMINATE_DELAY_MS,
+} from "../../constants";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
-
-// ── Worker lifecycle constants ─────────────────────────────────────
-/** Wide JS-heap cap as a backstop against JS-level leaks (the WASM
- *  memory is a WebAssembly.Memory and is guarded by workerMemoryMb). */
-const WORKER_JS_HEAP_CAP_MB = 4096;
-/** Time to wait for a freshly spawned worker to report ready */
-const WORKER_READY_TIMEOUT_MS = 30_000;
-/** Delay before force-terminating a worker after dispose/shutdown */
-const WORKER_TERMINATE_DELAY_MS = 1000;
 
 interface PendingRequest {
   id: number;
@@ -56,8 +54,8 @@ let _active: ArchiveRunner | null = null;
 
 function readPoolSize(): number {
   const raw = vscode.workspace.getConfiguration("smart-archive").get<number>("workerPoolSize");
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 1;
-  return Math.max(1, Math.min(2, Math.floor(raw)));
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return WORKER_POOL_SIZE_DEFAULT;
+  return Math.max(WORKER_POOL_SIZE_DEFAULT, Math.min(WORKER_POOL_SIZE_MAX, Math.floor(raw)));
 }
 
 function activeRunner(): ArchiveRunner {
@@ -150,7 +148,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
         // it is guarded by the worker-side RSS check (workerMemoryMb).
         resourceLimits: { maxOldGenerationSizeMb: WORKER_JS_HEAP_CAP_MB },
       }),
-    private readonly poolSize = 1,
+    private readonly poolSize = WORKER_POOL_SIZE_DEFAULT,
   ) {}
 
   /**

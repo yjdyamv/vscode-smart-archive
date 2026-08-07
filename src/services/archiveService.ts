@@ -16,7 +16,7 @@ import * as fs from "fs";
 import * as os from "os";
 import { compressWith7z } from "../engines/js7z-compress";
 import { decompressWith7z } from "../engines/js7z-decompress";
-import { COMPRESS_FORMATS } from "../constants";
+import { COMPRESS_FORMATS, DEFAULT_COMPRESSION_LEVEL } from "../constants";
 import { logger } from "../utils/logger";
 
 /**
@@ -66,7 +66,7 @@ export async function convertArchive(
         password: outputPassword ?? password,
         level: vscode.workspace
           .getConfiguration("smart-archive")
-          .get<number>("defaultCompressionLevel", 5),
+          .get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL),
         volumeSize,
       },
       { report: () => {} },

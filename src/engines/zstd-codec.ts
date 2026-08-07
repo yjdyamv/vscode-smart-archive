@@ -17,6 +17,7 @@ import { logger } from "../utils/logger-core";
 import { checkFileSize } from "../utils/security";
 import type { ProgressLike } from "../utils/cancellation";
 import { t } from "../i18n";
+import { CODEC_SPAWN_MAX_BUFFER, CODEC_SPAWN_TIMEOUT_MS } from "../constants";
 import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import { shouldUseWasmCodec, wasmCompress, wasmCompressFile, wasmDecompress } from "./js7z-codec";
@@ -58,8 +59,8 @@ function systemCompressBuffer(data: Buffer, level: number): Buffer | null {
   try {
     const r = spawnSync(zstdPath, ["-q", "-c", "-f", `-${mapZstdLevel(level)}`], {
       input: data,
-      maxBuffer: 512 * 1024 * 1024,
-      timeout: 120_000,
+      maxBuffer: CODEC_SPAWN_MAX_BUFFER,
+      timeout: CODEC_SPAWN_TIMEOUT_MS,
     });
     if (r.status === 0) return r.stdout;
     logger.warn(
@@ -82,8 +83,8 @@ function systemDecompressBuffer(data: Buffer): Buffer | null {
   try {
     const r = spawnSync(zstdPath, ["-q", "-d", "-c"], {
       input: data,
-      maxBuffer: 512 * 1024 * 1024,
-      timeout: 120_000,
+      maxBuffer: CODEC_SPAWN_MAX_BUFFER,
+      timeout: CODEC_SPAWN_TIMEOUT_MS,
     });
     if (r.status === 0) return r.stdout;
     logger.warn(
@@ -230,7 +231,7 @@ export function zstdCompressFile(
     return new Promise((resolve, reject) => {
       let settled = false;
       const proc = spawn(zstdPath, ["-o", output, "-f", `-${mapZstdLevel(level)}`, "-T0", input], {
-        timeout: 120_000,
+        timeout: CODEC_SPAWN_TIMEOUT_MS,
       });
 
       const sizeTimer = progress
