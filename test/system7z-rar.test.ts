@@ -7,10 +7,12 @@
  * always routed to a RAR-capable binary (the bundled full-format 7zz).
  */
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hasRarSupport, system7zForExt } from "../src/engines/system7z";
+import { bundled7zPath } from "../src/engines/bundled7z";
+import { gate } from "./gates";
+import { tmpDir } from "./tmp";
 
 function fake7z(dir: string, name: string, rar: boolean): string {
   const p = path.join(dir, name);
@@ -25,7 +27,7 @@ function fake7z(dir: string, name: string, rar: boolean): string {
 describe("hasRarSupport", () => {
   let dir: string;
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar7z-"));
+    dir = tmpDir("sat_rar7z-");
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -41,17 +43,9 @@ describe("hasRarSupport", () => {
 });
 
 describe("system7zForExt (RAR)", () => {
-  const bundled = path.join(
-    __dirname,
-    "..",
-    "vendor",
-    "7z-bin",
-    process.platform,
-    process.arch,
-    process.platform === "win32" ? "7zz.exe" : "7zz",
-  );
+  const bundled = bundled7zPath();
 
-  it.runIf(fs.existsSync(bundled))(
+  it.runIf(gate("bundled7zz"))(
     "routes RAR to the bundled full-format 7zz on this machine",
     () => {
       const resolved = system7zForExt(".rar");

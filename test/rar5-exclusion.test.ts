@@ -10,11 +10,12 @@
  */
 import * as childProcess from "child_process";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compress } from "../src/api/compress";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../src/constants";
+import { gate } from "./gates";
+import { tmpDir } from "./tmp";
 
 const BUNDLED_7ZZ = path.join(
   __dirname,
@@ -25,21 +26,6 @@ const BUNDLED_7ZZ = path.join(
   process.arch,
   process.platform === "win32" ? "7zz.exe" : "7zz",
 );
-
-function canSpawn(bin: string): boolean {
-  try {
-    const r = childProcess.spawnSync(bin, ["--help"], { encoding: "utf8", timeout: 5000 });
-    if (r.status === null || r.status === undefined) return false;
-    const out = (r.stdout || "") + (r.stderr || "");
-    return out.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-function have7zz(): boolean {
-  return fs.existsSync(BUNDLED_7ZZ) && canSpawn(BUNDLED_7ZZ);
-}
 
 function listArchive(rarPath: string): string[] {
   const out = childProcess.execFileSync(BUNDLED_7ZZ, ["l", rarPath], { encoding: "utf8" });
@@ -58,7 +44,7 @@ describe("rar5 exclusion pipeline", () => {
   let dir: string;
   let proj: string;
   beforeAll(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "rarexc-"));
+    dir = tmpDir("rarexc-");
     proj = path.join(dir, "proj");
     fs.mkdirSync(path.join(proj, "src"), { recursive: true });
     fs.mkdirSync(path.join(proj, "node_modules", "pkg"), { recursive: true });
@@ -78,7 +64,7 @@ describe("rar5 exclusion pipeline", () => {
   });
   afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it.runIf(have7zz())(
+  it.runIf(gate("bundled7zz"))(
     "default noisy-dir patterns keep node_modules/.git/dist/__pycache__ out",
     async () => {
       const outPath = path.join(dir, "defaults.rar");
@@ -101,7 +87,7 @@ describe("rar5 exclusion pipeline", () => {
     },
   );
 
-  it.runIf(have7zz())("custom patterns exclude files and directories", async () => {
+  it.runIf(gate("bundled7zz"))("custom patterns exclude files and directories", async () => {
     const outPath = path.join(dir, "custom.rar");
     await compress({
       targets: [proj],
@@ -119,7 +105,7 @@ describe("rar5 exclusion pipeline", () => {
     expect(joined).toContain("src/main.js");
   });
 
-  it.runIf(have7zz())("multi-target: noisy dirs still excluded", async () => {
+  it.runIf(gate("bundled7zz"))("multi-target: noisy dirs still excluded", async () => {
     const outPath = path.join(dir, "multi.rar");
     await compress({
       targets: [proj, path.join(dir, "extra.txt")],
@@ -133,7 +119,7 @@ describe("rar5 exclusion pipeline", () => {
     expect(joined).toContain("extra.txt");
   });
 
-  it.runIf(have7zz())("empty directories are preserved", async () => {
+  it.runIf(gate("bundled7zz"))("empty directories are preserved", async () => {
     const outPath = path.join(dir, "empty.rar");
     await compress({
       targets: [proj],
@@ -146,7 +132,7 @@ describe("rar5 exclusion pipeline", () => {
     expect(joined).toContain("empty");
   });
 
-  it.runIf(have7zz())("symlinks are followed (file and directory)", async () => {
+  it.runIf(gate("bundled7zz"))("symlinks are followed (file and directory)", async () => {
     const linkedFile = path.join(proj, "src", "link.txt");
     const linkedDir = path.join(proj, "keep", "linkdir");
     try {

@@ -10,7 +10,6 @@
  */
 
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -28,21 +27,9 @@ import {
 } from "../src/engines/snappy-codec";
 import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
 import type { EngineConfig } from "../src/engines/worker/types";
+import { gate } from "./gates";
+import { tmpDir } from "./tmp";
 
-const SNAPPY_WASM = path.join(
-  __dirname,
-  "..",
-  "node_modules",
-  "snappy",
-  "snappy.wasi.cjs",
-);
-const RAR5_WASM = path.join(
-  __dirname,
-  "..",
-  "vendor",
-  "rar5-wasm",
-  "smart-archive-rar.wasi.cjs",
-);
 
 const RAR5_SIG = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]);
 
@@ -105,7 +92,7 @@ describe("snappy backend selection", () => {
 });
 
 describe("backend integration", () => {
-  it.runIf(fs.existsSync(SNAPPY_WASM))(
+  it.runIf(gate("snappyWasm"))(
     "snappy WASM backend round-trips via the setting",
     async () => {
       applyBackends({ snappyBackend: "wasm" });
@@ -117,11 +104,11 @@ describe("backend integration", () => {
     },
   );
 
-  it.runIf(fs.existsSync(RAR5_WASM))(
+  it.runIf(gate("rar5Wasm"))(
     "rar5 WASM backend creates an archive via the setting",
     async () => {
       applyBackends({ rar5Backend: "wasm" });
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_backend_"));
+      const td = tmpDir("sat_backend_");
       try {
         const src = path.join(td, "a.txt");
         fs.writeFileSync(src, "backend wasm rar");

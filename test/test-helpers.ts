@@ -12,8 +12,8 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 import { compress, decompress } from "../src/api";
+import { tmpDir } from "./tmp";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -42,9 +42,9 @@ export async function testCompress(
   format: TestFormat,
   options: TestCompressOptions = {},
 ): Promise<Buffer> {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tcomp_"));
+  const workDir = tmpDir("tcomp_");
   try {
-    const stageDir = path.join(tmpDir, "_stage");
+    const stageDir = path.join(workDir, "_stage");
     fs.mkdirSync(stageDir, { recursive: true });
 
     for (const [fp, content] of Object.entries(files)) {
@@ -62,7 +62,7 @@ export async function testCompress(
     }
 
     const targets = [...topLevel].map((seg) => path.join(stageDir, seg));
-    const outputPath = path.join(tmpDir, `output.${format}`);
+    const outputPath = path.join(workDir, `output.${format}`);
 
     await compress({
       targets,
@@ -76,7 +76,7 @@ export async function testCompress(
 
     return fs.readFileSync(outputPath);
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(workDir, { recursive: true, force: true });
   }
 }
 
@@ -86,13 +86,13 @@ export async function testDecompress(
   archiveBuffer: Buffer,
   options: TestDecompressOptions = {},
 ): Promise<Record<string, string>> {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tdec_"));
+  const workDir = tmpDir("tdec_");
   try {
     const archiveName = options.ext ? `archive.${options.ext}` : "archive.7z";
-    const archivePath = path.join(tmpDir, archiveName);
+    const archivePath = path.join(workDir, archiveName);
     fs.writeFileSync(archivePath, archiveBuffer);
 
-    const outputDir = path.join(tmpDir, "out");
+    const outputDir = path.join(workDir, "out");
 
     await decompress({
       inputPath: archivePath,
@@ -124,6 +124,6 @@ export async function testDecompress(
     walk(outputDir, "");
     return result;
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(workDir, { recursive: true, force: true });
   }
 }

@@ -8,11 +8,11 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import * as zlib from "node:zlib";
 import { spawnSync } from "child_process";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
+import { gate } from "./gates";
 import {
   wasmCompress,
   wasmCompressFile,
@@ -21,15 +21,7 @@ import {
 } from "../src/engines/js7z-codec";
 import { brotliDecompressFile } from "../src/engines/brotli-codec";
 import { lz4DecompressFile } from "../src/engines/lz4-codec";
-
-/** Independent zstd reference: the system CLI, when present. */
-function systemZstdAvailable(): boolean {
-  try {
-    return spawnSync("zstd", ["--version"], { timeout: 3000 }).status === 0;
-  } catch {
-    return false;
-  }
-}
+import { tmpDir } from "./tmp";
 
 function systemZstdCompress(data: Buffer, level = 9): Buffer {
   const r = spawnSync("zstd", ["-q", "-c", "-f", `-${level}`], {
@@ -60,7 +52,7 @@ function makeData(size = 512 * 1024): Buffer {
 }
 
 describe("7zz-wasm codec fallback", () => {
-  let tmpDir: string;
+  let tdir: string;
 
   beforeAll(() => {
     setForceWasmCodec(true);
@@ -71,19 +63,19 @@ describe("7zz-wasm codec fallback", () => {
   });
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_wasmcodec_"));
+    tdir = tmpDir("sat_wasmcodec_");
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tdir, { recursive: true, force: true });
   });
 
   for (const codec of ["zst", "br", "lz4"] as const) {
     it(`${codec} file round-trip through WASM`, async () => {
       const data = makeData();
-      const input = path.join(tmpDir, `input.${codec === "zst" ? "tar" : codec}`);
-      const compressed = path.join(tmpDir, `out.${codec}`);
-      const restored = path.join(tmpDir, `restored.${codec === "zst" ? "tar" : codec}`);
+      const input = path.join(tdir, `input.${codec === "zst" ? "tar" : codec}`);
+      const compressed = path.join(tdir, `out.${codec}`);
+      const restored = path.join(tdir, `restored.${codec === "zst" ? "tar" : codec}`);
       fs.writeFileSync(input, data);
 
       await wasmCompressFile(input, compressed, codec, 5);
@@ -101,7 +93,7 @@ describe("7zz-wasm codec fallback", () => {
     });
   }
 
-  it.runIf(systemZstdAvailable())(
+  it.runIf(gate("systemZstd"))(
     "WASM zstd output is decodable by system zstd and vice versa",
     async () => {
       const data = makeData();
@@ -140,8 +132,8 @@ describe("7zz-wasm codec fallback", () => {
   it("file-level brotli/lz4 decompression routes through wasm", async () => {
     const data = makeData();
     for (const codec of ["br", "lz4"] as const) {
-      const compressed = path.join(tmpDir, `mt.${codec}`);
-      const restored = path.join(tmpDir, `mt-restored.${codec}`);
+      const compressed = path.join(tdir, `mt.${codec}`);
+      const restored = path.join(tdir, `mt-restored.${codec}`);
       fs.writeFileSync(compressed, Buffer.from(await wasmCompress(data, codec, 5)));
       if (codec === "br") {
         await brotliDecompressFile(compressed, restored);

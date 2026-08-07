@@ -1,7 +1,7 @@
 /**
  * Security & Exclusion tests — Smart Archive VSCode Extension
  *
- * Tests for: security (safeJoin, parseSize, sanitizeCliPath, sanitizeTargetDir),
+ * Tests for: security (safeJoinPath, parseSize, sanitizeCliPath, sanitizeTargetDir),
  * encryption detection, exclusion integration, exclusion logic,
  * and smartarchive marker filtering.
  */
@@ -9,13 +9,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
 import {
   run7z,
   j7zCompressDir,
   j7zDecompress,
   copyFS,
-  isEncryptedInline,
+  isEncryptedWasm,
   createWrapped,
   trackedJS7z,
   resetActiveInstances,
@@ -29,11 +28,16 @@ import {
   isTargetExcluded,
   sanitizeCliPath,
   sanitizeTargetDir,
-  safeJoin,
+  safeJoinPath,
   parseSize,
+  checkFileSize,
+  checkTotalSize,
 } from "./shared-setup";
+import { setSecurityLimits } from "../src/utils/security";
+import { COMPRESS_EXCLUDE_DEFAULTS } from "../src/constants";
 import { testCompress, testDecompress } from "./test-helpers";
 import { brotliCompress } from "../src/engines/brotli-codec";
+import { tmpDir } from "./tmp";
 import { snappy, decompressSnappyFrames } from "./shared-setup";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,7 +50,7 @@ afterEach(() => {
   disposeAllTracked();
 });
 
-const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+const td = tmpDir("sat_");
 describe("exclusion integration", () => {
 
   it("compression excludes node_modules by default pattern", async () => {
@@ -143,26 +147,22 @@ describe("exclusion integration", () => {
 
 describe("security", () => {
   it("path traversal blocked", () => {
-    expect(safeJoin("/tmp/x", "file.txt")).toBe(path.resolve("/tmp/x", "file.txt"));
-    expect(() => safeJoin("/tmp/x", "../../../etc/passwd")).toThrow(/outside/);
-    expect(() => safeJoin("/tmp/x", "f\0.bin")).toThrow(/null byte/);
+    expect(safeJoinPath("/tmp/x", "file.txt")).toBe(path.resolve("/tmp/x", "file.txt"));
+    expect(() => safeJoinPath("/tmp/x", "../../../etc/passwd")).toThrow(/outside/);
+    expect(() => safeJoinPath("/tmp/x", "f\0.bin")).toThrow(/null byte/);
+    expect(() => safeJoinPath("/tmp/x", "C:evil")).toThrow(/'/);
   });
 
-  it("size limits", () => {
-    const MAX_F = 1024 * 1024 * 1024;
-    const MAX_T = 10 * MAX_F;
-    const checkFile = (s: number) => {
-      if (s > MAX_F) throw new Error("exceeds");
-    };
-    const checkTotal = (c: number, a: number): number => {
-      const t = c + a;
-      if (t > MAX_T) throw new Error("exceeds");
-      return t;
-    };
-    expect(() => checkFile(0)).not.toThrow();
-    expect(() => checkFile(MAX_F + 1)).toThrow(/exceeds/);
-    expect(checkTotal(0, 100)).toBe(100);
-    expect(() => checkTotal(MAX_T, 1)).toThrow(/exceeds/);
+  it("size limits (production checkFileSize/checkTotalSize)", () => {
+    setSecurityLimits({ maxFileSize: 1024, maxTotalSize: 10240 });
+    try {
+      expect(() => checkFileSize(0)).not.toThrow();
+      expect(() => checkFileSize(1025)).toThrow(/exceed/i);
+      expect(checkTotalSize(0, 100)).toBe(100);
+      expect(() => checkTotalSize(10239, 2)).toThrow(/exceed/i);
+    } finally {
+      setSecurityLimits({});
+    }
   });
 
   it("sanitizeCliPath: normal paths unchanged", () => {
@@ -174,6 +174,7 @@ describe("security", () => {
     expect(sanitizeCliPath("-flag")).toBe("./-flag");
     expect(sanitizeCliPath("--help")).toBe("./--help");
     expect(sanitizeCliPath("-")).toBe("./-");
+    expect(sanitizeCliPath("@listfile")).toBe("./@listfile");
   });
 
   it("sanitizeCliPath: empty string unchanged", () => {
@@ -238,7 +239,7 @@ describe("encryption detection", () => {
     const b = await j7zCompressDir({ "/f.txt": "secret" }, "/enc.7z", ["-pp4ss", "-mhe=on"]);
     const tmp = path.join(td, "enc-test.7z");
     fs.writeFileSync(tmp, b);
-    const encrypted = await isEncryptedInline(tmp);
+    const encrypted = await isEncryptedWasm(tmp);
     expect(encrypted).toBe(true);
     fs.unlinkSync(tmp);
   });
@@ -262,7 +263,7 @@ describe("encryption detection", () => {
     const b = await j7zCompressDir({ "/f.txt": "zip-secret" }, "/enc.zip", ["-pzip"]);
     const tmp = path.join(td, "enc-test.zip");
     fs.writeFileSync(tmp, b);
-    const encrypted = await isEncryptedInline(tmp);
+    const encrypted = await isEncryptedWasm(tmp);
     expect(encrypted).toBe(true);
     fs.unlinkSync(tmp);
   });
@@ -277,7 +278,7 @@ describe("exclusion logic", () => {
   let td2: string;
 
   beforeAll(() => {
-    td2 = fs.mkdtempSync(path.join(os.tmpdir(), "sat_excl_"));
+    td2 = tmpDir("sat_excl_");
   });
 
   afterAll(() => {
@@ -408,19 +409,9 @@ describe("exclusion logic", () => {
     expect(filtered[0].endsWith("included")).toBe(true);
   });
 
-  it("default patterns exclude all NOISY_DIR_PATTERNS entries", () => {
-    const patterns = [
-      "node_modules", ".npm", ".yarn", ".venv", "venv", "__pycache__",
-      ".pytest_cache", ".mypy_cache", ".tox", ".eggs", "site-packages",
-      ".git", ".svn", ".hg",
-      "dist", "build", "target", "out", "output",
-      ".next", ".nuxt", ".output", ".svelte-kit",
-      ".idea", ".vscode", ".vs",
-      "coverage", ".nyc_output", ".cache", ".turbo", ".parcel-cache",
-      "vendor", "bower_components", ".terraform",
-    ];
-    const ex = prepareExclusions(patterns);
-    for (const p of patterns) {
+  it("default patterns exclude all COMPRESS_EXCLUDE_DEFAULTS entries", () => {
+    const ex = prepareExclusions(COMPRESS_EXCLUDE_DEFAULTS);
+    for (const p of COMPRESS_EXCLUDE_DEFAULTS) {
       expect(isPathExcluded(p, ex)).toBe(true);
     }
     expect(isPathExcluded("a/b/c/node_modules/x/y", ex)).toBe(true);

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import * as zlib from "zlib";
 
@@ -8,6 +7,7 @@ import { mapLimit } from "../scripts/lib/async";
 import { countStatuses, downloadWithCache } from "../scripts/lib/download";
 import { extractNodeFromTgz, findFileInTree } from "../scripts/lib/archive";
 import { sha256 } from "../scripts/lib/hash-pins";
+import { tmpDir } from "./tmp";
 
 /** Build a minimal ustar entry for tests. */
 function tarEntry(name: string, data: Buffer): Buffer {
@@ -61,7 +61,7 @@ describe("countStatuses", () => {
 describe("downloadWithCache force mode", () => {
   it("re-downloads even when dest and cache already match the pinned hash", async () => {
     process.env.SA_FORCE_DOWNLOAD = "1";
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-force-"));
+    const dir = tmpDir("sa-force-");
     try {
       const cacheDir = path.join(dir, "cache");
       const destPath = path.join(dir, "out.bin");
@@ -95,7 +95,7 @@ describe("downloadWithCache force mode", () => {
 
 describe("findFileInTree", () => {
   it("finds a file recursively by basename", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sa-find-"));
+    const dir = tmpDir("sa-find-");
     try {
       const nested = path.join(dir, "a", "b");
       fs.mkdirSync(nested, { recursive: true });

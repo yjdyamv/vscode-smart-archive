@@ -8,7 +8,6 @@
 
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import * as crypto from "node:crypto";
 import { lz4CompressFile } from "../src/engines/lz4-codec";
@@ -19,9 +18,10 @@ import {
 } from "../src/engines/zstd-codec";
 import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
+import { tmpDir } from "./tmp";
 
 function makeInput(name: string, sizeMb = 120, random = false): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_codec_"));
+  const dir = tmpDir("sat_codec_");
   const input = path.join(dir, name);
   // 3 × 50 MiB codec chunks → multiple progress reports. Zeros compress
   // quickly so the tests stay fast.

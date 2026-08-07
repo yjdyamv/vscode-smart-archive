@@ -8,7 +8,6 @@
 
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
 import {
   mkdirP,
   run7z,
@@ -23,6 +22,8 @@ import {
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
 import { copyDirToFS } from "../src/utils/fs";
+import { createTarFile } from "../src/engines/tar-writer";
+import { tmpDir } from "./tmp";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -34,14 +35,14 @@ afterEach(() => {
   disposeAllTracked();
 });
 
-const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+const td = tmpDir("sat_");
 describe("js7z compress/decompress", () => {
 
   // ── 7z ──
 
   it("follows symlinked directories when copying into the WASM VFS", async () => {
     const j = await trackedJS7z();
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_symdir_"));
+    const tmp = tmpDir("sa_symdir_");
     try {
       fs.mkdirSync(path.join(tmp, "real"));
       fs.writeFileSync(path.join(tmp, "real", "a.txt"), "hello");
@@ -565,27 +566,27 @@ describe("split volumes", () => {
       .sort();
     expect(parts.length).toBeGreaterThanOrEqual(2);
 
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa_test_"));
+    let tdir = tmpDir("sa_test_");
     try {
       for (const p of parts) {
         const data = j.FS.readFile("/" + p, { encoding: "binary" });
-        fs.writeFileSync(path.join(tmpDir, p), Buffer.from(data));
+        fs.writeFileSync(path.join(tdir, p), Buffer.from(data));
       }
 
       const toDelete = parts.length >= 3 ? parts[1] : parts[parts.length - 1];
-      fs.unlinkSync(path.join(tmpDir, toDelete));
+      fs.unlinkSync(path.join(tdir, toDelete));
 
       const j2 = await trackedJS7z();
       const name = "x.7z";
       const diskParts = fs
-        .readdirSync(tmpDir)
+        .readdirSync(tdir)
         .filter((f: string) =>
           new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.(\\d+)$`).test(f),
         )
         .sort();
 
       for (const dp of diskParts) {
-        const diskPath = path.join(tmpDir, dp);
+        const diskPath = path.join(tdir, dp);
         const data = fs.readFileSync(diskPath);
         j2.FS.writeFile("/" + dp, new Uint8Array(data));
       }
@@ -611,7 +612,7 @@ describe("split volumes", () => {
 
       expect(exitCode !== 0 || /error|missing|can.*open|unexpected/i.test(stderr)).toBe(true);
     } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(tdir, { recursive: true, force: true });
     }
   });
 });
@@ -621,115 +622,70 @@ describe("split volumes", () => {
 // ════════════════════════════════════════════════════════════════════
 
 
-describe("tar LongLink", () => {
-  it("writes GNU LongLink for paths > 100 bytes", async () => {
-    // Inline writeLongLink logic to avoid vscode import in vitest
-    const BLOCK = 512;
-    function writeLongLink(fd: number, name: string): void {
-      const nb = Buffer.from(name);
-      const h = Buffer.alloc(BLOCK);
-      Buffer.from("././@LongLink").copy(h, 0);
-      Buffer.from("000644 ").copy(h, 100);
-      Buffer.from("000000 ").copy(h, 108);
-      Buffer.from("000000 ").copy(h, 116);
-      Buffer.from(nb.length.toString(8).padStart(11, "0") + " ").copy(h, 124);
-      const mt = Math.floor(Date.now() / 1000).toString(8).padStart(11, "0") + " ";
-      Buffer.from(mt).copy(h, 136);
-      Buffer.from("        ").copy(h, 148);
-      h[156] = 0x4c;
-      Buffer.from("ustar").copy(h, 257); h[263] = 0x30; h[264] = 0x30;
-      let s = 0;
-      for (let i = 0; i < BLOCK; i++) s += i >= 148 && i < 156 ? 32 : h[i];
-      Buffer.from(s.toString(8).padStart(6, "0") + "\0 ").copy(h, 148);
-      fs.writeSync(fd, h);
-      fs.writeSync(fd, nb);
-      const pad = nb.length % BLOCK === 0 ? 0 : BLOCK - (nb.length % BLOCK);
-      if (pad > 0) fs.writeSync(fd, Buffer.alloc(pad));
-    }
-
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+describe("tar LongLink (production tar-writer)", () => {
+  it("creates a tar with long paths that the WASM 7zz lists and extracts", async () => {
+    const tmp = tmpDir("sat_");
     try {
-      const tarPath = path.join(tmp, "test.tar");
-      const longFile = "d".repeat(50) + "/" + "f".repeat(60) + ".txt";
-      const fd = fs.openSync(tarPath, "w");
-
-      writeLongLink(fd, longFile);
-      // Minimal valid file header (name ignored, LongLink provides full path)
-      const fh = Buffer.alloc(BLOCK);
-      Buffer.from("x").copy(fh, 0);
-      Buffer.from("000644 ").copy(fh, 100);
-      Buffer.from("00000000003 ").copy(fh, 124);
-      const mt = Math.floor(Date.now() / 1000).toString(8).padStart(11, "0") + " ";
-      Buffer.from(mt).copy(fh, 136);
-      Buffer.from("        ").copy(fh, 148);
-      fh[156] = 0x30;
-      Buffer.from("ustar").copy(fh, 257); fh[263] = 0x30; fh[264] = 0x30;
-      let s = 0;
-      for (let i = 0; i < BLOCK; i++) s += i >= 148 && i < 156 ? 32 : fh[i];
-      Buffer.from(s.toString(8).padStart(6, "0") + "\0 ").copy(fh, 148);
-      fs.writeSync(fd, fh);
-      fs.writeSync(fd, Buffer.from("xyz"));
-      fs.writeSync(fd, Buffer.alloc(509));
-      fs.writeSync(fd, Buffer.alloc(1024));
-      fs.closeSync(fd);
-
-      const j = await trackedJS7z();
-      j.FS.writeFile("/t.tar", fs.readFileSync(tarPath));
-      // run7z captures stdout — verify WASM 7z reads the ustar prefix
-      try { await run7z(j, ["l", "-slt", "-sccUTF-8", "/t.tar"]); } catch { /* listing ok */ }
-      // The tar was built with inline tarHeader which now uses ustar prefix.
-      // WASM 7z supports this; verify the archive is valid and non-empty.
-      expect(fs.statSync(tarPath).size).toBeGreaterThan(1024);
-    } finally {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it("falls back to GNU LongLink when single CJK basename > 100 bytes", async () => {
-    const { writeLongLink } = await import("../src/engines/tar-writer");
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
-    try {
-      const tarPath = path.join(tmp, "test.tar");
-      // 40 CJK chars = 120 bytes — exceeds ustar name field (100 bytes)
+      // ustar-prefix path: deep ASCII dir chain whose relative name exceeds
+      // the 100-byte name field (prefix 155 + name 100 = 255 max).
+      const deep = path.join(tmp, "d".repeat(50), "e".repeat(30), "f".repeat(20));
+      fs.mkdirSync(deep, { recursive: true });
+      const deepFile = path.join(deep, "payload.txt");
+      fs.writeFileSync(deepFile, "deep content");
+      // GNU LongLink fallback: single CJK basename > 100 bytes.
       const longBase = "只".repeat(40) + ".文档";
       expect(Buffer.byteLength(longBase)).toBeGreaterThan(100);
-      const fd = fs.openSync(tarPath, "w");
-      writeLongLink(fd, longBase);
-      const hdr = Buffer.alloc(512);
-      Buffer.from("s").copy(hdr, 0);
-      Buffer.from("000644 ").copy(hdr, 100);
-      Buffer.from("00000000002 ").copy(hdr, 124);
-      const mt = Math.floor(Date.now() / 1000).toString(8).padStart(11, "0") + " ";
-      Buffer.from(mt).copy(hdr, 136);
-      Buffer.from("        ").copy(hdr, 148);
-      hdr[156] = 0x30;
-      Buffer.from("ustar  ").copy(hdr, 257); hdr[263] = 0x30; hdr[264] = 0x30;
-      let s = 0;
-      for (let i = 0; i < 512; i++) s += i >= 148 && i < 156 ? 32 : hdr[i];
-      Buffer.from(s.toString(8).padStart(6, "0") + "\0 ").copy(hdr, 148);
-      fs.writeSync(fd, hdr);
-      fs.writeSync(fd, Buffer.from("ok"));
-      fs.writeSync(fd, Buffer.alloc(510));
-      fs.writeSync(fd, Buffer.alloc(1024));
-      fs.closeSync(fd);
-      expect(fs.statSync(tarPath).size).toBeGreaterThan(1024);
+      fs.writeFileSync(path.join(tmp, longBase), "cjk content");
+
+      const tarPath = path.join(tmp, "long.tar");
+      await createTarFile(tarPath, [path.join(tmp, "d".repeat(50)), path.join(tmp, longBase)]);
+
+      // Oracle round-trip: extract the produced tar with the raw WASM 7zz
+      // and compare every entry byte-for-byte. Entries are stored under
+      // their full relative path.
+      const j = await trackedJS7z();
+      j.FS.writeFile("/long.tar", fs.readFileSync(tarPath));
+      j.FS.mkdir("/o");
+      await run7z(j, ["x", "/long.tar", "-o/o"]);
+      const got: Record<string, string> = {};
+      copyFS(j, "/o", "", got);
+      const deepRel = path.join("d".repeat(50), "e".repeat(30), "f".repeat(20), "payload.txt");
+      expect(got[deepRel]).toBe("deep content");
+      expect(got[longBase]).toBe("cjk content");
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 
-  it("preserves symlinks with type '2' entries", async () => {
-    const { tarHeader: _th } = await import("../src/engines/tar-writer");
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+  it("follows top-level symlinks, skips nested ones (WASM 7z has no type '2')", async () => {
+    const tmp = tmpDir("sat_");
     try {
-      const targetFile = path.join(tmp, "real.txt");
-      fs.writeFileSync(targetFile, "data");
+      const nested = path.join(tmp, "nested");
+      fs.mkdirSync(nested, { recursive: true });
+      fs.writeFileSync(path.join(tmp, "real.txt"), "data");
       fs.symlinkSync("real.txt", path.join(tmp, "link.txt"));
+      fs.symlinkSync("real.txt", path.join(nested, "inner-link.txt"));
 
-      // Verify lstat detects symlink and readlink returns target
-      const lst = fs.lstatSync(path.join(tmp, "link.txt"));
-      expect(lst.isSymbolicLink()).toBe(true);
-      expect(fs.readlinkSync(path.join(tmp, "link.txt"))).toBe("real.txt");
+      // Top-level symlink target: the writer follows it (entry = link.txt
+      // with the target's content).
+      await createTarFile(path.join(tmp, "top.tar"), [path.join(tmp, "link.txt")]);
+      const j = await trackedJS7z();
+      j.FS.writeFile("/top.tar", fs.readFileSync(path.join(tmp, "top.tar")));
+      j.FS.mkdir("/o1");
+      await run7z(j, ["x", "/top.tar", "-o/o1"]);
+      const gotTop: Record<string, string> = {};
+      copyFS(j, "/o1", "", gotTop);
+      expect(gotTop["link.txt"]).toBe("data");
+
+      // Nested symlink: skipped entirely.
+      await createTarFile(path.join(tmp, "nested.tar"), [nested]);
+      const j2 = await trackedJS7z();
+      j2.FS.writeFile("/n.tar", fs.readFileSync(path.join(tmp, "nested.tar")));
+      j2.FS.mkdir("/o2");
+      await run7z(j2, ["x", "/n.tar", "-o/o2"]);
+      const gotNested: Record<string, string> = {};
+      copyFS(j2, "/o2", "", gotNested);
+      expect(Object.keys(gotNested).length).toBe(0);
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }

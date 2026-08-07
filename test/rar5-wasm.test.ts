@@ -15,6 +15,8 @@ import * as path from "path";
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
+import { gate } from "./gates";
+import { tmpDir } from "./tmp";
 
 // Force the WASI fallback. loadBinding() is lazy, so setting this before the
 // first compressWithRar5 call selects the WASM engine for this test file.
@@ -29,13 +31,6 @@ const RAR5_FORMAT = {
 
 const RAR5_SIG = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]);
 
-const WASM_LOADER = path.join(
-  __dirname,
-  "..",
-  "vendor",
-  "rar5-wasm",
-  "smart-archive-rar.wasi.cjs",
-);
 
 const UNRAR =
   process.env.SA_OFFICIAL_UNRAR || path.join(os.homedir(), "下载", "rar", "unrar");
@@ -61,10 +56,10 @@ function checkRar5Signature(file: string): void {
 }
 
 describe("rar5 WASI fallback engine", () => {
-  it.runIf(fs.existsSync(WASM_LOADER))(
+  it.runIf(gate("rar5Wasm"))(
     "compresses a folder via the WASM loader with progress to 100%",
     async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5wasm_"));
+      const td = tmpDir("sat_rar5wasm_");
       try {
         const src = path.join(td, "src");
         fs.mkdirSync(path.join(src, "sub"), { recursive: true });
@@ -106,10 +101,10 @@ describe("rar5 WASI fallback engine", () => {
     },
   );
 
-  it.runIf(fs.existsSync(WASM_LOADER))(
+  it.runIf(gate("rar5Wasm"))(
     "creates an AES-256 + header-encrypted archive via the WASM loader",
     async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5wasm2_"));
+      const td = tmpDir("sat_rar5wasm2_");
       try {
         const file = path.join(td, "secret.txt");
         fs.writeFileSync(file, "classified\n");
