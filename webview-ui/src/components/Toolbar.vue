@@ -37,9 +37,11 @@
       </button>
     </div>
     <div class="flex flex-wrap items-center gap-2 ml-auto">
-      <span class="sel-count">
-        <b>{{ selectedFiles }}/{{ totalFiles }}</b> files
-        <b class="ml-2">{{ selectedDirs }}/{{ totalDirs }}</b> dirs
+      <span
+        class="sel-count text-sa-sm text-[var(--vscode-descriptionForeground)] whitespace-nowrap"
+      >
+        <b class="text-[var(--vscode-foreground)]">{{ selectedFiles }}/{{ totalFiles }}</b> files
+        <b class="ml-2 text-[var(--vscode-foreground)]">{{ selectedDirs }}/{{ totalDirs }}</b> dirs
       </span>
       <span class="sep"></span>
       <span class="sort-lbl" :class="{ on: sortKey === 'name' }" @click="$emit('sort', 'name')"
@@ -67,13 +69,19 @@
       />
       <button
         class="btn-ico search-regex-btn"
-        :class="{ on: isRegex }"
+        :class="[
+          isRegex
+            ? 'text-[var(--vscode-focusBorder,#007acc)] bg-[var(--vscode-toolbar-hoverBackground)]'
+            : '',
+        ]"
         :title="isRegex ? 'Switch to fuzzy search' : 'Use regular expression'"
         @click="$emit('toggle-regex')"
       >
         <span class="codicon codicon-regex"></span>
       </button>
-      <span v-if="searchQuery && (searchMatchCount ?? 0) > 0" class="search-match"
+      <span
+        v-if="searchQuery && (searchMatchCount ?? 0) > 0"
+        class="search-match text-sa-2xs text-[var(--vscode-descriptionForeground)] whitespace-nowrap"
         >{{ searchMatchCount }} match{{ (searchMatchCount ?? 0) > 1 ? "es" : "" }}</span
       >
     </div>
@@ -109,110 +117,3 @@ defineEmits<{
   (e: "toggle-regex"): void;
 }>();
 </script>
-
-<style scoped>
-.sep {
-  width: var(--sa-sep-width);
-  height: 18px;
-  background: var(--vscode-sideBarSectionHeader-border);
-  flex-shrink: 0;
-}
-.btn {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border: none;
-  padding: 3px 10px;
-  border-radius: var(--sa-radius);
-  cursor: pointer;
-  font-size: var(--sa-font-base);
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  transition: var(--sa-transition-fast);
-}
-.btn:hover {
-  background: var(--vscode-button-hoverBackground);
-}
-.btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.btn-ico {
-  background: transparent;
-  color: var(--vscode-foreground);
-  border: none;
-  padding: 3px 5px;
-  border-radius: var(--sa-radius);
-  cursor: pointer;
-  font-size: var(--sa-font-base);
-  line-height: 1;
-  flex-shrink: 0;
-  transition: var(--sa-transition-fast);
-}
-.btn-ico:hover {
-  background: var(--vscode-toolbar-hoverBackground);
-}
-.btn-ico .codicon {
-  font-size: var(--sa-font-3xl);
-}
-.search-input {
-  background: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border, transparent);
-  padding: 3px 8px;
-  border-radius: var(--sa-radius);
-  font-size: var(--sa-font-md);
-  width: 120px;
-  min-width: 80px;
-  max-width: 200px;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.search-input:focus {
-  border-color: var(--vscode-focusBorder);
-}
-.search-input.search-error {
-  border-color: var(--sa-color-error);
-  box-shadow: var(--sa-shadow-error-ring);
-}
-.search-regex-btn.on {
-  color: var(--vscode-focusBorder, #007acc);
-  background: var(--vscode-toolbar-hoverBackground);
-}
-.search-match {
-  font-size: var(--sa-font-2xs);
-  color: var(--vscode-descriptionForeground);
-  white-space: nowrap;
-}
-.sort-lbl {
-  cursor: pointer;
-  font-size: var(--sa-font-md-sm);
-  color: var(--vscode-descriptionForeground);
-  padding: 2px 6px;
-  border-radius: var(--sa-radius);
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  transition:
-    color var(--sa-transition-medium),
-    background var(--sa-transition-medium);
-}
-.sort-lbl:hover {
-  color: var(--vscode-foreground);
-  background: var(--vscode-toolbar-hoverBackground);
-}
-.sort-lbl.on {
-  color: var(--vscode-foreground);
-  font-weight: 600;
-  background: var(--vscode-toolbar-hoverBackground);
-}
-.sel-count {
-  font-size: var(--sa-font-sm);
-  color: var(--vscode-descriptionForeground);
-  white-space: nowrap;
-}
-.sel-count b {
-  color: var(--vscode-foreground);
-}
-</style>

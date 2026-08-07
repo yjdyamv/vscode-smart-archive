@@ -12,7 +12,6 @@ import { handleCopy } from "./copy";
 import { handleDelete } from "./deleteEntries";
 import { handleRename } from "./rename";
 import { handleAddFiles } from "./addFiles";
-import { handleDropFiles } from "./dropFiles";
 import { handleNewFolder } from "./newFolder";
 import { handlePreview } from "./preview";
 import { handleMerge } from "./merge";
@@ -30,7 +29,6 @@ export const HANDLERS: Record<string, MessageHandler> = {
   delSel: handleDelete,
   renamePrompt: handleRename,
   addFiles: handleAddFiles,
-  dropFiles: handleDropFiles,
   newFolderPrompt: handleNewFolder,
   preview: handlePreview,
   merge: handleMerge,

@@ -1,30 +1,29 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import type { ExtensionMessage } from "../types";
+import { ref, watch } from "vue";
 import { PW_ERROR_HIDE_MS } from "../constants";
 
-defineProps<{ archiveName: string }>();
+const props = defineProps<{ archiveName: string; hasError?: boolean }>();
 const emit = defineEmits<{ (e: "submit", pw: string): void }>();
 const password = ref("");
 const showPassword = ref(false);
-const hasError = ref(false);
+const errorVisible = ref(false);
 
-function onMsg(e: MessageEvent) {
-  const data = e.data as ExtensionMessage;
-  if (data?.c === "pwerr") {
-    hasError.value = true;
-    password.value = "";
-    setTimeout(() => {
-      hasError.value = false;
-    }, PW_ERROR_HIDE_MS);
-  }
-}
-onMounted(() => window.addEventListener("message", onMsg));
-onUnmounted(() => window.removeEventListener("message", onMsg));
+watch(
+  () => props.hasError,
+  (v) => {
+    if (v) {
+      errorVisible.value = true;
+      password.value = "";
+      setTimeout(() => {
+        errorVisible.value = false;
+      }, PW_ERROR_HIDE_MS);
+    }
+  },
+);
 
 function submit() {
   if (password.value.trim()) {
-    hasError.value = false;
+    errorVisible.value = false;
     emit("submit", password.value);
   }
 }
@@ -35,13 +34,15 @@ function onKeydown(e: KeyboardEvent) {
 
 <template>
   <div class="flex flex-col items-center justify-center h-screen gap-3">
-    <div class="pw-icon"><span class="codicon codicon-lock"></span></div>
-    <div class="text-[var(--vscode-foreground)] text-[1.15em] font-medium">{{ archiveName }}</div>
-    <div class="text-[var(--vscode-descriptionForeground)] text-[0.9em]">
+    <div class="text-[48px] leading-none text-[var(--vscode-descriptionForeground)] mb-1">
+      <span class="codicon codicon-lock"></span>
+    </div>
+    <div class="text-[var(--vscode-foreground)] text-sa-2xl font-medium">{{ archiveName }}</div>
+    <div class="text-[var(--vscode-descriptionForeground)] text-sa-md">
       This archive is encrypted. Enter its password to continue.
     </div>
     <div class="flex items-center gap-2 mt-1">
-      <div :class="{ ring: hasError }" class="pw-box">
+      <div :class="{ ring: errorVisible }" class="pw-box">
         <input
           v-model="password"
           :type="showPassword ? 'text' : 'password'"
@@ -58,69 +59,12 @@ function onKeydown(e: KeyboardEvent) {
         </button>
       </div>
     </div>
-    <button class="unlock-btn" @click="submit">Unlock</button>
-    <div class="pw-error" :class="{ show: hasError }">Wrong password — please try again</div>
+    <button class="btn !px-5 !py-1.5 !text-sa-xl" @click="submit">Unlock</button>
+    <div
+      class="text-sa-error text-sa-md min-h-[1.4em] transition-opacity duration-200"
+      :class="errorVisible ? 'opacity-100' : 'opacity-0'"
+    >
+      Wrong password — please try again
+    </div>
   </div>
 </template>
-
-<style scoped>
-.pw-icon {
-  font-size: 48px;
-  line-height: 1;
-  color: var(--vscode-descriptionForeground);
-  margin-bottom: 4px;
-}
-.pw-box {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
-  border-radius: var(--sa-radius-md);
-  background: var(--vscode-input-background);
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-.pw-box:focus-within {
-  border-color: var(--vscode-focusBorder);
-}
-.pw-box.ring {
-  border-color: var(--sa-color-error);
-  box-shadow: var(--sa-shadow-error-ring);
-}
-.pw-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--vscode-descriptionForeground);
-  padding: 4px 8px;
-  font-size: 14px;
-  line-height: 1;
-  transition: color var(--sa-transition-fast);
-}
-.pw-btn:hover {
-  color: var(--vscode-foreground);
-}
-.unlock-btn {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border: none;
-  padding: 5px 20px;
-  border-radius: var(--sa-radius);
-  cursor: pointer;
-  font-size: var(--sa-font-xl);
-  transition: var(--sa-transition-fast);
-}
-.unlock-btn:hover {
-  background: var(--vscode-button-hoverBackground);
-}
-.pw-error {
-  color: var(--sa-color-error);
-  font-size: var(--sa-font-md);
-  min-height: 1.4em;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.pw-error.show {
-  opacity: 1;
-}
-</style>

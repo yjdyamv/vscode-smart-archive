@@ -385,12 +385,3 @@ export function formatSize(bytes: number): string {
   }
   return size.toFixed(size < 10 ? 1 : 0) + " " + units[i];
 }
-
-export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}

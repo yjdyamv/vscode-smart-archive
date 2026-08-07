@@ -2,7 +2,9 @@
 import { ref, computed } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import type { FlatNode, TreeNodeData } from "../types";
-import { ROW_HEIGHT_MULTIPLIER, DEFAULT_FONT_SIZE, VIRTUAL_OVERSCAN } from "../constants";
+import type { DescCount } from "../bootstrap";
+import { VIRTUAL_OVERSCAN } from "../constants";
+import { resolveRowHeight } from "../utils/dom";
 import FileRow from "./FileRow.vue";
 
 const props = defineProps<{
@@ -11,8 +13,8 @@ const props = defineProps<{
   selected: Set<string>;
   expanded: Set<string>;
   searchQuery: string;
-  matchSet: Set<string>;
   loadingPaths: Set<string>;
+  descCounts: Record<string, DescCount>;
 }>();
 
 const emit = defineEmits<{
@@ -32,13 +34,7 @@ defineExpose({
     if (el) el.scrollIntoView({ block: "nearest" });
   },
 });
-const rowHeight = computed(() => {
-  const fontSize =
-    parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size")) ||
-    parseFloat(getComputedStyle(document.documentElement).fontSize) ||
-    DEFAULT_FONT_SIZE;
-  return fontSize * ROW_HEIGHT_MULTIPLIER;
-});
+const rowHeight = computed(() => resolveRowHeight());
 
 const virtualizer = useVirtualizer(
   computed(() => ({
@@ -85,9 +81,9 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
           :flat-node="flatNodes[item.index]"
           :depth="flatNodes[item.index].depth"
           :selected="selected.has(flatNodes[item.index].path)"
-          :match-set="matchSet"
           :search-query="searchQuery"
           :is-loading="loadingPaths.has(flatNodes[item.index].path)"
+          :desc-counts="descCounts"
           @click="
             (shift, ctrl) =>
               emit(

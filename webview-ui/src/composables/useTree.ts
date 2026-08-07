@@ -30,7 +30,7 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
     return nodeMap.value.get(path) ?? null;
   }
 
-  function initExpandedFromTree(maxDepth = DEFAULT_EXPAND_DEPTH) {
+  function initExpandedFromTree(maxDepth = DEFAULT_EXPAND_DEPTH, persisted?: string[]) {
     const saved = loadState<{ expanded?: string[] }>();
     if (saved?.expanded?.length) {
       expandedPaths.value = new Set(saved.expanded);
@@ -40,11 +40,10 @@ export function useTreeFlatten(treeData: Ref<TreeNodeData[]>) {
       }
       return;
     }
-    const persistent = (window as any)._xExpanded as string[] | undefined;
-    if (persistent?.length) {
+    if (persisted?.length) {
       autoExpandMaxDepth.value = null;
-      expandedPaths.value = new Set(persistent);
-      for (const p of persistent) {
+      expandedPaths.value = new Set(persisted);
+      for (const p of persisted) {
         expandTo(p);
       }
       return;

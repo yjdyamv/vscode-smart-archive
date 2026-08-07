@@ -31,12 +31,3 @@ export interface ArchiveProps {
 export interface FileIcon {
   codicon: string;
 }
-
-/** Discriminated union for all extension → webview messages. */
-export type ExtensionMessage =
-  | { c: "ok"; t: string }
-  | { c: "err"; t: string }
-  | { c: "pwerr"; t: string }
-  | { c: "loading"; t: string | false }
-  | { c: "dirChildren"; path: string; children: TreeNodeData[] }
-  | { c: "encState"; v: boolean };

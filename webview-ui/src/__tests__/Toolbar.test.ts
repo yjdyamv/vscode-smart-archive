@@ -119,8 +119,8 @@ describe("Toolbar", () => {
 
   it("shows regex button as active when isRegex is true", () => {
     const w = mountToolbar({ isRegex: true });
-    const regexBtn = w.find(".search-regex-btn.on");
-    expect(regexBtn.exists()).toBe(true);
+    const regexBtn = w.find(".search-regex-btn");
+    expect(regexBtn.classes().join(" ")).toContain("text-[var(--vscode-focusBorder,#007acc)]");
   });
 
   it("shows search match count when query has results", () => {

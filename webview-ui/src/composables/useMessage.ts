@@ -1,17 +1,17 @@
-import type { ExtensionMessage } from "../types";
+import type { WebviewToHost, HostToWebview } from "../protocol";
 
 const vscode = acquireVsCodeApi();
 
 export function useMessage() {
-  function post(msg: Record<string, unknown>): void {
+  function post(msg: WebviewToHost): void {
     vscode.postMessage(msg);
   }
 
   return { post, onMessage };
 }
 
-function onMessage(handler: (msg: ExtensionMessage) => void): () => void {
-  const listener = (e: MessageEvent) => handler(e.data as ExtensionMessage);
+function onMessage(handler: (msg: HostToWebview) => void): () => void {
+  const listener = (e: MessageEvent) => handler(e.data as HostToWebview);
   window.addEventListener("message", listener);
   return () => window.removeEventListener("message", listener);
 }

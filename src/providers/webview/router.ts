@@ -22,7 +22,6 @@
  *   delSel        { c: "delSel",        paths: string[] }
  *   renamePrompt  { c: "renamePrompt",  path: string }
  *   addFiles      { c: "addFiles",      dir?: string }
- *   dropFiles     { c: "dropFiles",     paths: string[], dir? }
  *   newFolderPrompt { c: "newFolderPrompt", dir?: string }
  *   preview       { c: "preview",       path: string }
  *   merge         { c: "merge" }
@@ -33,7 +32,6 @@
  *   test          { c: "test" }
  *   expandDir     { c: "expandDir",     path: string }
  *   saveExpanded  { c: "saveExpanded",  paths: string[] }
- *   log           { c: "log",           msg: string }
  *
  * @module providers/webview/router
  */
@@ -164,11 +162,6 @@ export function registerHandler(webview: vscode.Webview): void {
       }
 
       // Lightweight inline handlers
-      if (msg.c === "log") {
-        logger.debug({ event: "webview.ui", msg: msg.msg });
-        return;
-      }
-
       if (msg.c === "expandDir" && typeof msg.path === "string") {
         const children = getDirChildren(msg.path, s.entries, s.entryIndex);
         markNoisyDirs(children, getNoisyPatterns());

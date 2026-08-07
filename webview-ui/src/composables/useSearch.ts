@@ -26,6 +26,64 @@ export function fuzzyMatch(s: string, q: string): boolean {
   return qi === q.length;
 }
 
+export interface HighlightSegment {
+  text: string;
+  mark: boolean;
+}
+
+/**
+ * Split a file name into plain / highlighted segments using the same matching
+ * semantics (and the same ReDoS guard) as the search filter itself.
+ */
+export function segmentHighlight(name: string, query: string): HighlightSegment[] {
+  const plain: HighlightSegment[] = [{ text: name, mark: false }];
+  const raw = query.trim();
+  if (!raw) return plain;
+
+  if (raw.length > 2 && raw[0] === "/" && raw.lastIndexOf("/") === raw.length - 1) {
+    const pattern = raw.slice(1, -1);
+    if (!isRedosSafe(pattern)) return plain;
+    try {
+      const re = new RegExp("(" + pattern + ")", "gi");
+      const segs: HighlightSegment[] = [];
+      let last = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(name)) !== null) {
+        if (m.index > last) segs.push({ text: name.slice(last, m.index), mark: false });
+        segs.push({ text: m[0], mark: true });
+        last = m.index + m[0].length;
+        if (m[0].length === 0) re.lastIndex++; // guard against zero-width matches
+      }
+      if (last < name.length) segs.push({ text: name.slice(last), mark: false });
+      return segs.length > 0 ? segs : plain;
+    } catch {
+      return plain;
+    }
+  }
+
+  const q = raw.toLowerCase();
+  const lower = name.toLowerCase();
+  const pos: number[] = [];
+  let qi = 0;
+  for (let ci = 0; ci < lower.length && qi < q.length; ci++) {
+    if (lower[ci] === q[qi]) {
+      pos.push(ci);
+      qi++;
+    }
+  }
+  if (pos.length === 0) return plain;
+
+  const segs: HighlightSegment[] = [];
+  let last = 0;
+  for (const p of pos) {
+    if (p > last) segs.push({ text: name.slice(last, p), mark: false });
+    segs.push({ text: name.charAt(p), mark: true });
+    last = p + 1;
+  }
+  if (last < name.length) segs.push({ text: name.slice(last), mark: false });
+  return segs;
+}
+
 export function collectMatches(
   nodes: TreeNodeData[],
   re: RegExp | null,
@@ -111,14 +169,6 @@ export function useSearch() {
     }
   }
 
-  function clearSearch(): void {
-    query.value = "";
-    isRegex.value = false;
-    regexError.value = "";
-    matchSet.value.clear();
-    directMatchSet.value.clear();
-  }
-
   return {
     query,
     isRegex,
@@ -128,6 +178,5 @@ export function useSearch() {
     updateSearch,
     isVisible,
     toggleRegex,
-    clearSearch,
   };
 }

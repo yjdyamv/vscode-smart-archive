@@ -43,12 +43,21 @@
     </div>
     <span class="sep"></span>
     <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-      <b class="meta-name">{{ name }}</b>
-      <span class="meta-div">|</span> {{ format }} <span class="meta-div">|</span> Items:
-      <b>{{ count }}</b> <span class="meta-div">|</span> Files: <b>{{ files }}</b>
-      <span class="meta-div">|</span> Dirs: <b>{{ dirs }}</b> <span class="meta-div">|</span> Size:
+      <b class="meta-name text-[var(--vscode-foreground)] text-sa-xl">{{ name }}</b>
+      <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
+      {{ format }}
+      <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
+      Items:
+      <b>{{ count }}</b>
+      <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
+      Files: <b>{{ files }}</b>
+      <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
+      Dirs: <b>{{ dirs }}</b>
+      <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
+      Size:
       <b class="text-[var(--vscode-foreground)]">{{ size }}</b>
-      <span class="meta-div">|</span> Ratio:
+      <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
+      Ratio:
       <b class="text-[var(--vscode-foreground)]">{{
         ratio === 0 ? "—" : (ratio * 100).toFixed(2) + "%"
       }}</b>
@@ -78,53 +87,3 @@ defineEmits<{
   (e: "decrypt"): void;
 }>();
 </script>
-
-<style scoped>
-.sep {
-  width: var(--sa-sep-width);
-  height: 16px;
-  background: var(--vscode-sideBarSectionHeader-border);
-  flex-shrink: 0;
-}
-.btn-ico {
-  background: transparent;
-  color: var(--vscode-foreground);
-  border: none;
-  padding: 2px 4px;
-  border-radius: var(--sa-radius);
-  cursor: pointer;
-  font-size: var(--sa-font-md-sm);
-  line-height: 1;
-  flex-shrink: 0;
-  transition: var(--sa-transition-fast);
-}
-.btn-ico:hover {
-  background: var(--vscode-toolbar-hoverBackground);
-}
-.btn {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  border: none;
-  padding: 3px 10px;
-  border-radius: var(--sa-radius);
-  cursor: pointer;
-  font-size: var(--sa-font-sm);
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  transition: var(--sa-transition-fast);
-}
-.btn:hover {
-  background: var(--vscode-button-hoverBackground);
-}
-.meta-name {
-  color: var(--vscode-foreground);
-  font-size: var(--sa-font-xl);
-}
-.meta-div {
-  color: var(--vscode-descriptionForeground);
-  opacity: 0.5;
-  margin: 0 2px;
-}
-</style>

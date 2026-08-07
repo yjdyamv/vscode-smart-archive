@@ -3,14 +3,16 @@ import { computed } from "vue";
 import type { FlatNode } from "../types";
 import { getFileIcon, formatSize } from "../utils/icons";
 import { INDENT_PX } from "../constants";
+import { segmentHighlight } from "../composables/useSearch";
+import type { DescCount } from "../bootstrap";
 
 const props = defineProps<{
   flatNode: FlatNode;
   depth: number;
   selected: boolean;
-  matchSet: Set<string>;
   searchQuery: string;
   isLoading: boolean;
+  descCounts: Record<string, DescCount>;
 }>();
 
 const emit = defineEmits<{
@@ -22,23 +24,13 @@ const emit = defineEmits<{
 }>();
 
 const node = computed(() => props.flatNode.node);
-function readDescCounts(): Record<string, { files: number; dirs: number; size?: number }> {
-  const el = document.getElementById("_xDescCounts");
-  if (!el) return {};
-  try {
-    return JSON.parse(el.textContent ?? "{}");
-  } catch {
-    return {};
-  }
-}
 
 const isDir = computed(() => node.value.kind === "DIRECTORY");
-const isCollapsedDir = computed(() => isDir.value && node.value.collapsed === true);
 const inheritCollapsed = computed(() => props.flatNode.inheritCollapsed);
 const icon = computed(() => getFileIcon(node.value.name, isDir.value));
 const descLabel = computed(() => {
   if (!isDir.value) return "";
-  const counts = readDescCounts()[node.value.path];
+  const counts = props.descCounts[node.value.path];
   if (!counts) return "";
   const parts: string[] = [];
   if (counts.files > 0) parts.push(`${counts.files} file${counts.files > 1 ? "s" : ""}`);
@@ -48,78 +40,15 @@ const descLabel = computed(() => {
 
 const dirSize = computed(() => {
   if (!isDir.value) return "";
-  const counts = readDescCounts()[node.value.path];
+  const counts = props.descCounts[node.value.path];
   if (!counts?.size) return "";
   return formatSize(counts.size);
 });
 
-function indentGuides(depth: number, showChildGuide: boolean): number[] {
-  return Array.from({ length: depth + (showChildGuide ? 1 : 0) }, (_, i) => i);
-}
-
-// Split the name into plain / highlighted segments. Rendered with {{ }} in the
+// Split the name into plain / highlighted segments, rendered with {{ }} in the
 // template (Vue auto-escapes), so no v-html and no manual HTML escaping — an
 // attacker-controlled entry name cannot inject markup.
-interface NameSeg {
-  text: string;
-  mark: boolean;
-}
-
-const nameSegments = computed<NameSeg[]>(() => {
-  const name = node.value.name;
-  const plain: NameSeg[] = [{ text: name, mark: false }];
-  if (!props.searchQuery.trim()) return plain;
-
-  const raw = props.searchQuery.trim();
-  if (raw.length > 2 && raw[0] === "/" && raw.lastIndexOf("/") === raw.length - 1) {
-    try {
-      const pattern = raw.slice(1, -1);
-      if (
-        /\((?!\?[:!=]).*\)(\+|\*|\{\d+,\})\s*(\+|\*|\{\d+,\})/.test(pattern) ||
-        /(\+|\*)\s*(\+|\*)/.test(pattern) ||
-        pattern.length > 200
-      ) {
-        return plain;
-      }
-      const re = new RegExp("(" + pattern + ")", "gi");
-      const segs: NameSeg[] = [];
-      let last = 0;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(name)) !== null) {
-        if (m.index > last) segs.push({ text: name.slice(last, m.index), mark: false });
-        segs.push({ text: m[0], mark: true });
-        last = m.index + m[0].length;
-        if (m[0].length === 0) re.lastIndex++; // guard against zero-width matches
-      }
-      if (last < name.length) segs.push({ text: name.slice(last), mark: false });
-      return segs.length > 0 ? segs : plain;
-    } catch {
-      return plain;
-    }
-  }
-
-  const q = raw.toLowerCase();
-  const lower = name.toLowerCase();
-  const pos: number[] = [];
-  let qi = 0;
-  for (let ci = 0; ci < lower.length && qi < q.length; ci++) {
-    if (lower[ci] === q[qi]) {
-      pos.push(ci);
-      qi++;
-    }
-  }
-  if (pos.length === 0) return plain;
-
-  const segs: NameSeg[] = [];
-  let last = 0;
-  for (const p of pos) {
-    if (p > last) segs.push({ text: name.slice(last, p), mark: false });
-    segs.push({ text: name.charAt(p), mark: true });
-    last = p + 1;
-  }
-  if (last < name.length) segs.push({ text: name.slice(last), mark: false });
-  return segs;
-});
+const nameSegments = computed(() => segmentHighlight(node.value.name, props.searchQuery));
 
 function onRowClick(e: MouseEvent) {
   if ((e.target as HTMLElement).closest(".checkbox")) return;
@@ -153,7 +82,7 @@ function onExpandClick(e: MouseEvent) {
     @contextmenu="emit('contextmenu', $event)"
   >
     <span
-      v-for="i in indentGuides(depth, flatNode.hasChildren && flatNode.expanded && !isDir)"
+      v-for="i in depth"
       :key="'g' + i"
       class="guide"
       :style="{ left: i * INDENT_PX + INDENT_PX / 2 + 'px' }"
@@ -175,175 +104,30 @@ function onExpandClick(e: MouseEvent) {
       :tabindex="isDir && flatNode.hasChildren ? 0 : -1"
       @click="isDir ? onExpandClick($event) : undefined"
     >
-      <span v-if="isLoading" class="arrow-loading"></span>
+      <span v-if="isLoading" class="spinner-sm size-[var(--size-sa-spinner-sm)]"></span>
       <span v-else-if="isDir" class="codicon codicon-chevron-right arrow-icon"></span>
     </span>
-    <span class="codicon ic" :class="'codicon-' + icon.codicon"></span>
-    <span class="name" :title="node.path"
+    <span class="codicon icon" :class="'codicon-' + icon.codicon"></span>
+    <span class="name truncate flex-1" :title="node.path"
       ><template v-for="(seg, i) in nameSegments" :key="i"
         ><mark v-if="seg.mark">{{ seg.text }}</mark
         ><template v-else>{{ seg.text }}</template></template
       ></span
     >
-    <span v-if="isDir" class="desc-count">{{ descLabel }}</span>
-    <span v-if="isDir && dirSize" class="size">{{ dirSize }}</span>
-    <span v-else-if="!isDir && node.size > 0" class="size">{{ formatSize(node.size) }}</span>
+    <span
+      v-if="isDir"
+      class="desc-count text-sa-sm text-[var(--vscode-descriptionForeground)] ml-1.5 shrink-0 whitespace-nowrap"
+      >{{ descLabel }}</span
+    >
+    <span
+      v-if="isDir && dirSize"
+      class="size text-sa-sm text-[var(--vscode-descriptionForeground)] ml-2.5 shrink-0 tabular-nums"
+      >{{ dirSize }}</span
+    >
+    <span
+      v-else-if="!isDir && node.size > 0"
+      class="size text-sa-sm text-[var(--vscode-descriptionForeground)] ml-2.5 shrink-0 tabular-nums"
+      >{{ formatSize(node.size) }}</span
+    >
   </div>
 </template>
-
-<style scoped>
-.row {
-  position: relative;
-  height: var(--sa-row-height);
-  line-height: var(--sa-row-height);
-  display: flex;
-  align-items: center;
-  cursor: default;
-  user-select: none;
-  -webkit-user-select: none;
-  padding-right: 8px;
-  transition: var(--sa-transition-hover);
-}
-.row:hover {
-  background: var(--vscode-list-hoverBackground);
-}
-.row:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
-}
-.row.sel {
-  background: var(--vscode-list-activeSelectionBackground);
-  color: var(--vscode-list-activeSelectionForeground);
-}
-.row.sel .guide {
-  opacity: 0.4;
-}
-.row.noisy {
-  color: var(--vscode-descriptionForeground);
-}
-.row.noisy:hover {
-  color: var(--vscode-foreground);
-}
-.guide {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: var(--sa-sep-width);
-  background: var(--vscode-tree-indentGuidesStroke);
-  opacity: 0.5;
-  pointer-events: none;
-}
-.checkbox {
-  width: 22px;
-  flex-shrink: 0;
-  text-align: center;
-  cursor: pointer;
-  padding: 2px 0;
-}
-.checkbox:hover .checkmark {
-  border-color: var(--vscode-focusBorder, #007acc);
-  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc44);
-}
-.checkmark {
-  display: inline-block;
-  width: var(--sa-checkmark-size);
-  height: var(--sa-checkmark-size);
-  border: 1.5px solid var(--vscode-checkbox-border, #6e7681);
-  border-radius: var(--sa-radius);
-  background: var(--vscode-checkbox-background, transparent);
-  vertical-align: middle;
-  position: relative;
-  transition: all var(--sa-transition-fast);
-}
-.checkmark.on {
-  background: var(--vscode-checkbox-selectBackground, #0e639c);
-  border-color: var(--vscode-checkbox-selectBorder, #007acc);
-}
-.checkmark.on::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 42%;
-  width: 28%;
-  height: 52%;
-  border: solid var(--vscode-checkbox-selectForeground, #2ea043);
-  border-width: 0 2px 2px 0;
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-.arrow {
-  width: var(--sa-arrow-width);
-  flex-shrink: 0;
-  text-align: center;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity var(--sa-transition-fastest);
-}
-.arrow:hover {
-  opacity: 1;
-}
-.arrow-icon {
-  font-size: 12px;
-  line-height: 1;
-  display: inline-block;
-  vertical-align: middle;
-  transition: transform var(--sa-transition-medium) ease;
-}
-.arrow.rot .arrow-icon {
-  transform: rotate(90deg);
-}
-.arrow.empty {
-  opacity: 0.25;
-  cursor: default;
-}
-.arrow.empty:hover {
-  opacity: 0.25;
-}
-.arrow-loading {
-  display: inline-block;
-  width: var(--sa-spinner-sm);
-  height: var(--sa-spinner-sm);
-  border: 1.5px solid var(--vscode-descriptionForeground);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: ar-spin var(--sa-spin-sm) linear infinite;
-  vertical-align: middle;
-}
-@keyframes ar-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.icon {
-  width: var(--sa-icon-width);
-  text-align: center;
-  flex-shrink: 0;
-  line-height: var(--sa-row-height);
-  font-size: var(--sa-font-2xl);
-}
-.name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-.size {
-  font-size: var(--sa-font-sm);
-  color: var(--vscode-descriptionForeground);
-  margin-left: 10px;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-.desc-count {
-  font-size: var(--sa-font-sm);
-  color: var(--vscode-descriptionForeground);
-  margin-left: 6px;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-:deep(mark) {
-  background: var(--vscode-editor-findMatchHighlightBackground, #d4d40066);
-  color: inherit;
-  border-radius: var(--sa-radius-sm);
-  padding: 0 1px;
-}
-</style>

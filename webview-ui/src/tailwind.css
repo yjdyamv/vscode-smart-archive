@@ -1,5 +1,388 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens — single source of truth for the webview.
+ * All sizes/typography derive from --vscode-font-size so the UI tracks the
+ * editor's zoom level. Token namespaces generate Tailwind utilities:
+ * --radius-* → rounded-*, --text-* → text-*, --color-* → bg/text/border-*,
+ * --z-index-* → z-*, --shadow-* → shadow-*, --size-* → size-*,
+ * --animate-* → animate-*.
+ */
+@theme static {
+  /* Radius */
+  --radius-sa: 3px;
+  --radius-sa-md: 4px;
+  --radius-sa-sm: 2px;
+
+  /* Z-index */
+  --z-index-toast: 999;
+  --z-index-menu: 1000;
+
+  /* Shadows */
+  --shadow-sa-menu: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-sa-error-ring: 0 0 0 1px #e5140033;
+
+  /* Colors */
+  --color-sa-error: #e51400;
+
+  /* Sizes */
+  --size-sa-checkmark: calc(var(--vscode-font-size) * 1.25);
+  --size-sa-arrow: calc(var(--vscode-font-size) * 1.3);
+  --size-sa-icon: calc(var(--vscode-font-size) * 1.5);
+  --size-sa-row: calc(var(--vscode-font-size) * var(--sa-row-multiplier, 1.85));
+  --size-sa-sep: 1px;
+  --size-sa-spinner: 28px;
+  --size-sa-spinner-sm: 8px;
+
+  /* Typography scale */
+  --text-sa-2xs: calc(var(--vscode-font-size) * 0.78);
+  --text-sa-xs: calc(var(--vscode-font-size) * 0.8);
+  --text-sa-sm: calc(var(--vscode-font-size) * 0.82);
+  --text-sa-md-sm: calc(var(--vscode-font-size) * 0.85);
+  --text-sa-md: calc(var(--vscode-font-size) * 0.88);
+  --text-sa-base: calc(var(--vscode-font-size) * 0.9);
+  --text-sa-lg: calc(var(--vscode-font-size) * 0.92);
+  --text-sa-xl: calc(var(--vscode-font-size) * 0.95);
+  --text-sa-2xl: calc(var(--vscode-font-size) * 1.05);
+  --text-sa-3xl: calc(var(--vscode-font-size) * 1.15);
+
+  /* Transitions */
+  --transition-sa-fast: background 0.12s ease;
+  --transition-sa-fastest: 0.1s;
+  --transition-sa-hover: 0.08s;
+  --transition-sa-medium: 0.15s;
+  --transition-sa-normal: 0.2s;
+  --transition-sa-slow: 0.25s;
+
+  /* Animations */
+  --animate-sa-spin: sa-spin 0.7s linear infinite;
+  --animate-sa-spin-sm: sa-spin 0.6s linear infinite;
+
+  @keyframes sa-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+/*
+ * JS-visible metrics — the row-height multiplier lives here so both CSS and
+ * the virtualizer read the same value (see utils/dom.ts).
+ */
+:root {
+  --sa-row-multiplier: 1.85;
+}
+
+/* Shared visual primitives. Templates use utilities for layout; components
+ * with hover/active/pseudo-element states are consolidated here so a visual
+ * change lands in exactly one place. */
+@layer components {
+  .btn {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    padding: 3px 10px;
+    border-radius: var(--radius-sa);
+    cursor: pointer;
+    font-size: var(--text-sa-base);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: var(--transition-sa-fast);
+  }
+  .btn:hover {
+    background: var(--vscode-button-hoverBackground);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .btn-ico {
+    background: transparent;
+    color: var(--vscode-foreground);
+    border: none;
+    padding: 3px 5px;
+    border-radius: var(--radius-sa);
+    cursor: pointer;
+    font-size: var(--text-sa-base);
+    line-height: 1;
+    flex-shrink: 0;
+    transition: var(--transition-sa-fast);
+  }
+  .btn-ico:hover {
+    background: var(--vscode-toolbar-hoverBackground);
+  }
+  .btn-ico .codicon {
+    font-size: var(--text-sa-3xl);
+  }
+
+  .sep {
+    width: var(--size-sa-sep);
+    height: 18px;
+    background: var(--vscode-sideBarSectionHeader-border);
+    flex-shrink: 0;
+  }
+
+  .spinner,
+  .spinner-sm {
+    border-radius: 9999px;
+    border-style: solid;
+  }
+  .spinner {
+    border-width: 3px;
+    border-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+    border-top-color: var(--vscode-progressBar-background, #007acc);
+    animation: var(--animate-sa-spin);
+  }
+  .spinner-sm {
+    border-width: 1.5px;
+    border-color: var(--vscode-descriptionForeground);
+    border-top-color: transparent;
+    animation: var(--animate-sa-spin-sm);
+  }
+
+  .search-input {
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, transparent);
+    padding: 3px 8px;
+    border-radius: var(--radius-sa);
+    font-size: var(--text-sa-md);
+    width: 120px;
+    min-width: 80px;
+    max-width: 200px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus {
+    border-color: var(--vscode-focusBorder);
+  }
+  .search-input.search-error {
+    border-color: var(--color-sa-error);
+    box-shadow: var(--shadow-sa-error-ring);
+  }
+
+  .sort-lbl {
+    cursor: pointer;
+    font-size: var(--text-sa-md-sm);
+    color: var(--vscode-descriptionForeground);
+    padding: 2px 6px;
+    border-radius: var(--radius-sa);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    transition:
+      color var(--transition-sa-medium),
+      background var(--transition-sa-medium);
+  }
+  .sort-lbl:hover {
+    color: var(--vscode-foreground);
+    background: var(--vscode-toolbar-hoverBackground);
+  }
+  .sort-lbl.on {
+    color: var(--vscode-foreground);
+    font-weight: 600;
+    background: var(--vscode-toolbar-hoverBackground);
+  }
+
+  .cmi {
+    padding: 5px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s ease;
+  }
+  .cmi:hover {
+    background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  }
+  .cmi.disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .cmi-sep {
+    height: 1px;
+    margin: 4px 12px;
+    background: var(--vscode-menu-border, var(--vscode-sideBarSectionHeader-border));
+  }
+
+  .cmi-shortcut {
+    margin-left: auto;
+    font-size: var(--text-sa-xs);
+    opacity: 0.6;
+  }
+
+  .pw-box {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
+    border-radius: var(--radius-sa-md);
+    background: var(--vscode-input-background);
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
+  .pw-box:focus-within {
+    border-color: var(--vscode-focusBorder);
+  }
+  .pw-box.ring {
+    border-color: var(--color-sa-error);
+    box-shadow: var(--shadow-sa-error-ring);
+  }
+
+  .pw-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--vscode-descriptionForeground);
+    padding: 4px 8px;
+    font-size: 14px;
+    line-height: 1;
+    transition: color var(--transition-sa-fast);
+  }
+  .pw-btn:hover {
+    color: var(--vscode-foreground);
+  }
+
+  .row {
+    position: relative;
+    height: var(--size-sa-row);
+    line-height: var(--size-sa-row);
+    display: flex;
+    align-items: center;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+    padding-right: 8px;
+    transition: var(--transition-sa-hover);
+  }
+  .row:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+  .row:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+  }
+  .row.sel {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+  }
+  .row.sel .guide {
+    opacity: 0.4;
+  }
+  .row.noisy {
+    color: var(--vscode-descriptionForeground);
+  }
+  .row.noisy:hover {
+    color: var(--vscode-foreground);
+  }
+
+  .guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: var(--size-sa-sep);
+    background: var(--vscode-tree-indentGuidesStroke);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .checkbox {
+    width: 22px;
+    flex-shrink: 0;
+    text-align: center;
+    cursor: pointer;
+    padding: 2px 0;
+  }
+  .checkbox:hover .checkmark {
+    border-color: var(--vscode-focusBorder, #007acc);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc44);
+  }
+
+  .checkmark {
+    display: inline-block;
+    width: var(--size-sa-checkmark);
+    height: var(--size-sa-checkmark);
+    border: 1.5px solid var(--vscode-checkbox-border, #6e7681);
+    border-radius: var(--radius-sa);
+    background: var(--vscode-checkbox-background, transparent);
+    vertical-align: middle;
+    position: relative;
+    transition: all var(--transition-sa-fast);
+  }
+  .checkmark.on {
+    background: var(--vscode-checkbox-selectBackground, #0e639c);
+    border-color: var(--vscode-checkbox-selectBorder, #007acc);
+  }
+  .checkmark.on::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    width: 28%;
+    height: 52%;
+    border: solid var(--vscode-checkbox-selectForeground, #2ea043);
+    border-width: 0 2px 2px 0;
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  .arrow {
+    width: var(--size-sa-arrow);
+    flex-shrink: 0;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity var(--transition-sa-fastest);
+  }
+  .arrow:hover {
+    opacity: 1;
+  }
+  .arrow.rot .arrow-icon {
+    transform: rotate(90deg);
+  }
+  .arrow.empty {
+    opacity: 0.25;
+    cursor: default;
+  }
+  .arrow.empty:hover {
+    opacity: 0.25;
+  }
+  .arrow-icon {
+    font-size: 12px;
+    line-height: 1;
+    display: inline-block;
+    vertical-align: middle;
+    transition: transform var(--transition-sa-medium) ease;
+  }
+
+  .cmi-icon {
+    font-size: var(--text-sa-2xl);
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .icon {
+    width: var(--size-sa-icon);
+    text-align: center;
+    flex-shrink: 0;
+    line-height: var(--size-sa-row);
+    font-size: var(--text-sa-2xl);
+  }
+}
+
+mark {
+  background: var(--vscode-editor-findMatchHighlightBackground, #d4d40066);
+  color: inherit;
+  border-radius: var(--radius-sa-sm);
+  padding: 0 1px;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4)) transparent;
