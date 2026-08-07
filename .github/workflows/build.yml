@@ -174,7 +174,9 @@ jobs:
           VER=${TAG#v}; VER=${VER%%-*}
           echo "Testing 7-Zip $VER on Windows"
           curl -fsSL -o 7zz-windows-x64.zip "https://github.com/${REPO}/releases/download/${TAG}/7zz-windows-x64.zip"
-          mkdir -p bin && tar -xf 7zz-windows-x64.zip -C bin
+          # Git Bash's GNU tar cannot read zip archives; Windows' built-in
+          # Expand-Archive handles the GitHub release zip reliably.
+          mkdir -p bin && powershell -NoProfile -Command "Expand-Archive -Force -Path 7zz-windows-x64.zip -DestinationPath bin"
           BIN="$(find bin -type f -name 7zz.exe | head -1)"
           test -n "$BIN" || { echo "::error::7zz.exe not found in windows zip"; exit 1; }
           ls -l "$BIN"
