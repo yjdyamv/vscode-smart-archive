@@ -9,6 +9,7 @@ vendor/7zz-wasm/7zz.wasm
 vendor/7zz-wasm/LICENSE
 vendor/7z-bin/
 vendor/rar5-bin/
+vendor/rar5-wasm/
 **/*.tsbuildinfo
 .cache/
 

@@ -66,11 +66,23 @@ async function fetchViaAssetsApi(repo, tag, assetName) {
   if (!asset || !asset.id) {
     throw new Error(`asset "${assetName}" not found in release ${tag} (assets API)`);
   }
-  return await httpGetRetry(`${apiBase}/releases/assets/${asset.id}`, {
+  const buf = await httpGetRetry(`${apiBase}/releases/assets/${asset.id}`, {
     timeoutMs: 300000,
     retries: 2,
-    headers: { Accept: "application/octet-stream", ...API_HEADERS },
+    // API_HEADERS first: its Accept is intentionally overridden below, so
+    // the request asks GitHub for the binary (302 to objects.githubusercontent.com)
+    // instead of the asset metadata JSON.
+    headers: { ...API_HEADERS, Accept: "application/octet-stream" },
   });
+  if (
+    buf.length > 0 &&
+    buf[0] === 0x7b && // '{'
+    buf.length < 4096 &&
+    buf.toString("utf8", 0, 200).includes('"url":')
+  ) {
+    throw new Error(`assets API returned metadata JSON instead of the binary for ${assetName}`);
+  }
+  return buf;
 }
 
 async function defaultFetchJson(url) {

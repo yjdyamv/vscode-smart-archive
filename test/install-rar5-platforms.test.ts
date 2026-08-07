@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 import {
   EXPECTED_HASHES,
   TRIPLES,
+  WASM_ASSETS,
   REPO,
   resolveVersion,
 } from "../scripts/install-rar5-platforms.js";
@@ -45,9 +46,9 @@ function stagedNodes(): { triple: string; file: string }[] {
 }
 
 describe("rar5 platform config", () => {
-  it("covers exactly the 10 staged platform triples", () => {
+  it("pins every native triple and WASI asset", () => {
     const pinned = Object.keys(EXPECTED_HASHES).sort();
-    expect(pinned).toEqual(allTriples().sort());
+    expect(pinned).toEqual([...allTriples(), ...WASM_ASSETS].sort());
   });
 
   it("hashes are 64-char lowercase hex", () => {
@@ -106,13 +107,17 @@ describe("rar5 release digest verification", () => {
         .map((a) => [a.name, a.digest!.replace(/^sha256:/, "")]),
     );
 
-    for (const triple of allTriples()) {
-      const asset = `smart-archive-rar.${triple}.node`;
+    const assets = [
+      ...allTriples().map((triple) => ({
+        asset: `smart-archive-rar.${triple}.node`,
+        pinKey: triple,
+      })),
+      ...WASM_ASSETS.map((name) => ({ asset: name, pinKey: name })),
+    ];
+    for (const { asset, pinKey } of assets) {
       const official = digestByAsset.get(asset);
       expect(official, `no digest for ${asset} in release v${version}`).toBeTruthy();
-      expect(EXPECTED_HASHES[triple], `pin for ${triple} differs from GitHub digest`).toBe(
-        official,
-      );
+      expect(EXPECTED_HASHES[pinKey], `pin for ${pinKey} differs from GitHub digest`).toBe(official);
     }
   });
 });

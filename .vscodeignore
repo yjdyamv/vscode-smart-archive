@@ -23,8 +23,17 @@ node_modules/
 !node_modules/snappy/index.js
 !node_modules/snappy/index.d.ts
 !node_modules/snappy/snappy.*.node
+!node_modules/snappy/snappy.wasi.cjs
+!node_modules/snappy/snappy.wasm32-wasi.wasm
+!node_modules/snappy/wasi-worker.mjs
 !node_modules/snappy/package.json
 !node_modules/snappy/LICENSE
+!node_modules/@napi-rs/wasm-runtime/**
+!node_modules/@napi-rs/wasm-runtime/package.json
+!node_modules/@emnapi/**
+!node_modules/@emnapi/package.json
+!node_modules/@tybys/**
+!node_modules/@tybys/package.json
 
 # ── 输出 & 杂项 ──
 .cache/**
