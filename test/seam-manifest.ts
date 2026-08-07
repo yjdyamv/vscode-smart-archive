@@ -201,6 +201,7 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "workspace.test.ts"
   ],
   "src/utils/path.ts": [
+    "encoding-recovery.test.ts",
     "shared-setup.ts"
   ],
   "src/utils/rar.ts": [
