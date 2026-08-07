@@ -390,7 +390,7 @@ export async function compressWithRar5(
       controller.signal,
     );
   } catch (err) {
-    if (isCancellationError(err) || (err instanceof Error && err.name === "AbortError")) {
+    if (isCancellationError(err)) {
       cleanupPartialOutput(options.outputPath);
       throw new CancelledError();
     }

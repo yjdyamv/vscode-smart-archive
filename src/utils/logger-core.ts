@@ -91,10 +91,4 @@ export const logger = {
     }
     p.error(sanitize(obj), msg);
   },
-
-  throw(event: string, err: unknown, data?: Record<string, unknown>): never {
-    logger.error({ event, err, ...data });
-    if (err instanceof Error) throw err;
-    throw new Error(String(err));
-  },
 };
