@@ -15,7 +15,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
-import { isRarExt } from "../../utils/rar";
 import { checkFileSize, validatePassword } from "../../utils/security";
 import { t } from "../../i18n";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
@@ -23,13 +22,9 @@ import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../t
 /** Delay before disposing the preview tab cleanup subscription (10 min) */
 const PREVIEW_CLEANUP_DELAY_MS = 600_000;
 import { logger } from "../../utils/logger";
-import {
-  hasSystem7zForFormat,
-  system7zForExt,
-  spawnCapture,
-  renameInArchiveSystem7z,
-} from "../../engines/system7z";
+import { system7zForExt, spawnCapture, renameInArchiveSystem7z } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
+import { selectEngine } from "../../engines/select-engine";
 import { rebuildRarArchive, archiveJoin } from "./rar5-modify";
 
 export async function createFolderInArchive(
@@ -45,9 +40,14 @@ export async function createFolderInArchive(
     folderName,
     ext: getFullExt(archivePath),
   });
+  const { engine } = selectEngine({
+    op: "createFolder",
+    ext: getFullExt(archivePath),
+    password,
+  });
 
   // 7-Zip cannot create folders inside RAR archives — rebuild instead.
-  if (isRarExt(getFullExt(archivePath))) {
+  if (engine === "rarRebuild") {
     logger.info({ event: "createFolder.rar5.rebuild", archivePath, targetDir, folderName });
     const newDir = targetDir ? `${targetDir.replace(/\\/g, "/")}/${folderName}` : folderName;
     await rebuildRarArchive({
@@ -101,7 +101,8 @@ export async function previewFileFromArchive(
   // Fast path: use system 7z when available (no WASM overhead, no full-archive
   // load). Brotli and LZ4 are not supported by system 7z — falls through to
   // the worker below.
-  if (hasSystem7zForFormat(archiveExt, true)) {
+  const { engine: previewEngine } = selectEngine({ op: "preview", ext: archiveExt, password });
+  if (previewEngine === "system7z") {
     try {
       const fileData = await extractOneWithSystem7z(
         archivePath,
@@ -302,9 +303,10 @@ export async function renameInArchive(
   logger.info({ event: "rename.start", archivePath, oldPath, newPath });
 
   const ext = getFullExt(archivePath);
+  const { engine } = selectEngine({ op: "rename", ext, password });
 
   // 7-Zip cannot rename entries inside RAR archives — rebuild instead.
-  if (isRarExt(ext)) {
+  if (engine === "rarRebuild") {
     logger.info({ event: "rename.rar5.rebuild", archivePath, oldPath, newPath });
     await rebuildRarArchive({
       archivePath,
@@ -319,11 +321,7 @@ export async function renameInArchive(
     return;
   }
 
-  // Wrapped formats always mutate via WASM (worker).
-  if (!isWrappedFormat(ext) && hasSystem7zForFormat(ext) && !password) {
-    // System 7z passes passwords via -p<password> on the command line,
-    // visible in process listings. For encrypted archives, fall back to
-    // WASM to avoid CLI password leakage.
+  if (engine === "system7z") {
     logger.info({ event: "rename.system7z", archivePath, ext });
     await renameInArchiveSystem7z(archivePath, oldPath, newPath, password);
     return;

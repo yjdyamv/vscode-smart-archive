@@ -10,13 +10,13 @@
  */
 
 import * as vscode from "vscode";
-import { getFullExt, isWrappedFormat, COMPRESS_EXCLUDE_DEFAULTS } from "../../constants";
-import { isRarExt } from "../../utils/rar";
+import { getFullExt, COMPRESS_EXCLUDE_DEFAULTS } from "../../constants";
 import { prepareExclusions } from "../../utils/exclude";
 import { logger } from "../../utils/logger";
 import { t } from "../../i18n";
-import { hasSystem7zForFormat, addToArchiveSystem7z } from "../../engines/system7z";
+import { addToArchiveSystem7z } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
+import { selectEngine } from "../../engines/select-engine";
 import { rebuildRarArchive, archiveJoin, copyIntoArchive } from "./rar5-modify";
 
 // ── Per-archive pending state for add-to-archive ──
@@ -170,8 +170,10 @@ export async function addToArchive(
     vscode.workspace.getConfiguration("smart-archive").get<string[]>("compressExcludePatterns") ??
     COMPRESS_EXCLUDE_DEFAULTS;
 
+  const { engine } = selectEngine({ op: "add", ext, password });
+
   // 7-Zip cannot add files to RAR archives (E_NOTIMPL) — rebuild instead.
-  if (isRarExt(ext)) {
+  if (engine === "rarRebuild") {
     logger.info({
       event: "addToArchive.rar5.rebuild",
       archivePath,
@@ -192,9 +194,7 @@ export async function addToArchive(
     return;
   }
 
-  // Wrapped formats always mutate via WASM (worker); the system fast path
-  // below is only for plain formats.
-  if (!isWrappedFormat(ext) && hasSystem7zForFormat(ext) && !password) {
+  if (engine === "system7z") {
     logger.info({ event: "addToArchive.system7z", archivePath, ext });
     const exclusions = prepareExclusions(patterns);
     await addToArchiveSystem7z(archivePath, localPaths, targetDir, exclusions, password);

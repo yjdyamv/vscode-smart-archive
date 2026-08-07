@@ -12,8 +12,9 @@
 import * as vscode from "vscode";
 import type { CompressOptions } from "../types";
 import { runArchiveOp } from "./worker/runner";
-import { hasSystem7zForFormat, compressWithSystem7z } from "./system7z";
+import { compressWithSystem7z } from "./system7z";
 import { compressWithRar5 } from "./rar5-engine";
+import { selectEngine } from "./select-engine";
 import { isCancellationError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import { logger } from "../utils/logger";
@@ -24,10 +25,19 @@ export async function compressWith7z(
   token?: vscode.CancellationToken,
   excludePatterns?: string[],
 ): Promise<void> {
-  // RAR5 creation is handled by the native rar5 engine — 7-Zip cannot
-  // create RAR archives, and the rar5 binding keeps passwords in memory.
-  if (options.format.label === "rar") {
-    logger.info({ event: "compress.usingRar5", format: options.format.label });
+  const { engine, reason } = selectEngine({
+    op: "compress",
+    ext: options.format.label,
+    password: options.password,
+  });
+  logger.info({
+    event: "compress.engine",
+    engine,
+    reason,
+    format: options.format.label,
+  });
+
+  if (engine === "rar5") {
     try {
       await compressWithRar5(options, progress, token, excludePatterns);
     } catch (err) {
@@ -37,19 +47,10 @@ export async function compressWith7z(
     return;
   }
 
-  // System 7z passes passwords via -p<password> on the command line,
-  // which is visible in process listings (ps aux). For encrypted archives,
-  // force WASM to avoid CLI password leakage.
-  if (hasSystem7zForFormat(options.format.label) && !options.password) {
-    logger.info({ event: "compress.usingSystem7z", format: options.format.label });
+  if (engine === "system7z") {
     await compressWithSystem7z(options, progress, token, excludePatterns);
     return;
   }
-
-  if (options.password) {
-    logger.info({ event: "compress.wasm.encrypted", format: options.format.label });
-  }
-  logger.info({ event: "compress.wasm.fallback", format: options.format.label });
 
   try {
     await runArchiveOp(
