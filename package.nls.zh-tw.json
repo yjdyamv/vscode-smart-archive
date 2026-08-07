@@ -48,5 +48,13 @@
   "config.logLevel.warn": "錯誤和警告",
   "config.logLevel.info": "錯誤、警告和資訊（預設）",
   "config.logLevel.debug": "全部，包括偵錯細節（較吵雜）",
-  "config.logHistoryBytes.description": "日誌歷史緩衝的記憶體預算（位元組）。切換日誌層級時用它重渲染輸出面板；預算越大保留的日誌行越多。"
+  "config.logHistoryBytes.description": "日誌歷史緩衝的記憶體預算（位元組）。切換日誌層級時用它重渲染輸出面板；預算越大保留的日誌行越多。",
+  "config.rar5Backend.description": "選擇 RAR5 建立使用的後端。內建原生綁定更快、記憶體佔用更低；WASM 引擎用於沒有原生二進位檔的平臺。",
+  "config.rar5Backend.auto": "原生綁定可用時使用原生，否則回退到 WASM 引擎（預設）。",
+  "config.rar5Backend.native": "一律使用原生 Node 綁定；目前平臺不可用時提示錯誤。",
+  "config.rar5Backend.wasm": "一律使用 WASM 引擎，即使原生綁定可用。",
+  "config.snappyBackend.description": "選擇 tar.sz 使用的 snappy 實作。原生 Node 增益集更快；WASM 引擎用於沒有原生二進位檔的平臺。",
+  "config.snappyBackend.auto": "原生 Node 增益集可用時使用原生，否則回退到 WASM 引擎（預設）。",
+  "config.snappyBackend.native": "一律使用原生 Node 增益集；不可用時提示錯誤。",
+  "config.snappyBackend.wasm": "一律使用 WASM 引擎，即使原生增益集可用。"
 }

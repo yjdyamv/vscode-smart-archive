@@ -80,10 +80,46 @@ interface Rar5Binding {
   repairArchive(inputPath: string, outputPath: string): void;
 }
 
-let binding: Rar5Binding | undefined;
-let bindingError: Error | undefined;
+export type Rar5Backend = "auto" | "native" | "wasm";
+
+/** Injected config: rar5Backend setting (wired by utils/config.ts). */
+let rar5Config: { backend?: Rar5Backend } = {};
+
+/**
+ * Inject the rar5Backend setting. The host wires it from
+ * `smart-archive.rar5Backend`; tests inject it directly. `auto` keeps the
+ * native-first / WASI-fallback behaviour.
+ */
+export function setRar5Config(config: { backend?: Rar5Backend }): void {
+  rar5Config = config;
+}
+
+/**
+ * Resolve the active backend. SA_RAR5_FORCE_WASM=1 (used by CI/tests) takes
+ * precedence over the setting so forced-WASM runs stay reproducible.
+ */
+export function resolveRar5Backend(): Rar5Backend {
+  if (process.env.SA_RAR5_FORCE_WASM === "1") return "wasm";
+  const backend = rar5Config.backend ?? "auto";
+  return backend === "native" || backend === "wasm" ? backend : "auto";
+}
+
+let nativeBinding: Rar5Binding | undefined;
+let wasmBinding: Rar5Binding | undefined;
+let nativeBindingError: Error | undefined;
+let wasmBindingError: Error | undefined;
+
+/** Drop cached bindings/errors (e.g. after a setting change or re-stage). */
+export function resetRar5BindingCache(): void {
+  nativeBinding = undefined;
+  wasmBinding = undefined;
+  nativeBindingError = undefined;
+  wasmBindingError = undefined;
+}
 
 function loadNativeBinding(): Rar5Binding {
+  if (nativeBinding) return nativeBinding;
+  if (nativeBindingError) throw nativeBindingError;
   const triple = resolveRarTriple();
   const rel = path.join(
     "vendor",
@@ -103,12 +139,19 @@ function loadNativeBinding(): Rar5Binding {
     );
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  binding = require(nodePath) as Rar5Binding;
-  logger.info({ event: "rar5.bindingLoaded", triple, path: nodePath });
-  return binding;
+  try {
+    nativeBinding = require(nodePath) as Rar5Binding;
+    logger.info({ event: "rar5.bindingLoaded", triple, path: nodePath });
+    return nativeBinding;
+  } catch (err) {
+    nativeBindingError = err instanceof Error ? err : new Error(String(err));
+    throw nativeBindingError;
+  }
 }
 
 function loadWasmBinding(): Rar5Binding {
+  if (wasmBinding) return wasmBinding;
+  if (wasmBindingError) throw wasmBindingError;
   const rel = path.join("vendor", "rar5-wasm", "smart-archive-rar.wasi.cjs");
   const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
   const loaderPath = candidates.find((c) => fs.existsSync(c));
@@ -127,20 +170,36 @@ function loadWasmBinding(): Rar5Binding {
     process.env.SA_RAR5_WASM_WORKERS = String(Math.max(1, cores));
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  binding = require(loaderPath) as Rar5Binding;
-  logger.info({
-    event: "rar5.wasmLoaded",
-    path: loaderPath,
-    workers: process.env.SA_RAR5_WASM_WORKERS,
-  });
-  return binding;
+  try {
+    wasmBinding = require(loaderPath) as Rar5Binding;
+    logger.info({
+      event: "rar5.wasmLoaded",
+      path: loaderPath,
+      workers: process.env.SA_RAR5_WASM_WORKERS,
+    });
+    return wasmBinding;
+  } catch (err) {
+    wasmBindingError = err instanceof Error ? err : new Error(String(err));
+    throw wasmBindingError;
+  }
 }
 
 function loadBinding(): Rar5Binding {
-  if (binding) return binding;
-  if (bindingError) throw bindingError;
+  const backend = resolveRar5Backend();
   const errors: Error[] = [];
-  if (process.env.SA_RAR5_FORCE_WASM !== "1") {
+  if (backend === "wasm") {
+    try {
+      return loadWasmBinding();
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
+  } else if (backend === "native") {
+    try {
+      return loadNativeBinding();
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
+  } else {
     try {
       return loadNativeBinding();
     } catch (err) {
@@ -148,17 +207,15 @@ function loadBinding(): Rar5Binding {
       errors.push(wrapped);
       logger.warn({ event: "rar5.nativeUnavailable", error: wrapped.message });
     }
+    try {
+      return loadWasmBinding();
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
   }
-  try {
-    return loadWasmBinding();
-  } catch (err) {
-    errors.push(err instanceof Error ? err : new Error(String(err)));
-  }
-  bindingError = new Error(
-    `rar5 engine unavailable (native and WASI fallback both failed): ` +
-      errors.map((e) => e.message).join(" | "),
+  throw new Error(
+    `rar5 engine unavailable (backend "${backend}"): ` + errors.map((e) => e.message).join(" | "),
   );
-  throw bindingError;
 }
 
 /** Collect disk entries with exclusion filtering applied at every level. */

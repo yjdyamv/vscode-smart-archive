@@ -2,40 +2,141 @@ import { logger } from "../utils/logger-core";
 import { checkFileSize, checkTotalSize } from "../utils/security";
 import type { ProgressLike } from "../utils/cancellation";
 import * as fs from "fs";
+import * as path from "path";
 import { CODEC_CHUNK } from "../constants";
 import { isMusl } from "../utils/platform";
 
 const OPTS = { copyOutputData: true };
 
-// Snappy's napi-rs loader has a broken isMusl(): when glibcVersionRuntime is
-// absent (Electron/VM environments) it assumes musl with no fallback, causing
-// it to load linux-x64-musl.node on glibc systems. We patch getReport() to
-// inject glibcVersionRuntime when we know the system is glibc.
+export type SnappyBackend = "auto" | "native" | "wasm";
 
-const _getReport = process.report?.getReport;
-if (process.platform === "linux" && typeof _getReport === "function" && !isMusl()) {
-  process.report.getReport = function () {
-    const r = _getReport.call(process.report) as Record<string, unknown> | undefined;
-    const header = r && typeof r === "object" ? (r as Record<string, unknown>).header : undefined;
-    if (
-      header &&
-      typeof header === "object" &&
-      (header as Record<string, unknown>).glibcVersionRuntime
-    )
-      return r as object;
-    return { header: { glibcVersionRuntime: process.versions?.node ?? "unknown" } };
-  };
-}
-
-const snappy = require("snappy") as {
+interface SnappyLike {
   compress: (data: Buffer | Uint8Array, opts?: { copyOutputData?: boolean }) => Promise<Buffer>;
   compressSync: (data: Buffer | Uint8Array, opts?: { copyOutputData?: boolean }) => Buffer;
   uncompress: (data: Buffer, opts?: { copyOutputData?: boolean }) => Promise<Buffer>;
   uncompressSync: (data: Buffer, opts?: { copyOutputData?: boolean }) => Buffer;
-};
+}
 
-if (process.platform === "linux" && typeof _getReport === "function") {
-  process.report.getReport = _getReport;
+/** Injected config: snappyBackend setting (wired by utils/config.ts + worker). */
+let snappyConfig: { backend?: SnappyBackend } = {};
+
+/**
+ * Inject the snappyBackend setting. The host/worker wire it from
+ * `smart-archive.snappyBackend`; tests inject it directly.
+ */
+export function setSnappyConfig(config: { backend?: SnappyBackend }): void {
+  snappyConfig = config;
+}
+
+/**
+ * Resolve the active backend. NAPI_RS_FORCE_WASI (used by CI/tests) takes
+ * precedence over the setting so forced-WASM runs stay reproducible.
+ */
+export function resolveSnappyBackend(): SnappyBackend {
+  const force = process.env.NAPI_RS_FORCE_WASI;
+  if (force === "error" || force === "true" || force === "1") return "wasm";
+  const backend = snappyConfig.backend ?? "auto";
+  return backend === "native" || backend === "wasm" ? backend : "auto";
+}
+
+let nativeSnappy: SnappyLike | undefined;
+let wasmSnappy: SnappyLike | undefined;
+let nativeSnappyError: Error | undefined;
+let wasmSnappyError: Error | undefined;
+
+/** Drop cached bindings/errors (e.g. after a setting change or re-stage). */
+export function resetSnappyBindingCache(): void {
+  nativeSnappy = undefined;
+  wasmSnappy = undefined;
+  nativeSnappyError = undefined;
+  wasmSnappyError = undefined;
+}
+
+function loadNativeSnappy(): SnappyLike {
+  if (nativeSnappy) return nativeSnappy;
+  if (nativeSnappyError) throw nativeSnappyError;
+  // Snappy's napi-rs loader has a broken isMusl(): when glibcVersionRuntime is
+  // absent (Electron/VM environments) it assumes musl with no fallback, causing
+  // it to load linux-x64-musl.node on glibc systems. We patch getReport() to
+  // inject glibcVersionRuntime when we know the system is glibc.
+  const _getReport = process.report?.getReport;
+  if (process.platform === "linux" && typeof _getReport === "function" && !isMusl()) {
+    process.report.getReport = function () {
+      const r = _getReport.call(process.report) as Record<string, unknown> | undefined;
+      const header = r && typeof r === "object" ? (r as Record<string, unknown>).header : undefined;
+      if (
+        header &&
+        typeof header === "object" &&
+        (header as Record<string, unknown>).glibcVersionRuntime
+      )
+        return r as object;
+      return { header: { glibcVersionRuntime: process.versions?.node ?? "unknown" } };
+    };
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    nativeSnappy = require("snappy") as SnappyLike;
+    return nativeSnappy;
+  } catch (err) {
+    nativeSnappyError = err instanceof Error ? err : new Error(String(err));
+    throw nativeSnappyError;
+  } finally {
+    if (process.platform === "linux" && typeof _getReport === "function") {
+      process.report.getReport = _getReport;
+    }
+  }
+}
+
+function loadWasmSnappy(): SnappyLike {
+  if (wasmSnappy) return wasmSnappy;
+  if (wasmSnappyError) throw wasmSnappyError;
+  try {
+    // The staged WASI loader sits next to the natives (installed by
+    // scripts/install-snappy-platforms.js); requiring it directly bypasses
+    // the upstream index.js native-first logic. Resolve through the package
+    // main's directory: snappy 7.3+ restricts "exports", so the subpath
+    // "snappy/snappy.wasi.cjs" is not importable directly.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const wasiLoader = path.join(path.dirname(require.resolve("snappy")), "snappy.wasi.cjs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    wasmSnappy = require(wasiLoader) as SnappyLike;
+    return wasmSnappy;
+  } catch (err) {
+    wasmSnappyError = err instanceof Error ? err : new Error(String(err));
+    throw wasmSnappyError;
+  }
+}
+
+function resolveSnappy(): SnappyLike {
+  const backend = resolveSnappyBackend();
+  const errors: Error[] = [];
+  if (backend === "wasm") {
+    try {
+      return loadWasmSnappy();
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
+  } else if (backend === "native") {
+    try {
+      return loadNativeSnappy();
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
+  } else {
+    try {
+      return loadNativeSnappy();
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
+    try {
+      return loadWasmSnappy();
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+  throw new Error(
+    `snappy engine unavailable (backend "${backend}"): ` + errors.map((e) => e.message).join(" | "),
+  );
 }
 
 export async function snappyCompressFile(
@@ -45,6 +146,7 @@ export async function snappyCompressFile(
   progress?: ProgressLike,
 ): Promise<void> {
   const CHUNK = CODEC_CHUNK;
+  const snappy = resolveSnappy();
   const rfd = fs.openSync(input, "r");
   const out = fs.openSync(output, "w");
   const total = fs.fstatSync(rfd).size;
@@ -77,7 +179,11 @@ export async function snappyCompressFile(
 }
 
 export async function snappyCompress(data: Uint8Array, _level?: number): Promise<Uint8Array> {
-  const compressed = await snappy.compress(data, OPTS);
+  // Use the sync API: the upstream WASI loader's async path relies on emnapi
+  // async-work workers that are not wired up, while compressSync is fully
+  // supported by both the native addon and the WASM engine. Codec calls run
+  // inside the archive worker thread, so blocking briefly is acceptable.
+  const compressed = resolveSnappy().compressSync(data, OPTS);
   const lenBuf = Buffer.alloc(4);
   lenBuf.writeUInt32LE(compressed.length, 0);
   return Buffer.concat([lenBuf, compressed]);
@@ -97,7 +203,7 @@ export async function snappyDecompress(data: Uint8Array): Promise<Uint8Array> {
     if (offset + frameLen > buf.length) break;
     const frame = buf.subarray(offset, offset + frameLen);
     offset += frameLen;
-    const decompressed = await snappy.uncompress(frame, OPTS);
+    const decompressed = resolveSnappy().uncompressSync(frame, OPTS);
     totalSize = checkTotalSize(totalSize, decompressed.length);
     checkFileSize(decompressed.length);
     parts.push(decompressed);
@@ -116,6 +222,7 @@ export async function snappyDecompress(data: Uint8Array): Promise<Uint8Array> {
 }
 
 export async function snappyDecompressFile(input: string, output: string): Promise<void> {
+  const snappy = resolveSnappy();
   const rfd = fs.openSync(input, "r");
   const wfd = fs.openSync(output, "w");
   try {
@@ -138,7 +245,7 @@ export async function snappyDecompressFile(input: string, output: string): Promi
       }
       offset += frameLen;
 
-      const decompressed = await snappy.uncompress(frame, OPTS);
+      const decompressed = snappy.uncompressSync(frame, OPTS);
       writtenTotal = checkTotalSize(writtenTotal, decompressed.length);
       checkFileSize(decompressed.length);
       fs.writeSync(wfd, decompressed);

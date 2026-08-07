@@ -52,5 +52,13 @@
   "config.logLevel.warn": "Errors and warnings",
   "config.logLevel.info": "Errors, warnings and info (default)",
   "config.logLevel.debug": "Everything, including debug details (noisy)",
-  "config.logHistoryBytes.description": "Memory budget (bytes) for the log history buffer used to re-render the output panel when the log level changes. Larger budgets keep more log lines available."
+  "config.logHistoryBytes.description": "Memory budget (bytes) for the log history buffer used to re-render the output panel when the log level changes. Larger budgets keep more log lines available.",
+  "config.rar5Backend.description": "Which RAR5 creation engine to use. The bundled native binding is faster and uses less memory; the WASM engine covers platforms without a native binary.",
+  "config.rar5Backend.auto": "Use the native Node binding when available; fall back to the WASM engine otherwise (default).",
+  "config.rar5Backend.native": "Always use the native Node binding. Show an error if it is unavailable for this platform.",
+  "config.rar5Backend.wasm": "Always use the WASM engine, even if the native binding is available.",
+  "config.snappyBackend.description": "Which snappy implementation to use for tar.sz. The native Node addon is faster; the WASM engine covers platforms without a native binary.",
+  "config.snappyBackend.auto": "Use the native Node addon when available; fall back to the WASM engine otherwise (default).",
+  "config.snappyBackend.native": "Always use the native Node addon. Show an error if it is unavailable.",
+  "config.snappyBackend.wasm": "Always use the WASM engine, even if the native addon is available."
 }

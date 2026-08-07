@@ -36,6 +36,8 @@ import { WORKER_MEMORY_LIMIT_DEFAULT_MB } from "../../constants";
 import { setSecurityLimits } from "../../utils/security";
 import { setZstdConfig, resetZstdDetectionCache } from "../zstd-codec";
 import { setBrotliConfig } from "../brotli-codec";
+import { setRar5Config } from "../rar5-engine";
+import { setSnappyConfig } from "../snappy-codec";
 import { setLoggerSink } from "../../utils/logger-core";
 import { setWorkerMemoryLimitMb } from "./memory-guard";
 import { isCancellationError } from "../../utils/cancellation";
@@ -67,6 +69,8 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
       backend: config.brotliBackend ?? "node",
       warn: (message) => post({ type: "notify", message }),
     });
+    setRar5Config({ backend: config.rar5Backend ?? "auto" });
+    setSnappyConfig({ backend: config.snappyBackend ?? "auto" });
     // A setting change may flip the system-zstd decision — drop the cached
     // detection result so the next zstd op re-detects.
     resetZstdDetectionCache();

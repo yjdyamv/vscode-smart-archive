@@ -93,6 +93,8 @@ All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, A
 | `smart-archive.maxTotalSize` | `"10g"` | Max total decompressed size |
 | `smart-archive.useSystem7z` | `"auto"` | 7-Zip engine: `auto` (system→bundled native→WASM), `always` (system only), `bundled` (bundled native only), `never` (WASM only) |
 | `smart-archive.useSystemZstd` | `"auto"` | System zstd: `auto`, `always`, `never` |
+| `smart-archive.rar5Backend` | `"auto"` | RAR5 engine: `auto` (native binding→WASM), `native` (Node binding only), `wasm` (WASM only) |
+| `smart-archive.snappyBackend` | `"auto"` | Snappy (tar.sz): `auto` (native addon→WASM), `native` (Node addon only), `wasm` (WASM only) |
 | `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
 | `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Patterns excluded when compressing |
 | `smart-archive.volumeSizes` | `{}` | Custom split volume size presets |
