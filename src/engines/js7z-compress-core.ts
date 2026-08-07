@@ -324,7 +324,7 @@ export async function compressWith7z(
       fs.writeFileSync(options.outputPath, Buffer.from(data));
     }
 
-    logger.info({ event: "compress.wasm.complete", outputPath: options.outputPath });
+    logger.info({ event: "compress.wasm.ok", outputPath: options.outputPath });
   } finally {
     disposeJS7z(js7z);
   }

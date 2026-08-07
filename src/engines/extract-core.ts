@@ -61,7 +61,7 @@ function copyFromFSWithStrip(
 
       if (name === ".smartarchive") {
         logger.debug(
-          { event: "extractSelected.skipSmartarchive" },
+          { event: "extraction.skipSmartarchive" },
           "Skipped internal .smartarchive marker",
         );
         continue;
@@ -75,7 +75,7 @@ function copyFromFSWithStrip(
         }
       } catch {
         logger.warn(
-          { event: "extractSelected.copyStat.failed" },
+          { event: "extraction.copyStat.failed" },
           "Failed to stat entry, trying as file",
         );
       }
@@ -122,7 +122,7 @@ function copyFromFSWithStrip(
           statSize = js7z.FS.stat(full).size;
         } catch {
           logger.warn(
-            { event: "extractSelected.statSize.failed" },
+            { event: "extraction.statSize.failed" },
             "Stat may fail for size check, falling through",
           );
         }
@@ -130,7 +130,7 @@ function copyFromFSWithStrip(
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
         logger.warn(
-          { event: "extractSelected.readFile.failed", path: full, err: readErr },
+          { event: "extraction.readFile.failed", path: full, err: readErr },
           "Failed to read entry from virtual FS, skipping",
         );
         continue;
@@ -143,7 +143,7 @@ function copyFromFSWithStrip(
         reportedSize = js7z.FS.stat(full).size;
       } catch {
         logger.debug(
-          { event: "extractSelected.statReportedSize.failed" },
+          { event: "extraction.statReportedSize.failed" },
           "Stat may fail, skipping bomb check",
         );
       }
@@ -204,7 +204,7 @@ export async function extractSelectedCore(
   const isWrapped = isWrappedFormat(ext);
 
   logger.info({
-    event: "extractSelected.enter",
+    event: "extraction.start",
     archivePath,
     pathCount: selectedPaths.length,
     flat,
@@ -280,7 +280,7 @@ export async function extractSelectedCore(
 
         if (!x2HasContent) {
           logger.warn({
-            event: "extractSelected.emptySelectiveWrapped",
+            event: "extraction.emptySelectiveWrapped",
             archivePath,
             pathCount: normalizedPaths.length,
           });
@@ -308,7 +308,7 @@ export async function extractSelectedCore(
       disposeJS7z(js7z);
     }
     logger.info({
-      event: "extractSelected.exit",
+      event: "extraction.done",
       duration: Date.now() - start,
       engine: "7z-wrapped",
     });
@@ -355,7 +355,7 @@ export async function extractSelectedCore(
 
     if (!outHasContent) {
       logger.warn({
-        event: "extractSelected.emptySelective",
+        event: "extraction.emptySelective",
         archivePath,
         pathCount: normalizedPaths.length,
       });
@@ -380,7 +380,7 @@ export async function extractSelectedCore(
     } else {
       copyFromFSWithStrip(js7z, "/out", outputDir, selectedPaths, token);
     }
-    logger.info({ event: "extractSelected.exit", duration: Date.now() - start, engine: "7z" });
+    logger.info({ event: "extraction.done", duration: Date.now() - start, engine: "7z" });
   } finally {
     disposeJS7z(js7z);
   }

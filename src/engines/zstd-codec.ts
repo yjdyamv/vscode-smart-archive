@@ -69,7 +69,7 @@ function systemCompressBuffer(data: Buffer, level: number): Buffer | null {
     );
   } catch (err) {
     logger.warn(
-      { event: "zstd.system.buffer.error", err },
+      { event: "zstd.system.buffer.failed", err },
       "System zstd buffer compression failed",
     );
   }
@@ -93,7 +93,7 @@ function systemDecompressBuffer(data: Buffer): Buffer | null {
     );
   } catch (err) {
     logger.warn(
-      { event: "zstd.system.buffer.decompress.error", err },
+      { event: "zstd.system.buffer.decompress.failed", err },
       "System zstd decompression failed",
     );
   }

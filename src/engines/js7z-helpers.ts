@@ -101,7 +101,7 @@ function run7z(
   timeoutMs = RUN7Z_TIMEOUT,
   printBridge?: PrintBridge,
 ): Promise<void> {
-  logger.info({ event: "run7z.enter", args: sanitizeArgs(args) });
+  logger.info({ event: "run7z.start", args: sanitizeArgs(args) });
   // Track cumulative reported percentage so fast/small operations still land
   // on 100% at completion even when no intermediate % is printed.
   let reportedPct = 0;
@@ -176,7 +176,7 @@ function run7z(
       settled = true;
       clearTimeout(timer);
       cleanup();
-      logger.info({ event: "run7z.exit", exitCode });
+      logger.info({ event: "run7z.done", exitCode });
       if (exitCode === 0) {
         if (trackProgress && reportedPct < 100) {
           trackProgress.report({ message: "100%", increment: 100 - reportedPct });

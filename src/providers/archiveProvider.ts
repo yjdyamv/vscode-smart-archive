@@ -34,7 +34,7 @@ class ArchiveEditorProvider implements vscode.CustomReadonlyEditorProvider {
       };
       await setupWebview(webviewPanel.webview, document.uri);
     } catch (err) {
-      logger.error({ event: "resolveCustomEditor.failed", err }, (err as Error).message);
+      logger.error({ event: "archiveProvider.resolveEditor.failed", err }, (err as Error).message);
       throw err;
     }
   }
@@ -66,7 +66,7 @@ export async function openArchivePreview(archiveUri: vscode.Uri): Promise<void> 
     );
     await setupWebview(panel.webview, archiveUri);
   } catch (err) {
-    logger.error({ event: "openArchivePreview.failed", err }, (err as Error).message);
+    logger.error({ event: "archiveProvider.open.failed", err }, (err as Error).message);
     throw err;
   }
 }

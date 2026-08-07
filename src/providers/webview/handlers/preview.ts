@@ -21,7 +21,7 @@ export const handlePreview: MessageHandler = async (ctx) => {
   try {
     await previewFileFromArchive(s.filePath, msg.path, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.preview.complete", path: msg.path });
+    logger.info({ event: "webview.preview.ok", path: msg.path });
   } catch (err) {
     if (isCancellationError(err)) return;
     const errMsg = err instanceof Error ? err.message : String(err ?? "");

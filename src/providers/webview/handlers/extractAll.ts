@@ -23,7 +23,7 @@ export const handleExtractAll: MessageHandler = async (ctx) => {
       await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", s.archiveUri);
     }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.extAll.complete", archiveName: s.archiveName });
+    logger.info({ event: "webview.extAll.ok", archiveName: s.archiveName });
     webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
   } catch (err) {
     if (isCancellationError(err)) return;

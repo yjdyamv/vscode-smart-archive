@@ -113,7 +113,7 @@ export const handlePassword: MessageHandler = async (ctx) => {
     }
   } catch (err) {
     if (isCancellationError(err)) return;
-    logger.error({ event: "webview.password.error", err });
+    logger.error({ event: "webview.password.failed", err });
     const errMsg = err instanceof Error ? err.message : String(err);
     if (isPasswordOrEncryptError(errMsg)) {
       webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });

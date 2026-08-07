@@ -5,6 +5,20 @@
  * (utils/logger) re-points the sink to the VSCode LogOutputChannel via
  * setLoggerSink; without a sink, records go to stderr as JSON.
  *
+ * ── Log event naming ──────────────────────────────────────────────
+ * Every structured record uses `event: "<namespace>.<action>[.<result>]"`.
+ *
+ *   namespace — the module name that emits the event (system7z, webview,
+ *               addToArchive, copyPaste, …). Dotted, lowercase first
+ *               segment; compound module names keep their camelCase.
+ *   result    — one of the fixed vocabulary:
+ *               start / done / ok / failed / cancelled / skip / warn
+ *               (start/done = lifecycle begin/end, ok/failed = outcome,
+ *                cancelled/skip/warn = special outcomes).
+ *   Forbidden as a final segment: error, complete, success, enter, exit.
+ *
+ * Enforced by test/event-naming.test.ts — keep new events in this shape.
+ *
  * @module utils/logger-core
  */
 

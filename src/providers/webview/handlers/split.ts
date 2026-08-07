@@ -41,7 +41,7 @@ export const handleSplit: MessageHandler = async (ctx) => {
     const dst = path.join(folderPath, base);
     webview.postMessage({ c: "loading", t: t("archive.splitting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, undefined, token);
-    logger.info({ event: "webview.split.complete", dst });
+    logger.info({ event: "webview.split.ok", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
   } catch (err) {
     if (isCancellationError(err)) return;

@@ -29,7 +29,7 @@ export const handleConvert: MessageHandler = async (ctx) => {
     const dst = s.filePath.slice(0, -oldExt.length) + `.${fmt}`;
     webview.postMessage({ c: "loading", t: t("archive.converting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
-    logger.info({ event: "webview.convert.complete", dst });
+    logger.info({ event: "webview.convert.ok", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
     if (isCancellationError(err)) return;

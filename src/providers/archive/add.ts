@@ -139,7 +139,7 @@ export async function runAddToArchive(): Promise<void> {
     const start = Date.now();
     await addToArchive(ctx.archivePath, filePaths, ctx.targetDir, ctx.password);
     logger.info({
-      event: "addToArchive.complete",
+      event: "addToArchive.ok",
       durationMs: Date.now() - start,
       archivePath: ctx.archivePath,
     });

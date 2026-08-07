@@ -55,7 +55,7 @@ export const handleNewFolder: MessageHandler = async (ctx) => {
     webview.postMessage({ c: "loading", t: t("archive.creatingFolder") });
     await createFolderInArchive(s.filePath, targetDir, name, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.newFolder.complete", dir: targetDir, name });
+    logger.info({ event: "webview.newFolder.ok", dir: targetDir, name });
     if (s.archiveUri) {
       try {
         await setupWebview(webview, s.archiveUri, t("archive.toastCreatedFolder"));

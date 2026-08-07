@@ -56,7 +56,7 @@ export const handleEncrypt: MessageHandler = async (ctx) => {
     }
     webview.postMessage({ c: "loading", t: t("archive.encrypting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw, token);
-    logger.info({ event: "webview.encrypt.complete", dst });
+    logger.info({ event: "webview.encrypt.ok", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: true });
   } catch (err) {

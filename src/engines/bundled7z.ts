@@ -149,7 +149,7 @@ export function versionOk(binaryPath: string): boolean {
     return false;
   } catch (err) {
     logger.warn({
-      event: "system7z.detect.error",
+      event: "system7z.detect.failed",
       path: binaryPath,
       platform: process.platform,
       err,

@@ -53,7 +53,7 @@ export const handleRename: MessageHandler = async (ctx) => {
     webview.postMessage({ c: "loading", t: t("archive.renaming") });
     await renameInArchive(s.filePath, oldPath, newPath, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.rename.complete", oldPath, newPath });
+    logger.info({ event: "webview.rename.ok", oldPath, newPath });
     if (s.archiveUri) {
       try {
         await setupWebview(webview, s.archiveUri, t("archive.toastRenamed"));

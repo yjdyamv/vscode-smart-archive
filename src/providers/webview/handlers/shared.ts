@@ -74,7 +74,7 @@ export function pwInputBox(
     });
     ib.onDidHide(() => {
       if (!accepted) {
-        logger.debug({ event: "pwInputBox.cancelled" });
+        logger.debug({ event: "shared.pwInputBox.cancelled" });
       }
       resolve(undefined);
     });

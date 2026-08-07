@@ -140,7 +140,7 @@ async function decompressSingleFile(
         vscode.window.showInformationMessage(
           t("decompress.done") + outputDir + t("time.elapsed", elapsed),
         );
-        logger.info({ event: "decompress.complete", outputDir });
+        logger.info({ event: "decompress.ok", outputDir });
       } catch (err) {
         logger.error({ event: "decompress.extraction.failed", err }, "Decompression failed");
         // Clean up output directory only if it's empty (partial extraction

@@ -201,7 +201,7 @@ function _copyDirFromFS(
       stat = js7z.FS.stat(fsEntry);
     } catch {
       logger.warn(
-        { event: "copyDirFromFS.stat.failed" },
+        { event: "vfsio.copyDirFromFS.stat.failed" },
         "Failed to stat virtual FS entry, falling back to raw read",
       );
     }
