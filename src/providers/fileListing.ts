@@ -33,7 +33,7 @@ export async function fetchFileList(
   const { engine } = selectEngine({ op: "list", ext, password, hasData: !!data });
 
   if (engine === "system7z") {
-    logger.debug({ event: "fetchFileList.system7z", filePath });
+    logger.debug({ event: "fileListing.system7z", filePath });
     return listWithSystem7z(filePath, password);
   }
 

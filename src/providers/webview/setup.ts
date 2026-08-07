@@ -80,7 +80,7 @@ export async function setupWebview(
   // Recalculate ext after potential volume redirection above
   const resolvedExt = getFullExt(filePath);
   logger.info({
-    event: "setupWebview.start",
+    event: "webview.setup.start",
     filePath,
     ext: resolvedExt,
     wrapped: isWrappedFormat(resolvedExt),
@@ -101,7 +101,7 @@ export async function setupWebview(
     } catch {
       encryptionDetectionFailed = true;
       logger.warn(
-        { event: "setupWebview.isEncrypted.failed" },
+        { event: "webview.setup.isEncrypted.failed" },
         "isEncrypted failed, may be multi-volume archive",
       );
       // For encryptable formats where detection failed (e.g. split volumes),
@@ -111,22 +111,22 @@ export async function setupWebview(
     if (encrypted) isEnc = true;
 
     if ((encrypted || encryptionDetectionFailed) && password) {
-      logger.info({ event: "setupWebview.password.retry" });
+      logger.info({ event: "webview.setup.password.retry" });
       try {
         const pwEntries = await fetchFileList(filePath, password);
         if (pwEntries.length > 0) {
           encrypted = false;
           isEnc = false;
           encryptionDetectionFailed = false;
-          logger.info({ event: "setupWebview.password.retrySuccess", count: pwEntries.length });
+          logger.info({ event: "webview.setup.password.retrySuccess", count: pwEntries.length });
         }
       } catch {
-        logger.warn({ event: "setupWebview.password.retryFailed" });
+        logger.warn({ event: "webview.setup.password.retryFailed" });
       }
     }
 
     if (encrypted || (encryptionDetectionFailed && !password)) {
-      logger.info({ event: "setupWebview.passwordRequired" });
+      logger.info({ event: "webview.setup.passwordRequired" });
       handlerStates.set(webview, {
         archiveUri,
         archiveName,
@@ -170,7 +170,7 @@ export async function setupWebview(
   try {
     entries = await fetchFileList(filePath, password);
   } catch (err) {
-    logger.error({ event: "setupWebview.fetchFileList.failed", err }, (err as Error).message);
+    logger.error({ event: "webview.setup.fetchFileList.failed", err }, (err as Error).message);
     webview.html = emptyHtml(
       t("decompress.failed") + (err as Error).message,
       cssUri,
@@ -263,5 +263,5 @@ export async function setupWebview(
     registerHandler(webview);
   }
 
-  logger.info({ event: "setupWebview.done", filePath, entryCount: entries.length });
+  logger.info({ event: "webview.setup.done", filePath, entryCount: entries.length });
 }

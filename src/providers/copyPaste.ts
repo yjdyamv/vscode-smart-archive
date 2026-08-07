@@ -24,7 +24,7 @@ interface ClipboardState {
 let clipboard: ClipboardState | null = null;
 
 export function pasteCopiedFromArchive(): void {
-  logger.info({ event: "pasteCopied.enter", pathCount: clipboard?.paths.length || 0 });
+  logger.info({ event: "copyPaste.start", pathCount: clipboard?.paths.length || 0 });
 
   if (!clipboard || clipboard.paths.length === 0) {
     vscode.window.showInformationMessage(t("archive.copyNone"));
@@ -32,7 +32,7 @@ export function pasteCopiedFromArchive(): void {
   }
   const { paths, archivePath: source, password: pw, flat: fl } = clipboard;
   if (!fs.existsSync(source)) {
-    logger.warn({ event: "pasteCopied.sourceMissing", archivePath: source });
+    logger.warn({ event: "copyPaste.sourceMissing", archivePath: source });
     vscode.window
       .showErrorMessage(t("archive.sourceMissing", source), t("generic.copy"))
       .then((action) => {
@@ -53,14 +53,14 @@ export function pasteCopiedFromArchive(): void {
       if (!uris || uris.length === 0) return;
       await extractSelected(source, paths, pw, fl, uris[0].fsPath);
       logger.info({
-        event: "pasteCopied.success",
+        event: "copyPaste.ok",
         pathCount: paths.length,
         outputDir: uris[0].fsPath,
       });
       cleanupPreviewTemp();
       clearCopiedPaths();
     } catch (err: unknown) {
-      logger.error({ event: "pasteCopied.failed", err }, (err as Error).message);
+      logger.error({ event: "copyPaste.failed", err }, (err as Error).message);
       vscode.window
         .showErrorMessage(t("decompress.failed") + (err as Error).message, t("generic.copy"))
         .then((action) => {
@@ -79,7 +79,7 @@ export function setCopiedPaths(
 ): void {
   if (clipboard && clipboard.archivePath !== archivePath && clipboard.paths.length > 0) {
     logger.warn({
-      event: "setCopiedPaths.overwriting",
+      event: "copyPaste.setCopiedPaths.overwriting",
       prevArchive: clipboard.archivePath,
       newArchive: archivePath,
     });
@@ -88,7 +88,7 @@ export function setCopiedPaths(
       t("archive.copyReplaced", path.basename(clipboard.archivePath), path.basename(archivePath)),
     );
   }
-  logger.info({ event: "setCopiedPaths", pathCount: paths.length, archivePath, flat });
+  logger.info({ event: "copyPaste.setCopiedPaths", pathCount: paths.length, archivePath, flat });
   clipboard = { paths, archivePath, password, flat };
 }
 

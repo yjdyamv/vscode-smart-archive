@@ -64,7 +64,7 @@ export const handleDelete: MessageHandler = async (ctx) => {
 
     await deleteFromArchive(s.filePath, pathsToDelete, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.delSel.complete", count: msg.paths.length });
+    logger.info({ event: "webview.delSel.ok", count: msg.paths.length });
     try {
       await setupWebview(
         webview,

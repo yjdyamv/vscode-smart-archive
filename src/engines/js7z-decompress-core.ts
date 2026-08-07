@@ -75,7 +75,7 @@ async function decompressCodecWrapper(
     } finally {
       disposeJS7z(js7z);
     }
-    logger.info({ event: "decompress.complete", outputDir: options.outputDir });
+    logger.info({ event: "decompress.ok", outputDir: options.outputDir });
   } finally {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -168,7 +168,7 @@ export async function decompressWith7z(
     copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
 
     await unwrapInnerTar(options.outputDir, progress);
-    logger.info({ event: "decompress.complete", outputDir: options.outputDir });
+    logger.info({ event: "decompress.ok", outputDir: options.outputDir });
   } finally {
     disposeJS7z(js7z);
   }

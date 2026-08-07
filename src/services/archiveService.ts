@@ -77,7 +77,7 @@ export async function convertArchive(
       fs.rmSync(tmp, { recursive: true, force: true });
     } catch (err) {
       logger.warn(
-        { event: "service.convert.cleanupFailed", err },
+        { event: "service.convert.cleanup.failed", err },
         "Failed to cleanup temp directory",
       );
     }

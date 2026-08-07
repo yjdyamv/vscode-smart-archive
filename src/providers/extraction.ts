@@ -33,7 +33,7 @@ export async function extractSelected(
   const outputDir = path.resolve(rawOutputDir);
 
   logger.info({
-    event: "extractSelected.enter",
+    event: "extraction.start",
     archivePath,
     pathCount: selectedPaths.length,
     flat,

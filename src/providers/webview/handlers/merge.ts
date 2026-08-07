@@ -31,7 +31,7 @@ export const handleMerge: MessageHandler = async (ctx) => {
     const dst = base + "." + fmt;
     webview.postMessage({ c: "loading", t: t("archive.merging") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
-    logger.info({ event: "webview.merge.complete", dst });
+    logger.info({ event: "webview.merge.ok", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {
     if (isCancellationError(err)) return;

@@ -85,7 +85,7 @@ export async function fetchFileListCore(
         throw wrapped;
       }
     }
-    logger.warn({ event: "fetchFileList.listFiles.failed", err, filePath }, "js7z listing failed");
+    logger.warn({ event: "fileListing.listFiles.failed", err, filePath }, "js7z listing failed");
   }
   if (!password && isEncryptableExt(ext)) return [];
   return [];
@@ -134,21 +134,21 @@ export async function listViaExtract(
     if (ext === ".tar.lz4" || ext === ".tlz4") {
       const innerTar = await decompressLz4Frames(Buffer.from(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
-      logger.info({ event: "listViaExtract.lz4Decompressed", size: innerTar.length });
+      logger.info({ event: "fileListing.extract.lz4", size: innerTar.length });
       return extractAndList(innerName, innerTar);
     }
 
     if (ext === ".tar.br" || ext === ".tbr") {
       const innerTar = await brotliDecompress(new Uint8Array(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
-      logger.info({ event: "listViaExtract.brotliDecompressed", size: innerTar.length });
+      logger.info({ event: "fileListing.extract.brotli", size: innerTar.length });
       return extractAndList(innerName, innerTar);
     }
 
     if (ext === ".tar.sz" || ext === ".tsz") {
       const innerTar = await snappyDecompress(new Uint8Array(buf));
       const innerName = path.basename(filePath, ext) + ".tar";
-      logger.info({ event: "listViaExtract.snappyDecompressed", size: innerTar.length });
+      logger.info({ event: "fileListing.extract.snappy", size: innerTar.length });
       return extractAndList(innerName, innerTar);
     }
 
@@ -211,7 +211,7 @@ export function readDirEntries(
         results.push({ path: fixedPath, size: st.size || 0, type: "REGULAR_FILE" });
       }
     } catch {
-      logger.warn({ event: "readDirEntries.stat.failed" }, "Failed to stat virtual FS entry");
+      logger.warn({ event: "fileListing.readDir.stat.failed" }, "Failed to stat virtual FS entry");
       results.push({ path: fixedPath, size: 0, type: "REGULAR_FILE" });
     }
   }

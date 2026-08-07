@@ -406,7 +406,7 @@ export async function renameInArchiveCore(
 
   const ext = getFullExt(archivePath);
   if (isWrappedFormat(ext)) {
-    logger.info({ event: "renameInWrapped.start", archivePath, oldPath, newPath });
+    logger.info({ event: "rename.wrapped.start", archivePath, oldPath, newPath });
     const oldNorm = oldPath.replace(/\\/g, "/");
     const newNorm = newPath.replace(/\\/g, "/");
     await withWrappedArchiveCore(
@@ -426,8 +426,8 @@ export async function renameInArchiveCore(
       },
       token,
     );
-    logger.info({ event: "renameInWrapped.ok", archivePath, oldPath, newPath });
-    logger.info({ event: "renameInWrapped.ok", archivePath, oldPath, newPath });
+    logger.info({ event: "rename.wrapped.ok", archivePath, oldPath, newPath });
+    logger.info({ event: "rename.wrapped.ok", archivePath, oldPath, newPath });
     return;
   }
 
@@ -493,7 +493,7 @@ export async function createFolderInArchiveCore(
             js7z2.FS.mkdir(cur);
           } catch {
             logger.warn(
-              { event: "createFolderWrapped.mkdir.failed" },
+              { event: "createFolder.wrapped.mkdir.failed" },
               "Failed to create directory in virtual FS",
             );
           }

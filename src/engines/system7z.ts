@@ -1215,7 +1215,7 @@ export function spawnCapture(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      logger.error({ event: "system7z.spawn.error", binary, err }, "Failed to spawn 7z");
+      logger.error({ event: "system7z.spawn.failed", binary, err }, "Failed to spawn 7z");
       reject(new Error(`7z spawn failed: ${err.message}`));
     });
     proc.on("close", (code) => {
@@ -1497,7 +1497,7 @@ function run7z(
       const elapsed = Date.now() - startTime;
       logger.error(
         {
-          event: "system7z.run.error",
+          event: "system7z.run.failed",
           binary,
           elapsedMs: elapsed,
           err,

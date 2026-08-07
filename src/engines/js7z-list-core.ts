@@ -25,7 +25,7 @@ export async function listFilesWasm(
   password = "",
   data?: Uint8Array,
 ): Promise<ListEntry[]> {
-  logger.debug({ event: "listFiles.wasm.start", filePath, hasPassword: !!password });
+  logger.debug({ event: "fileListing.wasm.start", filePath, hasPassword: !!password });
 
   const useData = !!data;
   let stdout = "";
@@ -66,7 +66,7 @@ export async function listFilesWasm(
     });
 
     const results = parse7zListing(stdout, archiveName);
-    logger.debug({ event: "listFiles.wasm.done", count: results.length });
+    logger.debug({ event: "fileListing.wasm.done", count: results.length });
     return results;
   } finally {
     disposeJS7z(js7z);

@@ -25,7 +25,7 @@ export const handleExtractSelected: MessageHandler = async (ctx) => {
   try {
     await extractSelected(s.filePath, msg.paths, s.password, msg.flat, undefined, msg.excludes);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.extSel.complete", count: msg.paths.length });
+    logger.info({ event: "webview.extSel.ok", count: msg.paths.length });
     webview.postMessage({ c: "ok", t: t("decompress.done") + s.archiveName });
   } catch (err) {
     if (isCancellationError(err)) return;

@@ -19,7 +19,7 @@ export const handleTest: MessageHandler = async (ctx) => {
   try {
     const result = await testArchive(s.filePath, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.test.complete" });
+    logger.info({ event: "webview.test.ok" });
     webview.postMessage({ c: "ok", t: result });
   } catch (err) {
     if (isCancellationError(err)) return;

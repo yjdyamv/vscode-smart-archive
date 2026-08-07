@@ -47,7 +47,7 @@ export const handleDecrypt: MessageHandler = async (ctx) => {
     }
     webview.postMessage({ c: "loading", t: t("archive.decrypting") });
     await convertArchive(s.filePath, fmt, dst, pw, volSize, "", token);
-    logger.info({ event: "webview.decrypt.complete", dst });
+    logger.info({ event: "webview.decrypt.ok", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: false });
   } catch (err) {

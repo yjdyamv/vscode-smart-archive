@@ -41,7 +41,7 @@ export const handleDropFiles: MessageHandler = async (ctx) => {
     webview.postMessage({ c: "loading", t: t("archive.addingFilesProgress") });
     await addToArchive(s.filePath, msg.paths, targetDir, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    logger.info({ event: "webview.dropFiles.complete", count: msg.paths.length });
+    logger.info({ event: "webview.dropFiles.ok", count: msg.paths.length });
     try {
       await setupWebview(webview, s.archiveUri, t("archive.toastAddedFiles"));
     } catch (err) {
