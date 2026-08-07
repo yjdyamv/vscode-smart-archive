@@ -9,7 +9,12 @@
 
 import { describe, it, expect } from "vitest";
 import type { TreeNodeData } from "../types";
-import { fuzzyMatch, isRedosSafe, collectMatches } from "../composables/useSearch";
+import {
+  fuzzyMatch,
+  isRedosSafe,
+  collectMatches,
+  segmentHighlight,
+} from "../composables/useSearch";
 import { dedupPaths } from "../composables/useSelection";
 import { buildNodeMap } from "../composables/useTree";
 import { useSort } from "../composables/useSort";
@@ -168,6 +173,63 @@ describe("collectMatches", () => {
     collectMatches(nodes, /^helper\.ts$/, null, out, directOut);
     expect(directOut.has("src/lib/helper.ts")).toBe(true);
     expect(out.has("src/empty")).toBe(false);
+  });
+});
+
+describe("segmentHighlight", () => {
+  it("returns a single plain segment without a query", () => {
+    expect(segmentHighlight("readme.md", "")).toEqual([{ text: "readme.md", mark: false }]);
+    expect(segmentHighlight("readme.md", "   ")).toEqual([{ text: "readme.md", mark: false }]);
+  });
+
+  it("marks fuzzy-matched characters individually", () => {
+    expect(segmentHighlight("hello.txt", "hlo")).toEqual([
+      { text: "h", mark: true },
+      { text: "e", mark: false },
+      { text: "l", mark: true },
+      { text: "l", mark: false },
+      { text: "o", mark: true },
+      { text: ".txt", mark: false },
+    ]);
+  });
+
+  it("matches case-insensitively but preserves original casing", () => {
+    expect(segmentHighlight("Readme.MD", "readme")).toEqual([
+      { text: "R", mark: true },
+      { text: "e", mark: true },
+      { text: "a", mark: true },
+      { text: "d", mark: true },
+      { text: "m", mark: true },
+      { text: "e", mark: true },
+      { text: ".MD", mark: false },
+    ]);
+  });
+
+  it("returns plain when no fuzzy match", () => {
+    expect(segmentHighlight("abc.txt", "qqq")).toEqual([{ text: "abc.txt", mark: false }]);
+  });
+
+  it("highlights regex matches inside /.../ delimiters", () => {
+    expect(segmentHighlight("build-v2.zip", "/\\d+/")).toEqual([
+      { text: "build-v", mark: false },
+      { text: "2", mark: true },
+      { text: ".zip", mark: false },
+    ]);
+  });
+
+  it("blocks ReDoS-unsafe highlight patterns instead of highlighting", () => {
+    expect(segmentHighlight("aaa.txt", "/(a+)+*/")).toEqual([{ text: "aaa.txt", mark: false }]);
+    expect(segmentHighlight("aaa.txt", "/\\d++/")).toEqual([{ text: "aaa.txt", mark: false }]);
+  });
+
+  it("handles invalid regex gracefully", () => {
+    expect(segmentHighlight("aaa.txt", "/([/")).toEqual([{ text: "aaa.txt", mark: false }]);
+  });
+
+  it("handles zero-width regex matches without hanging", () => {
+    const segs = segmentHighlight("abc", "/(?:)/");
+    expect(segs.every((s) => !s.mark || s.text === "")).toBe(true);
+    expect(segs.map((s) => s.text).join("")).toBe("abc");
   });
 });
 

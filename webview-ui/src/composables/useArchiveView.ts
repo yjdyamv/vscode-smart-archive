@@ -1,28 +1,34 @@
 import { reactive, computed, type Ref, type ComputedRef } from "vue";
-import type { TreeNodeData, ExtensionMessage } from "../types";
+import type { TreeNodeData, FlatNode, ArchiveProps } from "../types";
+import type { WebviewToHost, HostToWebview } from "../protocol";
+import type { DescCount } from "../bootstrap";
 import { isCoveredByAncestor } from "./useSelection";
+import { useTreeFlatten } from "./useTree";
+import { useSelection } from "./useSelection";
+import { useSearch } from "./useSearch";
+import { resolveRowHeight } from "../utils/dom";
 import {
-  ROW_HEIGHT_MULTIPLIER,
-  DEFAULT_FONT_SIZE,
   TOAST_SUCCESS_MS,
   TOAST_ERROR_MS,
   SEARCH_DEBOUNCE_MS,
   DEFAULT_PAGE_SIZE,
 } from "../constants";
 
+type TreeController = ReturnType<typeof useTreeFlatten>;
+type SelectionController = ReturnType<typeof useSelection>;
+type SearchController = ReturnType<typeof useSearch>;
+
 export interface ArchiveViewContext {
-  post: (msg: Record<string, unknown>) => void;
-  onMessage: (handler: (msg: ExtensionMessage) => void) => () => void;
-  tree: ReturnType<typeof import("./useTree").useTreeFlatten>;
+  post: (msg: WebviewToHost) => void;
+  onMessage: (handler: (msg: HostToWebview) => void) => () => void;
+  tree: TreeController;
   treeData: Ref<TreeNodeData[]>;
-  selection: ReturnType<typeof import("./useSelection").useSelection>;
-  search: ReturnType<typeof import("./useSearch").useSearch>;
-  visibleFlatNodes: ComputedRef<
-    ReturnType<typeof import("./useTree").useTreeFlatten>["flatNodes"]["value"]
-  >;
+  selection: SelectionController;
+  search: SearchController;
+  visibleFlatNodes: ComputedRef<FlatNode[]>;
   viewState: Ref<string>;
   loadingMsg: Ref<string>;
-  archiveProps: Ref<{ name: string; format: string; count: number; size: string } | null>;
+  archiveProps: Ref<ArchiveProps | null>;
   totalFiles: Ref<number>;
   totalDirs: Ref<number>;
   readOnly: Ref<boolean>;
@@ -30,6 +36,8 @@ export interface ArchiveViewContext {
   canSplit: Ref<boolean>;
   isEncrypted: Ref<boolean>;
   canEncrypt: Ref<boolean>;
+  pwError: Ref<boolean>;
+  descCounts: Ref<Record<string, DescCount>>;
   containerEl: Ref<HTMLElement | null>;
   scrollToPath: (path: string) => void;
 }
@@ -86,10 +94,6 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     const node = tree.findNode(path);
     if (!node || node.kind !== "DIRECTORY") return;
     if (tree.expandedPaths.value.has(path)) {
-      tree.toggleExpand(path);
-      return;
-    }
-    if (node.children && node.children.length > 0) {
       tree.toggleExpand(path);
       return;
     }
@@ -159,15 +163,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
 
   // ── Selection counts ───────────────────────────────────────────────
 
-  const descEl = document.getElementById("_xDescCounts");
-  let descCounts: Record<string, { files: number; dirs: number; size?: number }> = {};
-  if (descEl) {
-    try {
-      descCounts = JSON.parse(descEl.textContent ?? "{}");
-    } catch {
-      descCounts = {};
-    }
-  }
+  const descCounts = ctx.descCounts;
 
   const selectionBreakdown = computed(() => {
     let dirs = 0;
@@ -178,7 +174,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
       if (!node) continue;
       if (node.kind === "DIRECTORY") {
         dirs += 1;
-        const dc = descCounts[p];
+        const dc = descCounts.value[p];
         if (dc) {
           files += dc.files;
           dirs += dc.dirs;
@@ -321,6 +317,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     showToast("Removing encryption...", true);
   }
   function submitPassword(pw: string) {
+    ctx.pwError.value = false;
     post({ c: "pw", pw });
   }
 
@@ -394,13 +391,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   function getPageSize(): number {
     const el = ctx.containerEl.value;
     if (!el) return DEFAULT_PAGE_SIZE;
-    const fontSize =
-      parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--vscode-font-size"),
-      ) ||
-      parseFloat(getComputedStyle(document.documentElement).fontSize) ||
-      DEFAULT_FONT_SIZE;
-    return Math.max(1, Math.floor(el.clientHeight / (fontSize * ROW_HEIGHT_MULTIPLIER)));
+    return Math.max(1, Math.floor(el.clientHeight / resolveRowHeight()));
   }
 
   function handleKeyboard(e: KeyboardEvent) {
@@ -488,7 +479,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   // ── Message handler ────────────────────────────────────────────────
 
   function setupMessageHandler() {
-    return ctx.onMessage((msg: ExtensionMessage) => {
+    return ctx.onMessage((msg: HostToWebview) => {
       switch (msg.c) {
         case "ok":
           showToast(msg.t, true);
@@ -507,7 +498,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
           }
           break;
         case "pwerr":
-          showToast(msg.t || "Wrong password", false);
+          ctx.pwError.value = true;
           break;
         case "encState":
           ctx.isEncrypted.value = !!msg.v;

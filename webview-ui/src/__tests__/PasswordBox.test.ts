@@ -1,12 +1,8 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import PasswordBox from "../components/PasswordBox.vue";
 
 describe("PasswordBox", () => {
-  afterEach(() => {
-    // Clean up any mock message listeners
-  });
-
   it("renders archive name", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
     expect(wrapper.text()).toContain("test.7z");
@@ -22,7 +18,8 @@ describe("PasswordBox", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
     const input = wrapper.find("input");
     await input.setValue("secret123");
-    await wrapper.find(".unlock-btn").trigger("click");
+    const unlock = wrapper.findAll("button").find((b) => b.text().includes("Unlock"));
+    await unlock?.trigger("click");
     expect(wrapper.emitted("submit")?.[0]).toEqual(["secret123"]);
   });
 
@@ -38,19 +35,14 @@ describe("PasswordBox", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
     const input = wrapper.find("input");
     await input.setValue("");
-    await wrapper.find(".unlock-btn").trigger("click");
+    const unlock = wrapper.findAll("button").find((b) => b.text().includes("Unlock"));
+    await unlock?.trigger("click");
     expect(wrapper.emitted("submit")).toBeUndefined();
   });
 
-  it("shows error state when pwerr message received", async () => {
-    const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
-
-    // Simulate pwerr message
-    window.dispatchEvent(
-      new MessageEvent("message", { data: { c: "pwerr", t: "Wrong password" } }),
-    );
+  it("shows error state when hasError prop is set", async () => {
+    const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z", hasError: true } });
     await wrapper.vm.$nextTick();
-
     expect(wrapper.text()).toContain("Wrong password");
   });
 
@@ -59,9 +51,7 @@ describe("PasswordBox", () => {
     const input = wrapper.find("input");
     await input.setValue("wrongpass");
 
-    window.dispatchEvent(
-      new MessageEvent("message", { data: { c: "pwerr", t: "Wrong password" } }),
-    );
+    await wrapper.setProps({ hasError: true });
     await wrapper.vm.$nextTick();
 
     expect((input.element as HTMLInputElement).value).toBe("");
@@ -82,8 +72,8 @@ describe("PasswordBox", () => {
 
   it("has error state hidden by default", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
-    const errDiv = wrapper.find(".pw-error");
+    const errDiv = wrapper.find(".text-sa-error");
     expect(errDiv.exists()).toBe(true);
-    expect(errDiv.classes()).not.toContain("show");
+    expect(errDiv.classes()).toContain("opacity-0");
   });
 });

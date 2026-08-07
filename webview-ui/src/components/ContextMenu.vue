@@ -46,7 +46,11 @@ const isReadOnly = computed(() => props.readOnly);
 </script>
 
 <template>
-  <div ref="menuRef" class="ctxmenu" :style="style">
+  <div
+    ref="menuRef"
+    class="ctxmenu fixed z-menu bg-[var(--vscode-menu-background,var(--vscode-sideBar-background))] border border-[var(--vscode-menu-border,var(--vscode-sideBarSectionHeader-border))] rounded-sa-md py-1 min-w-[180px] text-sa-lg shadow-sa-menu"
+    :style="style"
+  >
     <div class="cmi" @click="emit('copy')">
       <span class="codicon codicon-copy cmi-icon"></span>Copy<span class="cmi-shortcut"
         >Ctrl+C</span
@@ -74,62 +78,8 @@ const isReadOnly = computed(() => props.readOnly);
     <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('new-folder')">
       <span class="codicon codicon-new-folder cmi-icon"></span>New Folder{{ dirLabel }}
     </div>
-    <div class="cmi-foot">{{ paths.length }} item(s)</div>
+    <div class="px-4 py-0.5 text-sa-sm text-[var(--vscode-descriptionForeground)] cursor-default">
+      {{ paths.length }} item(s)
+    </div>
   </div>
 </template>
-
-<style scoped>
-.ctxmenu {
-  position: fixed;
-  z-index: var(--sa-z-menu);
-  background: var(--vscode-menu-background, var(--vscode-sideBar-background));
-  border: 1px solid var(--vscode-menu-border, var(--vscode-sideBarSectionHeader-border));
-  border-radius: var(--sa-radius-md);
-  padding: 4px 0;
-  min-width: 180px;
-  font-size: var(--sa-font-lg);
-  box-shadow: var(--sa-shadow-menu);
-}
-.cmi {
-  padding: 5px 16px;
-  cursor: pointer;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: background 0.1s ease;
-}
-.cmi:hover {
-  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
-}
-.cmi.disabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
-}
-.cmi.sep {
-  height: 0;
-}
-.cmi-icon {
-  font-size: var(--sa-font-2xl);
-  width: 18px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.cmi-sep {
-  height: 1px;
-  margin: 4px 12px;
-  background: var(--vscode-menu-border, var(--vscode-sideBarSectionHeader-border));
-}
-.cmi-shortcut {
-  margin-left: auto;
-  font-size: var(--sa-font-xs);
-  opacity: 0.6;
-}
-.cmi-foot {
-  padding: 3px 16px;
-  font-size: var(--sa-font-sm);
-  color: var(--vscode-descriptionForeground);
-  cursor: default;
-}
-</style>

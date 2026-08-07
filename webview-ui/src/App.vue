@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, provide, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, provide, watch } from "vue";
 import type { TreeNodeData, ArchiveProps } from "./types";
-import { useMessage } from "./composables/useMessage";
+import type { DescCount } from "./bootstrap";
+import { loadInitialState } from "./bootstrap";
+import { useMessage, saveState, loadState } from "./composables/useMessage";
 import { useSelection } from "./composables/useSelection";
 import { useSort, type SortKey } from "./composables/useSort";
 import { useSearch } from "./composables/useSearch";
 import { useTreeFlatten } from "./composables/useTree";
 import { useArchiveView } from "./composables/useArchiveView";
-import { saveState, loadState } from "./composables/useMessage";
 import LoadingSpinner from "./components/LoadingSpinner.vue";
 import PasswordBox from "./components/PasswordBox.vue";
 import Toolbar from "./components/Toolbar.vue";
@@ -22,33 +23,25 @@ const search = useSearch();
 
 const viewState = ref<"loading" | "password" | "content" | "empty">("loading");
 const treeData = ref<TreeNodeData[]>([]);
-function readJson(id: string) {
-  const el = document.getElementById(id);
-  if (!el) return null;
-  try {
-    return JSON.parse(el.textContent ?? "");
-  } catch {
-    return null;
-  }
-}
-
 const archiveProps = ref<ArchiveProps | null>(null);
 const totalFiles = ref(0);
 const totalDirs = ref(0);
 const loadingMsg = ref("Reading archive...");
-const readOnly = ref(!!readJson("_xReadOnly"));
-const isSplit = ref(!!readJson("_xIsSplit"));
-const canSplit = ref(!!readJson("_xCanSplit"));
-const isEncrypted = ref(!!readJson("_xIsEncrypted"));
-const canEncrypt = ref(!!readJson("_xCanEncrypt"));
+const readOnly = ref(false);
+const isSplit = ref(false);
+const canSplit = ref(false);
+const isEncrypted = ref(false);
+const canEncrypt = ref(false);
+const pwError = ref(false);
+const descCounts = ref<Record<string, DescCount>>({});
 
 const sort = useSort();
 const tree = useTreeFlatten(treeData);
 
 // Restore persisted sort preference (search is archive-specific, don't persist)
-const prefs = loadState<{ sortKey?: string; sortAsc?: boolean }>();
-if (prefs?.sortKey) sort.setSort(prefs.sortKey as SortKey);
-if (prefs?.sortAsc === false) sort.setSort(sort.sortKey.value);
+const prefs = loadState<{ sortKey?: SortKey; sortAsc?: boolean }>();
+if (prefs?.sortKey) sort.setSort(prefs.sortKey);
+if (prefs?.sortAsc === false) sort.sortAsc.value = false;
 
 watch([sort.sortKey, sort.sortAsc], () => {
   treeData.value = sort.sortNodes([...treeData.value]);
@@ -89,32 +82,36 @@ const av = useArchiveView({
   canSplit,
   isEncrypted,
   canEncrypt,
+  pwError,
+  descCounts,
   containerEl,
   scrollToPath,
 });
 
 onMounted(() => {
   const cleanupMessage = av.setupMessageHandler();
+  const initial = loadInitialState();
+
+  readOnly.value = initial.readOnly;
+  isSplit.value = initial.isSplit;
+  canSplit.value = initial.canSplit;
+  isEncrypted.value = initial.isEncrypted;
+  canEncrypt.value = initial.canEncrypt;
+  descCounts.value = initial.descCounts;
 
   try {
-    const rawTree = readJson("_xTree") ?? [];
-    const props = readJson("_xProps");
-    const files = readJson("_xFiles") ?? 0;
-    const dirs = readJson("_xDirs") ?? 0;
-    const initView = readJson("_xViewState");
-
-    if (initView === "password") {
-      if (props) archiveProps.value = props;
+    if (initial.viewState === "password") {
+      if (initial.props) archiveProps.value = initial.props;
       viewState.value = "password";
-    } else if (rawTree.length > 0) {
-      if (props) {
-        archiveProps.value = props;
-        totalFiles.value = files;
-        totalDirs.value = dirs;
+    } else if (initial.tree.length > 0) {
+      if (initial.props) {
+        archiveProps.value = initial.props;
+        totalFiles.value = initial.files;
+        totalDirs.value = initial.dirs;
       }
-      treeData.value = sort.sortNodes(rawTree);
+      treeData.value = sort.sortNodes(initial.tree);
       viewState.value = "content";
-      tree.initExpandedFromTree();
+      tree.initExpandedFromTree(undefined, initial.expanded);
       const validPaths = new Set(tree.nodeMap.value.keys());
       const filtered = new Set([...selection.state.selected].filter((p) => validPaths.has(p)));
       if (filtered.size !== selection.state.selected.size) {
@@ -143,14 +140,13 @@ onMounted(() => {
           if (!stillValid) selection.state.lastAddDir = "";
         }
       }
-      const toastMsg = readJson("_xToast");
-      if (toastMsg) av.showToast(toastMsg, true);
+      if (initial.toast) av.showToast(initial.toast, true);
       av.loadExpandedPaths();
     } else {
-      if (props) {
-        archiveProps.value = props;
-        totalFiles.value = files;
-        totalDirs.value = dirs;
+      if (initial.props) {
+        archiveProps.value = initial.props;
+        totalFiles.value = initial.files;
+        totalDirs.value = initial.dirs;
       }
       viewState.value = "empty";
       if (selection.state.lastAddDir) selection.state.lastAddDir = "";
@@ -176,52 +172,33 @@ provide(
   "lastAddDir",
   computed(() => selection.state.lastAddDir || ""),
 );
+
+const emptyState = computed(() => {
+  if (search.query.value.trim()) {
+    return {
+      icon: "codicon-search",
+      title: "No matching files",
+      hint: "Try adjusting your search terms or clear the query",
+    };
+  }
+  return {
+    icon: "codicon-archive",
+    title: archiveProps.value?.name ?? "Archive",
+    hint: "No files to display",
+  };
+});
 </script>
 
 <template>
   <div
-    class="flex flex-col h-screen text-[var(--vscode-foreground)] bg-[var(--vscode-sideBar-background)] font-[var(--vscode-font-family)]"
-    style="
-      font-size: var(--vscode-font-size);
-      --sa-radius: 3px;
-      --sa-radius-md: 4px;
-      --sa-radius-sm: 2px;
-      --sa-sep-width: 1px;
-      --sa-transition-fast: background 0.12s ease;
-      --sa-transition-fastest: 0.1s;
-      --sa-transition-hover: 0.08s;
-      --sa-transition-medium: 0.15s;
-      --sa-transition-normal: 0.2s;
-      --sa-transition-slow: 0.25s;
-      --sa-color-error: #e51400;
-      --sa-shadow-error-ring: 0 0 0 1px #e5140033;
-      --sa-shadow-menu: 0 4px 12px rgba(0, 0, 0, 0.25);
-      --sa-z-toast: 999;
-      --sa-z-menu: 1000;
-      --sa-spinner-sm: 8px;
-      --sa-spinner: 28px;
-      --sa-spin-sm: 0.6s;
-      --sa-spin: 0.7s;
-      --sa-font-2xs: calc(var(--vscode-font-size) * 0.78);
-      --sa-font-xs: calc(var(--vscode-font-size) * 0.8);
-      --sa-font-sm: calc(var(--vscode-font-size) * 0.82);
-      --sa-font-md-sm: calc(var(--vscode-font-size) * 0.85);
-      --sa-font-md: calc(var(--vscode-font-size) * 0.88);
-      --sa-font-base: calc(var(--vscode-font-size) * 0.9);
-      --sa-font-lg: calc(var(--vscode-font-size) * 0.92);
-      --sa-font-xl: calc(var(--vscode-font-size) * 0.95);
-      --sa-font-2xl: calc(var(--vscode-font-size) * 1.05);
-      --sa-font-3xl: calc(var(--vscode-font-size) * 1.15);
-      --sa-checkmark-size: calc(var(--vscode-font-size) * 1.25);
-      --sa-arrow-width: calc(var(--vscode-font-size) * 1.3);
-      --sa-icon-width: calc(var(--vscode-font-size) * 1.5);
-      --sa-row-height: calc(var(--vscode-font-size) * 1.85);
-    "
+    class="flex flex-col h-screen bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] font-[var(--vscode-font-family)]"
+    style="font-size: var(--vscode-font-size)"
   >
     <LoadingSpinner v-if="viewState === 'loading'" :msg="loadingMsg" />
     <PasswordBox
       v-else-if="viewState === 'password'"
       :archive-name="archiveProps?.name ?? ''"
+      :has-error="pwError"
       @submit="av.submitPassword"
     />
     <template v-else>
@@ -255,48 +232,42 @@ provide(
         @convert="av.convertFormat"
       />
       <template v-if="viewState === 'content'">
-        <div
-          v-if="search.query.value.trim() && visibleFlatNodes.length === 0"
-          class="flex-1 flex flex-col items-center justify-center gap-2 text-[var(--vscode-descriptionForeground)] text-sm"
-        >
-          <div>No matching files</div>
-          <div class="text-xs opacity-50">Try adjusting your search terms or clear the query</div>
-        </div>
         <FileTree
+          v-if="visibleFlatNodes.length > 0 || !search.query.value.trim()"
           ref="fileTreeRef"
-          v-else
           :flat-nodes="visibleFlatNodes"
           :tree-data="treeData"
           :selected="selection.state.selected"
           :expanded="tree.expandedPaths.value"
           :search-query="search.query.value"
-          :match-set="search.matchSet.value"
           :loading-paths="tree.loadingPaths.value"
+          :desc-counts="descCounts"
           @row-click="av.handleRowClick"
           @row-dblclick="av.handleRowDblClick"
           @check-click="av.handleCheckClick"
           @expand-click="av.handleExpandClick"
           @context-menu="av.handleContextMenu"
         />
+        <div
+          v-else
+          class="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--vscode-descriptionForeground)]"
+        >
+          <div class="text-[56px] leading-none opacity-35">
+            <span class="codicon" :class="emptyState.icon"></span>
+          </div>
+          <div class="text-sa-xl text-[var(--vscode-foreground)]">{{ emptyState.title }}</div>
+          <div class="text-sa-base opacity-70">{{ emptyState.hint }}</div>
+        </div>
       </template>
       <div
-        v-else
+        v-else-if="viewState === 'empty'"
         class="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--vscode-descriptionForeground)]"
       >
-        <template v-if="search.query.value.trim()">
-          <div class="empty-icon"><span class="codicon codicon-search"></span></div>
-          <div class="text-sm opacity-70">No matching files</div>
-          <div class="text-xs opacity-50 mt-1">
-            Try adjusting your search terms or clear the query
-          </div>
-        </template>
-        <template v-else>
-          <div class="empty-icon"><span class="codicon codicon-archive"></span></div>
-          <div class="text-[1.1em] text-[var(--vscode-foreground)]">
-            {{ archiveProps?.name ?? "Archive" }}
-          </div>
-          <div class="text-sm opacity-70">No files to display</div>
-        </template>
+        <div class="text-[56px] leading-none opacity-35">
+          <span class="codicon" :class="emptyState.icon"></span>
+        </div>
+        <div class="text-sa-xl text-[var(--vscode-foreground)]">{{ emptyState.title }}</div>
+        <div class="text-sa-base opacity-70">{{ emptyState.hint }}</div>
       </div>
       <StatusBar
         v-if="archiveProps"
@@ -337,11 +308,3 @@ provide(
     />
   </div>
 </template>
-
-<style scoped>
-.empty-icon {
-  font-size: 56px;
-  line-height: 1;
-  opacity: 0.35;
-}
-</style>

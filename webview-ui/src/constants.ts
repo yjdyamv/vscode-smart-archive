@@ -1,7 +1,7 @@
 /** Shared UI constants — Smart Archive webview */
 
-/** Row height = font-size × this multiplier */
-export const ROW_HEIGHT_MULTIPLIER = 1.85;
+/** JS fallback for --sa-row-multiplier (defined in tailwind.css) when CSS is unavailable */
+export const ROW_HEIGHT_FALLBACK = 1.85;
 /** Default font-size fallback when CSS variable is unavailable (px) */
 export const DEFAULT_FONT_SIZE = 14;
 /** Indent width per tree depth level (px) */
