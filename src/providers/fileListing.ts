@@ -11,14 +11,15 @@
 
 import { runArchiveOp } from "../engines/worker/runner";
 import type { ListEntry } from "../engines/fileListing-core";
-import { hasSystem7z, listWithSystem7z } from "../engines/system7z";
-import { getFullExt, isWrappedFormat } from "../constants";
+import { listWithSystem7z } from "../engines/system7z";
+import { selectEngine } from "../engines/select-engine";
+import { getFullExt } from "../constants";
 import { logger } from "../utils/logger";
 
 /**
  * Fetch the file list for an archive.
  *
- * Strategy (ordered by priority):
+ * Strategy (ordered by priority, see engines/select-engine):
  *   1. Wrapped formats (tar.gz etc.) — must extract to list (7z l doesn't traverse)
  *   2. System 7z child process — fast path
  *   3. WASM in the worker thread
@@ -29,10 +30,9 @@ export async function fetchFileList(
   data?: Uint8Array,
 ): Promise<ListEntry[]> {
   const ext = getFullExt(filePath);
+  const { engine } = selectEngine({ op: "list", ext, password, hasData: !!data });
 
-  // Wrapped formats always need WASM extraction-based listing (7z l does
-  // not traverse the inner tar) — never the system fast path.
-  if (!isWrappedFormat(ext) && hasSystem7z() && !data) {
+  if (engine === "system7z") {
     logger.debug({ event: "fetchFileList.system7z", filePath });
     return listWithSystem7z(filePath, password);
   }

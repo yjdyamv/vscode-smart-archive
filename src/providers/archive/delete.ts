@@ -9,11 +9,11 @@
  */
 
 import * as fs from "fs";
-import { isRarExt } from "../../utils/rar";
 import { getFullExt, isWrappedFormat } from "../../constants";
 import { logger } from "../../utils/logger";
-import { hasSystem7zForFormat, deleteFromArchiveSystem7z } from "../../engines/system7z";
+import { deleteFromArchiveSystem7z } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
+import { selectEngine } from "../../engines/select-engine";
 import { rebuildRarArchive, archiveJoin } from "./rar5-modify";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
 
@@ -25,9 +25,10 @@ export async function deleteFromArchive(
   token?: TokenLike,
 ): Promise<void> {
   const ext = getFullExt(archivePath);
+  const { engine } = selectEngine({ op: "delete", ext, password });
 
   // Wrapped formats always mutate via WASM (worker).
-  if (isWrappedFormat(ext)) {
+  if (engine === "worker" && isWrappedFormat(ext)) {
     logger.info({ event: "deleteFromArchive.worker.wrapped", archivePath, ext });
     await runArchiveOp(
       "modify",
@@ -39,7 +40,7 @@ export async function deleteFromArchive(
   }
 
   // 7-Zip cannot modify RAR archives (E_NOTIMPL) — rebuild instead.
-  if (isRarExt(ext)) {
+  if (engine === "rarRebuild") {
     logger.info({
       event: "deleteFromArchive.rar5.rebuild",
       archivePath,
@@ -63,7 +64,7 @@ export async function deleteFromArchive(
   // System 7z passes passwords via -p<password> on the command line,
   // visible in process listings. For encrypted archives, fall back to
   // WASM to avoid CLI password leakage.
-  if (hasSystem7zForFormat(ext) && !password) {
+  if (engine === "system7z") {
     logger.info({ event: "deleteFromArchive.system7z", archivePath, ext });
     await deleteFromArchiveSystem7z(archivePath, selectedPaths, password, progress, token);
     return;

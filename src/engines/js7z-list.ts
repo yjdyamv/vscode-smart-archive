@@ -10,10 +10,14 @@
  */
 
 import { runArchiveOp } from "./worker/runner";
-import { hasSystem7z, isEncryptedSystem7z } from "./system7z";
+import { isEncryptedSystem7z } from "./system7z";
+import { selectEngine } from "./select-engine";
+import { getFullExt } from "../constants";
 
 export async function isEncrypted(filePath: string): Promise<boolean> {
-  if (hasSystem7z()) {
+  const { engine } = selectEngine({ op: "isEncrypted", ext: getFullExt(filePath) });
+
+  if (engine === "system7z") {
     return isEncryptedSystem7z(filePath);
   }
 
