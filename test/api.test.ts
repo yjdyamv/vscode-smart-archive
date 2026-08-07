@@ -14,7 +14,7 @@
 import { describe, it, expect } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
+import * as childProcess from "child_process";
 
 import {
   compress,
@@ -29,6 +29,10 @@ import {
   resolveEffectiveInput,
 } from "../src/api";
 import { detectSystem7z } from "../src/engines/system7z";
+import { gate } from "./gates";
+import { verifyArchiveWith7zz } from "./verify";
+import { bundled7zPath } from "../src/engines/bundled7z";
+import { tmpDir } from "./tmp";
 
 const RAR5_BIN = path.join(__dirname, "..", "vendor", "rar5-bin");
 const RAR5_WASM = path.join(__dirname, "..", "vendor", "rar5-wasm");
@@ -203,13 +207,13 @@ describe("buildCompressOptions", () => {
 
 describe("validateTargetPaths", () => {
   it("returns empty for valid paths", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+    let tdir = tmpDir("sat_");
     try {
-      const p = path.join(tmpDir, "test.txt");
+      const p = path.join(tdir, "test.txt");
       fs.writeFileSync(p, "hello");
       expect(validateTargetPaths([p])).toEqual([]);
     } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(tdir, { recursive: true, force: true });
     }
   });
 
@@ -241,15 +245,15 @@ describe("deriveOutputDir", () => {
   });
 
   it("avoids collision with existing directories", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+    let tdir = tmpDir("sat_");
     try {
-      const archivePath = path.join(tmpDir, "test.7z");
+      const archivePath = path.join(tdir, "test.7z");
       fs.writeFileSync(archivePath, "fake");
-      fs.mkdirSync(path.join(tmpDir, "test.extracted"));
+      fs.mkdirSync(path.join(tdir, "test.extracted"));
       const result = deriveOutputDir(archivePath);
-      expect(result).toBe(path.join(tmpDir, "test_1.extracted"));
+      expect(result).toBe(path.join(tdir, "test_1.extracted"));
     } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(tdir, { recursive: true, force: true });
     }
   });
 });
@@ -282,18 +286,18 @@ describe("resolveEffectiveInput", () => {
 // ── High-level compress/decompress round-trips ────────────────────
 
 describe("API compress round-trips", () => {
-  let tmpDir: string;
+  let tdir: string;
 
   function writeFiles(files: Record<string, string>): string[] {
     const targetDirs: string[] = [];
     for (const [relPath, content] of Object.entries(files)) {
       const normalized = relPath.replace(/^\/+/, "").replace(/\\/g, "/");
       const segments = normalized.split("/");
-      const fullPath = path.join(tmpDir, ...segments);
+      const fullPath = path.join(tdir, ...segments);
 
       // Ensure parent directories exist
       const dir = path.dirname(fullPath);
-      if (dir !== tmpDir) {
+      if (dir !== tdir) {
         fs.mkdirSync(dir, { recursive: true });
       }
 
@@ -302,7 +306,7 @@ describe("API compress round-trips", () => {
 
       // Collect top-level directories (not files) as compression targets
       if (segments.length > 1) {
-        const topDir = path.join(tmpDir, segments[0]);
+        const topDir = path.join(tdir, segments[0]);
         if (!targetDirs.includes(topDir)) {
           targetDirs.push(topDir);
         }
@@ -313,7 +317,7 @@ describe("API compress round-trips", () => {
     if (targetDirs.length === 0) {
       for (const [relPath] of Object.entries(files)) {
         const normalized = relPath.replace(/^\/+/, "").replace(/\\/g, "/");
-        targetDirs.push(path.join(tmpDir, ...normalized.split("/")));
+        targetDirs.push(path.join(tdir, ...normalized.split("/")));
       }
     }
 
@@ -321,11 +325,11 @@ describe("API compress round-trips", () => {
   }
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_api_"));
+    tdir = tmpDir("sat_api_");
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tdir, { recursive: true, force: true });
   });
 
   it("7z single file round-trip", async () => {
@@ -439,7 +443,7 @@ describe("API compress round-trips", () => {
 
   it("compression with explicit outputPath", async () => {
     const targets = writeFiles({ "doc.txt": "docs" });
-    const outPath = path.join(tmpDir, "custom-output.7z");
+    const outPath = path.join(tdir, "custom-output.7z");
     const result = await compress({ targets, format: "7z", outputPath: outPath });
     expect(result).toBe(outPath);
     expect(fs.existsSync(outPath)).toBe(true);
@@ -452,7 +456,7 @@ describe("API compress round-trips", () => {
     const size9 = fs.statSync(archivePath).size;
 
     // Level 0 (store) should produce a larger archive
-    const archivePath0 = path.join(tmpDir, "store.7z");
+    const archivePath0 = path.join(tdir, "store.7z");
     await compress({ targets, format: "7z", level: 0, outputPath: archivePath0 });
     const size0 = fs.statSync(archivePath0).size;
     expect(size0).toBeGreaterThan(size9);
@@ -466,7 +470,7 @@ describe("API compress round-trips", () => {
   });
 
   it.runIf(rar5Staged())("creates a RAR5 archive via the rar5 engine", async () => {
-    const rarTmp = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar_"));
+    const rarTmp = tmpDir("sat_rar_");
     try {
       fs.mkdirSync(path.join(rarTmp, "proj", "sub"), { recursive: true });
       fs.writeFileSync(path.join(rarTmp, "proj", "a.txt"), "hello rar");
@@ -477,6 +481,13 @@ describe("API compress round-trips", () => {
 
       const head = fs.readFileSync(outPath).subarray(0, 8);
       expect(Buffer.from(head).equals(Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]))).toBe(true);
+      if (gate("bundled7zz")) {
+        // Real behavior check: the produced RAR5 lists and extracts correctly.
+        await verifyArchiveWith7zz(outPath, {
+          "proj/a.txt": "hello rar",
+          "proj/sub/b.bin": Buffer.alloc(5000, 3).toString(),
+        });
+      }
 
       // Encrypted + multi-volume
       const encPath = path.join(rarTmp, "enc.rar");
@@ -488,6 +499,27 @@ describe("API compress round-trips", () => {
         outputPath: encPath,
       });
       expect(fs.statSync(encPath).size).toBeGreaterThan(0);
+      if (gate("bundled7zz")) {
+        // Encrypted RAR: content test without the password must fail,
+        // with the password it must pass.
+        let noPwOk = true;
+        try {
+          childProcess.execFileSync(
+            bundled7zPath()!,
+            ["t", encPath],
+            { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+          );
+        } catch {
+          noPwOk = false;
+        }
+        expect(noPwOk, "password-less test of encrypted RAR must fail").toBe(false);
+        const withPw = childProcess.execFileSync(
+          bundled7zPath()!,
+          ["t", `-phunter2`, encPath],
+          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+        );
+        expect(withPw).toContain("Everything is Ok");
+      }
     } finally {
       fs.rmSync(rarTmp, { recursive: true, force: true });
     }
@@ -502,7 +534,7 @@ describe("API compress round-trips", () => {
     const result = await compress({
       targets: ["/nonexistent/path"],
       format: "7z",
-      outputPath: path.join(tmpDir, "empty.7z"),
+      outputPath: path.join(tdir, "empty.7z"),
     });
     expect(fs.existsSync(result)).toBe(true);
     },
@@ -621,18 +653,18 @@ const WRAPPED_FORMATS: { label: string; shortAlias?: string }[] = [
 ];
 
 describe("API wrapped format compression", () => {
-  let tmpDir: string;
+  let tdir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_wrap_"));
+    tdir = tmpDir("sat_wrap_");
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tdir, { recursive: true, force: true });
   });
 
   function writeMultiFile(): string[] {
-    const projDir = path.join(tmpDir, "proj");
+    const projDir = path.join(tdir, "proj");
     const srcDir = path.join(projDir, "src");
     const libDir = path.join(srcDir, "lib");
     fs.mkdirSync(libDir, { recursive: true });
@@ -645,7 +677,7 @@ describe("API wrapped format compression", () => {
   for (const fmt of WRAPPED_FORMATS) {
     it(`compresses with format "${fmt.label}" and produces non-empty archive`, async () => {
       const targets = writeMultiFile();
-      const outPath = path.join(tmpDir, `archive.${fmt.label}`);
+      const outPath = path.join(tdir, `archive.${fmt.label}`);
       const result = await compress({ targets, format: fmt.label, outputPath: outPath });
       expect(result).toBe(outPath);
       expect(fs.existsSync(outPath)).toBe(true);
@@ -662,7 +694,7 @@ describe("API wrapped format compression", () => {
     if (fmt.shortAlias) {
       it(`compresses with short alias ".${fmt.shortAlias}" and verifies content`, async () => {
         const targets = writeMultiFile();
-        const outPath = path.join(tmpDir, `archive.${fmt.shortAlias}`);
+        const outPath = path.join(tdir, `archive.${fmt.shortAlias}`);
         const result = await compress({
           targets,
           format: fmt.label, // use canonical format, not alias
@@ -678,20 +710,20 @@ describe("API wrapped format compression", () => {
 // ── Wrapped format decompression ──────────────────────────────────
 
 describe("API wrapped format round-trips", () => {
-  let tmpDir: string;
+  let tdir: string;
 
   function writeFiles(files: Record<string, string>): string[] {
     const targets: string[] = [];
     for (const [relPath, content] of Object.entries(files)) {
       const segments = relPath.replace(/^\/+/, "").replace(/\\/g, "/").split("/");
-      const fullPath = path.join(tmpDir, ...segments);
+      const fullPath = path.join(tdir, ...segments);
       fs.mkdirSync(path.dirname(fullPath), { recursive: true });
       fs.writeFileSync(fullPath, content);
       if (segments.length === 1 && !targets.includes(fullPath)) {
         targets.push(fullPath);
       }
       if (segments.length > 1) {
-        const topDir = path.join(tmpDir, segments[0]);
+        const topDir = path.join(tdir, segments[0]);
         if (!targets.includes(topDir)) targets.push(topDir);
       }
     }
@@ -713,11 +745,11 @@ describe("API wrapped format round-trips", () => {
   }
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_wrap_"));
+    tdir = tmpDir("sat_wrap_");
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tdir, { recursive: true, force: true });
   });
 
   // ── tar.br — full round-trip (only WASM path) ──
@@ -731,7 +763,7 @@ describe("API wrapped format round-trips", () => {
       };
       const targets = writeFiles(files);
 
-      const archivePath = path.join(tmpDir, "bundle.tar.br");
+      const archivePath = path.join(tdir, "bundle.tar.br");
       const out = await compress({ targets, format: "tar.br", outputPath: archivePath });
       expect(fs.existsSync(out)).toBe(true);
 
@@ -743,11 +775,11 @@ describe("API wrapped format round-trips", () => {
     });
 
     it("tar.br with single directory containing one file", async () => {
-      const projDir = path.join(tmpDir, "app");
+      const projDir = path.join(tdir, "app");
       fs.mkdirSync(projDir, { recursive: true });
       fs.writeFileSync(path.join(projDir, "main.ts"), "const x = 1;");
 
-      const archivePath = path.join(tmpDir, "app.tar.br");
+      const archivePath = path.join(tdir, "app.tar.br");
       await compress({ targets: [projDir], format: "tar.br", outputPath: archivePath });
       expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
@@ -756,11 +788,11 @@ describe("API wrapped format round-trips", () => {
     });
 
     it("tar.br short alias (tbr) round-trip with directory", async () => {
-      const projDir = path.join(tmpDir, "mod");
+      const projDir = path.join(tdir, "mod");
       fs.mkdirSync(projDir, { recursive: true });
       fs.writeFileSync(path.join(projDir, "data.bin"), "alias-test");
 
-      const archivePath = path.join(tmpDir, "mod.tbr");
+      const archivePath = path.join(tdir, "mod.tbr");
       await compress({ targets: [projDir], format: "tar.br", outputPath: archivePath });
 
       const outDir = await decompress({ inputPath: archivePath });
@@ -777,7 +809,7 @@ describe("API wrapped format round-trips", () => {
       };
       const targets = writeFiles(files);
 
-      const archivePath = path.join(tmpDir, "bundle.tar.lz4");
+      const archivePath = path.join(tdir, "bundle.tar.lz4");
       const out = await compress({ targets, format: "tar.lz4", outputPath: archivePath });
       expect(fs.existsSync(out)).toBe(true);
 
@@ -789,11 +821,11 @@ describe("API wrapped format round-trips", () => {
     });
 
     it("tar.lz4 single directory round-trip", async () => {
-      const projDir = path.join(tmpDir, "data");
+      const projDir = path.join(tdir, "data");
       fs.mkdirSync(projDir, { recursive: true });
       fs.writeFileSync(path.join(projDir, "log.txt"), "lz4-test-content");
 
-      const archivePath = path.join(tmpDir, "data.tar.lz4");
+      const archivePath = path.join(tdir, "data.tar.lz4");
       await compress({ targets: [projDir], format: "tar.lz4", outputPath: archivePath });
 
       const outDir = await decompress({ inputPath: archivePath });
@@ -801,11 +833,11 @@ describe("API wrapped format round-trips", () => {
     });
 
     it("tar.lz4 short alias (tlz4) round-trip", async () => {
-      const projDir = path.join(tmpDir, "pkg");
+      const projDir = path.join(tdir, "pkg");
       fs.mkdirSync(projDir, { recursive: true });
       fs.writeFileSync(path.join(projDir, "info.json"), '{"v":1}');
 
-      const archivePath = path.join(tmpDir, "pkg.tlz4");
+      const archivePath = path.join(tdir, "pkg.tlz4");
       await compress({ targets: [projDir], format: "tar.lz4", outputPath: archivePath });
 
       const outDir = await decompress({ inputPath: archivePath });
@@ -824,7 +856,7 @@ describe("API wrapped format round-trips", () => {
       };
       const targets = writeFiles(files);
 
-      const archivePath = path.join(tmpDir, "bundle.tar.sz");
+      const archivePath = path.join(tdir, "bundle.tar.sz");
       const out = await compress({ targets, format: "tar.sz", outputPath: archivePath });
       expect(fs.existsSync(out)).toBe(true);
 
@@ -836,11 +868,11 @@ describe("API wrapped format round-trips", () => {
     });
 
     it("tar.sz single directory round-trip", async () => {
-      const projDir = path.join(tmpDir, "data");
+      const projDir = path.join(tdir, "data");
       fs.mkdirSync(projDir, { recursive: true });
       fs.writeFileSync(path.join(projDir, "log.txt"), "snappy-test-content");
 
-      const archivePath = path.join(tmpDir, "data.tar.sz");
+      const archivePath = path.join(tdir, "data.tar.sz");
       await compress({ targets: [projDir], format: "tar.sz", outputPath: archivePath });
       expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
@@ -849,11 +881,11 @@ describe("API wrapped format round-trips", () => {
     });
 
     it("tar.sz short alias (tsz) round-trip with directory", async () => {
-      const projDir = path.join(tmpDir, "pkg");
+      const projDir = path.join(tdir, "pkg");
       fs.mkdirSync(projDir, { recursive: true });
       fs.writeFileSync(path.join(projDir, "info.json"), '{"v":1}');
 
-      const archivePath = path.join(tmpDir, "pkg.tsz");
+      const archivePath = path.join(tdir, "pkg.tsz");
       await compress({ targets: [projDir], format: "tar.sz", outputPath: archivePath });
 
       const outDir = await decompress({ inputPath: archivePath });
@@ -875,10 +907,10 @@ describe("API wrapped format round-trips", () => {
   for (const fmt of PARTIAL_FORMATS) {
     describe(`${fmt.label} (full round-trip)`, () => {
       it(`single file round-trip for "${fmt.label}"`, async () => {
-        const filePath = path.join(tmpDir, "data.txt");
+        const filePath = path.join(tdir, "data.txt");
         fs.writeFileSync(filePath, "wrapped round-trip test");
 
-        const archivePath = path.join(tmpDir, `archive.${fmt.label}`);
+        const archivePath = path.join(tdir, `archive.${fmt.label}`);
         await compress({ targets: [filePath], format: fmt.label, outputPath: archivePath });
         expect(fs.existsSync(archivePath)).toBe(true);
         expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
@@ -888,13 +920,13 @@ describe("API wrapped format round-trips", () => {
       });
 
       it(`multi-file directory round-trip for "${fmt.label}"`, async () => {
-        const projDir = path.join(tmpDir, "proj");
+        const projDir = path.join(tdir, "proj");
         const srcDir = path.join(projDir, "src");
         fs.mkdirSync(srcDir, { recursive: true });
         fs.writeFileSync(path.join(projDir, "readme.md"), "hello");
         fs.writeFileSync(path.join(srcDir, "app.ts"), "type X = 1;");
 
-        const archivePath = path.join(tmpDir, `proj.${fmt.label}`);
+        const archivePath = path.join(tdir, `proj.${fmt.label}`);
         await compress({
           targets: [projDir],
           format: fmt.label,
@@ -914,22 +946,22 @@ describe("API wrapped format round-trips", () => {
 // ── Decompress-specific flows ─────────────────────────────────────
 
 describe("API decompress flows", () => {
-  let tmpDir: string;
+  let tdir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_dec_"));
+    tdir = tmpDir("sat_dec_");
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(tdir, { recursive: true, force: true });
   });
 
   it("resolves outputDir automatically", async () => {
-    const archivePath = path.join(tmpDir, "test.7z");
-    fs.writeFileSync(path.join(tmpDir, "a.txt"), "a");
+    const archivePath = path.join(tdir, "test.7z");
+    fs.writeFileSync(path.join(tdir, "a.txt"), "a");
     // We need an actual archive to decompress
     // Create one using the compress API
-    const srcFile = path.join(tmpDir, "hello.txt");
+    const srcFile = path.join(tdir, "hello.txt");
     fs.writeFileSync(srcFile, "world");
 
     const outPath = await compress({
@@ -939,18 +971,18 @@ describe("API decompress flows", () => {
     });
 
     const result = await decompress({ inputPath: outPath });
-    expect(result).toBe(path.join(tmpDir, "test.extracted"));
+    expect(result).toBe(path.join(tdir, "test.extracted"));
     expect(fs.existsSync(result)).toBe(true);
   });
 
   it("respects explicit outputDir", async () => {
-    const archivePath = path.join(tmpDir, "data.7z");
-    const srcFile = path.join(tmpDir, "note.txt");
+    const archivePath = path.join(tdir, "data.7z");
+    const srcFile = path.join(tdir, "note.txt");
     fs.writeFileSync(srcFile, "content");
 
     await compress({ targets: [srcFile], format: "7z", outputPath: archivePath });
 
-    const customOut = path.join(tmpDir, "my_output");
+    const customOut = path.join(tdir, "my_output");
     const result = await decompress({ inputPath: archivePath, outputDir: customOut });
     expect(result).toBe(customOut);
     expect(fs.existsSync(path.join(customOut, "note.txt"))).toBe(true);

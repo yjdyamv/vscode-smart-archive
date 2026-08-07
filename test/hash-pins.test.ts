@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
+import { tmpDir } from "./tmp";
 
 import {
   checkHash,
@@ -49,7 +49,7 @@ describe("checkHash bootstrap", () => {
 
 describe("updatePinnedHash", () => {
   it("rewrites quoted and bare keys inside EXPECTED_HASHES", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dwc-"));
+    const dir = tmpDir("dwc-");
     const script = path.join(dir, "install-test.js");
     fs.writeFileSync(
       script,
@@ -82,7 +82,7 @@ describe("persistBootstrapHash", () => {
   });
 
   function fixture(scriptBody: string): { dir: string; script: string; dest: string } {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dwc-boot-"));
+    const dir = tmpDir("dwc-boot-");
     const script = path.join(dir, "install-test.js");
     fs.writeFileSync(script, scriptBody);
     fs.chmodSync(script, 0o755);

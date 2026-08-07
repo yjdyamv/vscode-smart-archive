@@ -1,8 +1,13 @@
 /**
- * Test helpers — Smart Archive VSCode Extension
+ * Test fixture oracle — Smart Archive VSCode Extension
  *
- * Shared VFS utilities, compression/decompression wrappers, tree builders,
- * and format utilities used by extension test files.
+ * The ONLY test-side implementations in this suite. Everything here is an
+ * independent oracle that produces archive bytes through the raw 7zz WASM
+ * CLI — deliberately not reusing production compression logic, so a broken
+ * production codec cannot pass a round-trip test by "compressing like
+ * itself". Logic that mirrors production (tree building, format detection,
+ * security utils, listing parsing) must NOT live here — import it from
+ * src/ instead, so tests and production share one implementation.
  * Pure logic — no vscode dependency.
  */
 
@@ -62,21 +67,6 @@ export interface JS7zInstance {
   printErr?: (t: string) => void;
   print?: (t: string) => void;
   NODEFS: unknown;
-}
-
-export interface TreeNode {
-  name: string;
-  path: string;
-  size: number;
-  kind: string;
-  children?: TreeNode[];
-  collapsed?: boolean;
-}
-
-export interface FlatEntry {
-  path: string;
-  size: number;
-  type: string;
 }
 
 // ── VFS helpers ──
@@ -291,151 +281,4 @@ export function walkFS(j: JS7zInstance, dir: string, prefix: string): string[] {
     }
   }
   return res;
-}
-
-// ── Tree builder (production-mirror) ──
-
-export function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
-  const normed: { entry: FlatEntry; parts: string[] }[] = [];
-  for (const e of entries) {
-    const parts = e.path.replace(/\\/g, "/").split("/").filter(Boolean);
-    if (parts.length === 1 && parts[0] === archiveName) continue;
-    normed.push({ entry: e, parts });
-  }
-  const root: TreeNode[] = [];
-  const dirMap = new Map<string, TreeNode>();
-  normed.sort((a, b) => {
-    const aD = a.entry.type !== "REGULAR_FILE" ? 0 : 1;
-    const bD = b.entry.type !== "REGULAR_FILE" ? 0 : 1;
-    if (aD !== bD) return aD - bD;
-    return a.entry.path.localeCompare(b.entry.path);
-  });
-  for (const { entry, parts } of normed) {
-    let siblings = root;
-    let prefix = "";
-    for (let i = 0; i < parts.length; i++) {
-      const seg = parts[i];
-      const last = i === parts.length - 1;
-      const full = prefix ? prefix + "/" + seg : seg;
-      if (last) {
-        if (seg === ".smartarchive") continue;
-        const isDir = entry.type !== "REGULAR_FILE";
-        const existing = dirMap.get(full);
-        if (existing && existing.kind === "DIRECTORY") {
-          existing.size = entry.size || existing.size;
-        } else {
-          const node: TreeNode = {
-            name: seg,
-            path: entry.path,
-            size: entry.size,
-            kind: isDir ? "DIRECTORY" : "REGULAR_FILE",
-            children: isDir ? [] : undefined,
-          };
-          siblings.push(node);
-          if (isDir) dirMap.set(full, node);
-        }
-      } else {
-        let dir = dirMap.get(full);
-        if (!dir) {
-          const dup = siblings.findIndex((s) => s.name === seg && s.kind !== "DIRECTORY");
-          if (dup >= 0) siblings.splice(dup, 1);
-          dir = { name: seg, path: full, size: 0, kind: "DIRECTORY", children: [] };
-          siblings.push(dir);
-          dirMap.set(full, dir);
-        }
-        siblings = dir.children!;
-        prefix = full;
-      }
-    }
-  }
-  return root;
-}
-
-export function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total: number } {
-  let files = 0;
-  let dirs = 0;
-  for (const n of nodes) {
-    if (n.kind === "DIRECTORY") {
-      dirs++;
-      if (n.children && n.children.length > 0) {
-        const c = countTreeStats(n.children);
-        files += c.files;
-        dirs += c.dirs;
-      }
-    } else {
-      files++;
-    }
-  }
-  return { files, dirs, total: files + dirs };
-}
-
-// ── Encryption detection ──
-
-import * as fs from "fs";
-
-export async function isEncryptedInline(filePath: string): Promise<boolean> {
-  const data = fs.readFileSync(filePath);
-  let stdout = "",
-    stderr = "";
-  const j = await JS7z({
-    print: (t: string) => (stdout += t + "\n"),
-    printErr: (t: string) => (stderr += t + "\n"),
-  });
-  try {
-    j.FS.writeFile("/_ie", new Uint8Array(data));
-    try {
-      await new Promise<void>((resolve, reject) => {
-        j.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
-        j.callMain(["l", "-slt", "-p-", "/_ie"]);
-      });
-      return stdout.includes("Encrypted = +");
-    } catch {
-      const msg = (stdout + stderr).toLowerCase();
-      return msg.includes("encrypted") || msg.includes("wrong password");
-    }
-  } finally {
-    disposeJS7z(j);
-  }
-}
-
-// ── Format / encoding utilities (mirrors src/) ──
-
-export function fixArchiveEncoding(raw: string): string {
-  if (!raw) return raw;
-  if (/^[ -~]*$/.test(raw)) return raw;
-  return raw;
-}
-
-export function getFullExt(fp: string): string {
-  const lower = fp.toLowerCase();
-  const compounds = [".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tar.sz", ".tgz", ".tbz2", ".txz", ".tsz"];
-  for (const ext of compounds) {
-    if (lower.endsWith(ext)) return ext;
-  }
-  return path.extname(fp).toLowerCase();
-}
-
-export function formatCompactSize(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), units.length - 1);
-  const val = bytes / Math.pow(k, i);
-  return `${i === 0 ? val.toFixed(0) : val.toFixed(1)} ${units[i]}`;
-}
-
-export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const s = Math.floor(ms / 1000) % 60;
-  const m = Math.floor(ms / 60000);
-  if (m === 0) return `${s}s`;
-  return `${m}m ${s}s`;
-}
-
-export function isRarExt(ext: string): boolean {
-  return /^\.(?:rar|r\d{2})$/i.test(ext);
-}
-
-export function isRarVolume(ext: string): boolean {
-  return /^\.r\d{2}$/i.test(ext);
 }

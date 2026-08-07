@@ -9,7 +9,6 @@
  */
 import * as childProcess from "child_process";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
@@ -18,7 +17,9 @@ import {
   hasEncryptedHeaders,
   readRecoveryPercent,
 } from "../src/providers/archive/rar5-modify";
+import { gate, rar5CliBinaries } from "./gates";
 import { verifyArchivePassword } from "../src/providers/webview/handlers/shared";
+import { tmpDir } from "./tmp";
 
 const RAR5_FORMAT = {
   label: "rar",
@@ -36,9 +37,8 @@ const BUNDLED_7ZZ = path.join(
   "x64",
   "7zz",
 );
-const RAR_CLI = path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "rar");
-const UNRAR_CLI = path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "unrar");
-const BINDING = path.join(__dirname, "..", "vendor", "rar5-bin", "linux", "x64", "smart-archive-rar.linux-x64-gnu.node");
+const RAR_CLI = rar5CliBinaries().rar;
+const UNRAR_CLI = rar5CliBinaries().unrar;
 
 function canSpawn(bin: string): boolean {
   try {
@@ -54,10 +54,9 @@ function canSpawn(bin: string): boolean {
 function haveBinaries(): boolean {
   return (
     process.platform === "linux" &&
-    canSpawn(BUNDLED_7ZZ) &&
-    canSpawn(RAR_CLI) &&
-    canSpawn(UNRAR_CLI) &&
-    fs.existsSync(BINDING)
+    gate("bundled7zz") &&
+    gate("rar5Cli") &&
+    gate("rar5Binding")
   );
 }
 
@@ -68,7 +67,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
   });
 
   it.runIf(haveBinaries())("deletes a folder inside a RAR archive and stays valid", async () => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5e2e-"));
+    dir = tmpDir("sat_rar5e2e-");
     const proj = path.join(dir, "proj");
     fs.mkdirSync(path.join(proj, "keep"), { recursive: true });
     fs.mkdirSync(path.join(proj, "drop", "sub"), { recursive: true });
@@ -126,7 +125,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
     // incomplete table, which 7-Zip's RAR5 decoder rejects with "Data
     // Error" (while rar-rs's own decoder and The Unarchiver accept it).
     // The bundled 7zz binary (~3.7 MB) triggers the case reliably.
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5bin-"));
+    dir = tmpDir("sat_rar5bin-");
     const proj = path.join(dir, "proj");
     fs.mkdirSync(proj, { recursive: true });
     fs.copyFileSync(BUNDLED_7ZZ, path.join(proj, "7zz.bin"));
@@ -170,7 +169,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
     // verification with "Can't open as archive" → false "wrong password"
     // (this machine's /usr/bin/7z is exactly such a build). It must resolve
     // the RAR-capable binary (bundled full-format 7zz) instead.
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5pw-"));
+    dir = tmpDir("sat_rar5pw-");
     const proj = path.join(dir, "proj");
     fs.mkdirSync(proj, { recursive: true });
     fs.writeFileSync(path.join(proj, "secret.txt"), "top secret");
@@ -196,7 +195,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
   it.runIf(haveBinaries())("encrypts headers so file names stay hidden, and preserves them on rebuild", async () => {
     // RAR5 header encryption: the archive structure must be invisible
     // without the password, and a rebuild must keep header encryption.
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5hdr-"));
+    dir = tmpDir("sat_rar5hdr-");
     const proj = path.join(dir, "proj");
     fs.mkdirSync(path.join(proj, "secret"), { recursive: true });
     fs.writeFileSync(path.join(proj, "secret", "hidden.txt"), "classified");
@@ -258,7 +257,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
   it.runIf(haveBinaries())("creates .rev recovery volumes the official rar rc can rebuild from", async () => {
     // WinRAR `-rv` equivalent: split the archive and generate .rev files;
     // the official `rar rc` must reconstruct a deleted volume byte-exactly.
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5rv-"));
+    dir = tmpDir("sat_rar5rv-");
     const proj = path.join(dir, "proj");
     fs.mkdirSync(proj, { recursive: true });
     // Random (incompressible) payload so the archive really splits.
@@ -306,7 +305,7 @@ describe("rar5 rebuild e2e (delete folder)", () => {
     // validate it ("Testing the recovery record ... OK"), a rebuild must
     // preserve the percent, and the binding's repair must restore a
     // damaged archive byte-exactly.
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5rr-"));
+    dir = tmpDir("sat_rar5rr-");
     const proj = path.join(dir, "proj");
     fs.mkdirSync(proj, { recursive: true });
     const payload = Buffer.alloc(4000, 0x61);

@@ -1,44 +1,57 @@
 import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import { sweepRegisteredDirs, readRegistry } from "./tmp";
 
 /**
- * Global vitest setup — cleans stale temp directories from previous
- * test runs before the test suite starts.  Prevents fs.writeFileSync
- * failures caused by accumulated test artifacts (e.g. ENOSPC, inode
- * exhaustion on tmpfs).
+ * Global vitest setup — sweeps stale temp directories from previous runs
+ * and cleans up after the run.
+ *
+ * Directories are tracked by test/tmp.ts in test-results/tmp-dirs.json,
+ * so the sweep is exact — the old prefix list drifted out of sync with
+ * the actual prefixes in use and leaked dirs silently.
  */
-export function setup(): void {
-  const tmp = os.tmpdir();
-  // All temp directory prefixes used by test helpers and test files.
-  const prefixes = [
-    "sat_",      // general short-lived tests
-    "sa_test_",  // compress-decompress
-    "saa_",      // system7z add
-    "sab_",      // preview brotli
-    "sal_",      // lz4
-    "sas_",      // snappy
-    "saz_",      // zstd
-    "svt_",      // split-volume tests
-    "tcomp_",    // testCompress helper
-    "tdec_",     // testDecompress helper
-  ];
 
-  for (const prefix of prefixes) {
+export function setup(): void {
+  const stale = readRegistry();
+  sweepRegisteredDirs();
+  if (stale.length > 0) {
+    console.log(`tmp sweep: removed ${stale.length} stale test temp dir(s)`);
+  }
+}
+
+import { gateReportPath, formatGateReport } from "./gates";
+import type { GateRecord, TierName } from "./gates";
+
+export function teardown(): void {
+  // Clean up temp dirs registered during this run.
+  try {
+    sweepRegisteredDirs();
+  } catch {
+    // Best effort.
+  }
+
+  // Print the merged environment-gate report and flag tiers that were
+  // checked but never available, so CI can see what was silently skipped.
+  try {
+    let report: Partial<Record<TierName, GateRecord>> = {};
     try {
-      const entries = fs.readdirSync(tmp);
-      for (const entry of entries) {
-        if (entry.startsWith(prefix)) {
-          const full = path.join(tmp, entry);
-          try {
-            fs.rmSync(full, { recursive: true, force: true });
-          } catch {
-            // Best effort — another process may hold a lock
-          }
-        }
-      }
+      report = JSON.parse(fs.readFileSync(gateReportPath(), "utf8"));
     } catch {
-      // tmpdir not readable — skip
+      // No probes ran — nothing to report.
     }
+    const entries = Object.entries(report) as [TierName, GateRecord][];
+    if (entries.length === 0) return;
+    console.log("\n===== GATE REPORT =====");
+    for (const line of formatGateReport(report).split("\n")) console.log(`  ${line}`);
+    const dead = entries.filter(([, rec]) => rec.checked > 0 && rec.available === 0);
+    if (dead.length > 0) {
+      console.log(
+        "  WARNING: tiers checked but NEVER available: " +
+          dead.map(([tier]) => tier).join(", ") +
+          ` — report: ${gateReportPath()}`,
+      );
+    }
+    console.log("=======================\n");
+  } catch {
+    // Teardown must never fail the run.
   }
 }

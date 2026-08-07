@@ -2,11 +2,13 @@
  * Shared test setup — Smart Archive VSCode Extension
  *
  * Code shared across test files that test against the bundled 7zz WASM engine.
- * Imports: vitest globals, path/fs/os, helpers, codec modules, inline security
- * re-implementations (avoiding vscode dependency).
+ * Imports: vitest globals, path/fs/os, fixture oracle (./helpers), codec
+ * modules, and PRODUCTION logic modules — tests must exercise production
+ * implementations, never copies.
  */
 
-import * as path from "path";
+
+// ── Fixture oracle (test-side implementation, intentionally independent) ──
 
 export {
   mkdirP,
@@ -15,25 +17,40 @@ export {
   j7zCompressDir,
   j7zDecompress,
   copyFS,
-  buildTree,
-  countTreeStats,
-  isEncryptedInline,
-  fixArchiveEncoding,
-  getFullExt,
-  formatCompactSize,
-  formatDuration,
-  isRarExt,
-  isRarVolume,
   createWrapped,
   disposeJS7z,
   trackedJS7z,
   resetActiveInstances,
   disposeAllTracked,
+  getActiveInstances,
 } from "./helpers";
+
+export type { JS7zInstance } from "./helpers";
 
 export { testCompress, testDecompress } from "./test-helpers";
 
-export type { JS7zInstance, FlatEntry } from "./helpers";
+// ── Production logic under test (one implementation, no mirrors) ──
+
+export {
+  buildTree,
+  countTreeStats,
+} from "../src/providers/treeBuilder";
+export type { TreeNode, FlatEntry } from "../src/providers/treeBuilder";
+
+export { fixArchiveEncoding } from "../src/utils/path";
+export { getFullExt } from "../src/constants";
+export { formatCompactSize, formatDuration } from "../src/utils/format";
+export { isRarExt, isRarVolume } from "../src/utils/rar";
+export { isEncryptedWasm } from "../src/engines/js7z-list-core";
+export {
+  parseSize,
+  safeJoinPath,
+  checkFileSize,
+  checkTotalSize,
+  validatePassword,
+  sanitizeCliPath,
+  sanitizeTargetDir,
+} from "../src/utils/security";
 
 // ── Codec modules (WASM-based; no native addons anymore) ──
 
@@ -98,56 +115,7 @@ export async function decompressLz4Frames(data: Buffer): Promise<Uint8Array> {
   return result;
 }
 
-// ── Inline security utils (avoid vscode dependency) ──
-
-export function sanitizeCliPath(entryName: string): string {
-  return entryName.startsWith("-") ? "./" + entryName : entryName;
-}
-
-export function sanitizeTargetDir(dir: string): string {
-  if (!dir) return "";
-  let safe = dir.replace(/\\/g, "/").replace(/^\/+/, "");
-  const segments = safe.split("/");
-  for (const seg of segments) {
-    if (seg === ".." || seg === ".") throw new Error("path traversal");
-  }
-  return safe;
-}
-
-export function safeJoin(outDir: string, entry: string): string {
-  if (entry.includes("\0")) throw new Error(`null byte: ${entry}`);
-  const safe = entry
-    .replace(/^[a-zA-Z]:\\/, "")
-    .replace(/^[a-zA-Z]:/, "")
-    .replace(/^\/+/, "");
-  const resolved = path.resolve(outDir, safe);
-  const norm = path.resolve(outDir) + path.sep;
-  const within =
-    process.platform === "win32"
-      ? resolved.toLowerCase().startsWith(norm.toLowerCase())
-      : resolved.startsWith(norm);
-  if (!within && resolved !== path.resolve(outDir)) throw new Error("outside");
-  return resolved;
-}
-
-export function parseSize(raw: string | number | undefined, def: number): number {
-  if (raw === undefined || raw === null) return def;
-  if (typeof raw === "number") {
-    if (!Number.isFinite(raw) || raw <= 0) return def;
-    return Math.min(raw * 1024 * 1024, Number.MAX_SAFE_INTEGER);
-  }
-  const s = String(raw).trim().toLowerCase();
-  if (s === "" || s === "0") return def;
-  const m = s.match(/^(\d+(?:\.\d+)?)\s*(k|m|g)$/i);
-  if (!m) return def;
-  const num = parseFloat(m[1]);
-  if (!Number.isFinite(num) || num <= 0) return def;
-  const mult: Record<string, number> = { k: 1024, m: 1024 * 1024, g: 1024 * 1024 * 1024 };
-  const bytes = Math.round(num * mult[m[2].toLowerCase()]);
-  return bytes > Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : bytes;
-}
-
-// ── Exclusion module ──
+// ── Exclusion module (production) ──
 
 export const { prepareExclusions, isPathExcluded, isTargetExcluded } = await import(
   "../src/utils/exclude"

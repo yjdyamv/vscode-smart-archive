@@ -11,10 +11,11 @@
  */
 
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
+import { gate } from "./gates";
+import { tmpDir } from "./tmp";
 
 const RAR5_FORMAT = {
   label: "rar",
@@ -23,15 +24,6 @@ const RAR5_FORMAT = {
   supportsEncryption: true,
 };
 
-const BINDING = path.join(
-  __dirname,
-  "..",
-  "vendor",
-  "rar5-bin",
-  "linux",
-  "x64",
-  "smart-archive-rar.linux-x64-gnu.node",
-);
 
 interface Report {
   message?: string;
@@ -52,10 +44,10 @@ function expectMonotonic(pcts: number[]): void {
 }
 
 describe("rar5 compress progress", () => {
-  it.runIf(fs.existsSync(BINDING))(
+  it.runIf(gate("rar5Binding"))(
     "folder compression does not stall mid-way (directory double-count regression)",
     async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5prog_"));
+      const td = tmpDir("sat_rar5prog_");
       try {
         const src = path.join(td, "src");
         fs.mkdirSync(src);
@@ -90,10 +82,10 @@ describe("rar5 compress progress", () => {
     },
   );
 
-  it.runIf(fs.existsSync(BINDING))(
+  it.runIf(gate("rar5Binding"))(
     "a >64 MiB member reports monotonically without exceeding 100%",
     async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5prog2_"));
+      const td = tmpDir("sat_rar5prog2_");
       try {
         const big = path.join(td, "big.bin");
         // Incompressible pseudo-random data: the streaming (>64 MiB) path

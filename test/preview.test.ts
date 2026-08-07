@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
 
 import {
   mkdirP,
@@ -20,12 +19,15 @@ import {
   walkFS,
   disposeJS7z,
 } from "./helpers";
-import type { TreeNode, FlatEntry } from "./helpers";
+import type { FlatEntry } from "../src/providers/treeBuilder";
+import { buildTree } from "../src/providers/treeBuilder";
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
+import { parse7zListing } from "../src/utils/parse7z";
 import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
 import { brotliCompressFile, brotliDecompressFile, brotliCompress, brotliDecompress } from "../src/engines/brotli-codec";
 import { JS7z } from "../src/engines/js7z-factory";
 import { wasmCompress, wasmDecompress } from "../src/engines/js7z-codec";
+import { tmpDir } from "./tmp";
 
 
 // ── Format matrix (mirrors FORMAT_TABLE from constants.ts) ──
@@ -87,7 +89,7 @@ function randPad512(buf: Buffer): Buffer {
 
 describe("selective extraction", () => {
   beforeAll(() => {
-    td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+    td = tmpDir("sat_");
   });
 
   afterAll(() => {
@@ -448,10 +450,10 @@ describe("brotli", () => {
   });
 
   it("brotli file-to-file roundtrip: compress -> decompress (15MB)", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
-    const original = path.join(tmpDir, "original.bin");
-    const compressed = path.join(tmpDir, "compressed.br");
-    const decompressed = path.join(tmpDir, "decompressed.bin");
+    let tdir = tmpDir("sat_");
+    const original = path.join(tdir, "original.bin");
+    const compressed = path.join(tdir, "compressed.br");
+    const decompressed = path.join(tdir, "decompressed.bin");
 
     try {
       const SIZE = 15 * 1024 * 1024;
@@ -471,15 +473,15 @@ describe("brotli", () => {
       expect(decBuf.length).toBe(SIZE);
       expect(decBuf.equals(buf)).toBe(true);
     } finally {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(tdir, { recursive: true, force: true }); } catch {}
     }
   });
 
   it("brotli file-to-file stream: 100MB multi-frame roundtrip", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sab_"));
-    const original = path.join(tmpDir, "big.bin");
-    const compressed = path.join(tmpDir, "big.br");
-    const decompressed = path.join(tmpDir, "big_out.bin");
+    let tdir = tmpDir("sab_");
+    const original = path.join(tdir, "big.bin");
+    const compressed = path.join(tdir, "big.br");
+    const decompressed = path.join(tdir, "big_out.bin");
 
     try {
       // 100MB spans 2 compression chunks (50MB each) → tests multi-frame concatenation
@@ -520,61 +522,16 @@ describe("brotli", () => {
         fs.closeSync(decFd);
       }
     } finally {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(tdir, { recursive: true, force: true }); } catch {}
     }
   }, 120_000);
 });
 
 // ════════════════════════════════════════════════════════════════════
-// parse7zListing
+// parse7zListing (production)
 // ════════════════════════════════════════════════════════════════════
 
-function parse7zListing(
-  stdout: string,
-  archiveName: string,
-): { path: string; size: number; type: string }[] {
-  const results: { path: string; size: number; type: string }[] = [];
-  let curPath = "";
-  let curSize = 0;
-  let curAttr = "";
-
-  const flush = () => {
-    if (curPath) {
-      results.push({
-        path: curPath,
-        size: curSize,
-        type: curAttr.includes("D") ? "DIRECTORY" : "REGULAR_FILE",
-      });
-    }
-    curPath = "";
-    curSize = 0;
-    curAttr = "";
-  };
-
-  for (const line of stdout.split("\n")) {
-    const m = line.match(/^(\w[\w ]*?)\s*=\s*(.*)/);
-    if (!m) continue;
-    const key = m[1].trim();
-    const val = m[2].trim();
-    if (key === "Path") {
-      flush();
-      curPath = val;
-    } else if (key === "Size" && !curSize) {
-      curSize = parseInt(val, 10) || 0;
-    } else if (key === "Attributes") {
-      curAttr = val;
-    }
-  }
-  flush();
-
-  const volBase = archiveName.match(/^(.+\.(?:7z|zip|wim))\.\d+$/i)?.[1] ?? null;
-  return results.filter((r) => {
-    if (r.path === `/${archiveName}` || r.path === archiveName) return false;
-    if (volBase && (r.path === `/${volBase}` || r.path === volBase)) return false;
-    return true;
-  });
-}
-
+/** Builds `7z l -slt`-style stdout from entries — a test fixture, not logic. */
 function mock7zListing(entries: { path: string; size: number; attr: string }[]): string {
   const lines: string[] = [];
   for (const e of entries) {
@@ -667,70 +624,6 @@ describe("parse7zListing", () => {
   });
 });
 
-function buildTreeLocal(entries: FlatEntry[]): TreeNode[] {
-  const normed: { entry: FlatEntry; parts: string[] }[] = [];
-  for (const e of entries) {
-    let p = e.path.replace(/\\/g, "/");
-    if (p.startsWith("./")) p = p.slice(2);
-    if (!p || p === ".") continue;
-    const parts = p.split("/").filter(Boolean);
-    if (parts.length === 0) continue;
-    normed.push({ entry: e, parts });
-  }
-  normed.sort((a, b) => {
-    const aD = a.entry.type !== "DIRECTORY" ? 1 : 0;
-    const bD = b.entry.type !== "DIRECTORY" ? 1 : 0;
-    if (aD !== bD) return aD - bD;
-    return a.entry.path < b.entry.path ? -1 : a.entry.path > b.entry.path ? 1 : 0;
-  });
-  const root: TreeNode[] = [];
-  const dirMap = new Map<string, TreeNode>();
-  const siblingMap = new Map<string, number>();
-  for (const { entry, parts } of normed) {
-    let siblings = root;
-    let prefix = "";
-    for (let i = 0; i < parts.length; i++) {
-      const seg = parts[i];
-      const last = i === parts.length - 1;
-      const full = prefix ? prefix + "/" + seg : seg;
-      if (last) {
-        const isDir = entry.type === "DIRECTORY";
-        const existing = dirMap.get(full);
-        if (existing && existing.kind === "DIRECTORY") {
-          existing.size = entry.size || existing.size;
-        } else {
-          const node: TreeNode = {
-            name: seg,
-            path: entry.path,
-            size: entry.size,
-            kind: isDir ? "DIRECTORY" : "REGULAR_FILE",
-            children: isDir ? [] : undefined,
-          };
-          if (!isDir) siblingMap.set(seg, siblings.length);
-          siblings.push(node);
-          if (isDir) dirMap.set(full, node);
-        }
-      } else {
-        let dir = dirMap.get(full);
-        if (!dir) {
-          const dup = siblingMap.get(seg);
-          if (dup !== undefined && siblings[dup]?.kind !== "DIRECTORY") {
-            siblings.splice(dup, 1);
-            siblingMap.delete(seg);
-          }
-          dir = { name: seg, path: full, size: 0, kind: "DIRECTORY", children: [] };
-          siblingMap.set(seg, siblings.length);
-          siblings.push(dir);
-          dirMap.set(full, dir);
-        }
-        siblings = dir.children!;
-        prefix = full;
-      }
-    }
-  }
-  return root;
-}
-
 describe("markNoisyDirs", () => {
   it("collapses node_modules at root", () => {
     const entries: FlatEntry[] = [
@@ -739,7 +632,7 @@ describe("markNoisyDirs", () => {
       { path: "node_modules/express/index.js", size: 100, type: "REGULAR_FILE" },
       { path: "src/index.js", size: 42, type: "REGULAR_FILE" },
     ];
-    const tree = buildTreeLocal(entries);
+    const tree = buildTree(entries, "a.7z");
     markNoisyDirs(tree, ["node_modules", ".git"]);
     const nm = tree.find((n) => n.name === "node_modules");
     expect(nm).toBeTruthy();
@@ -758,7 +651,7 @@ describe("markNoisyDirs", () => {
       { path: "project/.git", size: 0, type: "DIRECTORY" },
       { path: "project/.git/HEAD", size: 5, type: "REGULAR_FILE" },
     ];
-    const tree = buildTreeLocal(entries);
+    const tree = buildTree(entries, "a.7z");
     markNoisyDirs(tree, ["node_modules", ".git"]);
     const project = tree.find((n) => n.name === "project");
     expect(project!.collapsed).toBeUndefined();
@@ -777,7 +670,7 @@ describe("markNoisyDirs", () => {
       { path: "node_modules/express/lib", size: 0, type: "DIRECTORY" },
       { path: "node_modules/express/lib/app.js", size: 50, type: "REGULAR_FILE" },
     ];
-    const tree = buildTreeLocal(entries);
+    const tree = buildTree(entries, "a.7z");
     markNoisyDirs(tree, ["node_modules"]);
     const nm = tree[0];
     expect(nm.collapsed).toBe(true);
@@ -791,7 +684,7 @@ describe("markNoisyDirs", () => {
     const entries: FlatEntry[] = [
       { path: "node_modules/lib.js", size: 10, type: "REGULAR_FILE" },
     ];
-    const tree = buildTreeLocal(entries);
+    const tree = buildTree(entries, "a.7z");
     markNoisyDirs(tree, []);
     expect(tree[0].collapsed).toBeUndefined();
   });
@@ -803,7 +696,7 @@ describe("markNoisyDirs", () => {
       { path: "logs/info.log", size: 15, type: "REGULAR_FILE" },
       { path: "src/main.ts", size: 30, type: "REGULAR_FILE" },
     ];
-    const tree = buildTreeLocal(entries);
+    const tree = buildTree(entries, "a.7z");
     markNoisyDirs(tree, ["*.log"]);
     const logs = tree.find((n) => n.name === "logs");
     expect(logs!.collapsed).toBeUndefined();
@@ -817,7 +710,7 @@ describe("markNoisyDirs", () => {
       { path: ".vscode/settings.json", size: 8, type: "REGULAR_FILE" },
       { path: "src/app.ts", size: 12, type: "REGULAR_FILE" },
     ];
-    const tree = buildTreeLocal(entries);
+    const tree = buildTree(entries, "a.7z");
     markNoisyDirs(tree, [".npm", ".vscode"]);
     expect(tree.find((n) => n.name === ".npm")!.collapsed).toBe(true);
     expect(tree.find((n) => n.name === ".vscode")!.collapsed).toBe(true);

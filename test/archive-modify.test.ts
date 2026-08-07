@@ -7,8 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as path from "path";
-import * as fs from "fs";
-import * as os from "os";
+import { tmpDir } from "./tmp";
 import {
   mkdirP,
   run7z,
@@ -34,7 +33,7 @@ afterEach(() => {
   disposeAllTracked();
 });
 
-const _td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+const _td = tmpDir("sat_");
 describe("add-to-archive", () => {
   it("individual file paths lose dir structure", async () => {
     const j = await trackedJS7z();

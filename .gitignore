@@ -16,3 +16,4 @@ vendor/rar5-wasm/
 .agents/
 .claude/
 skills-lock.json
+test-results/

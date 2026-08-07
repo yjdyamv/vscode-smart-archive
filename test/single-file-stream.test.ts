@@ -7,16 +7,17 @@
  * Requires a system 7-Zip installation; skipped otherwise.
  */
 
-import { describe, it, expect } from "vitest";
+
 import * as path from "path";
 import * as fs from "fs";
-import * as os from "os";
 import { spawnSync } from "child_process";
 import { fetchFileList } from "../src/providers/fileListing";
 import { decompressWith7z } from "../src/engines/js7z-decompress";
 import { previewFileFromArchive } from "../src/providers/archive/modify";
 import { getPreviewTmpDir } from "../src/providers/tempFiles";
-import * as vscode from "vscode";
+import { itIf } from "./gates";
+import { __setWorkspaceFs } from "./__mocks__/vscode";
+import { tmpDir } from "./tmp";
 
 function find7z(): string | null {
   for (const c of ["/usr/bin/7z", "/usr/local/bin/7z", "7z", "7zz"]) {
@@ -31,18 +32,11 @@ function find7z(): string | null {
 }
 
 const sz = find7z();
-const itOrSkip = sz ? it : it.skip;
 
 function stubVscodePreviewApis(archivePath: string): void {
-  (vscode.workspace as unknown as { fs: unknown }).fs = {
+  __setWorkspaceFs({
     stat: async () => ({ size: fs.statSync(archivePath).size }),
-  };
-  (vscode.workspace as unknown as { onDidCloseTextDocument: unknown }).onDidCloseTextDocument =
-    () => ({ dispose: () => {} });
-  (vscode as unknown as { commands: unknown }).commands = {
-    executeCommand: async () => undefined,
-  };
-  (vscode as unknown as { ViewColumn: unknown }).ViewColumn = { Beside: 2 };
+  });
 }
 
 describe("single-file streams", () => {
@@ -51,8 +45,8 @@ describe("single-file streams", () => {
     ["xz", "xz"],
     ["bz2", "bzip2"],
   ] as const) {
-    itOrSkip(`list + decompress .${ext}`, async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), `sat_str_${ext}_`));
+    itIf("system7z", `list + decompress .${ext}`, async () => {
+      const td = tmpDir(`sat_str_${ext}_`);
       const src = path.join(td, "data.bin");
       fs.writeFileSync(src, "hello single-file stream\n".repeat(1000));
       const arc = path.join(td, `data.${ext}`);
@@ -77,8 +71,8 @@ describe("single-file streams", () => {
       fs.rmSync(td, { recursive: true, force: true });
     });
 
-    itOrSkip(`preview .${ext} extracts the single inner file`, async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), `sat_strprev_${ext}_`));
+    itIf("system7z", `preview .${ext} extracts the single inner file`, async () => {
+      const td = tmpDir(`sat_strprev_${ext}_`);
       const src = path.join(td, "data.bin");
       fs.writeFileSync(src, "hello single-file stream\n".repeat(1000));
       const arc = path.join(td, `data.${ext}`);
@@ -115,8 +109,8 @@ describe("wrapped vs stream confusion", () => {
     [".tar.xz", "xz"],
     [".tar.bz2", "bzip2"],
   ] as const) {
-    itOrSkip(`wrapped ${ext} lists tar entries, not a single stream entry`, async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_wrap_"));
+    itIf("system7z", `wrapped ${ext} lists tar entries, not a single stream entry`, async () => {
+      const td = tmpDir("sat_wrap_");
       const arc = mkArchive(td, ext, flag);
       const entries = await fetchFileList(arc);
       expect(entries.length).toBeGreaterThan(1);
@@ -124,8 +118,8 @@ describe("wrapped vs stream confusion", () => {
       fs.rmSync(td, { recursive: true, force: true });
     });
 
-    itOrSkip(`wrapped ${ext} decompresses to the tar tree`, async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_wrap2_"));
+    itIf("system7z", `wrapped ${ext} decompresses to the tar tree`, async () => {
+      const td = tmpDir("sat_wrap2_");
       const arc = mkArchive(td, ext, flag);
       const outDir = path.join(td, "out");
       fs.mkdirSync(outDir);
@@ -147,8 +141,8 @@ describe("wrapped vs stream confusion", () => {
       fs.rmSync(td, { recursive: true, force: true });
     });
 
-    itOrSkip(`wrapped ${ext} previews a file from inside the tar`, async () => {
-      const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_wrap3_"));
+    itIf("system7z", `wrapped ${ext} previews a file from inside the tar`, async () => {
+      const td = tmpDir("sat_wrap3_");
       const arc = mkArchive(td, ext, flag);
       stubVscodePreviewApis(arc);
       const before = new Set(fs.readdirSync(getPreviewTmpDir()));

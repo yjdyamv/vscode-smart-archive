@@ -5,9 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as path from "path";
-import * as fs from "fs";
-import * as os from "os";
+import * as iconv from "iconv-lite";
 import {
   buildTree,
   countTreeStats,
@@ -22,7 +20,9 @@ import {
   resetActiveInstances,
   disposeAllTracked,
 } from "./shared-setup";
+import { parse7zListing } from "../src/utils/parse7z";
 import type { FlatEntry } from "./shared-setup";
+import { tmpDir } from "./tmp";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -34,7 +34,7 @@ afterEach(() => {
   disposeAllTracked();
 });
 
-const _td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_"));
+const _td = tmpDir("sat_");
 describe("tree builder", () => {
   it("flat files only", () => {
     const entries: FlatEntry[] = [
@@ -104,6 +104,17 @@ describe("tree builder", () => {
     expect(tree.length).toBe(1);
     expect(tree[0].name).toBe("data.txt");
   });
+
+  it("directories carry hasMore when they have children", () => {
+    const entries: FlatEntry[] = [
+      { path: "src/main.ts", size: 10, type: "REGULAR_FILE" },
+      { path: "empty", size: 0, type: "DIRECTORY" },
+    ];
+    const tree = buildTree(entries, "test.zip");
+    const src = tree.find((n) => n.name === "src");
+    expect(src!.kind).toBe("DIRECTORY");
+    expect(src!.hasMore).toBe(true);
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════
@@ -117,12 +128,41 @@ describe("format utilities", () => {
     expect(fixArchiveEncoding("")).toBe("");
   });
 
+  it("fixArchiveEncoding recovers GBK mojibake (production logic)", () => {
+    // 7z decodes non-UTF-8 names as CP437; GBK bytes of a Chinese filename
+    // re-encoded through cp437 are the real-world mojibake shape. cp949
+    // also decodes these bytes (to hanja garbage) — cp936 must win.
+    const gbkBytes = iconv.encode("中文文件.txt", "gbk");
+    const mojibake = iconv.decode(gbkBytes, "cp437");
+    expect(fixArchiveEncoding(mojibake)).toBe("中文文件.txt");
+  });
+
+  it("fixArchiveEncoding recovers Shift-JIS kana filenames", () => {
+    // Full-width kana is the exact SJIS signature — no other code page
+    // can decode to it.
+    const sjisBytes = iconv.encode("テスト.txt", "shiftjis");
+    const mojibake = iconv.decode(sjisBytes, "cp437");
+    expect(fixArchiveEncoding(mojibake)).toBe("テスト.txt");
+  });
+
+  it("fixArchiveEncoding recovers EUC-KR hangul filenames", () => {
+    const euckrBytes = iconv.encode("실험결과.txt", "euc-kr");
+    const mojibake = iconv.decode(euckrBytes, "cp437");
+    expect(fixArchiveEncoding(mojibake)).toBe("실험결과.txt");
+  });
+
   it("getFullExt detects wrapped extensions", () => {
     expect(getFullExt("archive.tar.gz")).toBe(".tar.gz");
     expect(getFullExt("archive.tgz")).toBe(".tgz");
     expect(getFullExt("archive.tar.xz")).toBe(".tar.xz");
     expect(getFullExt("archive.7z")).toBe(".7z");
     expect(getFullExt("archive.zip")).toBe(".zip");
+  });
+
+  it("getFullExt resolves split volumes to the base extension", () => {
+    expect(getFullExt("archive.7z.001")).toBe(".7z");
+    expect(getFullExt("archive.zip.002")).toBe(".zip");
+    expect(getFullExt("archive.wim.001")).toBe(".wim");
   });
 
   it("formatCompactSize", () => {
@@ -157,17 +197,35 @@ describe("CJK encoding", () => {
     expect(found[0]).toBe(cjkName);
   });
 
-  it("archive round-trip via FS basename", async () => {
+  it("archive round-trip preserves CJK filenames and content", async () => {
     const j = await trackedJS7z();
     j.FS.mkdir("/in");
     const cjkName = "中文文件.txt";
     j.FS.writeFile("/in/" + cjkName, new Uint8Array(Buffer.from("world")));
     await run7z(j, ["a", "/cjk.7z", "/in/" + cjkName]);
     const buf = Buffer.from(j.FS.readFile("/cjk.7z", { encoding: "binary" }));
-    const j2 = await trackedJS7z();
+
+    // Listing parses through production parse7zListing.
+    let listing = "";
+    const j2 = await trackedJS7z({
+      print: (t: string) => (listing += t + "\n"),
+      printErr: () => {},
+    });
     j2.FS.writeFile("/cjk.7z", new Uint8Array(buf));
-    await run7z(j2, ["l", "-slt", "/cjk.7z"]);
-    expect(true).toBe(true); // no throw = success
+    await new Promise<void>((resolve, reject) => {
+      j2.onExit = (c: number) => (c === 0 ? resolve() : reject(new Error(`exit ${c}`)));
+      j2.callMain(["l", "-slt", "/cjk.7z"]);
+    });
+    const entries = parse7zListing(listing, "cjk.7z");
+    expect(entries.some((e) => e.path.includes("中文文件.txt"))).toBe(true);
+
+    // Extraction returns the original content.
+    const j3 = await trackedJS7z();
+    j3.FS.writeFile("/cjk.7z", new Uint8Array(buf));
+    j3.FS.mkdir("/out");
+    await run7z(j3, ["x", "/cjk.7z", "-o/out"]);
+    const got = Buffer.from(j3.FS.readFile("/out/中文文件.txt", { encoding: "binary" })).toString();
+    expect(got).toBe("world");
   });
 });
 

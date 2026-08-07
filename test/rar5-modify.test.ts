@@ -6,7 +6,6 @@
  * re-compress → atomic-swap rebuild pipeline.
  */
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,6 +27,7 @@ import {
   copyIntoArchive,
 } from "../src/providers/archive/rar5-modify";
 import { prepareExclusions } from "../src/utils/exclude";
+import { tmpDir } from "./tmp";
 
 const RAR5_SIG = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]);
 const RAR4_SIG = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00]);
@@ -48,7 +48,7 @@ function extractFixtureTree(outputDir: string): void {
 describe("assertRarModifiable", () => {
   let dir: string;
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5m-"));
+    dir = tmpDir("sat_rar5m-");
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -72,7 +72,7 @@ describe("assertRarModifiable", () => {
 describe("detectRarVersion", () => {
   let dir: string;
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5v-"));
+    dir = tmpDir("sat_rar5v-");
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -88,7 +88,7 @@ describe("detectRarVersion", () => {
 describe("archiveJoin", () => {
   let root: string;
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5j-"));
+    root = tmpDir("sat_rar5j-");
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
@@ -111,7 +111,7 @@ describe("rebuildRarArchive", () => {
   let archivePath: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5r-"));
+    dir = tmpDir("sat_rar5r-");
     archivePath = fakeArchive(dir, "out.rar");
     vi.clearAllMocks();
 
@@ -204,7 +204,7 @@ describe("rebuildRarArchive", () => {
 describe("copyIntoArchive", () => {
   let dir: string;
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar5c-"));
+    dir = tmpDir("sat_rar5c-");
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 

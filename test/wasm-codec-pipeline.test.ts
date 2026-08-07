@@ -8,7 +8,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { compressWith7z as compressCore } from "../src/engines/js7z-compress-core";
 import { decompressWith7z as decompressCore } from "../src/engines/js7z-decompress-core";
@@ -20,6 +19,7 @@ import {
   renameInArchiveCore,
 } from "../src/engines/modify-core";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
+import { tmpDir } from "./tmp";
 
 function readDirRecursive(dir: string, prefix = ""): Record<string, string> {
   const result: Record<string, string> = {};
@@ -48,14 +48,14 @@ describe("7zz-wasm wrapped-format pipeline", () => {
 
   for (const format of formats) {
     it(`${format}: compress → list → modify → preview → decompress`, async () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `sat_wasmpipe_${format.replace(".", "")}_`));
+      const tdir = tmpDir(`sat_wasmpipe_${format.replace(".", "")}_`);
       try {
-        const pkgDir = path.join(tmpDir, "pkg");
+        const pkgDir = path.join(tdir, "pkg");
         fs.mkdirSync(path.join(pkgDir, "src"), { recursive: true });
         fs.writeFileSync(path.join(pkgDir, "src", "main.ts"), "export const x = 1;");
         fs.writeFileSync(path.join(pkgDir, "readme.txt"), "readme content");
 
-        const archivePath = path.join(tmpDir, `bundle.${format}`);
+        const archivePath = path.join(tdir, `bundle.${format}`);
         await compressCore(
           {
             targets: [{ fsPath: pkgDir }],
@@ -85,13 +85,13 @@ describe("7zz-wasm wrapped-format pipeline", () => {
         expect(afterRename).toContain("pkg/renamed.txt");
         expect(afterRename).not.toContain("pkg/readme.txt");
 
-        const addedPath = path.join(tmpDir, "added.txt");
+        const addedPath = path.join(tdir, "added.txt");
         fs.writeFileSync(addedPath, "added content");
         await addToArchiveCore(archivePath, [addedPath], "pkg");
         const afterAdd = (await fetchFileListCore(archivePath)).map((e) => e.path);
         expect(afterAdd).toContain("pkg/added.txt");
 
-        const previewPath = path.join(tmpDir, "preview.txt");
+        const previewPath = path.join(tdir, "preview.txt");
         await previewFileCore(archivePath, "pkg/renamed.txt", undefined, previewPath);
         expect(fs.readFileSync(previewPath, "utf-8")).toBe("readme content");
 
@@ -100,14 +100,14 @@ describe("7zz-wasm wrapped-format pipeline", () => {
         expect(afterDelete).not.toContain("pkg/renamed.txt");
         expect(afterDelete).toContain("pkg/added.txt");
 
-        const extractDir = path.join(tmpDir, "out");
+        const extractDir = path.join(tdir, "out");
         await decompressCore({ inputPath: archivePath, outputDir: extractDir, password: "" });
         const extracted = readDirRecursive(extractDir);
         expect(extracted["pkg/src/main.ts"]).toBe("export const x = 1;");
         expect(extracted["pkg/added.txt"]).toBe("added content");
         expect(extracted["pkg/renamed.txt"]).toBeUndefined();
       } finally {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
+        fs.rmSync(tdir, { recursive: true, force: true });
       }
     });
   }

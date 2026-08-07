@@ -65,7 +65,8 @@ describe("rar5 platform config", () => {
     // hashes differ from the CI-built release assets — allowed when
     // byte-identical to the local dev build. Anything else that deviates
     // from the pinned hash fails the packaging gate.
-    const devProject = path.join(os.homedir(), "桌面", "smart-archive-rar");
+    const devProject =
+      process.env.SA_RAR5_DEV_PROJECT ?? path.join(os.homedir(), "桌面", "smart-archive-rar");
     for (const { triple, file } of staged) {
       const actual = crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
       if (actual === EXPECTED_HASHES[triple]) continue;

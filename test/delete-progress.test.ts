@@ -8,12 +8,13 @@
 
 import { describe, it, expect, afterAll } from "vitest";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
-import { execFileSync, spawnSync } from "child_process";
+import { execFileSync } from "child_process";
 import { deleteFromArchiveSystem7z } from "../src/engines/system7z";
+import { gate } from "./gates";
+import { tmpDir } from "./tmp";
 
-const td = fs.mkdtempSync(path.join(os.tmpdir(), "sadp_"));
+const td = tmpDir("sadp_");
 const BUNDLED_7Z = path.join(
   __dirname,
   "..",
@@ -23,17 +24,6 @@ const BUNDLED_7Z = path.join(
   process.arch,
   process.platform === "win32" ? "7zz.exe" : "7zz",
 );
-
-function canSpawn(bin: string): boolean {
-  try {
-    const r = spawnSync(bin, ["--help"], { encoding: "utf8", timeout: 5000 });
-    if (r.status === null || r.status === undefined) return false;
-    const out = (r.stdout || "") + (r.stderr || "");
-    return out.length > 0;
-  } catch {
-    return false;
-  }
-}
 
 function makeArchive(name: string, sizeMb = 64): string {
   const archive = path.join(td, name);
@@ -59,7 +49,7 @@ afterAll(() => {
   }
 });
 
-describe.runIf(canSpawn(BUNDLED_7Z))("deleteFromArchiveSystem7z", () => {
+describe.runIf(gate("bundled7zz"))("deleteFromArchiveSystem7z", () => {
   it("deletes entries without leaving temp files behind", async () => {
     const archive = makeArchive("rebuild.7z");
     await deleteFromArchiveSystem7z(archive, ["a-rebuild.7z.bin"]);

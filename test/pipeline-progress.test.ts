@@ -8,11 +8,13 @@
 
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import * as crypto from "node:crypto";
 import { compressWith7z } from "../src/engines/js7z-compress";
-import { compressWithSystem7z, detectSystem7z } from "../src/engines/system7z";
+import { compressWithSystem7z } from "../src/engines/system7z";
+
+import { itIf } from "./gates";
+import { tmpDir } from "./tmp";
 
 interface Report {
   stage?: "copy" | "pack" | "compress";
@@ -39,7 +41,7 @@ function expectStageProgress(pcts: number[]): void {
 
 describe("full-pipeline compress progress", () => {
   it("WASM wrapped pipeline (tar.br) scales progress across tar + codec", async () => {
-    const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_full_"));
+    const td = tmpDir("sat_full_");
     const src = path.join(td, "data.bin");
     // 5 × 50 MiB codec chunks → multiple reports in both phases. Random
     // data keeps the WASM brotli phase emitting percent updates
@@ -67,7 +69,7 @@ describe("full-pipeline compress progress", () => {
   });
 
   it("WASM volume compression (password forces WASM) reports compression-phase progress", async () => {
-    const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_vol_"));
+    const td = tmpDir("sat_vol_");
     const src = path.join(td, "data.bin");
     // Incompressible random data split into several 1m volumes so the
     // WASM compression phase takes long enough to emit multiple reports.
@@ -101,11 +103,9 @@ describe("full-pipeline compress progress", () => {
     fs.rmSync(td, { recursive: true, force: true });
   });
 
-  const hasSystem7z = !!detectSystem7z();
-  const itOrSkip = hasSystem7z ? it : it.skip;
 
-  itOrSkip("system-7z wrapped pipeline (tar.gz) scales progress across tar + gzip", async () => {
-    const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_full2_"));
+  itIf("system7z", "system-7z wrapped pipeline (tar.gz) scales progress across tar + gzip", async () => {
+    const td = tmpDir("sat_full2_");
     const src = path.join(td, "data.bin");
     // Incompressible data so the gzip step takes long enough to emit
     // multiple size-monitor reports.

@@ -9,9 +9,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 import type { HostMessage, WorkerMessage } from "../src/engines/worker/types";
 import { createArchiveWorkerHandler } from "../src/engines/worker/handler";
+import { verifyArchiveContents } from "./verify";
+import { tmpDir } from "./tmp";
 
 class FakePort {
   messages: WorkerMessage[] = [];
@@ -57,7 +58,7 @@ function initWorker(config?: Record<string, unknown>): void {
   });
 }
 
-const td = fs.mkdtempSync(path.join(os.tmpdir(), "saw_"));
+const td = tmpDir("saw_");
 
 beforeEach(() => {
   port = new FakePort();
@@ -102,8 +103,9 @@ describe("createArchiveWorkerHandler", () => {
       },
     });
     await promise;
-    expect(fs.existsSync(out)).toBe(true);
-    expect(fs.statSync(out).size).toBeGreaterThan(0);
+    await verifyArchiveContents(fs.readFileSync(out), {
+      "w1.txt": "worker handler test payload",
+    });
   });
 
   it("decompresses an archive and replies done", async () => {
@@ -364,14 +366,43 @@ describe("createArchiveWorkerHandler", () => {
     expect(fs.existsSync(path.join(outDir, "nested.tar.gz"))).toBe(false);
   });
 
-  it("applies reconfigure (locale + limits)", async () => {
+  it("applies reconfigure (locale + limits) and the next op still works", async () => {
     initWorker({ locale: "en" });
     port.send({
       type: "reconfigure",
       config: { locale: "zh-cn", limits: { maxFileSize: 123 }, useSystemZstd: "never" },
     });
-    // reconfigure applies synchronously; no response expected — just ensure
-    // the next op still works and no crash occurs.
     expect(port.ofType("error")).toHaveLength(0);
+
+    // The reconfigured worker must still produce correct archives.
+    const src = path.join(td, "w_reconf.txt");
+    fs.writeFileSync(src, "post-reconfigure payload");
+    const out = path.join(td, "w_reconf.7z");
+    const promise = new Promise<void>((resolve) => {
+      const check = () => {
+        if (port.last().type === "done") resolve();
+        else setTimeout(check, 10);
+      };
+      check();
+    });
+    port.send({
+      type: "request",
+      id: 9,
+      op: "compress",
+      payload: {
+        options: {
+          targets: [{ fsPath: src }],
+          format: { label: "7z", description: "", canCreate: true, supportsEncryption: false },
+          outputPath: out,
+          password: "",
+          level: 5,
+        },
+        excludePatterns: [],
+      },
+    });
+    await promise;
+    await verifyArchiveContents(fs.readFileSync(out), {
+      "w_reconf.txt": "post-reconfigure payload",
+    });
   });
 });
