@@ -3,8 +3,9 @@
  *
  * Both codecs can run on the native Node binding or the WASM engine.
  * `smart-archive.rar5Backend` / `smart-archive.snappyBackend` (auto /
- * native / wasm) are injected via setRar5Config / setSnappyConfig; the
- * legacy env overrides (SA_RAR5_FORCE_WASM / NAPI_RS_FORCE_WASI) still win.
+ * native / wasm) are injected via applyEngineConfig (the single config
+ * interface shared by host and worker); the legacy env overrides
+ * (SA_RAR5_FORCE_WASM / NAPI_RS_FORCE_WASI) still win.
  * Integration cases verify the setting alone can force the WASM engine.
  */
 
@@ -14,19 +15,19 @@ import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   resolveRar5Backend,
-  setRar5Config,
   resetRar5BindingCache,
   compressWithRar5,
   type Rar5Backend,
 } from "../src/engines/rar5-engine";
 import {
   resolveSnappyBackend,
-  setSnappyConfig,
   resetSnappyBindingCache,
   snappyCompress,
   snappyDecompress,
   type SnappyBackend,
 } from "../src/engines/snappy-codec";
+import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
+import type { EngineConfig } from "../src/engines/worker/types";
 
 const SNAPPY_WASM = path.join(
   __dirname,
@@ -45,9 +46,14 @@ const RAR5_WASM = path.join(
 
 const RAR5_SIG = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]);
 
+const NOOP_WARN = { warn: () => {} };
+
+function applyBackends(config: Partial<EngineConfig>): void {
+  applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG, ...config }, NOOP_WARN);
+}
+
 afterEach(() => {
-  setRar5Config({});
-  setSnappyConfig({});
+  applyBackends({});
   resetRar5BindingCache();
   resetSnappyBindingCache();
   delete process.env.SA_RAR5_FORCE_WASM;
@@ -56,42 +62,44 @@ afterEach(() => {
 
 describe("rar5 backend selection", () => {
   it("defaults to auto", () => {
+    applyBackends({});
     expect(resolveRar5Backend()).toBe("auto");
   });
 
   it("prefers SA_RAR5_FORCE_WASM=1 over the setting", () => {
-    setRar5Config({ backend: "native" });
+    applyBackends({ rar5Backend: "native" });
     process.env.SA_RAR5_FORCE_WASM = "1";
     expect(resolveRar5Backend()).toBe("wasm");
   });
 
   it("honours the injected setting", () => {
-    setRar5Config({ backend: "native" });
+    applyBackends({ rar5Backend: "native" });
     expect(resolveRar5Backend()).toBe("native");
-    setRar5Config({ backend: "wasm" });
+    applyBackends({ rar5Backend: "wasm" });
     expect(resolveRar5Backend()).toBe("wasm");
-    setRar5Config({ backend: "bogus" as unknown as Rar5Backend });
+    applyBackends({ rar5Backend: "bogus" as unknown as Rar5Backend });
     expect(resolveRar5Backend()).toBe("auto");
   });
 });
 
 describe("snappy backend selection", () => {
   it("defaults to auto", () => {
+    applyBackends({});
     expect(resolveSnappyBackend()).toBe("auto");
   });
 
   it("prefers NAPI_RS_FORCE_WASI over the setting", () => {
-    setSnappyConfig({ backend: "native" });
+    applyBackends({ snappyBackend: "native" });
     process.env.NAPI_RS_FORCE_WASI = "error";
     expect(resolveSnappyBackend()).toBe("wasm");
   });
 
   it("honours the injected setting", () => {
-    setSnappyConfig({ backend: "native" });
+    applyBackends({ snappyBackend: "native" });
     expect(resolveSnappyBackend()).toBe("native");
-    setSnappyConfig({ backend: "wasm" });
+    applyBackends({ snappyBackend: "wasm" });
     expect(resolveSnappyBackend()).toBe("wasm");
-    setSnappyConfig({ backend: "bogus" as unknown as SnappyBackend });
+    applyBackends({ snappyBackend: "bogus" as unknown as SnappyBackend });
     expect(resolveSnappyBackend()).toBe("auto");
   });
 });
@@ -100,7 +108,7 @@ describe("backend integration", () => {
   it.runIf(fs.existsSync(SNAPPY_WASM))(
     "snappy WASM backend round-trips via the setting",
     async () => {
-      setSnappyConfig({ backend: "wasm" });
+      applyBackends({ snappyBackend: "wasm" });
       const data = Buffer.from("backend wasm ".repeat(64));
       const compressed = await snappyCompress(data);
       expect(compressed.length).toBeGreaterThan(0);
@@ -112,7 +120,7 @@ describe("backend integration", () => {
   it.runIf(fs.existsSync(RAR5_WASM))(
     "rar5 WASM backend creates an archive via the setting",
     async () => {
-      setRar5Config({ backend: "wasm" });
+      applyBackends({ rar5Backend: "wasm" });
       const td = fs.mkdtempSync(path.join(os.tmpdir(), "sat_backend_"));
       try {
         const src = path.join(td, "a.txt");
