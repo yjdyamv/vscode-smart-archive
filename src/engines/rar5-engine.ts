@@ -25,7 +25,7 @@ import { withStage } from "../utils/progress-scale";
 import { prepareExclusions, isPathExcluded, isTargetExcluded } from "../utils/exclude";
 import { isMusl } from "../utils/platform";
 import { checkFileSize, checkTotalSize, parseSize } from "../utils/security";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger-core";
 
 /** The rar5 library supports compression levels 0..=5; 7z uses 0..=9. */
 function mapLevel(level: number): number {
