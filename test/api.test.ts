@@ -28,6 +28,18 @@ import {
   resolveArchiveExt,
   resolveEffectiveInput,
 } from "../src/api";
+import { detectSystem7z } from "../src/engines/system7z";
+
+const RAR5_BIN = path.join(__dirname, "..", "vendor", "rar5-bin");
+const RAR5_WASM = path.join(__dirname, "..", "vendor", "rar5-wasm");
+
+function rar5Staged(): boolean {
+  if (fs.existsSync(RAR5_WASM)) return true;
+  if (!fs.existsSync(RAR5_BIN)) return false;
+  return fs
+    .readdirSync(RAR5_BIN, { recursive: true })
+    .some((f) => String(f).endsWith(".node"));
+}
 
 // ── Pure helper tests ─────────────────────────────────────────────
 
@@ -453,7 +465,7 @@ describe("API compress round-trips", () => {
     );
   });
 
-  it("creates a RAR5 archive via the native engine", async () => {
+  it.runIf(rar5Staged())("creates a RAR5 archive via the rar5 engine", async () => {
     const rarTmp = fs.mkdtempSync(path.join(os.tmpdir(), "sat_rar_"));
     try {
       fs.mkdirSync(path.join(rarTmp, "proj", "sub"), { recursive: true });
@@ -481,7 +493,9 @@ describe("API compress round-trips", () => {
     }
   });
 
-  it("nonexistent target handled by engine (may warn but not throw via system7z)", async () => {
+  it.runIf(detectSystem7z() !== null)(
+    "nonexistent target handled by engine (may warn but not throw via system7z)",
+    async () => {
     // When system 7z encounters a missing input file, it may produce
     // an empty archive with warning (code 1) instead of throwing.
     // The command layer pre-validates targets before reaching compressWith7z.
@@ -491,7 +505,8 @@ describe("API compress round-trips", () => {
       outputPath: path.join(tmpDir, "empty.7z"),
     });
     expect(fs.existsSync(result)).toBe(true);
-  });
+    },
+  );
 });
 
 // ── Wrapped format helpers (pure logic) ──────────────────────────
