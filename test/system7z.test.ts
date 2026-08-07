@@ -5,11 +5,15 @@
  * These tests require a system 7-Zip installation and are skipped otherwise.
  */
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { compressWithSystem7z } from "../src/engines/system7z";
+import {
+  compressWithSystem7z,
+  detectSystem7z,
+  resetDetectionCache,
+} from "../src/engines/system7z";
 
 const { spawnSync } = require("child_process") as {
   spawnSync: (cmd: string, args: string[], opts?: Record<string, unknown>) => {
@@ -20,40 +24,15 @@ const { spawnSync } = require("child_process") as {
   };
 };
 
-function find7z(): string | null {
-  const candidates: string[] = [];
-  if (process.platform === "win32") {
-    candidates.push(
-      "C:\\Program Files\\7-Zip\\7z.exe",
-      "C:\\Program Files (x86)\\7-Zip\\7z.exe",
-    );
-  }
-  candidates.push("7z", "7z.exe", "7za", "7za.exe");
-
-  for (const c of candidates) {
-    if (fs.existsSync(c)) {
-      const r = spawnSync(c, [], { stdio: "pipe", timeout: 5000 });
-      if (r.status === 0) return c;
-    }
-  }
-
-  for (const name of process.platform === "win32" ? ["7z.exe", "7za.exe"] : ["7z", "7za"]) {
-    try {
-      const whichCmd = process.platform === "win32" ? "where" : "which";
-      const r = spawnSync(whichCmd, [name], { stdio: "pipe", timeout: 5000 });
-      if (r.status === 0 && r.stdout.length > 0) {
-        const found = r.stdout.toString().trim().split("\n")[0].trim();
-        if (fs.existsSync(found)) return found;
-      }
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
-
-const sz = find7z();
+// Use the engine's own detection (bundled 7-Zip ZS first, then a system
+// install that passes its version/capability gates). CI runners often ship
+// p7zip 16.02, which the engine rejects — those runs must skip, not fail.
+const sz = detectSystem7z();
 const itOrSkip = sz ? it : it.skip;
+
+afterEach(() => {
+  resetDetectionCache();
+});
 
 describe("system 7-Zip", () => {
   itOrSkip("detects system 7-Zip installation", () => {
