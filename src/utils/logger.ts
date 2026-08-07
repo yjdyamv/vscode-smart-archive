@@ -169,10 +169,6 @@ export const logger = {
     coreLogger.error(obj, msg);
   },
 
-  throw(event: string, err: unknown, data?: Record<string, unknown>): never {
-    return coreLogger.throw(event, err, data);
-  },
-
   dispose(): void {
     // Reset state so a re-activation (same process) starts with a fresh
     // level and history; the next setLevel rebuilds the panel and purges

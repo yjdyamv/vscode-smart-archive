@@ -24,11 +24,14 @@ export class CancelledError extends Error {
 
 /**
  * True for vscode.CancellationError and CancelledError alike.
+ * Also true for "AbortError" (DOMException from AbortController.reject) —
+ * the rar5 native binding surfaces cancellation as an AbortError rejection,
+ * and this module owns every AbortController in the codebase.
  * Use at every catch site that previously did `instanceof vscode.CancellationError`.
  */
 export function isCancellationError(err: unknown): boolean {
   if (err instanceof CancelledError) return true;
-  if (err instanceof Error && err.name === "Cancelled") return true;
+  if (err instanceof Error && (err.name === "Cancelled" || err.name === "AbortError")) return true;
   return false;
 }
 
