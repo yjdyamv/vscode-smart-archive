@@ -9,7 +9,7 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import { isEncrypted } from "../../engines/js7z-engine";
+import { isEncrypted } from "../../engines/js7z-list";
 import {
   getFullExt,
   isWrappedFormat,

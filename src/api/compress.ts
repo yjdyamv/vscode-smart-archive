@@ -14,11 +14,17 @@
 
 import * as path from "path";
 import * as fs from "fs";
-import type { CompressOptions, FormatInfo } from "../types";
-import { compressWith7z } from "../engines/js7z-engine";
-import { COMPRESS_FORMATS, COMPRESS_EXCLUDE_DEFAULTS, getFullExt } from "../constants";
+import type { CompressOptions } from "../types";
+import { compressWith7z } from "../engines/js7z-compress";
+import { COMPRESS_EXCLUDE_DEFAULTS, lookupFormat } from "../constants";
 import { validatePassword } from "../utils/security";
 import { logger } from "../utils/logger";
+
+// Production helpers live next to their data (constants) and their domain
+// (utils/path); re-exported here so the api/ surface stays a stable test
+// entry point without hosting the logic.
+export { lookupFormat } from "../constants";
+export { resolveSaveName } from "../utils/path";
 
 /**
  * Parameters for a compression operation.
@@ -46,26 +52,6 @@ export interface CompressParams {
 }
 
 /**
- * Look up a FormatInfo entry by its label.
- * Throws if the format is unknown or not creatable.
- */
-export function lookupFormat(label: string): FormatInfo {
-  const found = COMPRESS_FORMATS.find((f) => f.label === label);
-  if (!found) {
-    throw new Error(
-      `Unknown or non-creatable format: "${label}". ` +
-        `Available: ${COMPRESS_FORMATS.map((f) => f.label).join(", ")}`,
-    );
-  }
-  return {
-    label: found.label,
-    description: found.description,
-    canCreate: found.canCreate,
-    supportsEncryption: found.supportsEncryption,
-  };
-}
-
-/**
  * Generate a default output path when none is provided.
  *
  * - Single target: derives from target name (mountain → mountain.7z)
@@ -85,26 +71,6 @@ export function resolveOutputPath(targets: string[], format: string, outputDir?:
     return path.join(dir, `${baseName}.${ext}`);
   }
   return path.join(dir, `archive.${ext}`);
-}
-
-/**
- * Clean a filename by stripping all trailing compound extensions,
- * then re-appending the format extension.
- *
- * e.g. "report.tar.lz4.tar.lz4" → "report.tar.lz4"
- *
- * Mirrors the logic in compressCommand's promptSaveNameWizard.
- */
-export function resolveSaveName(raw: string, ext: string): string {
-  let clean = raw.trim();
-  let prev = "";
-  while (prev !== clean) {
-    prev = clean;
-    const e = getFullExt(clean) || path.extname(clean);
-    if (!e) break;
-    clean = path.basename(clean, e);
-  }
-  return `${clean}.${ext}`;
 }
 
 /**

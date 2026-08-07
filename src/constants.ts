@@ -335,6 +335,26 @@ export const COMPRESS_FORMATS: FormatInfo[] = FORMAT_TABLE.filter((f) => f.canCr
     );
   });
 
+/**
+ * Look up a creatable format by its label (e.g. "7z", "tar.gz").
+ * Throws if the format is unknown or not creatable.
+ */
+export function lookupFormat(label: string): FormatInfo {
+  const found = COMPRESS_FORMATS.find((f) => f.label === label);
+  if (!found) {
+    throw new Error(
+      `Unknown or non-creatable format: "${label}". ` +
+        `Available: ${COMPRESS_FORMATS.map((f) => f.label).join(", ")}`,
+    );
+  }
+  return {
+    label: found.label,
+    description: found.description,
+    canCreate: found.canCreate,
+    supportsEncryption: found.supportsEncryption,
+  };
+}
+
 /** Regex for RAR-family extensions (including multi-volume .r00–.r99) */
 export { isRarExt } from "./utils/rar";
 

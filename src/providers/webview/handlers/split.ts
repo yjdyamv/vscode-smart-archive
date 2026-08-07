@@ -12,7 +12,7 @@ import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
-import { ArchiveService } from "../../../services/archiveService";
+import { convertArchive } from "../../../services/archiveService";
 import { promptVolumeSize } from "../../../ui/prompts";
 import { startOperation, endOperation } from "../state";
 
@@ -40,7 +40,7 @@ export const handleSplit: MessageHandler = async (ctx) => {
     }
     const dst = path.join(folderPath, base);
     webview.postMessage({ c: "loading", t: t("archive.splitting") });
-    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", volSize, undefined, token);
+    await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, undefined, token);
     logger.info({ event: "webview.split.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
   } catch (err) {
