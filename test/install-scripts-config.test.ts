@@ -16,7 +16,11 @@ import {
   REPO as REPOWASM,
   TAG as TAGWASM,
 } from "../scripts/install-7zz-wasm.js";
-import { EXPECTED_HASHES as HSN, PACKAGES } from "../scripts/install-snappy-platforms.js";
+import {
+  EXPECTED_HASHES as HSN,
+  PACKAGES,
+  WASM_ASSETS,
+} from "../scripts/install-snappy-platforms.js";
 import {
   SEVEN_ZIP_ZSTD_REPO,
   SEVEN_ZIP_ZSTD_TAG,
@@ -76,8 +80,8 @@ describe("7zz-wasm installer config", () => {
 });
 
 describe("snappy installer config", () => {
-  it("pins exactly the staged packages", () => {
-    expect(Object.keys(HSN).sort()).toEqual([...PACKAGES].sort());
+  it("pins exactly the staged packages and WASI assets", () => {
+    expect(Object.keys(HSN).sort()).toEqual([...PACKAGES, ...WASM_ASSETS].sort());
   });
 
   it("hashes are 64-char lowercase hex", () => {

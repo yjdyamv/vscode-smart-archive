@@ -42,6 +42,38 @@ jobs:
       - run: npm run check
       - run: npm test
 
+  # Exercise the RAR5 WASI fallback (wasm32-wasip1-threads): stages only the
+  # wasm bundle from the smart-archive-rar release and forces the extension's
+  # rar5 engine onto it (SA_RAR5_FORCE_WASM is set inside the test file).
+  test-rar5-wasm:
+    name: Test RAR5 WASI fallback
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Stage RAR5 WASI bundle
+        env:
+          SA_RAR5_PLATFORMS: ""
+          SA_RAR5_REQUIRE: "1"
+        run: node scripts/install-rar5-platforms.js
+      - run: npx vitest run test/rar5-wasm.test.ts
+
+  test-snappy-wasm:
+    name: Test snappy WASI fallback
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Stage snappy native + WASI assets
+        run: node scripts/install-snappy-platforms.js
+      - run: npx vitest run test/snappy-wasm.test.ts
+
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')

@@ -2,18 +2,21 @@
  * RAR5 creation engine — Smart Archive VSCode Extension
  *
  * Native napi-rs binding (`smart-archive-rar`) wrapping the pure-Rust
- * `rar5` library (codeberg.org/yjdyamv/rar-rs fork). Creates RAR5
- * archives with AES-256 encryption, multi-volume output, and progress
- * reporting — no external binary required, and passwords never touch
- * the command line.
+ * `rar5` library (codeberg.org/yjdyamv/rar-rs fork), with a WASI
+ * (wasm32-wasip1-threads) fallback when no native `.node` matches the host.
+ * Creates RAR5 archives with AES-256 encryption, multi-volume output, and
+ * progress reporting — no external binary required, and passwords never
+ * touch the command line.
  *
  * The platform .node binary is staged under vendor/rar5-bin/<platform>/<arch>/
- * by scripts/install-rar5-platforms.js.
+ * by scripts/install-rar5-platforms.js; the WASI bundle lives under
+ * vendor/rar5-wasm/ (smart-archive-rar.wasi.cjs + wasm modules + worker).
  *
  * @module engines/rar5-engine
  */
 
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import type { CompressOptions } from "../types";
 import { CancelledError, isCancellationError } from "../utils/cancellation";
@@ -39,9 +42,10 @@ export function resolveRarTriple(): string {
       if (arch === "arm") return "linux-arm-gnueabihf";
       throw new Error(`unsupported linux arch: ${arch}`);
     case "darwin":
-      if (arch === "x64") return "darwin-x64";
       if (arch === "arm64") return "darwin-arm64";
-      throw new Error(`unsupported darwin arch: ${arch}`);
+      throw new Error(
+        `unsupported darwin arch: ${arch} (native rar5 is arm64-only; WASI fallback applies)`,
+      );
     case "win32":
       if (arch === "x64") return "win32-x64-msvc";
       if (arch === "ia32") return "win32-ia32-msvc";
@@ -79,36 +83,82 @@ interface Rar5Binding {
 let binding: Rar5Binding | undefined;
 let bindingError: Error | undefined;
 
+function loadNativeBinding(): Rar5Binding {
+  const triple = resolveRarTriple();
+  const rel = path.join(
+    "vendor",
+    "rar5-bin",
+    process.platform,
+    process.arch,
+    `smart-archive-rar.${triple}.node`,
+  );
+  // Compiled bundle: out/extension.js → <root>/vendor/rar5-bin. Vitest/dev
+  // (source modules): src/engines/... → <root>/vendor/rar5-bin. Try both.
+  const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
+  const nodePath = candidates.find((c) => fs.existsSync(c));
+  if (!nodePath) {
+    throw new Error(
+      `rar5 native module not found (tried: ${candidates.join(", ")}) — run ` +
+        "`SA_RAR5_DEV=1 node scripts/install-rar5-platforms.js` or publish prebuilds",
+    );
+  }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  binding = require(nodePath) as Rar5Binding;
+  logger.info({ event: "rar5.bindingLoaded", triple, path: nodePath });
+  return binding;
+}
+
+function loadWasmBinding(): Rar5Binding {
+  const rel = path.join("vendor", "rar5-wasm", "smart-archive-rar.wasi.cjs");
+  const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
+  const loaderPath = candidates.find((c) => fs.existsSync(c));
+  if (!loaderPath) {
+    throw new Error(
+      `rar5 wasm loader not found (tried: ${candidates.join(", ")}) — run ` +
+        "`SA_RAR5_DEV=1 node scripts/install-rar5-platforms.js` after building the WASI target",
+    );
+  }
+  // WASI cannot see the host CPU count; the generated loader forwards
+  // process.env to its worker threads, so size the guest Rayon pools from
+  // the real host. SA_RAR5_WASM_WORKERS stays user-overridable.
+  if (!process.env.SA_RAR5_WASM_WORKERS) {
+    const cores =
+      typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
+    process.env.SA_RAR5_WASM_WORKERS = String(Math.max(1, cores));
+  }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  binding = require(loaderPath) as Rar5Binding;
+  logger.info({
+    event: "rar5.wasmLoaded",
+    path: loaderPath,
+    workers: process.env.SA_RAR5_WASM_WORKERS,
+  });
+  return binding;
+}
+
 function loadBinding(): Rar5Binding {
   if (binding) return binding;
   if (bindingError) throw bindingError;
-  try {
-    const triple = resolveRarTriple();
-    const rel = path.join(
-      "vendor",
-      "rar5-bin",
-      process.platform,
-      process.arch,
-      `smart-archive-rar.${triple}.node`,
-    );
-    // Compiled bundle: out/extension.js → <root>/vendor/rar5-bin. Vitest/dev
-    // (source modules): src/engines/... → <root>/vendor/rar5-bin. Try both.
-    const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
-    const nodePath = candidates.find((c) => fs.existsSync(c));
-    if (!nodePath) {
-      throw new Error(
-        `rar5 native module not found (tried: ${candidates.join(", ")}) — run ` +
-          "`SA_RAR5_DEV=1 node scripts/install-rar5-platforms.js` or publish prebuilds",
-      );
+  const errors: Error[] = [];
+  if (process.env.SA_RAR5_FORCE_WASM !== "1") {
+    try {
+      return loadNativeBinding();
+    } catch (err) {
+      const wrapped = err instanceof Error ? err : new Error(String(err));
+      errors.push(wrapped);
+      logger.warn({ event: "rar5.nativeUnavailable", error: wrapped.message });
     }
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    binding = require(nodePath) as Rar5Binding;
-    logger.info({ event: "rar5.bindingLoaded", triple, path: nodePath });
-  } catch (err) {
-    bindingError = err instanceof Error ? err : new Error(String(err));
-    throw bindingError;
   }
-  return binding;
+  try {
+    return loadWasmBinding();
+  } catch (err) {
+    errors.push(err instanceof Error ? err : new Error(String(err)));
+  }
+  bindingError = new Error(
+    `rar5 engine unavailable (native and WASI fallback both failed): ` +
+      errors.map((e) => e.message).join(" | "),
+  );
+  throw bindingError;
 }
 
 /** Collect disk entries with exclusion filtering applied at every level. */

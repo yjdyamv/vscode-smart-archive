@@ -7,6 +7,14 @@ const { execFileSync } = require("child_process");
  * Returns the raw .node data, or null if not found.
  */
 function extractNodeFromTgz(tgzBuf) {
+  return extractFileFromTgz(tgzBuf, (name) => name.endsWith(".node"));
+}
+
+/**
+ * Extract a file from a gzipped npm tarball (tgz) by exact suffix/name
+ * predicate. Returns the raw file data, or null if not found.
+ */
+function extractFileFromTgz(tgzBuf, match) {
   const BLOCK = 512;
   let pos = 0;
   const buf = tgzBuf;
@@ -27,7 +35,8 @@ function extractNodeFromTgz(tgzBuf) {
       continue;
     }
     const dataEnd = pos + Math.ceil(size / BLOCK) * BLOCK;
-    if (!isDir && name.endsWith(".node")) return buf.subarray(pos, pos + size);
+    const wanted = typeof match === "function" ? match(name) : match;
+    if (!isDir && wanted) return buf.subarray(pos, pos + size);
     pos = dataEnd;
   }
   return null;
@@ -146,6 +155,7 @@ function extractArchive(
 
 module.exports = {
   extractNodeFromTgz,
+  extractFileFromTgz,
   findFileInTree,
   findHostSevenZip,
   extractArchive,

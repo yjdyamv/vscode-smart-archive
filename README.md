@@ -129,6 +129,7 @@ npm run release          # build + check + package
 | Package | Purpose |
 |---------|---------|
 | [7-Zip ZS 26.02 WebAssembly](https://github.com/yjdyamv/7-Zip-zstd-wasm) | Bundled WASM fallback (`vendor/7zz-wasm`, downloaded at install; all compression & extraction; parallel zstd, standard lz4; brotli backend configurable — node:zlib default / WASM / bundled 7z planned) |
+| [smart-archive-rar](https://github.com/yjdyamv/smart-archive-rar) | RAR5 creation engine — native napi-rs binding with a WASI (`wasm32-wasip1-threads`) fallback; AES-256, header encryption, multi-volume, recovery records, progress |
 | [zstd-napi](https://github.com/drakedevel/zstd-napi) | Zstandard compression fast path (decompression runs on WASM) |
 | [lz4-napi](https://github.com/antoniomuso/lz4-napi) | LZ4 native binding used by tests/verification; runtime codec is WASM |
 | Node.js `zlib` (built-in) | Brotli native binding used by tests/verification; runtime codec is WASM |
