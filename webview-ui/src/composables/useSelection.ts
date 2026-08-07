@@ -2,6 +2,8 @@ import { reactive, watch } from "vue";
 import { saveState, loadState } from "./useMessage";
 import { SAVE_DEBOUNCE_MS } from "../constants";
 
+export type SelectionController = ReturnType<typeof useSelection>;
+
 export function useSelection() {
   const saved = loadState<{ sel?: string[]; anchor?: string | null; lastAdd?: string }>();
   const state = reactive({
