@@ -41,6 +41,7 @@ import { getBaseName } from "../utils/path";
 import {
   BINARY_DETECT_TIMEOUT,
   RUN7Z_TIMEOUT,
+  CHILD_CAPTURE_MAX_BYTES,
   SPAWN_CAPTURE_TIMEOUT,
   getFullExt,
 } from "../constants";
@@ -1179,7 +1180,7 @@ export function spawnCapture(
     // All actual passwords are passed via -p<value> on the command line.
     proc.stdin?.end();
 
-    const MAX_CAPTURE_BYTES = 500 * 1024 * 1024; // 500 MB
+    const MAX_CAPTURE_BYTES = CHILD_CAPTURE_MAX_BYTES;
     let totalCaptured = 0;
 
     const timer = setTimeout(() => {
@@ -1376,7 +1377,7 @@ function run7z(
     // are passed on the command line via -p<password> flag.
     proc.stdin?.end();
 
-    const MAX_RUN_BYTES = 500 * 1024 * 1024;
+    const MAX_RUN_BYTES = CHILD_CAPTURE_MAX_BYTES;
     let runBytes = 0;
 
     const timeoutTimer = setTimeout(() => {

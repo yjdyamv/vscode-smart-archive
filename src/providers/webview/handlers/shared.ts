@@ -9,7 +9,12 @@ import * as path from "path";
 import * as fs from "fs";
 import { spawnCapture, system7zForExt } from "../../../engines/system7z";
 import { validatePassword } from "../../../utils/security";
-import { getFullExt, COMPRESS_FORMATS, removeVolumeSuffix } from "../../../constants";
+import {
+  getFullExt,
+  COMPRESS_FORMATS,
+  removeVolumeSuffix,
+  PASSWORD_VERIFY_TIMEOUT_MS,
+} from "../../../constants";
 import { getVolumeSizes, toBinaryVolumeSize } from "../../../utils/volume-sizes";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
@@ -173,7 +178,11 @@ export async function verifyArchivePassword(
   const sz = system7zForExt(getFullExt(archivePath));
   if (sz) {
     try {
-      const { code } = await spawnCapture(sz, ["t", `-p${password}`, archivePath], 15_000);
+      const { code } = await spawnCapture(
+        sz,
+        ["t", `-p${password}`, archivePath],
+        PASSWORD_VERIFY_TIMEOUT_MS,
+      );
       return code === 0;
     } catch (err) {
       logger.warn(

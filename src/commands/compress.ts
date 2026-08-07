@@ -14,7 +14,12 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { compressWith7z } from "../engines/js7z-compress";
-import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS, lookupFormat } from "../constants";
+import {
+  COMPRESS_EXCLUDE_DEFAULTS,
+  COMPRESS_FORMATS,
+  DEFAULT_COMPRESSION_LEVEL,
+  lookupFormat,
+} from "../constants";
 import { resolveSaveName } from "../utils/path";
 import { getVolumeSizes } from "../utils/volume-sizes";
 import { parseSize } from "../utils/security";
@@ -184,7 +189,7 @@ async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
 
 async function promptLevelWizard(): Promise<StepResult<number>> {
   const config = vscode.workspace.getConfiguration("smart-archive");
-  const defaultLevel = config.get<number>("defaultCompressionLevel", 5);
+  const defaultLevel = config.get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL);
   const labels = compressLevels();
   const defaultIdx = LEVEL_VALUES.indexOf(defaultLevel);
   const order = LEVEL_VALUES.map((_, i) => i);
@@ -351,7 +356,7 @@ export async function compressCommand(
 
   // ── Wizard state ──
   let format: FormatInfo | undefined;
-  let level = 5;
+  let level = DEFAULT_COMPRESSION_LEVEL;
   let volumeSize: string | undefined;
   let doEncrypt = false;
   let password = "";
