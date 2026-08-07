@@ -16,9 +16,8 @@ import { snappyCompressFile } from "../src/engines/snappy-codec";
 import { brotliCompressFile } from "../src/engines/brotli-codec";
 import {
   zstdCompressFile,
-  setZstdConfig,
-  resetZstdDetectionCache,
 } from "../src/engines/zstd-codec";
+import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
 
 function makeInput(name: string, sizeMb = 120, random = false): string {
@@ -74,8 +73,7 @@ describe("codec compress progress", () => {
   });
 
   it("zstd (native path) reports message + increment", async () => {
-    setZstdConfig({ useSystemZstd: "never" });
-    resetZstdDetectionCache();
+    applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG, useSystemZstd: "never" }, { warn: () => {} });
     try {
       const input = makeInput("in.tar");
       const output = input + ".zst";
@@ -85,8 +83,7 @@ describe("codec compress progress", () => {
       expectDeterminateProgress(reports);
       fs.rmSync(path.dirname(input), { recursive: true, force: true });
     } finally {
-      setZstdConfig({});
-      resetZstdDetectionCache();
+      applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG }, { warn: () => {} });
     }
   });
 });

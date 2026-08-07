@@ -26,20 +26,12 @@ import {
   createFolderInArchiveCore,
   previewFileCore,
   testArchiveCore,
-  setModifyConfig,
 } from "../modify-core";
 import { extractSelectedCore } from "../extract-core";
 import { unwrapInnerTar } from "../js7z-decompress-core";
 import type { ModifyPayload } from "./types";
-import { setLocale } from "../../i18n";
-import { WORKER_MEMORY_LIMIT_DEFAULT_MB } from "../../constants";
-import { setSecurityLimits } from "../../utils/security";
-import { setZstdConfig, resetZstdDetectionCache } from "../zstd-codec";
-import { setBrotliConfig } from "../brotli-codec";
-import { setRar5Config } from "../rar5-engine";
-import { setSnappyConfig } from "../snappy-codec";
+import { applyEngineConfig } from "../engine-config";
 import { setLoggerSink } from "../../utils/logger-core";
-import { setWorkerMemoryLimitMb } from "./memory-guard";
 import { isCancellationError } from "../../utils/cancellation";
 import type { TokenLike, ProgressLike, ProgressStage } from "../../utils/cancellation";
 import { logger } from "../../utils/logger-core";
@@ -59,24 +51,11 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
   }
 
   function applyConfig(config: EngineConfig): void {
-    setLocale(config.locale ?? "en");
-    setSecurityLimits(config.limits ?? {});
-    setZstdConfig({
-      useSystemZstd: config.useSystemZstd ?? "auto",
+    // Same pipeline the host runs at activation / settings change — one
+    // interface keeps worker and host engine behaviour in lockstep.
+    applyEngineConfig(config, {
       warn: (message) => post({ type: "notify", message }),
     });
-    setBrotliConfig({
-      backend: config.brotliBackend ?? "node",
-      warn: (message) => post({ type: "notify", message }),
-    });
-    setRar5Config({ backend: config.rar5Backend ?? "auto" });
-    setSnappyConfig({ backend: config.snappyBackend ?? "auto" });
-    // A setting change may flip the system-zstd decision — drop the cached
-    // detection result so the next zstd op re-detects.
-    resetZstdDetectionCache();
-    setWorkerMemoryLimitMb(config.workerMemoryMb ?? WORKER_MEMORY_LIMIT_DEFAULT_MB);
-    setModifyConfig({ compressionLevel: config.compressionLevel ?? 5 });
-    logger.setLevel(config.logLevel ?? "info");
   }
 
   function makeToken(requestId: number): TokenLike {

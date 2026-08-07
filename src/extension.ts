@@ -21,9 +21,6 @@ import {
 } from "./providers/webview/expandedState";
 import { initTempCleanup } from "./providers/tempFiles";
 import { resetDetectionCache } from "./engines/system7z";
-import { resetZstdDetectionCache } from "./engines/zstd-codec";
-import { resetRar5BindingCache } from "./engines/rar5-engine";
-import { resetSnappyBindingCache } from "./engines/snappy-codec";
 import { applyHostConfig } from "./utils/config";
 import { disposeBurstLoggers } from "./providers/webview/router";
 import { resetArchiveRunner, reconfigureArchiveWorker } from "./engines/worker/runner";
@@ -47,8 +44,9 @@ export function activate(context: vscode.ExtensionContext): void {
   logger.info({ event: "extension.archiveProvider.registered" });
 
   // Invalidate cached engine detection when the relevant setting changes, so
-  // switching useSystem7z (e.g. to "bundled") or useSystemZstd applies without
-  // a window reload.
+  // switching useSystem7z (e.g. to "bundled") applies without a window
+  // reload. applyHostConfig already re-applies the other engine settings
+  // (including zstd/rar5/snappy backend cache resets via engine-config).
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       applyHostConfig();
@@ -56,9 +54,6 @@ export function activate(context: vscode.ExtensionContext): void {
       // worker keeps stale limits/zstd settings until it is restarted.
       reconfigureArchiveWorker();
       if (e.affectsConfiguration("smart-archive.useSystem7z")) resetDetectionCache();
-      if (e.affectsConfiguration("smart-archive.useSystemZstd")) resetZstdDetectionCache();
-      if (e.affectsConfiguration("smart-archive.rar5Backend")) resetRar5BindingCache();
-      if (e.affectsConfiguration("smart-archive.snappyBackend")) resetSnappyBindingCache();
     }),
   );
 
