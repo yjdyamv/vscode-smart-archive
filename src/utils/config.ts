@@ -18,6 +18,8 @@ import {
 import { setLocale } from "../i18n";
 import { setZstdConfig } from "../engines/zstd-codec";
 import { setBrotliConfig } from "../engines/brotli-codec";
+import { setRar5Config, type Rar5Backend } from "../engines/rar5-engine";
+import { setSnappyConfig, type SnappyBackend } from "../engines/snappy-codec";
 import { logger, setHistoryBudget } from "./logger";
 import type { EngineConfig } from "../engines/worker/types";
 import {
@@ -42,6 +44,8 @@ export function readEngineConfig(): EngineConfig {
     },
     useSystemZstd: config.get<string>("useSystemZstd", "auto"),
     brotliBackend: config.get<string>("brotliBackend", "node"),
+    rar5Backend: validBackend(config.get<string>("rar5Backend", "auto")),
+    snappyBackend: validBackend(config.get<string>("snappyBackend", "auto")),
     compressionLevel: config.get<number>("defaultCompressionLevel", 5),
     workerMemoryMb:
       typeof memMb === "number" && Number.isFinite(memMb)
@@ -49,6 +53,10 @@ export function readEngineConfig(): EngineConfig {
         : WORKER_MEMORY_LIMIT_DEFAULT_MB,
     logLevel: validLogLevel(config.get<string>("logLevel", "info")),
   };
+}
+
+function validBackend(raw: string): Rar5Backend | SnappyBackend {
+  return raw === "native" || raw === "wasm" ? raw : "auto";
 }
 
 function validLogLevel(raw: string): "error" | "warn" | "info" | "debug" {
@@ -80,6 +88,8 @@ export function applyHostConfig(): void {
       void vscode.window.showWarningMessage(message);
     },
   });
+  setRar5Config({ backend: config.rar5Backend });
+  setSnappyConfig({ backend: config.snappyBackend });
 }
 
 /** Read and clamp the logHistoryBytes setting into its documented bounds. */

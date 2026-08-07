@@ -22,6 +22,8 @@ import {
 import { initTempCleanup } from "./providers/tempFiles";
 import { resetDetectionCache } from "./engines/system7z";
 import { resetZstdDetectionCache } from "./engines/zstd-codec";
+import { resetRar5BindingCache } from "./engines/rar5-engine";
+import { resetSnappyBindingCache } from "./engines/snappy-codec";
 import { applyHostConfig } from "./utils/config";
 import { disposeBurstLoggers } from "./providers/webview/router";
 import { resetArchiveRunner, reconfigureArchiveWorker } from "./engines/worker/runner";
@@ -55,6 +57,8 @@ export function activate(context: vscode.ExtensionContext): void {
       reconfigureArchiveWorker();
       if (e.affectsConfiguration("smart-archive.useSystem7z")) resetDetectionCache();
       if (e.affectsConfiguration("smart-archive.useSystemZstd")) resetZstdDetectionCache();
+      if (e.affectsConfiguration("smart-archive.rar5Backend")) resetRar5BindingCache();
+      if (e.affectsConfiguration("smart-archive.snappyBackend")) resetSnappyBindingCache();
     }),
   );
 

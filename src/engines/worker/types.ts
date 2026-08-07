@@ -22,6 +22,10 @@ export interface EngineConfig {
   useSystemZstd?: string;
   /** Brotli backend: node | wasm | 7z (bundled 7z planned) */
   brotliBackend?: string;
+  /** RAR5 backend: auto | native | wasm */
+  rar5Backend?: "auto" | "native" | "wasm";
+  /** Snappy backend: auto | native | wasm */
+  snappyBackend?: "auto" | "native" | "wasm";
   /** Worker RSS memory guard threshold in MiB (0 = disabled) */
   workerMemoryMb?: number;
   /** Default compression level (0-9) for wrapped-format mutations */
