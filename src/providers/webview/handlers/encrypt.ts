@@ -10,7 +10,7 @@ import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt, isSplitVolume } from "../../../constants";
-import { ArchiveService } from "../../../services/archiveService";
+import { convertArchive } from "../../../services/archiveService";
 import { startOperation, endOperation } from "../state";
 import { uniquePath } from "../helpers";
 import { pwInputBox, resolveWritableFormat, detectVolumeSize, getSplitOutputPath } from "./shared";
@@ -55,7 +55,7 @@ export const handleEncrypt: MessageHandler = async (ctx) => {
       dst = uniquePath(s.filePath.slice(0, -ext.length) + "_encrypted." + fmt);
     }
     webview.postMessage({ c: "loading", t: t("archive.encrypting") });
-    await ArchiveService.convert(s.filePath, fmt, dst, s.password ?? "", volSize, newPw, token);
+    await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw, token);
     logger.info({ event: "webview.encrypt.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
     webview.postMessage({ c: "encState", v: true });

@@ -10,7 +10,7 @@ import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
-import { ArchiveService } from "../../../services/archiveService";
+import { convertArchive } from "../../../services/archiveService";
 import { startOperation, endOperation } from "../state";
 import { getSplitVolumeStem, resolveWritableFormat } from "./shared";
 
@@ -30,15 +30,7 @@ export const handleMerge: MessageHandler = async (ctx) => {
     const base = getSplitVolumeStem(s.filePath);
     const dst = base + "." + fmt;
     webview.postMessage({ c: "loading", t: t("archive.merging") });
-    await ArchiveService.convert(
-      s.filePath,
-      fmt,
-      dst,
-      s.password ?? "",
-      undefined,
-      undefined,
-      token,
-    );
+    await convertArchive(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
     logger.info({ event: "webview.merge.complete", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
   } catch (err) {

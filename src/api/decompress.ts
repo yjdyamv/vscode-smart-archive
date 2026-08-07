@@ -15,17 +15,21 @@
 import * as path from "path";
 import * as fs from "fs";
 import type { DecompressOptions } from "../types";
-import { decompressWith7z, isEncrypted } from "../engines/js7z-engine";
+import { decompressWith7z } from "../engines/js7z-decompress";
+import { isEncrypted } from "../engines/js7z-list";
 import {
   DECOMPRESS_EXTENSIONS,
   getFullExt,
   isEncryptableExt,
-  isSplitVolume,
-  resolveSplitVolume,
   MAX_COLLISION_RETRIES,
 } from "../constants";
-import { isRarExt, isRarVolume, resolveRarVolume, validateRarHeader } from "../utils/rar";
+import { isRarExt, validateRarHeader } from "../utils/rar";
+import { resolveEffectiveInput } from "../utils/path";
 import { logger } from "../utils/logger";
+
+// resolveEffectiveInput lives with the other path helpers (utils/path);
+// re-exported here so the api/ surface stays a stable test entry point.
+export { resolveEffectiveInput } from "../utils/path";
 
 /**
  * Parameters for a decompression operation.
@@ -103,28 +107,6 @@ export async function detectEncryption(inputPath: string): Promise<boolean> {
     );
     return false;
   }
-}
-
-/**
- * Resolve the effective input path for archives that may be part of
- * a multi-volume set (RAR .r00–.r99, 7z/zip .001–.999).
- * Returns the original path if not a split volume, or the first
- * volume path if it exists.
- */
-export function resolveEffectiveInput(inputPath: string): string {
-  const ext = getFullExt(inputPath);
-
-  if (isRarVolume(ext)) {
-    const rarPath = resolveRarVolume(inputPath);
-    if (rarPath) return rarPath;
-  }
-
-  if (isSplitVolume(inputPath) && !isRarVolume(ext)) {
-    const resolved = resolveSplitVolume(inputPath);
-    if (resolved) return resolved;
-  }
-
-  return inputPath;
 }
 
 /**

@@ -14,8 +14,9 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { decompressWith7z } from "../engines/js7z-engine";
-import { isEncrypted } from "../engines/js7z-engine";
+import { decompressWith7z } from "../engines/js7z-decompress";
+import { isEncrypted } from "../engines/js7z-list";
+import { resolveEffectiveInput } from "../utils/path";
 import { promptPassword } from "../ui/prompts";
 import { getOutputPath } from "../utils/fs";
 import {
@@ -29,7 +30,6 @@ import { openArchivePreview } from "../providers/archiveProvider";
 import { t, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
 import { promptOversizeFile } from "../utils/promptOversize";
-import { resolveEffectiveInput } from "../api/decompress";
 import { isCancellationError } from "../utils/cancellation";
 
 export async function decompressCommand(

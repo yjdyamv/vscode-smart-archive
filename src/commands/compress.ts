@@ -13,8 +13,9 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { compressWith7z } from "../engines/js7z-engine";
-import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS } from "../constants";
+import { compressWith7z } from "../engines/js7z-compress";
+import { COMPRESS_EXCLUDE_DEFAULTS, COMPRESS_FORMATS, lookupFormat } from "../constants";
+import { resolveSaveName } from "../utils/path";
 import { getVolumeSizes } from "../utils/volume-sizes";
 import { parseSize } from "../utils/security";
 import { promptSavePath } from "../ui/prompts";
@@ -22,7 +23,6 @@ import type { CompressOptions, FormatInfo } from "../types";
 import { normalizeSevenZipMethod } from "../utils/sevenZipMethod";
 import { t, compressLevels, formatDuration } from "../i18n";
 import { logger } from "../utils/logger";
-import { lookupFormat, resolveSaveName } from "../api/compress";
 import { isCancellationError } from "../utils/cancellation";
 import { StageProgress, type ProgressStage, type StageDuration } from "../ui/stage-progress";
 

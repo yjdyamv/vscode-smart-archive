@@ -9,7 +9,51 @@
 
 import * as path from "path";
 import * as iconv from "iconv-lite";
+import { getFullExt, isSplitVolume, resolveSplitVolume } from "../constants";
+import { isRarVolume, resolveRarVolume } from "./rar";
 import { logger } from "./logger-core";
+
+/**
+ * Clean a filename by stripping all trailing compound extensions,
+ * then re-appending the format extension.
+ *
+ * e.g. "report.tar.lz4.tar.lz4" → "report.tar.lz4"
+ *
+ * @returns The sanitized save name, e.g. "archive.7z"
+ */
+export function resolveSaveName(raw: string, ext: string): string {
+  let clean = raw.trim();
+  let prev = "";
+  while (prev !== clean) {
+    prev = clean;
+    const e = getFullExt(clean) || path.extname(clean);
+    if (!e) break;
+    clean = path.basename(clean, e);
+  }
+  return `${clean}.${ext}`;
+}
+
+/**
+ * Resolve the effective archive to operate on when the given path is part
+ * of a multi-volume set (RAR .r00–.r99, 7z/zip .001–.999).
+ * Returns the original path if not a split volume, or the first
+ * volume path if it exists.
+ */
+export function resolveEffectiveInput(inputPath: string): string {
+  const ext = getFullExt(inputPath);
+
+  if (isRarVolume(ext)) {
+    const rarPath = resolveRarVolume(inputPath);
+    if (rarPath) return rarPath;
+  }
+
+  if (isSplitVolume(inputPath) && !isRarVolume(ext)) {
+    const resolved = resolveSplitVolume(inputPath);
+    if (resolved) return resolved;
+  }
+
+  return inputPath;
+}
 
 /**
  * Join a virtual FS directory with a file/directory name.
