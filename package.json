@@ -1,7 +1,7 @@
 {
   "name": "smart-archive",
   "displayName": "Smart Archive",
-  "version": "1.27.0",
+  "version": "1.27.1",
   "private": true,
   "description": "Compress and decompress files with a bundled native 7-Zip (WASM fallback) + zstd/brotli/lz4 with WASM fallback. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
   "categories": [
