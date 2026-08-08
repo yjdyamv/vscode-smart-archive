@@ -1,11 +1,16 @@
 /**
  * Zstd codec wrapper — Smart Archive VSCode Extension
  *
- * zstd codec wrapper — Smart Archive VSCode Extension
- *
  * Prioritises the system zstd CLI (when enabled/found), otherwise uses the
- * bundled 7zz WASM engine (7-Zip ZS, zstd support). No native Node addon is
- * bundled anymore.
+ * bundled 7zz native binary and then the WASM engine (7-Zip ZS, zstd
+ * support). No native Node addon is bundled anymore.
+ *
+ * NOTE: Node's built-in zlib zstd (v22.15+) was evaluated as a backend and
+ * dropped: the API is still marked Experimental (Stability 1) on 22/24/26,
+ * the documented `level` option is silently ignored by the runtime, and the
+ * Electron node that VSCode actually runs builds zstd WITHOUT multithread
+ * support (ZSTD_c_nbWorkers throws ERR_ZLIB_INITIALIZATION_FAILED), which
+ * crashed every tar.zst creation in the real extension host.
  *
  * Decompression (in-memory) is handled by the bundled 7zz WASM engine
  * (parallel -mmt); archive-level decompression goes through 7zz as well.
@@ -24,15 +29,16 @@ import { shouldUseWasmCodec, wasmCompress, wasmCompressFile, wasmDecompress } fr
 import { nativeCompress, nativeCompressFile, nativeDecompress } from "./native-codec";
 
 /**
- * Map VSCode 0-9 compression level to zstd's 0-22 range.
- * zstd supports much higher levels than 7z/zip.
+ * Map the VSCode 0-9 compression level onto zstd's 0-22 range.
+ *
+ * Identity mapping (UI 1-9 → zstd 1-9, UI 0 → zstd 1), matching the
+ * bundled 7zz's own `-mx0..9` interpretation (ZstdEncoder.cpp). A magnified
+ * mapping (UI 9 → zstd 22) silently made the CLI tier ~78x slower at the
+ * top of the range (zstd 15+ uses the btultra2 optimal parsers). zstd 15+
+ * is only reachable through explicit `-m` parameters.
  */
 function mapZstdLevel(uiLevel: number): number {
-  if (uiLevel <= 0) return 1;
-  if (uiLevel <= 3) return 3;
-  if (uiLevel <= 5) return 9;
-  if (uiLevel <= 7) return 15;
-  return 22;
+  return Math.min(9, Math.max(1, Math.floor(uiLevel)));
 }
 
 export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Array> {
