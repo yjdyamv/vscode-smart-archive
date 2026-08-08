@@ -18,7 +18,7 @@ export type ArchiveOp = "compress" | "decompress" | "list" | "isEncrypted" | "mo
 
 export interface EngineConfig {
   locale: string;
-  limits: { maxFileSize?: number; maxTotalSize?: number };
+  limits: { maxArchiveSize?: number; maxExtractTotalSize?: number };
   useSystemZstd?: string;
   /** Brotli backend: node | wasm | 7z (bundled 7z planned) */
   brotliBackend?: string;

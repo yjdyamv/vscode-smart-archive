@@ -45,8 +45,10 @@ export { isEncryptedWasm } from "../src/engines/js7z-list-core";
 export {
   parseSize,
   safeJoinPath,
-  checkFileSize,
+  checkArchiveSize,
   checkTotalSize,
+  OversizeArchiveError,
+  isOversizeError,
   validatePassword,
   sanitizeCliPath,
   sanitizeTargetDir,

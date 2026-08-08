@@ -44,7 +44,7 @@ tractable.
 | 2.1 | **Move WASM compress/extract to a `worker_threads` worker** | 🔴 | L | The single most impactful reliability change. The engine layer (`src/engines/js7z-*`) is already well-isolated behind `archiveService`; a worker boundary fits the existing seam. Progress/cancel messages marshal across the port. Keep the system-7z (child-process) path as-is since it already runs off-thread. |
 | 2.2 | **Large-file benchmark suite** (1 GB / 5 GB / 10 GB fixtures, generated not committed) | 🟡 | M | Guards against regressions in the chunked-I/O / NODEFS paths the README advertises. Run manually / nightly, not on every PR. |
 | 2.3 | **Opt-in error reporting** via VS Code `TelemetryLogger` (respecting `telemetry.telemetryLevel`) | 🟡 | M | There is currently zero visibility into real-world failures. Report only classified error codes from `errorClassifier` + format/engine — never paths or filenames. Off unless the user's telemetry setting allows it. |
-| 2.4 | **Memory-pressure guardrails**: surface a clear warning before operations that would exceed the configured `maxTotalSize` in RAM, and prefer streaming paths | 🟡 | M | Bomb detection exists; this is the proactive "this will be slow/heavy" heads-up. |
+| 2.4 | **Memory-pressure guardrails**: surface a clear warning before operations that would exceed the configured `maxExtractTotalSize` in RAM, and prefer streaming paths | 🟡 | M | Bomb detection exists; this is the proactive "this will be slow/heavy" heads-up. |
 | 2.5 | **Concurrency limit for batch compress** of many small inputs | 🟢 | S | Avoids spawning unbounded work when a user compresses a huge folder tree. |
 
 **Exit criteria:** compressing/extracting a 5 GB archive keeps the VS Code UI responsive;

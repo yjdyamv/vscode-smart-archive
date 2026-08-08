@@ -19,6 +19,7 @@ import {
   getCompressedArchiveSize,
 } from "../../constants";
 import { isRarVolume, resolveRarVolume } from "../../utils/rar";
+import { isOversizeError } from "../../utils/security";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
 import {
@@ -34,6 +35,27 @@ import { handlerStates, handlerRegistered } from "./state";
 import { getNoisyPatterns, isReadOnlyExt, getWebviewUris } from "./helpers";
 import { registerHandler } from "./router";
 import { loadExpandedPaths } from "./expandedState";
+
+function renderOversizeMessage(
+  webview: vscode.Webview,
+  err: unknown,
+  cssUri: string,
+  jsUri: string,
+  codiconCssUri: string,
+): boolean {
+  if (!isOversizeError(err)) return false;
+  webview.html = emptyHtml(
+    t(
+      "webview.isEncryptedOversizeArchive",
+      formatCompactSize(err.size),
+      formatCompactSize(err.max),
+    ),
+    cssUri,
+    jsUri,
+    codiconCssUri,
+  );
+  return true;
+}
 
 export async function setupWebview(
   webview: vscode.Webview,
@@ -98,7 +120,8 @@ export async function setupWebview(
     let encrypted = false;
     try {
       encrypted = await isEncrypted(filePath);
-    } catch {
+    } catch (err) {
+      if (renderOversizeMessage(webview, err, cssUri, jsUri, codiconCssUri)) return;
       encryptionDetectionFailed = true;
       logger.warn(
         { event: "webview.setup.isEncrypted.failed" },
@@ -170,6 +193,7 @@ export async function setupWebview(
   try {
     entries = await fetchFileList(filePath, password);
   } catch (err) {
+    if (renderOversizeMessage(webview, err, cssUri, jsUri, codiconCssUri)) return;
     logger.error({ event: "webview.setup.fetchFileList.failed", err }, (err as Error).message);
     webview.html = emptyHtml(
       t("decompress.failed") + (err as Error).message,
