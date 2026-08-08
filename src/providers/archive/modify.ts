@@ -15,7 +15,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
-import { checkFileSize } from "../../utils/security";
 import { t } from "../../i18n";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
 
@@ -76,13 +75,11 @@ export async function previewFileFromArchive(
   password?: string,
 ): Promise<void> {
   const archiveExt = getFullExt(archivePath);
-  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
-  checkFileSize(stat.size);
   logger.info({
     event: "previewFile.start",
     archivePath,
     file: filePath,
-    sizeBytes: stat.size,
+    sizeBytes: fs.statSync(archivePath).size,
   });
 
   const normalizedFile = filePath.replace(/\\/g, "/");
@@ -283,8 +280,6 @@ async function extractOneWithSystem7z(
 
 export async function testArchive(archivePath: string, password?: string): Promise<string> {
   logger.info({ event: "testArchive.start", archivePath });
-  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
-  checkFileSize(stat.size);
   return runArchiveOp<string>("modify", { action: "test", archivePath, password });
 }
 

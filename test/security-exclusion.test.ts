@@ -30,8 +30,10 @@ import {
   sanitizeTargetDir,
   safeJoinPath,
   parseSize,
-  checkFileSize,
+  checkArchiveSize,
   checkTotalSize,
+  OversizeArchiveError,
+  isOversizeError,
 } from "./shared-setup";
 import { setSecurityLimits } from "../src/utils/security";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../src/constants";
@@ -153,13 +155,36 @@ describe("security", () => {
     expect(() => safeJoinPath("/tmp/x", "C:evil")).toThrow(/'/);
   });
 
-  it("size limits (production checkFileSize/checkTotalSize)", () => {
-    setSecurityLimits({ maxFileSize: 1024, maxTotalSize: 10240 });
+  it("size limits (production checkArchiveSize/checkTotalSize)", () => {
+    setSecurityLimits({ maxArchiveSize: 1024, maxExtractTotalSize: 10240 });
     try {
-      expect(() => checkFileSize(0)).not.toThrow();
-      expect(() => checkFileSize(1025)).toThrow(/exceed/i);
+      expect(() => checkArchiveSize(0)).not.toThrow();
+      expect(() => checkArchiveSize(1025)).toThrow(/exceed/i);
       expect(checkTotalSize(0, 100)).toBe(100);
       expect(() => checkTotalSize(10239, 2)).toThrow(/exceed/i);
+    } finally {
+      setSecurityLimits({});
+    }
+  });
+
+  it("size-limit errors stay recognizable across worker-style error clones", () => {
+    setSecurityLimits({ maxArchiveSize: 1024, maxExtractTotalSize: 10240 });
+    try {
+      let caught: unknown;
+      try {
+        checkArchiveSize(2048);
+      } catch (err) {
+        caught = err;
+      }
+      expect(isOversizeError(caught)).toBe(true);
+      expect(caught).toBeInstanceOf(OversizeArchiveError);
+      expect((caught as OversizeArchiveError).size).toBe(2048);
+
+      // worker_threads re-creates thrown errors as plain Error objects; the
+      // name check must still recognize them after serialization.
+      const cloned = new Error((caught as Error).message);
+      cloned.name = "OversizeArchiveError";
+      expect(isOversizeError(cloned)).toBe(true);
     } finally {
       setSecurityLimits({});
     }
@@ -693,4 +718,3 @@ for (const c of codecs) {
 // ════════════════════════════════════════════════════════════════════
 // Delete entries from archive (7z d) — tar.gz focus
 // ════════════════════════════════════════════════════════════════════
-

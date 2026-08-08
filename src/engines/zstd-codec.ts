@@ -19,7 +19,6 @@
  */
 
 import { logger } from "../utils/logger-core";
-import { checkFileSize } from "../utils/security";
 import type { ProgressLike } from "../utils/cancellation";
 import { t } from "../i18n";
 import { CODEC_SPAWN_MAX_BUFFER, CODEC_SPAWN_TIMEOUT_MS } from "../constants";
@@ -107,7 +106,6 @@ function systemDecompressBuffer(data: Buffer): Buffer | null {
 }
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
-  checkFileSize(data.byteLength);
   if (!shouldUseWasmCodec()) {
     const systemOut = systemDecompressBuffer(Buffer.from(data));
     if (systemOut) {
@@ -122,7 +120,6 @@ export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
   }
   logger.info({ event: "zstd.decompress.wasm" });
   const result = await wasmDecompress(data, "zst");
-  checkFileSize(result.byteLength);
   return result;
 }
 

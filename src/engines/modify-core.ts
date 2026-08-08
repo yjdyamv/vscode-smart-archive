@@ -24,7 +24,7 @@ import {
   VFS_TMP_PV2,
   VFS_INNER_TAR,
 } from "../constants";
-import { checkFileSize, validatePassword, sanitizeCliPath } from "../utils/security";
+import { checkArchiveSize, validatePassword, sanitizeCliPath } from "../utils/security";
 import { getBaseName } from "../utils/path";
 import { logger } from "../utils/logger-core";
 import { t } from "../i18n";
@@ -288,7 +288,7 @@ export async function addToArchiveCore(
     );
   }
 
-  checkFileSize(fs.statSync(archivePath).size);
+  checkArchiveSize(fs.statSync(archivePath).size);
 
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
   try {
@@ -431,7 +431,7 @@ export async function renameInArchiveCore(
     return;
   }
 
-  checkFileSize(fs.statSync(archivePath).size);
+  checkArchiveSize(fs.statSync(archivePath).size);
   const oldNorm = oldPath.replace(/\\/g, "/");
   const newNorm = newPath.replace(/\\/g, "/");
 
@@ -520,7 +520,7 @@ export async function createFolderInArchiveCore(
     );
   }
 
-  checkFileSize(fs.statSync(archivePath).size);
+  checkArchiveSize(fs.statSync(archivePath).size);
   const js7z = await JS7z({ print: () => {}, printErr: () => {} });
 
   try {
@@ -635,7 +635,7 @@ export async function previewFileCore(
   outputPath: string,
 ): Promise<void> {
   const archiveExt = getFullExt(archivePath);
-  checkFileSize(fs.statSync(archivePath).size);
+  checkArchiveSize(fs.statSync(archivePath).size);
   logger.info({
     event: "previewFile.start",
     archivePath,
@@ -760,7 +760,7 @@ export async function previewFileCore(
 
 export async function testArchiveCore(archivePath: string, password?: string): Promise<string> {
   logger.info({ event: "testArchive.start", archivePath });
-  checkFileSize(fs.statSync(archivePath).size);
+  checkArchiveSize(fs.statSync(archivePath).size);
   const data = fs.readFileSync(archivePath);
   const archiveName = path.basename(archivePath);
   let stdout = "";

@@ -12,7 +12,7 @@
 
 import * as vscode from "vscode";
 import { parseSize } from "./security";
-import { DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_TOTAL_SIZE } from "../constants";
+import { DEFAULT_MAX_ARCHIVE_SIZE, DEFAULT_MAX_EXTRACT_TOTAL_SIZE } from "../constants";
 import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../engines/engine-config";
 import { logger, setHistoryBudget } from "./logger";
 import type { EngineConfig } from "../engines/worker/types";
@@ -35,8 +35,14 @@ export function readEngineConfig(): EngineConfig {
   return {
     locale: vscode.env.language,
     limits: {
-      maxFileSize: parseSize(config.get<string | number>("maxFileSize"), DEFAULT_MAX_FILE_SIZE),
-      maxTotalSize: parseSize(config.get<string | number>("maxTotalSize"), DEFAULT_MAX_TOTAL_SIZE),
+      maxArchiveSize: parseSize(
+        config.get<string | number>("maxArchiveSize"),
+        DEFAULT_MAX_ARCHIVE_SIZE,
+      ),
+      maxExtractTotalSize: parseSize(
+        config.get<string | number>("maxExtractTotalSize"),
+        DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
+      ),
     },
     useSystemZstd: config.get("useSystemZstd", DEFAULT_ENGINE_CONFIG.useSystemZstd),
     brotliBackend: config.get("brotliBackend", DEFAULT_ENGINE_CONFIG.brotliBackend),

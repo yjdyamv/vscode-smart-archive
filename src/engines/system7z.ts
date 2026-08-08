@@ -34,7 +34,7 @@ import {
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
-import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
+import { validatePassword, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { withStage } from "../utils/progress-scale";
 import { getBaseName } from "../utils/path";
@@ -48,7 +48,7 @@ import {
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
-import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
+import { calcSplitVolumeTotalSize } from "./vfs-io";
 import { checkTotalSize } from "../utils/security";
 import { createTarFile } from "./tar-writer";
 import { isRarExt } from "../utils/rar";
@@ -1007,7 +1007,6 @@ export async function decompressWithSystem7z(
   const sz = system7zForExt(getFullExt(options.inputPath));
   if (!sz) throw new Error("System 7-Zip not available");
 
-  checkArchiveInputSize(options.inputPath);
   await preflightSystem7z(sz, options.inputPath, options.password ?? "");
 
   // Stage on the SAME filesystem as the output dir so the post-extraction move
@@ -1088,8 +1087,6 @@ export async function listWithSystem7z(
 export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
   const sz = system7zForExt(getFullExt(filePath));
   if (!sz) throw new Error("System 7-Zip not available");
-
-  checkFileSize(fs.statSync(filePath).size);
 
   // Strategy: `7z l -slt -p` with empty password piped via stdin.
   // Non-header-encrypted archives list normally and show "Encrypted = +".

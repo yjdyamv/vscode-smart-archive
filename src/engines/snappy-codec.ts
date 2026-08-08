@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger-core";
-import { checkFileSize, checkTotalSize } from "../utils/security";
+import { checkTotalSize } from "../utils/security";
 import type { ProgressLike } from "../utils/cancellation";
 import * as fs from "fs";
 import * as path from "path";
@@ -205,7 +205,6 @@ export async function snappyDecompress(data: Uint8Array): Promise<Uint8Array> {
     offset += frameLen;
     const decompressed = resolveSnappy().uncompressSync(frame, OPTS);
     totalSize = checkTotalSize(totalSize, decompressed.length);
-    checkFileSize(decompressed.length);
     parts.push(decompressed);
   }
 
@@ -247,7 +246,6 @@ export async function snappyDecompressFile(input: string, output: string): Promi
 
       const decompressed = snappy.uncompressSync(frame, OPTS);
       writtenTotal = checkTotalSize(writtenTotal, decompressed.length);
-      checkFileSize(decompressed.length);
       fs.writeSync(wfd, decompressed);
     }
 

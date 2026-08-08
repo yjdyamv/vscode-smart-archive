@@ -11,7 +11,6 @@
 
 import * as zlib from "node:zlib";
 import * as fs from "fs";
-import { checkFileSize } from "../utils/security";
 import type { ProgressLike } from "../utils/cancellation";
 import { t } from "../i18n";
 import { DEFAULT_COMPRESSION_LEVEL } from "../constants";
@@ -155,14 +154,11 @@ export async function brotliCompress(
 }
 
 export async function brotliDecompress(data: Uint8Array): Promise<Uint8Array> {
-  checkFileSize(data.byteLength);
   if (resolveBrotliBackend() === "node") {
     const result = zlib.brotliDecompressSync(Buffer.from(data));
-    checkFileSize(result.byteLength);
     return result;
   }
   const result = await wasmDecompress(data, "br");
-  checkFileSize(result.byteLength);
   return result;
 }
 
