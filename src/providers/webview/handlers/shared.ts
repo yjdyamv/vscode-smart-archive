@@ -180,11 +180,10 @@ export async function verifyArchivePassword(
     try {
       // No -p switch: 7z prompts for the password and reads it from stdin,
       // so the secret never appears in the child's argv.
-      const { code } = await spawnCapture(
-        sz,
-        ["t", archivePath],
-        { timeoutMs: PASSWORD_VERIFY_TIMEOUT_MS, password },
-      );
+      const { code } = await spawnCapture(sz, ["t", archivePath], {
+        timeoutMs: PASSWORD_VERIFY_TIMEOUT_MS,
+        password,
+      });
       return code === 0;
     } catch (err) {
       logger.warn(
