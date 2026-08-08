@@ -15,7 +15,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
-import { checkFileSize, validatePassword } from "../../utils/security";
+import { checkFileSize } from "../../utils/security";
 import { t } from "../../i18n";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
 
@@ -182,23 +182,17 @@ async function extractOneWithSystem7z(
     if (!wrapped) {
       // One step: 7z x archive -o<tmp> -aoa -y -- file
       const args: string[] = ["x", archivePath, `-o${tmpDir}`, "-aoa", "-y"];
-      if (password) {
-        validatePassword(password);
-        args.splice(1, 0, `-p${password}`);
-      }
       args.push("--", normalizedFile);
-      const { code } = await spawnCapture(sz, args);
+      // No -p switch: 7z prompts for the archive password; spawnCapture feeds
+      // it via stdin (never argv).
+      const { code } = await spawnCapture(sz, args, { password });
       if (code !== 0) throw new Error(`7z x non-wrapped exit ${code}`);
     } else {
       // Two step: first extract outer layer, then inner tar
       const tmpOuter = path.join(tmpDir, "_outer");
       fs.mkdirSync(tmpOuter);
       const args1: string[] = ["x", archivePath, `-o${tmpOuter}`, "-y"];
-      if (password) {
-        validatePassword(password);
-        args1.splice(1, 0, `-p${password}`);
-      }
-      const r1 = await spawnCapture(sz, args1);
+      const r1 = await spawnCapture(sz, args1, { password });
       if (r1.code !== 0) throw new Error(`7z x outer exit ${r1.code}`);
 
       // Find the inner tar

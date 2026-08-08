@@ -701,7 +701,9 @@ export async function compressWithSystem7z(
       ];
       if (options.password) {
         validatePassword(options.password);
-        compressArgs.splice(1, 0, `-p${options.password}`);
+        // Empty -p switch makes 7-Zip prompt for the password; the value is
+        // fed via stdin by run7z (never on the command line).
+        compressArgs.splice(1, 0, "-p");
       }
       // 7-Zip only prints live percentages when stderr is a console; when
       // piped it silently buffers the archive and writes it at the end.
@@ -720,6 +722,7 @@ export async function compressWithSystem7z(
         compressProgress,
         token,
         undefined,
+        options.password,
         progress
           ? {
               outputPath: options.outputPath,
@@ -773,7 +776,8 @@ export async function compressWithSystem7z(
 
   if (options.password) {
     validatePassword(options.password);
-    args.push(`-p${options.password}`);
+    // Empty -p switch triggers the stdin password prompt (see run7z).
+    args.push("-p");
     if (options.format.label === "7z") args.push("-mhe=on");
   }
   if (options.volumeSize) args.push(`-v${toBinaryVolumeSize(options.volumeSize)}`);
@@ -825,7 +829,7 @@ export async function compressWithSystem7z(
       outputPath: options.outputPath,
       totalInputBytes: monitorOutput?.totalInputBytes,
     });
-    await run7z(sz, args, compressProgress, token, undefined, monitorOutput);
+    await run7z(sz, args, compressProgress, token, undefined, options.password, monitorOutput);
   } catch (err) {
     logger.error({ event: "system7z.compress.failed", err }, "System 7z compression failed");
     throw err;
@@ -959,15 +963,13 @@ function verifyStagingDir(stagingDir: string): void {
  */
 async function preflightSystem7z(sz: string, inputPath: string, password: string): Promise<void> {
   const args: string[] = ["l", "-slt"];
-  if (password) {
-    validatePassword(password);
-    args.splice(1, 0, `-p${password}`);
-  }
   args.push("--", inputPath);
 
   let stdout: string;
   try {
-    ({ stdout } = await spawnCapture(sz, args));
+    // No -p switch: for an encrypted archive 7z prompts and reads the
+    // password from stdin (fed by spawnCapture, never argv).
+    ({ stdout } = await spawnCapture(sz, args, { password }));
   } catch {
     logger.warn(
       { event: "system7z.decompress.preflightFailed" },
@@ -1017,11 +1019,6 @@ export async function decompressWithSystem7z(
 
   const args: string[] = ["x", `-o${stagingDir}`, "-mmt=on"];
 
-  if (options.password) {
-    validatePassword(options.password);
-    args.splice(1, 0, `-p${options.password}`);
-  }
-
   args.push("--", options.inputPath);
 
   logger.info({
@@ -1037,7 +1034,8 @@ export async function decompressWithSystem7z(
   prog.report({ message: t("decompress.inProgress") });
 
   try {
-    await run7z(sz, args, progress, token);
+    // No -p switch: 7z prompts for the password and run7z feeds it via stdin.
+    await run7z(sz, args, progress, token, undefined, options.password);
     verifyStagingDir(stagingDir);
     moveMerge(stagingDir, options.outputDir);
     logger.info({ event: "system7z.decompress.ok", output: options.outputDir });
@@ -1067,10 +1065,6 @@ export async function listWithSystem7z(
 
   const archiveName = getBaseName(filePath);
   const args: string[] = ["l", "-slt"];
-  if (password) {
-    validatePassword(password);
-    args.splice(1, 0, `-p${password}`);
-  }
   args.push(filePath);
 
   logger.info({
@@ -1080,7 +1074,9 @@ export async function listWithSystem7z(
     args: args.filter((a) => !a.startsWith("-p")).join(" "),
   });
 
-  const { stdout } = await spawnCapture(sz, args);
+  // No -p switch: 7z prompts for the password and spawnCapture feeds it via
+  // stdin when the archive is encrypted.
+  const { stdout } = await spawnCapture(sz, args, { password });
   const results = parse7zListing(stdout, archiveName, filePath);
 
   logger.debug({ event: "system7z.list.ok", count: results.length });
@@ -1151,7 +1147,7 @@ interface CaptureResult {
   code: number | null;
 }
 
-/** Mask -p<password> tokens for safe logging */
+/** Mask -p switches for safe logging (passwords never appear in args). */
 function maskArgs(args: string[]): string {
   return args.map((a) => (a.startsWith("-p") ? "-p***" : a)).join(" ");
 }
@@ -1159,6 +1155,14 @@ function maskArgs(args: string[]): string {
 interface SpawnCaptureOpts {
   cwd?: string;
   timeoutMs?: number;
+  /**
+   * Password to feed to 7z via stdin. Never placed on the command line:
+   * 7-Zip prompts for the password when it needs one, and reads the line
+   * from stdin. Callers must omit the `-p` switch entirely for open-style
+   * operations (l/t/x/d/rn/a on an existing archive); for create-style
+   * operations pass an empty `-p` switch to trigger the prompt.
+   */
+  password?: string;
 }
 
 export function spawnCapture(
@@ -1166,10 +1170,9 @@ export function spawnCapture(
   args: string[],
   opts?: number | SpawnCaptureOpts,
 ): Promise<CaptureResult> {
-  const { cwd, timeoutMs } =
-    typeof opts === "number"
-      ? { timeoutMs: opts, cwd: undefined }
-      : { timeoutMs: SPAWN_CAPTURE_TIMEOUT, ...opts };
+  const normalized: SpawnCaptureOpts =
+    typeof opts === "number" ? { timeoutMs: opts } : { timeoutMs: SPAWN_CAPTURE_TIMEOUT, ...opts };
+  const { cwd, timeoutMs, password } = normalized;
 
   return new Promise((resolve, reject) => {
     const stdoutChunks: Buffer[] = [];
@@ -1184,9 +1187,14 @@ export function spawnCapture(
       timeout: timeoutMs,
     });
 
-    // Close stdin immediately — prevents 7z from hanging when -p (prompt)
-    // is used without a value, e.g. in encryption detection.
-    // All actual passwords are passed via -p<value> on the command line.
+    // Feed the password via stdin when one is provided (never argv), then
+    // close stdin immediately so a stray prompt can never hang the child.
+    // Encryption detection intentionally passes no password: an empty
+    // stdin makes `-p` (empty switch) fail fast on header-encrypted 7z.
+    if (password) {
+      validatePassword(password);
+      proc.stdin?.write(password + "\n");
+    }
     proc.stdin?.end();
 
     const MAX_CAPTURE_BYTES = CHILD_CAPTURE_MAX_BYTES;
@@ -1352,6 +1360,8 @@ function run7z(
   progress?: ProgressLike,
   token?: TokenLike,
   cwd?: string,
+  /** Password to feed via stdin — never appears on the command line. */
+  password?: string,
   monitorOutput?: { outputPath: string; totalInputBytes: number },
 ): Promise<void> {
   const rawProg = progress ?? { report: () => {} };
@@ -1382,8 +1392,12 @@ function run7z(
       ...(cwd ? { cwd } : {}),
     });
 
-    // Close stdin immediately — no password via stdin, all passwords
-    // are passed on the command line via -p<password> flag.
+    // Feed the password via stdin (never argv), then close stdin so a
+    // stray prompt cannot hang the child.
+    if (password) {
+      validatePassword(password);
+      proc.stdin?.write(password + "\n");
+    }
     proc.stdin?.end();
 
     const MAX_RUN_BYTES = CHILD_CAPTURE_MAX_BYTES;
@@ -1676,10 +1690,6 @@ export async function addToArchiveSystem7z(
     }
 
     const args: string[] = ["a", archivePath, "-aot", "-r"];
-    if (password) {
-      validatePassword(password);
-      args.splice(1, 0, `-p${password}`);
-    }
     args.push("*");
 
     logger.info({
@@ -1690,7 +1700,9 @@ export async function addToArchiveSystem7z(
       encrypted: !!password,
     });
 
-    await spawnCaptureInCwd(sz, args, tmpRoot);
+    // No -p switch: adding to an existing encrypted archive prompts for its
+    // password and spawnCapture feeds it via stdin (never argv).
+    await spawnCaptureInCwd(sz, args, tmpRoot, SPAWN_CAPTURE_TIMEOUT, password);
 
     logger.info({ event: "system7z.add.ok", archivePath, files: addedCount });
   } finally {
@@ -1707,8 +1719,9 @@ function spawnCaptureInCwd(
   args: string[],
   cwd: string,
   timeoutMs = SPAWN_CAPTURE_TIMEOUT,
+  password?: string,
 ): Promise<CaptureResult> {
-  return spawnCapture(binary, args, { cwd, timeoutMs });
+  return spawnCapture(binary, args, { cwd, timeoutMs, password });
 }
 
 export async function deleteFromArchiveSystem7z(
@@ -1722,10 +1735,6 @@ export async function deleteFromArchiveSystem7z(
   if (!sz) throw new Error("System 7-Zip not available");
 
   const dArgs = ["d", archivePath, "-y"];
-  if (password) {
-    validatePassword(password);
-    dArgs.splice(1, 0, `-p${password}`);
-  }
   dArgs.push(...selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/"))));
 
   logger.info({
@@ -1740,7 +1749,8 @@ export async function deleteFromArchiveSystem7z(
   // recompresses the remaining data — with -mx9 archives that takes a
   // while, and without progress it looks frozen. cwd = archive dir so
   // 7-Zip's atomic <archive>.tmp replacement lands next to the archive.
-  await run7z(sz, dArgs, progress, token, path.dirname(archivePath));
+  // No -p switch: 7z prompts for the archive password; run7z feeds it via stdin.
+  await run7z(sz, dArgs, progress, token, path.dirname(archivePath), password);
 
   logger.info({ event: "system7z.delete.ok", archivePath, entries: selectedPaths.length });
 }
@@ -1755,10 +1765,6 @@ export async function renameInArchiveSystem7z(
   if (!sz) throw new Error("System 7-Zip not available");
 
   const rnArgs = ["rn", archivePath, sanitizeCliPath(oldPath), sanitizeCliPath(newPath)];
-  if (password) {
-    validatePassword(password);
-    rnArgs.splice(1, 0, `-p${password}`);
-  }
 
   logger.info({
     event: "system7z.rename.start",
@@ -1768,7 +1774,9 @@ export async function renameInArchiveSystem7z(
     encrypted: !!password,
   });
 
-  await spawnCaptureInCwd(sz, rnArgs, path.dirname(archivePath));
+  // No -p switch: 7z prompts for the archive password; spawnCapture feeds it
+  // via stdin (never argv).
+  await spawnCaptureInCwd(sz, rnArgs, path.dirname(archivePath), SPAWN_CAPTURE_TIMEOUT, password);
 
   logger.info({ event: "system7z.rename.ok", archivePath, oldPath, newPath });
 }

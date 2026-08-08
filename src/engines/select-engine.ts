@@ -45,7 +45,7 @@ export interface SelectEngineRequest {
   op: SelectOp;
   /** Format label (compress) or full extension with leading dot (others). */
   ext: string;
-  /** Non-empty password forces WASM on CLI-adjacent paths (process-listing leak). */
+  /** Archive password. System 7z receives it via stdin (never argv); WASM keeps it in-process. */
   password?: string;
   /** list: in-memory archive bytes force the worker (no file to read). */
   hasData?: boolean;
@@ -64,7 +64,7 @@ export interface EngineSelection {
  * no file access beyond cached detection primitives.
  */
 export function selectEngine(request: SelectEngineRequest): EngineSelection {
-  const { op, ext, password } = request;
+  const { op, ext } = request;
 
   switch (op) {
     case "compress":
@@ -72,18 +72,17 @@ export function selectEngine(request: SelectEngineRequest): EngineSelection {
       // RAR archives, and the binding keeps passwords in memory.
       // (Compress passes a format label like "rar" without a leading dot.)
       if (isRarFormat(ext)) return { engine: "rar5", reason: "rar-format" };
-      // System 7z passes passwords via -p<password> on the command line,
-      // visible in process listings (ps aux) — force WASM when encrypted.
-      if (hasSystem7zForFormat(ext) && !password) {
+      // Passwords are piped to system 7z via stdin (never argv), so the
+      // native fast path is safe for encrypted archives too.
+      if (hasSystem7zForFormat(ext)) {
         return { engine: "system7z", reason: "system7z-available" };
       }
-      return { engine: "worker", reason: password ? "password-cli-leak" : "no-system7z" };
+      return { engine: "worker", reason: "no-system7z" };
 
     case "decompress": {
-      // Unlike compress, system 7z is kept for encrypted archives: WASM
-      // decompression of password-protected files has a known copyDirFromFS
-      // issue, and the password was just entered so the CLI exposure window
-      // is narrow.
+      // System 7z is kept for encrypted archives: WASM decompression of
+      // password-protected files has a known copyDirFromFS issue, and the
+      // password is piped via stdin so there is no argv exposure.
       if (hasSystem7zForFormat(ext, true) && system7zCanDecompress(request.archivePath ?? "")) {
         return { engine: "system7z", reason: "system7z-available" };
       }
@@ -109,7 +108,7 @@ export function selectEngine(request: SelectEngineRequest): EngineSelection {
     case "rename":
       // 7-Zip cannot modify RAR archives (E_NOTIMPL) — rebuild instead.
       if (isRarExt(ext)) return { engine: "rarRebuild", reason: "rar-format" };
-      return selectModifyEngine(ext, password);
+      return selectModifyEngine(ext);
 
     case "createFolder":
       // No system-7z fast path for folder creation — WASM in the worker.
@@ -126,16 +125,16 @@ export function selectEngine(request: SelectEngineRequest): EngineSelection {
   }
 }
 
-function selectModifyEngine(ext: string, password?: string): EngineSelection {
+function selectModifyEngine(ext: string): EngineSelection {
   // Wrapped formats always mutate via WASM (the worker) — the system fast
   // path is only for plain formats.
   if (isWrappedFormat(ext)) return { engine: "worker", reason: "wrapped-format" };
-  // System 7z passes passwords via -p<password> on the command line,
-  // visible in process listings — fall back to WASM to avoid leakage.
-  if (hasSystem7zForFormat(ext) && !password) {
+  // Passwords go to system 7z via stdin (never argv), so encrypted
+  // mutations can use the native fast path too.
+  if (hasSystem7zForFormat(ext)) {
     return { engine: "system7z", reason: "system7z-available" };
   }
-  return { engine: "worker", reason: password ? "password-cli-leak" : "no-system7z" };
+  return { engine: "worker", reason: "no-system7z" };
 }
 
 /** RAR family: extensions (.rar/.r00–.r99) or the bare "rar" format label. */

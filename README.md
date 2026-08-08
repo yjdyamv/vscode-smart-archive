@@ -143,7 +143,7 @@ npm run release          # build + check + package
 
 - **Untrusted archives** — whenever a native 7-Zip is used (the bundled binary by default, or a system install), extraction refuses archives containing symbolic-link entries and enforces the configured size limits *before* writing, guarding against path-traversal writes and decompression bombs. The archive browser renders attacker-controlled entry names under a strict Content-Security-Policy.
 - **Native vs sandboxed parsing** — by default (`auto`) archives are parsed by a native 7-Zip process, which is fast but runs C/C++ format handlers on untrusted input. To parse untrusted archives inside the WebAssembly sandbox instead, set `smart-archive.useSystem7z` to `never`.
-- **Passwords on shared machines** — a native 7-Zip receives the archive password on its command line (`-p…`), visible to other local users in the process list for the operation's duration — an inherent limitation of the 7-Zip CLI. Since a native 7-Zip is now bundled and used by default, this applies to all users unless you set `smart-archive.useSystem7z` to `never` (the WASM engine spawns no external process and never exposes the password).
+- **Passwords on shared machines** — passwords are piped to native 7-Zip through stdin (`Enter password:` prompt), never passed as a command-line argument, so they do not appear in the process list. The WASM engine similarly keeps passwords inside the extension process.
 
 ## License
 

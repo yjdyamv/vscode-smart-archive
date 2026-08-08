@@ -47,12 +47,12 @@ describe("selectEngine · compress", () => {
     expectChoice({ op: "compress", ext: "RAR", password: "pw" }, "rar5");
   });
 
-  it("uses system 7z for supported formats without a password", () => {
+  it("uses system 7z for supported formats", () => {
     expectChoice({ op: "compress", ext: "zip" }, "system7z");
   });
 
-  it("forces WASM when a password is set (CLI leak)", () => {
-    expectChoice({ op: "compress", ext: "zip", password: "secret" }, "worker");
+  it("keeps system 7z when a password is set (fed via stdin, never argv)", () => {
+    expectChoice({ op: "compress", ext: "zip", password: "secret" }, "system7z");
   });
 
   it("falls back to the worker when system 7z lacks the format", () => {
@@ -79,7 +79,7 @@ describe("selectEngine · decompress", () => {
     );
   });
 
-  it("keeps system 7z for encrypted archives (unlike compress)", () => {
+  it("keeps system 7z for encrypted archives (password via stdin)", () => {
     expectChoice(
       { op: "decompress", ext: ".7z", archivePath: "/tmp/a.7z", password: "pw" },
       "system7z",
@@ -122,12 +122,12 @@ describe("selectEngine · archive mutation (add/delete/rename)", () => {
       expectChoice({ op, ext: ".tar.zst" }, "worker");
     });
 
-    it(`uses system 7z for plain formats without a password (${op})`, () => {
+    it(`uses system 7z for plain formats (${op})`, () => {
       expectChoice({ op, ext: ".zip" }, "system7z");
     });
 
-    it(`forces the worker when encrypted (${op})`, () => {
-      expectChoice({ op, ext: ".zip", password: "pw" }, "worker");
+    it(`keeps system 7z when encrypted (password via stdin) (${op})`, () => {
+      expectChoice({ op, ext: ".zip", password: "pw" }, "system7z");
     });
   }
 });

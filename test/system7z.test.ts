@@ -10,8 +10,11 @@ import * as path from "path";
 import * as fs from "fs";
 import {
   compressWithSystem7z,
+  decompressWithSystem7z,
   detectSystem7z,
+  listWithSystem7z,
   resetDetectionCache,
+  spawnCapture,
 } from "../src/engines/system7z";
 import { itIf } from "./gates";
 import { tmpDir } from "./tmp";
@@ -121,7 +124,7 @@ describe("system 7-Zip", () => {
     fs.rmSync(tdir, { recursive: true, force: true });
   });
 
-  itIf("system7z", "lists encrypted 7z with correct password via -p flag", () => {
+  itIf("system7z", "lists encrypted 7z with correct password via stdin", () => {
     let tdir = tmpDir("sat_sz_enc_");
     const src = path.join(tdir, "correct.txt");
     fs.writeFileSync(src, "secret content");
@@ -133,9 +136,11 @@ describe("system 7-Zip", () => {
     });
     expect(r.status).toBe(0);
 
-    // List with -pPASSWORD on command line (7z on Windows cannot read pw from stdin pipe)
-    r = spawnSync(sz!, ["l", "-slt", "-pp4ss", archive], {
+    // No -p switch: 7z prompts for the password and reads it from stdin.
+    // Verified on Linux and on the Windows 7zz.exe build (via wine).
+    r = spawnSync(sz!, ["l", "-slt", archive], {
       stdio: "pipe",
+      input: "p4ss\n",
       timeout: 10_000,
     });
     const stdout = r.stdout.toString();
@@ -336,6 +341,75 @@ describe("system 7-Zip", () => {
     const pctReports = reports.filter((r) => r.message?.match(/^\d+%$/));
     expect(pctReports.length).toBeGreaterThan(0);
     expect(pctReports.some((r) => (r.increment ?? 0) > 0)).toBe(true);
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  it("feeds the password via stdin and never puts it in argv", async () => {
+    const tdir = tmpDir("sat_pw_argv_");
+    const report = path.join(tdir, "report.json");
+    const fake = path.join(tdir, "fake7z.cjs");
+    fs.writeFileSync(
+      fake,
+      [
+        'const fs = require("fs");',
+        "const report = process.argv[2];",
+        "const argv = process.argv.slice(2);",
+        'const stdin = fs.readFileSync(0, "utf8");',
+        "fs.writeFileSync(report, JSON.stringify({ argv, stdin }));",
+      ].join("\n"),
+    );
+
+    const secret = "hunter2-秘密";
+    const { code } = await spawnCapture(process.execPath, [fake, report, "t", "x.7z"], {
+      password: secret,
+    });
+    expect(code).toBe(0);
+
+    const rec = JSON.parse(fs.readFileSync(report, "utf8")) as {
+      argv: string[];
+      stdin: string;
+    };
+    expect(rec.argv.join(" ")).not.toContain(secret);
+    expect(rec.stdin).toBe(secret + "\n");
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("system7z", "compresses, lists and decompresses an encrypted 7z via stdin password", async () => {
+    const tdir = tmpDir("sat_sz_pw_rt_");
+    const src = path.join(tdir, "secret.txt");
+    fs.writeFileSync(src, "classified");
+    const archive = path.join(tdir, "locked.7z");
+    const outDir = path.join(tdir, "out");
+    const format = { label: "7z", description: "", canCreate: true, supportsEncryption: true };
+
+    await compressWithSystem7z({
+      targets: [{ fsPath: src }],
+      format,
+      outputPath: archive,
+      password: "p4ss-123",
+      level: 5,
+    });
+
+    const list = await listWithSystem7z(archive, "p4ss-123");
+    expect(list.some((e) => e.path.endsWith("secret.txt"))).toBe(true);
+
+    await decompressWithSystem7z({
+      inputPath: archive,
+      outputDir: outDir,
+      password: "p4ss-123",
+    });
+    expect(fs.readFileSync(path.join(outDir, "secret.txt"), "utf8")).toBe("classified");
+
+    // Wrong password must fail loudly on the stdin-fed test/extract path.
+    await expect(
+      decompressWithSystem7z({
+        inputPath: archive,
+        outputDir: path.join(tdir, "bad"),
+        password: "wrong",
+      }),
+    ).rejects.toThrow();
 
     fs.rmSync(tdir, { recursive: true, force: true });
   });
