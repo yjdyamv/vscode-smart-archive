@@ -178,10 +178,12 @@ export async function verifyArchivePassword(
   const sz = system7zForExt(getFullExt(archivePath));
   if (sz) {
     try {
+      // No -p switch: 7z prompts for the password and reads it from stdin,
+      // so the secret never appears in the child's argv.
       const { code } = await spawnCapture(
         sz,
-        ["t", `-p${password}`, archivePath],
-        PASSWORD_VERIFY_TIMEOUT_MS,
+        ["t", archivePath],
+        { timeoutMs: PASSWORD_VERIFY_TIMEOUT_MS, password },
       );
       return code === 0;
     } catch (err) {

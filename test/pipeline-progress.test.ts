@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "node:crypto";
 import { compressWith7z } from "../src/engines/js7z-compress";
+import { compressWith7z as compressWasmCore } from "../src/engines/js7z-compress-core";
 import { compressWithSystem7z } from "../src/engines/system7z";
 
 import { itIf } from "./gates";
@@ -68,7 +69,7 @@ describe("full-pipeline compress progress", () => {
     fs.rmSync(td, { recursive: true, force: true });
   });
 
-  it("WASM volume compression (password forces WASM) reports compression-phase progress", async () => {
+  it("WASM volume compression (worker core, password) reports compression-phase progress", async () => {
     const td = tmpDir("sat_vol_");
     const src = path.join(td, "data.bin");
     // Incompressible random data split into several 1m volumes so the
@@ -81,7 +82,7 @@ describe("full-pipeline compress progress", () => {
     const out = path.join(td, "data.7z");
 
     const reports: Report[] = [];
-    await compressWith7z(
+    await compressWasmCore(
       {
         targets: [{ fsPath: src }],
         format: { label: "7z", description: "", canCreate: true, supportsEncryption: true },

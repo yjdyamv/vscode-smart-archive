@@ -191,3 +191,60 @@ jobs:
           "$BIN" x -y -oout test.7z >/dev/null
           diff -r src out/src
           echo "✅ Windows 7zz.exe executed and round-tripped OK"
+
+  # Passwords must go to 7-Zip through stdin (never argv). This job runs the
+  # real bundled 7zz on native Linux and Windows runners and exercises the
+  # exact protocol the extension uses:
+  #   - create: `-p` (empty switch) triggers the prompt, password via stdin
+  #   - list/extract/test: no `-p` switch, 7z prompts and reads stdin
+  #   - wrong passwords are rejected
+  test-7z-stdin-password:
+    name: Validate 7zz stdin password (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download & extract 7zz
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_REPO")
+          TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            ASSET=7zz-windows-x64.zip
+          else
+            ASSET=7zz-linux-x64.tar.gz
+          fi
+          curl -fsSL -o "$ASSET" "https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
+          mkdir -p bin
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            powershell -NoProfile -Command "Expand-Archive -Force -Path '$ASSET' -DestinationPath bin"
+          else
+            tar -xf "$ASSET" -C bin
+          fi
+          BIN="$(find bin -type f \( -name 7zz -o -name 7zz.exe \) | head -1)"
+          test -n "$BIN"
+          echo "BIN=$BIN" >> "$GITHUB_ENV"
+      - name: Verify stdin password (create / list / extract / wrong-password)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src out
+          printf 'hello stdin 密码\n' > src/a.txt
+          # Create: empty -p triggers the prompt; the password arrives via stdin.
+          printf 'pw123\n' | "$BIN" a -t7z -mhe=on -p enc.7z src/a.txt >/dev/null
+          test -s enc.7z
+          # List: no -p switch; 7z prompts and reads the password from stdin.
+          printf 'pw123\n' | "$BIN" l -slt enc.7z | grep -q 'Encrypted = +'
+          # Extract: same stdin protocol.
+          printf 'pw123\n' | "$BIN" x -y -oout enc.7z >/dev/null
+          diff -r src out/src
+          # Wrong password must be rejected (no silent empty-password pass).
+          if printf 'nope\n' | "$BIN" t enc.7z >/dev/null 2>&1; then
+            echo "::error::wrong password unexpectedly accepted via stdin"
+            exit 1
+          fi
+          echo "✅ stdin password protocol OK on ${{ matrix.os }}"

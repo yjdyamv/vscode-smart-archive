@@ -61,9 +61,8 @@ export async function deleteFromArchive(
     return;
   }
 
-  // System 7z passes passwords via -p<password> on the command line,
-  // visible in process listings. For encrypted archives, fall back to
-  // WASM to avoid CLI password leakage.
+  // System 7z receives passwords via stdin (never argv), so encrypted
+  // archives can safely use the native fast path.
   if (engine === "system7z") {
     logger.info({ event: "deleteFromArchive.system7z", archivePath, ext });
     await deleteFromArchiveSystem7z(archivePath, selectedPaths, password, progress, token);
