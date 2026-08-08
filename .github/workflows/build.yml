@@ -232,16 +232,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p src out
-          printf 'hello stdin 密码\n' > src/a.txt
+          # NOTE: use `input`, not `src` — the repo root already contains a
+          # `src/` directory, which would make `diff -r` compare the whole
+          # extension source tree instead of the staged files.
+          mkdir -p input out
+          printf 'hello stdin 密码\n' > input/a.txt
           # Create: empty -p triggers the prompt; the password arrives via stdin.
-          printf 'pw123\n' | "$BIN" a -t7z -mhe=on -p enc.7z src/a.txt >/dev/null
+          printf 'pw123\n' | "$BIN" a -t7z -mhe=on -p enc.7z input/a.txt >/dev/null
           test -s enc.7z
           # List: no -p switch; 7z prompts and reads the password from stdin.
           printf 'pw123\n' | "$BIN" l -slt enc.7z | grep -q 'Encrypted = +'
           # Extract: same stdin protocol.
           printf 'pw123\n' | "$BIN" x -y -oout enc.7z >/dev/null
-          diff -r src out/src
+          diff -r input out/input
           # Wrong password must be rejected (no silent empty-password pass).
           if printf 'nope\n' | "$BIN" t enc.7z >/dev/null 2>&1; then
             echo "::error::wrong password unexpectedly accepted via stdin"
