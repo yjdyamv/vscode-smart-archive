@@ -37,6 +37,8 @@ node_modules/
 
 # ── 输出 & 杂项 ──
 .cache/**
+test-results/**
+coverage/**
 **/*.map
 **/.gitignore
 **/.DS_Store
