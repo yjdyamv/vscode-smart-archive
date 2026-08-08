@@ -202,6 +202,77 @@ describe("system 7-Zip", () => {
     fs.rmSync(tdir, { recursive: true, force: true });
   });
 
+  itIf("system7z", "honors the compression level for wrapped formats (tar.xz)", async () => {
+    let tdir = tmpDir("sat_sz_wraplvl_");
+    const srcDir = path.join(tdir, "src");
+    fs.mkdirSync(srcDir, { recursive: true });
+    // Deterministic corpus (seeded xorshift32): 4 identical 20×200KB text
+    // trees ≈ 16MB. The exact copies repeat at >1MiB distance, so only a
+    // large LZMA2 dictionary can match across them — -mx9 (256MiB dict)
+    // must beat -mx1 (256KiB) by a wide margin (measured ≈ 4:1).
+    const words = [
+      "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf",
+      "hotel", "india", "juliet", "kilo", "lima", "mike", "november",
+      "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform",
+      "victor", "whiskey", "xray", "yankee", "zulu", "compress", "archive",
+      "dictionary", "fast", "level", "benchmark", "stream", "block",
+      "solid", "method", "engine", "worker", "thread", "memory", "ratio",
+      "speed", "seek", "match", "length", "search", "hash", "chain",
+    ];
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-.,";
+    for (let d = 0; d < 4; d++) {
+      const dir = path.join(srcDir, `tree${d}`);
+      fs.mkdirSync(dir, { recursive: true });
+      for (let i = 0; i < 20; i++) {
+        // Seed depends only on the file index, so all four trees are identical.
+        let s = (i * 2654435761) >>> 0;
+        const rnd = () => {
+          s ^= s << 13;
+          s >>>= 0;
+          s ^= s >>> 17;
+          s ^= s << 5;
+          s >>>= 0;
+          return s;
+        };
+        let out = "";
+        while (out.length < 200_000) {
+          out += rnd() % 4 === 0 ? words[rnd() % words.length] + " " : chars[rnd() % chars.length];
+        }
+        fs.writeFileSync(path.join(dir, `f${i}.txt`), out);
+      }
+    }
+
+    const format = { label: "tar.xz", description: "", canCreate: true, supportsEncryption: false };
+    const outL1 = path.join(tdir, "fast.tar.xz");
+    const outL9 = path.join(tdir, "max.tar.xz");
+    await compressWithSystem7z({
+      targets: [{ fsPath: srcDir }],
+      format,
+      outputPath: outL1,
+      password: "",
+      level: 1,
+    });
+    await compressWithSystem7z({
+      targets: [{ fsPath: srcDir }],
+      format,
+      outputPath: outL9,
+      password: "",
+      level: 9,
+    });
+
+    expect(fs.existsSync(outL1)).toBe(true);
+    expect(fs.existsSync(outL9)).toBe(true);
+    // Regression: without -mx the wrapped path compressed both archives at
+    // the default level, so they were byte-identical in size. The large-dict
+    // margin (≈4:1 on this corpus) proves -mx<level> is actually honored.
+    const sizeL1 = fs.statSync(outL1).size;
+    const sizeL9 = fs.statSync(outL9).size;
+    expect(sizeL9).toBeLessThan(sizeL1);
+    expect(sizeL9).toBeLessThan(sizeL1 * 0.5);
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
   itIf("system7z", "reports determinate progress (message + increment) while compressing", async () => {
     let tdir = tmpDir("sat_sz_prog_");
     const src = path.join(tdir, "data.bin");

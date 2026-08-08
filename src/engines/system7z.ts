@@ -688,8 +688,17 @@ export async function compressWithSystem7z(
         packProgress,
       );
 
-      // Step 2: compress the tar
-      const compressArgs = ["a", `-t${typeFlag}`, options.outputPath, "--", tarPath];
+      // Step 2: compress the tar. Honor the UI level (xz: -mx0…-mx9 maps to
+      // the LZMA2 dictionary preset); without -mx the handler always uses
+      // the default level, which makes "fast" tar.xz requests pointless.
+      const compressArgs = [
+        "a",
+        `-t${typeFlag}`,
+        `-mx${options.level}`,
+        options.outputPath,
+        "--",
+        tarPath,
+      ];
       if (options.password) {
         validatePassword(options.password);
         compressArgs.splice(1, 0, `-p${options.password}`);
