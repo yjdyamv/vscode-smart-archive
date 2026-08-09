@@ -60,6 +60,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "codec-progress.test.ts",
     "defaults-consistency.test.ts"
   ],
+  "src/engines/extract-core.ts": [
+    "extract-wrapped.test.ts"
+  ],
   "src/engines/fileListing-core.ts": [
     "wasm-codec-pipeline.test.ts"
   ],

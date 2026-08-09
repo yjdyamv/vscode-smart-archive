@@ -237,7 +237,7 @@ export async function extractSelectedCore(
         innerTarName = found;
       }
       if (token?.isCancellationRequested) throw new CancelledError();
-      const innerData = js7z.FS.readFile(`/${innerTarName}`, { encoding: "binary" });
+      const innerData = js7z.FS.readFile(`${VFS_TMP_X1}/${innerTarName}`, { encoding: "binary" });
       const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
       try {
         js7z2.FS.writeFile(`/${innerTarName}`, new Uint8Array(innerData));
