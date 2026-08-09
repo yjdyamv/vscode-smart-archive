@@ -17,6 +17,8 @@ export const handleTest: MessageHandler = async (ctx) => {
   logger.info({ event: "webview.test", path: s.filePath });
   const token = startOperation(s);
   try {
+    // Immediate in-webview feedback — the test itself may take a while.
+    webview.postMessage({ c: "loading", t: t("archive.testing") });
     const result = await testArchive(s.filePath, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     logger.info({ event: "webview.test.ok" });
