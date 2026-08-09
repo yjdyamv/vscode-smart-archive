@@ -63,12 +63,20 @@ describe("package.json defaults match code defaults", () => {
     expect(settingDefault("logHistoryBytes")).toBe(DEFAULT_LOG_HISTORY_BYTES);
   });
 
-  it("useSystemZstd", () => {
-    expect(settingDefault("useSystemZstd")).toBe(DEFAULT_ENGINE_CONFIG.useSystemZstd);
+  it("sevenZBackend", () => {
+    expect(settingDefault("sevenZBackend")).toBe(DEFAULT_ENGINE_CONFIG.sevenZBackend);
+  });
+
+  it("zstdBackend", () => {
+    expect(settingDefault("zstdBackend")).toBe(DEFAULT_ENGINE_CONFIG.zstdBackend);
   });
 
   it("brotliBackend", () => {
     expect(settingDefault("brotliBackend")).toBe(DEFAULT_ENGINE_CONFIG.brotliBackend);
+  });
+
+  it("lz4Backend", () => {
+    expect(settingDefault("lz4Backend")).toBe(DEFAULT_ENGINE_CONFIG.lz4Backend);
   });
 
   it("rar5Backend", () => {

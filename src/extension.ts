@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
   logger.info({ event: "extension.archiveProvider.registered" });
 
   // Invalidate cached engine detection when the relevant setting changes, so
-  // switching useSystem7z (e.g. to "bundled") applies without a window
+  // switching sevenZBackend (e.g. to "bundled") applies without a window
   // reload. applyHostConfig already re-applies the other engine settings
   // (including zstd/rar5/snappy backend cache resets via engine-config).
   context.subscriptions.push(
@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // Push the new values into a live worker too — without this, the
       // worker keeps stale limits/zstd settings until it is restarted.
       reconfigureArchiveWorker();
-      if (e.affectsConfiguration("smart-archive.useSystem7z")) resetDetectionCache();
+      if (e.affectsConfiguration("smart-archive.sevenZBackend")) resetDetectionCache();
     }),
   );
 

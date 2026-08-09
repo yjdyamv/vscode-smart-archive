@@ -44,8 +44,23 @@ export function readEngineConfig(): EngineConfig {
         DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
       ),
     },
-    useSystemZstd: config.get("useSystemZstd", DEFAULT_ENGINE_CONFIG.useSystemZstd),
-    brotliBackend: config.get("brotliBackend", DEFAULT_ENGINE_CONFIG.brotliBackend),
+    sevenZBackend: validEngineBackend(
+      config.get("sevenZBackend", DEFAULT_ENGINE_CONFIG.sevenZBackend),
+      ["native", "bundled", "wasm"],
+    ),
+    zstdBackend: validEngineBackend(config.get("zstdBackend", DEFAULT_ENGINE_CONFIG.zstdBackend), [
+      "native",
+      "bundled",
+      "wasm",
+    ]),
+    brotliBackend: validEngineBackend(
+      config.get("brotliBackend", DEFAULT_ENGINE_CONFIG.brotliBackend),
+      ["native", "bundled", "wasm"],
+    ),
+    lz4Backend: validEngineBackend(config.get("lz4Backend", DEFAULT_ENGINE_CONFIG.lz4Backend), [
+      "bundled",
+      "wasm",
+    ]),
     rar5Backend: validBackend(config.get("rar5Backend", DEFAULT_ENGINE_CONFIG.rar5Backend)),
     snappyBackend: validBackend(config.get("snappyBackend", DEFAULT_ENGINE_CONFIG.snappyBackend)),
     compressionLevel: config.get("defaultCompressionLevel", DEFAULT_ENGINE_CONFIG.compressionLevel),
@@ -59,6 +74,14 @@ export function readEngineConfig(): EngineConfig {
 
 function validBackend(raw: string): Rar5Backend | SnappyBackend {
   return raw === "native" || raw === "wasm" ? raw : "auto";
+}
+
+/** Validate a unified engine-backend value against its allowed native tiers. */
+function validEngineBackend<T extends "native" | "bundled" | "wasm">(
+  raw: string,
+  nativeTiers: readonly T[],
+): T | "auto" {
+  return (raw === "wasm" || nativeTiers.includes(raw as T) ? raw : "auto") as T | "auto";
 }
 
 function validLogLevel(raw: string): "error" | "warn" | "info" | "debug" {

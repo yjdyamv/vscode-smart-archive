@@ -73,7 +73,7 @@ describe("codec compress progress", () => {
   });
 
   it("zstd (native path) reports message + increment", async () => {
-    applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG, useSystemZstd: "never" }, { warn: () => {} });
+    applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG, zstdBackend: "bundled" }, { warn: () => {} });
     try {
       const input = makeInput("in.tar");
       const output = input + ".zst";

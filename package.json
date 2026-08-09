@@ -517,52 +517,71 @@
           },
           "markdownDescription": "%config.volumeSizes.description%"
         },
-        "smart-archive.useSystem7z": {
+        "smart-archive.sevenZBackend": {
           "type": "string",
           "default": "auto",
           "enum": [
             "auto",
-            "always",
+            "native",
             "bundled",
-            "never"
+            "wasm"
           ],
           "enumDescriptions": [
-            "%config.useSystem7z.auto%",
-            "%config.useSystem7z.always%",
-            "%config.useSystem7z.bundled%",
-            "%config.useSystem7z.never%"
+            "%config.sevenZBackend.auto%",
+            "%config.sevenZBackend.native%",
+            "%config.sevenZBackend.bundled%",
+            "%config.sevenZBackend.wasm%"
           ],
-          "description": "%config.useSystem7z.description%"
+          "description": "%config.sevenZBackend.description%"
         },
-        "smart-archive.useSystemZstd": {
+        "smart-archive.zstdBackend": {
           "type": "string",
           "default": "auto",
           "enum": [
             "auto",
-            "always",
-            "never"
+            "native",
+            "bundled",
+            "wasm"
           ],
           "enumDescriptions": [
-            "%config.useSystemZstd.auto%",
-            "%config.useSystemZstd.always%",
-            "%config.useSystemZstd.never%"
+            "%config.zstdBackend.auto%",
+            "%config.zstdBackend.native%",
+            "%config.zstdBackend.bundled%",
+            "%config.zstdBackend.wasm%"
           ],
-          "description": "%config.useSystemZstd.description%"
+          "description": "%config.zstdBackend.description%"
         },
         "smart-archive.brotliBackend": {
           "type": "string",
-          "default": "node",
+          "default": "auto",
           "enum": [
-            "node",
-            "wasm",
-            "7z"
+            "auto",
+            "native",
+            "bundled",
+            "wasm"
           ],
           "enumDescriptions": [
-            "%config.brotliBackend.node%",
-            "%config.brotliBackend.wasm%",
-            "%config.brotliBackend.7z%"
+            "%config.brotliBackend.auto%",
+            "%config.brotliBackend.native%",
+            "%config.brotliBackend.bundled%",
+            "%config.brotliBackend.wasm%"
           ],
           "description": "%config.brotliBackend.description%"
+        },
+        "smart-archive.lz4Backend": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "bundled",
+            "wasm"
+          ],
+          "enumDescriptions": [
+            "%config.lz4Backend.auto%",
+            "%config.lz4Backend.bundled%",
+            "%config.lz4Backend.wasm%"
+          ],
+          "description": "%config.lz4Backend.description%"
         },
         "smart-archive.rar5Backend": {
           "type": "string",

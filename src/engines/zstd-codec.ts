@@ -41,7 +41,7 @@ function mapZstdLevel(uiLevel: number): number {
 }
 
 export async function zstdCompress(data: Uint8Array, level = 3): Promise<Uint8Array> {
-  if (!shouldUseWasmCodec()) {
+  if (!shouldUseWasmCodec() && !zstdWasmForced()) {
     const systemOut = systemCompressBuffer(Buffer.from(data), level);
     if (systemOut) {
       logger.info({ event: "zstd.compress.system.buffer", path: resolveSystemZstd() });
@@ -106,7 +106,7 @@ function systemDecompressBuffer(data: Buffer): Buffer | null {
 }
 
 export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
-  if (!shouldUseWasmCodec()) {
+  if (!shouldUseWasmCodec() && !zstdWasmForced()) {
     const systemOut = systemDecompressBuffer(Buffer.from(data));
     if (systemOut) {
       logger.info({ event: "zstd.decompress.system" });
@@ -125,35 +125,47 @@ export async function zstdDecompress(data: Uint8Array): Promise<Uint8Array> {
 
 let sysZstdPath: string | null | false = null;
 
-/** Injected config: useSystemZstd setting + optional warning hook (host shows it). */
-let zstdConfig: { useSystemZstd?: string; warn?: (message: string) => void } = {};
+/** Injected config: zstdBackend setting + optional warning hook (host shows it). */
+let zstdConfig: { zstdBackend?: string; warn?: (message: string) => void } = {};
 
 /**
- * Inject the useSystemZstd setting and a warning callback. The host wires
+ * Inject the zstdBackend setting and a warning callback. The host wires
  * warn → vscode.window.showWarningMessage; worker threads receive the
  * setting at init and forward warnings as notify messages.
  */
 export function setZstdConfig(config: {
-  useSystemZstd?: string;
+  zstdBackend?: string;
   warn?: (message: string) => void;
 }): void {
   zstdConfig = config;
 }
 
+function zstdBackendSetting(): string {
+  return zstdConfig.zstdBackend ?? "auto";
+}
+
+/** True when the setting forces the WASM engine for zstd. */
+function zstdWasmForced(): boolean {
+  return zstdBackendSetting() === "wasm";
+}
+
 /**
  * Clear the cached system-zstd detection result so a change to
- * `smart-archive.useSystemZstd` takes effect without a window reload.
+ * `smart-archive.zstdBackend` takes effect without a window reload.
  * Without this, the first resolveSystemZstd() latches sysZstdPath (including
- * the `false` sentinel written on the "never" branch) for the whole session.
+ * the `false` sentinel written on the "wasm"/"bundled" branches) for the
+ * whole session.
  */
 export function resetZstdDetectionCache(): void {
   sysZstdPath = null;
 }
 
 function resolveSystemZstd(): string | null {
-  const setting = zstdConfig.useSystemZstd ?? "auto";
+  const setting = zstdBackendSetting();
 
-  if (setting === "never") {
+  // "wasm" forces the WASM engine and "bundled" routes to the VSIX 7zz
+  // binary — neither ever uses the system CLI.
+  if (setting === "wasm" || setting === "bundled") {
     logger.debug({ event: "zstd.system.disabled" });
     sysZstdPath = false;
     return null;
@@ -174,7 +186,7 @@ function resolveSystemZstd(): string | null {
     sysZstdPath = false;
   }
 
-  if (!sysZstdPath && setting === "always") {
+  if (!sysZstdPath && setting === "native") {
     zstdConfig.warn?.(t("zstd.notAvailable"));
   }
 
@@ -223,7 +235,7 @@ export function zstdCompressFile(
   level: number,
   progress?: ProgressLike,
 ): Promise<void> {
-  if (shouldUseWasmCodec()) {
+  if (shouldUseWasmCodec() || zstdWasmForced()) {
     logger.info({ event: "zstd.compress.wasm.forced" });
     return wasmCompressFile(input, output, "zst", level, progress);
   }
