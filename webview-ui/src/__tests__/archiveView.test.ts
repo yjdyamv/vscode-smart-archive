@@ -13,6 +13,7 @@ import { useTreeFlatten } from "../composables/useTree";
 import { createHostOps } from "../composables/archiveOps";
 import { createMessageDispatcher } from "../composables/messageDispatcher";
 import { createKeyboardNav, computeNavigationTarget } from "../composables/keyboardNav";
+import { useArchiveView } from "../composables/useArchiveView";
 
 function makeTree(): TreeNodeData[] {
   return [
@@ -50,6 +51,7 @@ function makeFixture() {
   const loadingMsg = ref("");
   const pwError = ref(false);
   const isEncrypted = ref(false);
+  const selectAllPending = ref(false);
   const scrollToPath = vi.fn();
   const containerEl = ref<HTMLElement | null>(null);
   const showToast = vi.fn();
@@ -64,6 +66,7 @@ function makeFixture() {
     loadingMsg,
     pwError,
     isEncrypted,
+    selectAllPending,
     scrollToPath,
     containerEl,
     showToast,
@@ -325,6 +328,7 @@ describe("createKeyboardNav", () => {
       containerEl: f.containerEl,
       closeContextMenu,
       expandAllAndLoad: vi.fn(),
+      selectAllPending: f.selectAllPending,
       ops,
     });
     return { ...f, keyboard, closeContextMenu };
@@ -415,5 +419,134 @@ describe("createKeyboardNav", () => {
     f.selection.state.anchorPath = "dir";
     f.keyboard.handleKeyboard(new KeyboardEvent("keydown", { key: " " }));
     expect(f.selection.state.selected.has("dir")).toBe(false);
+  });
+
+  it("Ctrl+A marks a select-all in progress and selects visible rows", () => {
+    const f = makeKeyboard();
+    f.keyboard.handleKeyboard(new KeyboardEvent("keydown", { key: "a", ctrlKey: true }));
+    expect(f.selectAllPending.value).toBe(true);
+    expect(f.selection.state.selected.has("dir")).toBe(true);
+    expect(f.selection.state.selected.has("c.txt")).toBe(true);
+  });
+
+  it("Escape cancels an in-flight select-all", () => {
+    const f = makeKeyboard();
+    f.selectAllPending.value = true;
+    f.keyboard.handleKeyboard(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(f.selectAllPending.value).toBe(false);
+  });
+});
+
+describe("selectAllPending + dispatcher", () => {
+  it("dirChildren extends the selection for every inserted row while pending", () => {
+    const f = makeFixture();
+    f.selectAllPending.value = true;
+    const loadExpanded = vi.fn();
+    const d = createMessageDispatcher({ ...f, loadExpandedPaths: loadExpanded });
+    d.handleMessage({
+      c: "dirChildren",
+      path: "dir/sub",
+      children: [
+        { name: "x.txt", path: "dir/sub/x.txt", size: 1, kind: "REGULAR_FILE" },
+        { name: "y", path: "dir/sub/y", size: 0, kind: "DIRECTORY", hasMore: true, children: [] },
+      ],
+    });
+    expect(f.selection.state.selected.has("dir/sub/x.txt")).toBe(true);
+    expect(f.selection.state.selected.has("dir/sub/y")).toBe(true);
+  });
+
+  it("dirChildren does not auto-select when not pending and parent unselected", () => {
+    const f = makeFixture();
+    const d = createMessageDispatcher({ ...f, loadExpandedPaths: vi.fn() });
+    d.handleMessage({
+      c: "dirChildren",
+      path: "dir/sub",
+      children: [{ name: "x.txt", path: "dir/sub/x.txt", size: 1, kind: "REGULAR_FILE" }],
+    });
+    expect(f.selection.state.selected.has("dir/sub/x.txt")).toBe(false);
+  });
+});
+
+describe("useArchiveView row interactions", () => {
+  function makeView() {
+    const f = makeFixture();
+    const av = useArchiveView({
+      post: f.post,
+      onMessage: f.onMessage,
+      tree: f.tree,
+      treeData: f.treeData,
+      selection: f.selection,
+      search: {
+        query: ref(""),
+        isRegex: ref(false),
+        regexError: ref(""),
+        matchSet: ref(new Set<string>()),
+        directMatchSet: ref(new Set<string>()),
+        updateSearch: vi.fn(),
+        isVisible: () => true,
+        toggleRegex: vi.fn(),
+      },
+      visibleFlatNodes: f.visibleFlatNodes,
+      viewState: f.viewState,
+      loadingMsg: f.loadingMsg,
+      archiveProps: ref(null),
+      totalFiles: ref(0),
+      totalDirs: ref(0),
+      readOnly: ref(false),
+      isSplit: ref(false),
+      canSplit: ref(false),
+      isEncrypted: f.isEncrypted,
+      canEncrypt: ref(false),
+      pwError: f.pwError,
+      descCounts: ref({}),
+      containerEl: f.containerEl,
+      scrollToPath: f.scrollToPath,
+    });
+    return { ...f, av };
+  }
+
+  it("dbl-click on a file previews it", () => {
+    const { av, post } = makeView();
+    av.handleRowDblClick("c.txt", false);
+    expect(post).toHaveBeenCalledWith({ c: "preview", path: "c.txt" });
+  });
+
+  it("dbl-click on an unloaded directory requests its children", () => {
+    const { av, post } = makeView();
+    av.handleRowDblClick("dir/sub", true);
+    expect(post).toHaveBeenCalledWith({ c: "expandDir", path: "dir/sub" });
+  });
+
+  it("dbl-click on a loaded expanded directory collapses it", () => {
+    const { av, tree, post } = makeView();
+    expect(tree.expandedPaths.value.has("dir")).toBe(true);
+    av.handleRowDblClick("dir", true);
+    expect(tree.expandedPaths.value.has("dir")).toBe(false);
+    expect(post).not.toHaveBeenCalledWith({ c: "expandDir", path: "dir" });
+  });
+
+  it("a manual row click cancels an in-flight select-all", () => {
+    const { av } = makeView();
+    av.selectAllPending.value = true;
+    av.handleRowClick("c.txt", false, false, false);
+    expect(av.selectAllPending.value).toBe(false);
+  });
+
+  it("loadExpandedPaths clears the select-all marker once nothing is pending", () => {
+    const { av, tree, selection, post } = makeView();
+    av.selectAllPending.value = true;
+    tree.expandedPaths.value.add("dir/sub");
+    // "dir/sub" hasMore + unloaded → still pending → marker survives.
+    av.loadExpandedPaths();
+    expect(post).toHaveBeenCalledWith({ c: "expandDir", path: "dir/sub" });
+    expect(av.selectAllPending.value).toBe(true);
+    // Simulate the response: children arrive → pending list empties → cleared.
+    selection.state.selected.add("dir");
+    av.dispatcher.handleMessage({
+      c: "dirChildren",
+      path: "dir/sub",
+      children: [{ name: "x.txt", path: "dir/sub/x.txt", size: 1, kind: "REGULAR_FILE" }],
+    });
+    expect(av.selectAllPending.value).toBe(false);
   });
 });
