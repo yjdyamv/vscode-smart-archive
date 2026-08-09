@@ -319,14 +319,12 @@ const COMPRESS_FORMAT_ORDER: readonly string[] = [
 
 /** Formats available for compression (canCreate === true) */
 export const COMPRESS_FORMATS: FormatInfo[] = FORMAT_TABLE.filter((f) => f.canCreate)
-  .map(
-    (f): FormatInfo => ({
-      label: f.label,
-      description: f.description,
-      canCreate: f.canCreate,
-      supportsEncryption: f.supportsEncryption,
-    }),
-  )
+  .map((f): FormatInfo => ({
+    label: f.label,
+    description: f.description,
+    canCreate: f.canCreate,
+    supportsEncryption: f.supportsEncryption,
+  }))
   .sort((a, b) => {
     const ia = COMPRESS_FORMAT_ORDER.indexOf(a.label);
     const ib = COMPRESS_FORMAT_ORDER.indexOf(b.label);
