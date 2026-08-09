@@ -37,6 +37,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import type { ListEntry } from "../engines/fileListing-core";
+import { CACHE_HASH_ALGO, CACHE_TMP_EXT, LISTING_CACHE_FILE_EXT } from "../constants";
 import { logger } from "../utils/logger-core";
 import { secureUnlink } from "../utils/fs";
 
@@ -87,8 +88,8 @@ export function initListingCache(dir: string): void {
 
 /** Stable cache file name for an archive path — sha256 of the path. */
 export function cacheFilePath(dir: string, filePath: string): string {
-  const digest = crypto.createHash("sha256").update(filePath).digest("hex");
-  return path.join(dir, `${digest}.json`);
+  const digest = crypto.createHash(CACHE_HASH_ALGO).update(filePath).digest("hex");
+  return path.join(dir, `${digest}${LISTING_CACHE_FILE_EXT}`);
 }
 
 /**
@@ -119,7 +120,7 @@ export function clearListingCache(): number {
  * guards.
  */
 export async function hashFile(filePath: string): Promise<string> {
-  const hash = crypto.createHash("sha256");
+  const hash = crypto.createHash(CACHE_HASH_ALGO);
   const fd = await fs.promises.open(filePath, "r");
   try {
     const buf = Buffer.allocUnsafe(HASH_CHUNK);
@@ -264,7 +265,7 @@ export function pruneListingCache(cacheDir: string, maxFiles = MAX_CACHE_FILES):
   if (maxFiles <= 0) return 0;
   let files: string[];
   try {
-    files = fs.readdirSync(cacheDir).filter((f) => f.endsWith(".json"));
+    files = fs.readdirSync(cacheDir).filter((f) => f.endsWith(LISTING_CACHE_FILE_EXT));
   } catch {
     return 0;
   }
@@ -303,7 +304,7 @@ export function sweepListingCache(cacheDir: string, now = Date.now()): number {
   let removed = 0;
   for (const name of names) {
     const cacheFile = path.join(cacheDir, name);
-    if (name.endsWith(".tmp")) {
+    if (name.endsWith(CACHE_TMP_EXT)) {
       if (isStaleTmp(cacheFile, now)) {
         try {
           secureUnlink(cacheFile);
@@ -314,7 +315,7 @@ export function sweepListingCache(cacheDir: string, now = Date.now()): number {
       }
       continue;
     }
-    if (!name.endsWith(".json")) continue;
+    if (!name.endsWith(LISTING_CACHE_FILE_EXT)) continue;
     if (!shouldKeepSnapshot(cacheFile, now)) {
       try {
         secureUnlink(cacheFile);

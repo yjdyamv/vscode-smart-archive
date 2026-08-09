@@ -40,6 +40,17 @@ import { applyHostConfig } from "./utils/config";
 import { disposeBurstLoggers } from "./providers/webview/router";
 import { resetArchiveRunner, reconfigureArchiveWorker } from "./engines/worker/runner";
 import { t } from "./i18n";
+import {
+  CLEAR_CACHES_COMMAND,
+  CONFIG_MAX_FILES,
+  CONFIG_MAX_MB,
+  CONFIG_MAX_PREVIEW_MB,
+  CONFIG_SECTION,
+  CONFIG_TTL_DAYS,
+  DAILY_CACHE_SWEEP_MS,
+  LISTING_CACHE_DIR,
+  PREVIEW_CACHE_DIR,
+} from "./constants";
 
 /**
  * Called when the extension is activated.
@@ -55,35 +66,32 @@ export function activate(context: vscode.ExtensionContext): void {
   initExpandedState(context.secrets);
   initPasswordVault(context.secrets);
   initTempCleanup(context);
-  initListingCache(path.join(context.globalStorageUri.fsPath, "listing-cache"));
+  initListingCache(path.join(context.globalStorageUri.fsPath, LISTING_CACHE_DIR));
   initPreviewCache(
-    path.join(context.globalStorageUri.fsPath, "preview-cache"),
+    path.join(context.globalStorageUri.fsPath, PREVIEW_CACHE_DIR),
     readPreviewCacheConfig,
   );
 
   // Daily sweep: activation and post-store sweeps alone let expired files
   // linger while VS Code stays open without previews. A 24h timer keeps
   // the caches at their budget even in a long-lived session.
-  const dailyCacheSweep = setInterval(
-    () => {
-      const previewDir = getPreviewCacheDir();
-      if (previewDir) {
-        const pruned = sweepPreviewCache(previewDir);
-        if (pruned > 0) logger.info({ event: "previewCache.dailySweep", pruned });
-      }
-      const listingDir = getListingCacheDir();
-      if (listingDir) {
-        const pruned = sweepListingCache(listingDir);
-        if (pruned > 0) logger.info({ event: "listingCache.dailySweep", pruned });
-      }
-    },
-    24 * 60 * 60 * 1000,
-  );
+  const dailyCacheSweep = setInterval(() => {
+    const previewDir = getPreviewCacheDir();
+    if (previewDir) {
+      const pruned = sweepPreviewCache(previewDir);
+      if (pruned > 0) logger.info({ event: "previewCache.dailySweep", pruned });
+    }
+    const listingDir = getListingCacheDir();
+    if (listingDir) {
+      const pruned = sweepListingCache(listingDir);
+      if (pruned > 0) logger.info({ event: "listingCache.dailySweep", pruned });
+    }
+  }, DAILY_CACHE_SWEEP_MS);
   context.subscriptions.push({ dispose: () => clearInterval(dailyCacheSweep) });
 
   // Invalidate the caches on demand.
   context.subscriptions.push(
-    vscode.commands.registerCommand("yjdyamv.smart-archive.clearCaches", () => {
+    vscode.commands.registerCommand(CLEAR_CACHES_COMMAND, () => {
       const preview = clearPreviewCache();
       const listing = clearListingCache();
       logger.info({ event: "caches.cleared", preview, listing });
@@ -175,12 +183,12 @@ export async function deactivate(): Promise<void> {
  * cache entirely.
  */
 function readPreviewCacheConfig(): Partial<PreviewCacheConfig> {
-  const c = vscode.workspace.getConfiguration("smart-archive");
-  const maxPreviewMB = c.get<number>("cache.maxPreviewMB", 10);
+  const c = vscode.workspace.getConfiguration(CONFIG_SECTION);
+  const maxPreviewMB = c.get<number>(CONFIG_MAX_PREVIEW_MB, 10);
   return {
     maxCacheableBytes: maxPreviewMB <= 0 ? 0 : maxPreviewMB * 1024 * 1024,
-    ttlMs: c.get<number>("cache.ttlDays", 30) * 24 * 60 * 60 * 1000,
-    maxBytes: c.get<number>("cache.maxMB", 1024) * 1024 * 1024,
-    maxFiles: c.get<number>("cache.maxFiles", 100),
+    ttlMs: c.get<number>(CONFIG_TTL_DAYS, 30) * 24 * 60 * 60 * 1000,
+    maxBytes: c.get<number>(CONFIG_MAX_MB, 1024) * 1024 * 1024,
+    maxFiles: c.get<number>(CONFIG_MAX_FILES, 100),
   };
 }

@@ -36,10 +36,14 @@
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import { CACHE_HASH_ALGO, CACHE_TMP_EXT } from "../constants";
 import { logger } from "../utils/logger-core";
 import { secureUnlink } from "../utils/fs";
 
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
+/** Full content-hash shape enforced on dedup-index entries. */
+const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
 /** Name of the dedup index file inside the cache dir. */
 const MANIFEST_NAME = "dedup-manifest.json";
@@ -132,7 +136,7 @@ export function previewCachePath(
 ): string {
   if (!cacheDir) throw new Error("preview cache not initialized");
   const digest = crypto
-    .createHash("sha256")
+    .createHash(CACHE_HASH_ALGO)
     .update(`${archivePath}|${mtimeMs}|${size}|${filePath}`)
     .digest("hex")
     .slice(0, 16);
@@ -174,7 +178,7 @@ function readManifest(): DedupManifest {
       // Reject malformed hashes and any name that could escape the cache
       // dir (path separators would turn the link target into an arbitrary
       // path under the attacker's control).
-      if (!/^[0-9a-f]{64}$/.test(hash)) continue;
+      if (!CONTENT_HASH_RE.test(hash)) continue;
       if (typeof name !== "string" || name !== path.basename(name)) continue;
       map[hash] = name;
     }
@@ -194,7 +198,7 @@ function writeManifest(manifest: DedupManifest): void {
     }
     return;
   }
-  const tmp = `${manifestPath()}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
+  const tmp = `${manifestPath()}.${process.pid}.${crypto.randomBytes(4).toString("hex")}${CACHE_TMP_EXT}`;
   try {
     fs.writeFileSync(tmp, JSON.stringify(manifest), { flag: "wx" });
     fs.renameSync(tmp, manifestPath());
@@ -232,7 +236,7 @@ function pruneStaleManifestEntries(dir: string): void {
  */
 export async function storePreviewCache(cacheFile: string, data: Uint8Array): Promise<void> {
   const manifest = readManifest();
-  const hash = crypto.createHash("sha256").update(data).digest("hex");
+  const hash = crypto.createHash(CACHE_HASH_ALGO).update(data).digest("hex");
   const existing = manifest.map[hash];
   if (existing) {
     const existingPath = path.join(cacheDir!, existing);
@@ -247,7 +251,7 @@ export async function storePreviewCache(cacheFile: string, data: Uint8Array): Pr
       // Missing/stale target: fall through to a plain write.
     }
   }
-  const tmp = `${cacheFile}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
+  const tmp = `${cacheFile}.${process.pid}.${crypto.randomBytes(4).toString("hex")}${CACHE_TMP_EXT}`;
   try {
     await fs.promises.writeFile(tmp, data, { flag: "wx" });
     await fs.promises.rename(tmp, cacheFile);
@@ -311,7 +315,7 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
     } catch {
       continue;
     }
-    if (name.endsWith(".tmp")) {
+    if (name.endsWith(CACHE_TMP_EXT)) {
       if (now - st.mtimeMs > SWEEP_INTERVAL_MS) {
         try {
           secureUnlink(file);
