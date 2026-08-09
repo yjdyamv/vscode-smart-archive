@@ -28,6 +28,7 @@ import { validatePassword, sanitizeCliPath } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike } from "../utils/cancellation";
+import { checkWorkerMemory } from "./worker/memory-guard";
 import { JS7z } from "./js7z-factory";
 import { disposeJS7z } from "./js7z-lifecycle";
 
@@ -113,6 +114,7 @@ function copyFromFSWithStrip(
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
 
       let data: Uint8Array | ArrayBuffer;
+      checkWorkerMemory();
       try {
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
