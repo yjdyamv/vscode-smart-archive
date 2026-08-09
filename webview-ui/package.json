@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview",
+    "dev": "vite",
+    "build:watch": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -21,6 +21,7 @@
     "@vscode/codicons": "^0.0.46-24",
     "@vue/test-utils": "^2.4.11",
     "jsdom": "^30.0.1",
+    "jsonc-parser": "^3.3.1",
     "typescript": "^6.0.3",
     "vite": "^8.2.1",
     "vitest": "^4.1.10",

@@ -112,8 +112,8 @@ All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, A
 ```bash
 npm install              # installs root + webview-ui deps
 npm run build            # build webview + compile (one step)
-npm run watch            # watch mode (TS only)
-npm run dev:webview      # Vite dev server with HMR
+npm run watch            # watch mode: extension compile + webview rebuild
+npm run dev:webview      # browser preview of the UI (localhost:5173, HMR, mock data)
 npm run lint             # oxlint static analysis
 npm run typecheck        # TypeScript type checking
 npm run format           # oxfmt code formatting
@@ -125,6 +125,17 @@ npm run release          # build + check + package
 ```
 
 > Quick dev workflow: `npm install` → `npm run build` → `F5` in VS Code.
+>
+> **UI development, two flows:**
+>
+> - **Browser preview (fastest):** `npm run dev:webview` serves the webview UI
+>   at http://localhost:5173 with HMR and a mock archive (`src/devMock.ts`
+>   simulates the host: lazy tree expansion, search, selection). No VS Code
+>   needed — ideal for iterating on components.
+> - **Real panel:** run `npm run watch` (extension compile + webview rebuild on
+>   save), press `F5` to open the Extension Development Host, open an archive,
+>   then reload the webview panel (re-open the archive or
+>   `Developer: Reload Window`) after each change.
 
 ## Dependencies
 
