@@ -9,6 +9,7 @@
  */
 
 import * as vscode from "vscode";
+import * as path from "path";
 import { compressCommand } from "./commands/compress";
 import { repairCommand } from "./commands/repair";
 import { decompressCommand, browseCommand } from "./commands/decompress";
@@ -20,6 +21,7 @@ import {
   dispose as disposeExpandedState,
 } from "./providers/webview/expandedState";
 import { initTempCleanup } from "./providers/tempFiles";
+import { initListingCache } from "./providers/listingCache";
 import { resetDetectionCache } from "./engines/system7z";
 import { applyHostConfig } from "./utils/config";
 import { disposeBurstLoggers } from "./providers/webview/router";
@@ -38,6 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   initExpandedState(context.secrets);
   initTempCleanup(context);
+  initListingCache(path.join(context.globalStorageUri.fsPath, "listing-cache"));
 
   // Register custom editor as default viewer for archive files (.7z, .zip, …)
   registerArchiveEditor(context);

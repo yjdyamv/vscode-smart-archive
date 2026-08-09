@@ -35,6 +35,11 @@ export interface KeyboardContext {
   closeContextMenu: () => void;
   /** Ctrl+A: expand everything and kick off lazy loads for restored paths. */
   expandAllAndLoad: () => void;
+  /**
+   * Select-all-in-progress marker: set by Ctrl+A, cleared by the drain in
+   * loadExpandedPaths, by Escape, or by any manual row interaction.
+   */
+  selectAllPending: Ref<boolean>;
   ops: {
     extSel: () => void;
     copySel: () => void;
@@ -66,6 +71,7 @@ export function createKeyboardNav(ctx: KeyboardContext) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if ((e.ctrlKey || e.metaKey) && e.key === "a") {
       e.preventDefault();
+      ctx.selectAllPending.value = true;
       ctx.expandAllAndLoad();
       for (const fn of ctx.visibleFlatNodes.value) ctx.selection.state.selected.add(fn.path);
     }
@@ -85,6 +91,7 @@ export function createKeyboardNav(ctx: KeyboardContext) {
       ctx.ops.extSel();
     }
     if (e.key === "Escape") {
+      ctx.selectAllPending.value = false;
       ctx.selection.clearAll();
       ctx.closeContextMenu();
     }

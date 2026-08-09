@@ -3,6 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 
 import { getSplitVolumeStem, detectVolumeSize, getSplitOutputPath } from "../src/providers/webview/router";
+import { mergeOutputPath } from "../src/providers/webview/handlers/shared";
 import { tmpDir } from "./tmp";
 
 let tdir: string;
@@ -57,6 +58,30 @@ describe("getSplitVolumeStem", () => {
   it("handles windows backslash paths", () => {
     const result = getSplitVolumeStem("C:\\data\\archive.7z.001");
     expect(result).toBe("C:\\data\\archive");
+  });
+});
+
+describe("mergeOutputPath", () => {
+  it("targets the base archive name for .7z.001 sets", () => {
+    expect(mergeOutputPath("/dir/archive.7z.001", "7z")).toBe("/dir/archive.7z");
+  });
+
+  it("uniquifies when the base target already exists", () => {
+    const existing = path.join(tdir, "merge_existing.7z");
+    touch(existing, 10);
+    const dst = mergeOutputPath(path.join(tdir, "merge_existing.7z.001"), "7z");
+    expect(dst).toBe(path.join(tdir, "merge_existing_1.7z"));
+  });
+
+  it("targets the base archive name for .part1.rar sets", () => {
+    expect(mergeOutputPath("/dir/archive.part1.rar", "rar")).toBe("/dir/archive.rar");
+  });
+
+  it("keeps the current file for .rNN sets (base file is the first volume)", () => {
+    // The webview redirects archive.r00 → archive.rar, so the merge target
+    // equals the file being merged — replacing the first volume is intent,
+    // and it must NOT be uniquified.
+    expect(mergeOutputPath("/dir/archive.rar", "rar")).toBe("/dir/archive.rar");
   });
 });
 

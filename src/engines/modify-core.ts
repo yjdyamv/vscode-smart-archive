@@ -25,6 +25,7 @@ import {
   VFS_INNER_TAR,
 } from "../constants";
 import { checkArchiveSize, validatePassword, sanitizeCliPath } from "../utils/security";
+import { PreviewTooLargeError } from "../utils/errors";
 import { getBaseName } from "../utils/path";
 import { logger } from "../utils/logger-core";
 import { t } from "../i18n";
@@ -33,7 +34,6 @@ import { zstdCompress } from "./zstd-codec";
 import { brotliCompress, brotliDecompress } from "./brotli-codec";
 import { lz4Compress, lz4Decompress } from "./lz4-codec";
 import { snappyCompress, snappyDecompress } from "./snappy-codec";
-import { decompressLz4Frames } from "./lz4-codec";
 import { JS7z } from "./js7z-factory";
 import { disposeJS7z } from "./js7z-lifecycle";
 import { CancelledError } from "../utils/cancellation";
@@ -427,7 +427,6 @@ export async function renameInArchiveCore(
       token,
     );
     logger.info({ event: "rename.wrapped.ok", archivePath, oldPath, newPath });
-    logger.info({ event: "rename.wrapped.ok", archivePath, oldPath, newPath });
     return;
   }
 
@@ -654,7 +653,7 @@ export async function previewFileCore(
     // decompresses to a raw tar, which 7z then extracts.
     if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
       const buf = fs.readFileSync(archivePath);
-      const innerTar = await decompressLz4Frames(Buffer.from(buf));
+      const innerTar = await lz4Decompress(buf);
       const tarName = path.basename(archivePath, archiveExt) + ".tar";
       archiveFsPath = `/${tarName}`;
       writeLargeVFS(js7z, archiveFsPath, innerTar);
@@ -748,7 +747,11 @@ export async function previewFileCore(
 
   const buf = Buffer.from(fileData);
   if (buf.length > MAX_PREVIEW_FILE_SIZE) {
-    throw new Error(t("preview.fileTooLarge", String(buf.length), String(MAX_PREVIEW_FILE_SIZE)));
+    throw new PreviewTooLargeError(
+      t("preview.fileTooLarge", String(buf.length), String(MAX_PREVIEW_FILE_SIZE)),
+      buf.length,
+      MAX_PREVIEW_FILE_SIZE,
+    );
   }
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, buf);

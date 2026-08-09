@@ -211,8 +211,43 @@ describe("system 7-Zip", () => {
     fs.rmSync(tdir, { recursive: true, force: true });
   });
 
-  itIf("system7z", "honors the compression level for wrapped formats (tar.xz)", async () => {
-    let tdir = tmpDir("sat_sz_wraplvl_");
+  itIf("system7z", "replaces an existing output archive instead of merging into it", async () => {
+    let tdir = tmpDir("sat_sz_replace_");
+    const format = { label: "7z", description: "", canCreate: true, supportsEncryption: false };
+    const archive = path.join(tdir, "out.7z");
+
+    const oldFile = path.join(tdir, "old.txt");
+    fs.writeFileSync(oldFile, "old content");
+    await compressWithSystem7z({
+      targets: [{ fsPath: oldFile }],
+      format,
+      outputPath: archive,
+      password: "",
+      level: 5,
+    });
+
+    const newFile = path.join(tdir, "new.txt");
+    fs.writeFileSync(newFile, "new content");
+    await compressWithSystem7z({
+      targets: [{ fsPath: newFile }],
+      format,
+      outputPath: archive,
+      password: "",
+      level: 5,
+    });
+
+    // `7z a` would have merged (keeping old.txt); the replace contract means
+    // only new.txt survives.
+    const r = spawnSync(sz!, ["l", "-slt", archive], { stdio: "pipe", timeout: 10_000 });
+    expect(r.status).toBe(0);
+    const listing = r.stdout.toString();
+    expect(listing).toContain("new.txt");
+    expect(listing).not.toContain("old.txt");
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("system7z", "honors the compression level for wrapped formats (tar.xz)", async () => {    let tdir = tmpDir("sat_sz_wraplvl_");
     const srcDir = path.join(tdir, "src");
     fs.mkdirSync(srcDir, { recursive: true });
     // Deterministic corpus (seeded xorshift32): 4 identical 20×200KB text

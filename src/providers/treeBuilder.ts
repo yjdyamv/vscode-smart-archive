@@ -69,76 +69,6 @@ function mknondirNode(name: string, path: string, size: number): TreeNode {
   return { name, path, size, kind: "REGULAR_FILE" };
 }
 
-// ── Full-tree build (existing, optimized) ─────────────────────────
-
-function buildTree(entries: FlatEntry[], archiveName: string): TreeNode[] {
-  const normed = normalizeEntries(entries, archiveName);
-  sortEntries(normed);
-
-  const root: TreeNode[] = [];
-  const dirMap = new Map<string, TreeNode>();
-  const siblingMap = new Map<string, number>(); // avoids O(n) findIndex
-
-  for (const { entry, parts } of normed) {
-    let siblings = root;
-    let prefix = "";
-
-    for (let i = 0; i < parts.length; i++) {
-      const seg = parts[i];
-      const last = i === parts.length - 1;
-      const full = prefix ? prefix + "/" + seg : seg;
-
-      if (last) {
-        if (seg === ".smartarchive") continue;
-        const isDir = entry.type !== "REGULAR_FILE";
-        const existing = dirMap.get(full);
-        if (existing && existing.kind === "DIRECTORY") {
-          existing.size = entry.size || existing.size;
-          existing.hasMore = !!(existing.children && existing.children.length > 0);
-        } else {
-          const node: TreeNode = isDir
-            ? {
-                name: seg,
-                path: entry.path,
-                size: entry.size,
-                kind: "DIRECTORY",
-                children: [],
-                hasMore: false,
-              }
-            : { name: seg, path: entry.path, size: entry.size, kind: "REGULAR_FILE" };
-          // Track in siblingMap so intermediate dirs from other entries can replace this file
-          if (!isDir) siblingMap.set(seg, siblings.length);
-          siblings.push(node);
-          if (isDir) dirMap.set(full, node);
-        }
-      } else {
-        let dir = dirMap.get(full);
-        if (!dir) {
-          // replace a file node with the same name by a dir node
-          const dup = siblingMap.get(seg);
-          if (dup !== undefined && siblings[dup]?.kind !== "DIRECTORY") {
-            siblings.splice(dup, 1);
-            siblingMap.delete(seg);
-          }
-          dir = mkdirNode(seg, full, false);
-          siblingMap.set(seg, siblings.length);
-          siblings.push(dir);
-          dirMap.set(full, dir);
-        }
-        siblings = dir.children!;
-        prefix = full;
-      }
-    }
-  }
-
-  // Post-pass: set hasMore on directories that have non-empty children
-  for (const dir of dirMap.values()) {
-    dir.hasMore = !!(dir.children && dir.children.length > 0);
-  }
-
-  return root;
-}
-
 // ── Lazy: root-only build ─────────────────────────────────────────
 
 function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[] {
@@ -147,20 +77,7 @@ function buildTreeRootOnly(entries: FlatEntry[], archiveName: string): TreeNode[
 
   // buildNodes handles common-prefix directories natively via
   // implicitDir detection (parts.length > 1 → seg is a directory).
-  const nodes = buildNodes(normed);
-
-  // If all entries collapsed into a single directory node and its name
-  // matches the archive name, show that dir instead of "nothing to see".
-  if (
-    nodes.length === 1 &&
-    nodes[0].kind === "DIRECTORY" &&
-    nodes[0].name === archiveName &&
-    nodes[0].hasMore
-  ) {
-    return nodes;
-  }
-
-  return nodes;
+  return buildNodes(normed);
 }
 
 function buildNodes(normed: EntryWithParts[]): TreeNode[] {
@@ -398,24 +315,6 @@ function countAllStats(entries: FlatEntry[]): {
   return { files, dirs: dirSet.size, total: files + dirSet.size, totalSize };
 }
 
-function countTreeStats(nodes: TreeNode[]): { files: number; dirs: number; total: number } {
-  let files = 0;
-  let dirs = 0;
-  for (const node of nodes) {
-    if (node.kind === "DIRECTORY") {
-      dirs++;
-      if (node.children && node.children.length > 0) {
-        const child = countTreeStats(node.children);
-        files += child.files;
-        dirs += child.dirs;
-      }
-    } else {
-      files++;
-    }
-  }
-  return { files, dirs, total: files + dirs };
-}
-
 /**
  * Build a map of directory path → {descendant file count, descendant dir count}
  * from the full flat entry list. Used by the frontend for accurate selection counts.
@@ -451,12 +350,4 @@ export function buildDescendantCounts(
 }
 
 export type { TreeNode, FlatEntry, EntryIndex };
-export {
-  buildTree,
-  buildTreeRootOnly,
-  getDirChildren,
-  countTreeStats,
-  buildEntryIndex,
-  markNoisyDirs,
-  countAllStats,
-};
+export { buildTreeRootOnly, getDirChildren, buildEntryIndex, markNoisyDirs, countAllStats };

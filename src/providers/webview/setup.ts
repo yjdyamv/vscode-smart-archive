@@ -63,6 +63,10 @@ export async function setupWebview(
   toast?: string,
 ): Promise<void> {
   let filePath = archiveUri.fsPath;
+  // Kept before any redirect so split-volume flags (merge button, read-only
+  // toast) reflect the file the user actually opened: a .r00 volume redirects
+  // to the set's base .rar, whose own extension is not a split marker.
+  const originalFilePath = filePath;
   const ext = getFullExt(filePath);
   const { cssUri, jsUri, codiconCssUri } = getWebviewUris(webview);
 
@@ -173,7 +177,7 @@ export async function setupWebview(
         "password",
       );
       const flags: string[] = [];
-      if (isSplitVolume(filePath)) {
+      if (isSplitVolume(originalFilePath)) {
         flags.push("window._xIsSplit=true");
       } else if ([".7z", ".zip"].includes(resolvedExt)) {
         flags.push("window._xCanSplit=true");
@@ -232,7 +236,9 @@ export async function setupWebview(
   const ratio = totalSize > 0 ? archiveFileSize / totalSize : 0;
   const roExt = resolvedExt;
   const roToast =
-    [".deb", ".rpm"].includes(roExt) || isSplitVolume(filePath) ? t("archive.readOnly") : undefined;
+    [".deb", ".rpm"].includes(roExt) || isSplitVolume(originalFilePath)
+      ? t("archive.readOnly")
+      : undefined;
   const finalToast = toast ?? roToast;
   webview.html = contentHtml(
     tree,

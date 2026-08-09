@@ -12,7 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { streamToVFS } from "./vfs-io";
-import { decompressLz4Frames } from "./lz4-codec";
+import { lz4Decompress } from "./lz4-codec";
 import { brotliDecompress } from "./brotli-codec";
 import { snappyDecompress } from "./snappy-codec";
 import {
@@ -28,6 +28,7 @@ import { validatePassword, sanitizeCliPath } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike } from "../utils/cancellation";
+import { checkWorkerMemory } from "./worker/memory-guard";
 import { JS7z } from "./js7z-factory";
 import { disposeJS7z } from "./js7z-lifecycle";
 
@@ -113,6 +114,7 @@ function copyFromFSWithStrip(
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
 
       let data: Uint8Array | ArrayBuffer;
+      checkWorkerMemory();
       try {
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
@@ -201,21 +203,25 @@ export async function extractSelectedCore(
     const js7z = await JS7z({ print: () => {}, printErr: () => {} });
     try {
       let innerTarName: string;
+      let innerTarVfsPath: string;
       if (ext === ".tar.lz4" || ext === ".tlz4") {
         const buf = fs.readFileSync(archivePath);
-        const innerTar = await decompressLz4Frames(Buffer.from(buf));
+        const innerTar = await lz4Decompress(buf);
         innerTarName = path.basename(archivePath, ext) + ".tar";
-        js7z.FS.writeFile(`/${innerTarName}`, new Uint8Array(innerTar));
+        innerTarVfsPath = `/${innerTarName}`;
+        js7z.FS.writeFile(innerTarVfsPath, new Uint8Array(innerTar));
       } else if (ext === ".tar.br" || ext === ".tbr") {
         const buf = fs.readFileSync(archivePath);
         const innerTar = await brotliDecompress(new Uint8Array(buf));
         innerTarName = path.basename(archivePath, ext) + ".tar";
-        js7z.FS.writeFile(`/${innerTarName}`, innerTar);
+        innerTarVfsPath = `/${innerTarName}`;
+        js7z.FS.writeFile(innerTarVfsPath, innerTar);
       } else if (ext === ".tar.sz" || ext === ".tsz") {
         const buf = fs.readFileSync(archivePath);
         const innerTar = await snappyDecompress(new Uint8Array(buf));
         innerTarName = path.basename(archivePath, ext) + ".tar";
-        js7z.FS.writeFile(`/${innerTarName}`, innerTar);
+        innerTarVfsPath = `/${innerTarName}`;
+        js7z.FS.writeFile(innerTarVfsPath, innerTar);
       } else {
         const outerFsPath = streamToVFS(js7z, archivePath);
         js7z.FS.mkdir(VFS_TMP_X1);
@@ -235,9 +241,10 @@ export async function extractSelectedCore(
         const found = top.find((e: string) => e.endsWith(".tar"));
         if (!found) throw new Error("Wrapped archive: no inner .tar found");
         innerTarName = found;
+        innerTarVfsPath = `${VFS_TMP_X1}/${innerTarName}`;
       }
       if (token?.isCancellationRequested) throw new CancelledError();
-      const innerData = js7z.FS.readFile(`/${innerTarName}`, { encoding: "binary" });
+      const innerData = js7z.FS.readFile(innerTarVfsPath, { encoding: "binary" });
       const js7z2 = await JS7z({ print: () => {}, printErr: () => {} });
       try {
         js7z2.FS.writeFile(`/${innerTarName}`, new Uint8Array(innerData));
@@ -269,6 +276,10 @@ export async function extractSelectedCore(
             archivePath,
             pathCount: normalizedPaths.length,
           });
+          // Known edge: this fallback drops the excludes — 7z re-extracts
+          // everything, so excluded files inside a selected directory land
+          // in /_x2 and get copied. Accepted: the fallback only triggers
+          // when the selection matched nothing (usually stale paths).
           const allInnerArgs = ["x", `/${innerTarName}`, "-o/_x2", "-y"];
           await new Promise<void>((resolve, reject) => {
             js7z2.onExit = (c: number) => {
@@ -344,6 +355,8 @@ export async function extractSelectedCore(
         archivePath,
         pathCount: normalizedPaths.length,
       });
+      // Known edge: this fallback drops the excludes — see the wrapped
+      // branch for the same accepted behavior.
       const allArgs = ["x", archiveFsPath, "-o/out", "-y"];
       if (password) {
         allArgs.splice(1, 0, `-p${password}`);

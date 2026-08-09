@@ -143,7 +143,7 @@ export async function j7zCompressDir(
       if (dir && dir !== "/") mkdirP(j, dir);
       j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
     }
-    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
+    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.replace(/^\/+/, "").split("/")[0]))];
     await run7z(j, ["a", archive, ...tops, ...extra]);
     return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
   } finally {
@@ -229,7 +229,7 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       if (d && d !== "/") mkdirP(j1, d);
       j1.FS.writeFile(fp, new Uint8Array(Buffer.from(c)));
     }
-    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.split("/")[1]))];
+    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.replace(/^\/+/, "").split("/")[0]))];
     await run7z(j1, ["a", "/_t.tar", ...tops]);
     const tb = Buffer.from(j1.FS.readFile("/_t.tar", { encoding: "binary" }));
     if (ext === "tar.zst" || ext === "tzst") {

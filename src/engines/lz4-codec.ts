@@ -62,14 +62,6 @@ export async function lz4Decompress(data: Uint8Array): Promise<Uint8Array> {
   return wasmDecompress(data, "lz4");
 }
 
-export async function decompressLz4Frames(compressed: Buffer): Promise<Uint8Array> {
-  if (!shouldUseWasmCodec()) {
-    const nativeOut = await nativeDecompress(compressed, "lz4");
-    if (nativeOut) return nativeOut;
-  }
-  return wasmDecompress(compressed, "lz4");
-}
-
 export async function lz4DecompressFile(input: string, output: string): Promise<void> {
   if (!shouldUseWasmCodec() && (await nativeDecompressFile(input, output, "lz4"))) {
     return;

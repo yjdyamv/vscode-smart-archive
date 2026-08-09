@@ -668,6 +668,20 @@ export async function compressWithSystem7z(
   const outputDir = path.dirname(options.outputPath);
   fs.mkdirSync(outputDir, { recursive: true });
 
+  // `7z a` UPDATES an existing archive (keeps old entries and adds the new
+  // ones) instead of replacing it — the WASM path and the rar5 engine both
+  // create fresh. This function is only ever used for creation (add-to-
+  // archive goes through addToArchiveSystem7z), so a pre-existing output is
+  // a replace intent (e.g. a save-dialog overwrite) — drop it first to make
+  // the engines behave identically instead of silently merging archives.
+  if (fs.existsSync(options.outputPath)) {
+    logger.info(
+      { event: "system7z.compress.replaceExisting", output: options.outputPath },
+      "Replacing existing output archive",
+    );
+    fs.unlinkSync(options.outputPath);
+  }
+
   const typeFlag = formatTo7zType(options.format.label);
   const isWrapped = typeFlag === "gzip" || typeFlag === "bzip2" || typeFlag === "xz";
 
