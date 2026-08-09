@@ -131,4 +131,44 @@ describe("parse7zListing — edge cases", () => {
     expect(results).toHaveLength(1);
     expect(results[0].path).toBe("valid.txt");
   });
+
+  it("infers directories from path prefixes when Attributes are absent (TAR)", () => {
+    const stdout = [
+      "Path = src",
+      "Path = src/main.ts",
+      "Path = src/lib/util.ts",
+      "Path = readme.md",
+    ].join("\n");
+    const results = parse7zListing(stdout, "a.tar");
+    const byPath = new Map(results.map((r) => [r.path, r]));
+    expect(byPath.size).toBe(4);
+    expect(byPath.get("src")!.type).toBe("DIRECTORY");
+    expect(byPath.get("src/main.ts")!.type).toBe("REGULAR_FILE");
+    expect(byPath.get("src/lib/util.ts")!.type).toBe("REGULAR_FILE");
+    expect(byPath.get("readme.md")!.type).toBe("REGULAR_FILE");
+  });
+
+  it("infers multi-level directory prefixes and keeps explicit dirs", () => {
+    const stdout = ["Path = a/b/c.txt", "Path = a/b", "Path = a"].join("\n");
+    const results = parse7zListing(stdout, "a.tar");
+    const byPath = new Map(results.map((r) => [r.path, r]));
+    expect(byPath.get("a")!.type).toBe("DIRECTORY");
+    expect(byPath.get("a/b")!.type).toBe("DIRECTORY");
+    expect(byPath.get("a/b/c.txt")!.type).toBe("REGULAR_FILE");
+  });
+
+  it("parses a 100k-entry listing quickly (directory inference is not O(n²))", () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 100_000; i++) {
+      lines.push(`Path = dir${i % 1000}/file${i}.txt`);
+    }
+    const start = Date.now();
+    const results = parse7zListing(lines.join("\n"), "big.7z");
+    const elapsed = Date.now() - start;
+    expect(results.length).toBe(100_000);
+    // The former per-entry prefix scan took ~54s at this size; the
+    // prefix-set rewrite is ~50ms. 5s gives 100x headroom against slow
+    // CI machines while still failing on any O(n²) regression.
+    expect(elapsed).toBeLessThan(5000);
+  });
 });

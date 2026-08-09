@@ -59,19 +59,21 @@ export function parse7zListing(
   }
   flush();
 
-  // Second pass: for entries without Attributes, infer directories
-  // by checking whether any other entry's path starts with this one + "/".
-  // TAR format listings omit the Attributes field entirely.
-  const pathSet = new Set(results.map((r) => r.path));
+  // Second pass: for entries without Attributes, infer directories from
+  // path prefixes — a path is a directory when it is an ancestor of another
+  // entry. Collect every ancestor prefix once (O(n × segments)) instead of
+  // scanning the whole set per entry (the former O(n²) loop took ~54s on a
+  // 100k-entry listing). TAR format listings omit the Attributes field.
+  const dirSet = new Set<string>();
   for (const r of results) {
-    if (r.type === "DIRECTORY") continue;
-    const prefix = r.path + "/";
-    for (const p of pathSet) {
-      if (p.startsWith(prefix)) {
-        r.type = "DIRECTORY";
-        break;
-      }
+    let i = r.path.indexOf("/");
+    while (i !== -1) {
+      if (i > 0) dirSet.add(r.path.slice(0, i));
+      i = r.path.indexOf("/", i + 1);
     }
+  }
+  for (const r of results) {
+    if (r.type === "REGULAR_FILE" && dirSet.has(r.path)) r.type = "DIRECTORY";
   }
 
   const volBase = getSplitVolumeBase(archiveName);
