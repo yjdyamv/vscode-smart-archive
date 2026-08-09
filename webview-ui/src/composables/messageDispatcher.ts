@@ -13,6 +13,12 @@ export interface MessageDispatcherContext {
   pwError: Ref<boolean>;
   isEncrypted: Ref<boolean>;
   loadExpandedPaths: () => void;
+  /**
+   * Set while a Ctrl+A select-all is draining its lazy loads: every
+   * directory inserted in this window extends the selection, so unloaded
+   * descendants are included once their children arrive.
+   */
+  selectAllPending: Ref<boolean>;
 }
 
 /**
@@ -57,6 +63,9 @@ export function createMessageDispatcher(ctx: MessageDispatcherContext) {
             }
           }
           if (ctx.selection.state.selected.has(parentPath)) {
+            for (const childPath of childPaths) ctx.selection.state.selected.add(childPath);
+          }
+          if (ctx.selectAllPending.value) {
             for (const childPath of childPaths) ctx.selection.state.selected.add(childPath);
           }
           ctx.loadExpandedPaths();

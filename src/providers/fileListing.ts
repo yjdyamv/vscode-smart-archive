@@ -13,8 +13,9 @@ import { runArchiveOp } from "../engines/worker/runner";
 import type { ListEntry } from "../engines/fileListing-core";
 import { listWithSystem7z } from "../engines/system7z";
 import { selectEngine } from "../engines/select-engine";
-import { getFullExt } from "../constants";
+import { getFullExt, isWrappedFormat } from "../constants";
 import { logger } from "../utils/logger";
+import { getListingCacheDir, readListingCache, writeListingCache } from "./listingCache";
 
 /**
  * Fetch the file list for an archive.
@@ -37,5 +38,25 @@ export async function fetchFileList(
     return listWithSystem7z(filePath, password);
   }
 
-  return runArchiveOp<ListEntry[]>("list", { inputPath: filePath, password, data });
+  // Wrapped formats only: repeat previews skip the full in-memory
+  // extraction via the disk cache (stat + sha256 verified on read).
+  // Note: a cache hit intentionally bypasses the archive-size gate in the
+  // listing core — the gate protects the worker from reading an oversized
+  // archive into memory, and a hit reads nothing at all.
+  const cacheDir = isWrappedFormat(ext) && !data && !password ? getListingCacheDir() : null;
+  if (cacheDir) {
+    const cached = await readListingCache(cacheDir, filePath);
+    if (cached) return cached;
+  }
+
+  const entries = await runArchiveOp<ListEntry[]>("list", { inputPath: filePath, password, data });
+
+  if (cacheDir) {
+    try {
+      await writeListingCache(cacheDir, filePath, entries);
+    } catch (err) {
+      logger.warn({ event: "listingCache.writeFailed", err }, "Failed to write listing cache");
+    }
+  }
+  return entries;
 }

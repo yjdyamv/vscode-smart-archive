@@ -60,6 +60,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "codec-progress.test.ts",
     "defaults-consistency.test.ts"
   ],
+  "src/engines/extract-core.ts": [
+    "extract-wrapped.test.ts"
+  ],
   "src/engines/fileListing-core.ts": [
     "wasm-codec-pipeline.test.ts"
   ],
@@ -155,6 +158,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/providers/fileListing.ts": [
     "single-file-stream.test.ts"
   ],
+  "src/providers/listingCache.ts": [
+    "listing-cache.test.ts"
+  ],
   "src/providers/tempFiles.ts": [
     "single-file-stream.test.ts"
   ],
@@ -171,6 +177,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/providers/webview/router.ts": [
     "router-burst.test.ts",
     "split-volume.test.ts"
+  ],
+  "src/utils/errors.ts": [
+    "preview-oversize.test.ts"
   ],
   "src/utils/exclude.ts": [
     "rar5-modify.test.ts"
@@ -219,7 +228,6 @@ export const SEAM_COVERED: Record<string, string[]> = {
 
 export const SEAM_GAPS: Record<string, string> = {
   "src/api/index.ts": "re-export barrel — api/compress.ts + api/decompress.ts covered",
-  "src/engines/extract-core.ts": "exercised via worker extract op only transitively",
   "src/engines/js7z-helpers.ts": "WASM primitives — exercised transitively by every WASM op",
   "src/engines/js7z-lifecycle.ts": "dispose lifecycle — exercised via helpers.disposeJS7z path",
   "src/engines/js7z-list.ts": "host list dispatcher — exercised via decompress isEncrypted flow",
@@ -264,7 +272,6 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/utils/cancellation.ts": "TokenLike/ProgressLike structural types",
   "src/utils/config.ts": "host config reads — partially via commands-e2e",
   "src/utils/errorClassifier.ts": "error classification — untested",
-  "src/utils/errors.ts": "error types — untested",
   "src/utils/platform.ts": "platform helpers — untested",
   "src/utils/progress-scale.ts": "progress scaling — untested",
   "src/utils/promptOversize.ts": "oversize dialog — exercised via decompress command flow",

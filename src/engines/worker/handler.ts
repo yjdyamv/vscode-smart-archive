@@ -22,6 +22,23 @@ export interface WorkerPort {
   close(): void;
 }
 
+export function serializeWorkerError(err: unknown): { message: string; name?: string } {
+  if (err instanceof Error) return { message: err.message, name: err.name };
+  // Non-Error throws (e.g. emscripten's FS.ErrnoError is a plain object) —
+  // String(err) would become "[object Object]" and hide the failure.
+  if (err && typeof err === "object") {
+    const e = err as { name?: unknown; errno?: unknown; message?: unknown };
+    const parts: string[] = [];
+    if (typeof e.name === "string" && e.name) parts.push(e.name);
+    if (typeof e.errno === "number") parts.push(`errno=${e.errno}`);
+    if (typeof e.message === "string" && e.message) parts.push(e.message);
+    if (parts.length > 0) {
+      return { message: parts.join(": "), name: typeof e.name === "string" ? e.name : undefined };
+    }
+  }
+  return { message: String(err) };
+}
+
 export function createArchiveWorkerHandler(port: WorkerPort): void {
   const cancelled = new Set<number>();
   let requestChain: Promise<void> = Promise.resolve();
@@ -73,12 +90,13 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
       const result = await dispatchOp(op, payload, makeProgress(id), makeToken(id));
       post({ type: "done", id, result });
     } catch (err) {
+      const serialized = serializeWorkerError(err);
       post({
         type: "error",
         id,
         cancelled: isCancellationError(err),
-        message: err instanceof Error ? err.message : String(err),
-        name: err instanceof Error ? err.name : undefined,
+        message: serialized.message,
+        name: serialized.name,
         stack: err instanceof Error ? err.stack : undefined,
       });
     } finally {

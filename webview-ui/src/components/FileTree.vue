@@ -30,6 +30,15 @@ const containerRef = ref<HTMLElement | null>(null);
 defineExpose({
   containerEl: containerRef,
   scrollToPath: (path: string) => {
+    // Virtualized rows are not all in the DOM — route through the
+    // virtualizer so far-away targets (keyboard Home/End/PageNav) actually
+    // scroll. The querySelector fallback covers search-filtered rows, where
+    // the path may not map to a visible flat node.
+    const idx = props.flatNodes.findIndex((f) => f.path === path);
+    if (idx >= 0) {
+      virtualizer.value.scrollToIndex(idx, { align: "auto" });
+      return;
+    }
     const el = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
     if (el) el.scrollIntoView({ block: "nearest" });
   },

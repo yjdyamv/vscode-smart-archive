@@ -1,4 +1,4 @@
-import { reactive, computed, type Ref, type ComputedRef } from "vue";
+import { reactive, ref, computed, type Ref, type ComputedRef } from "vue";
 import type { TreeNodeData, FlatNode, ArchiveProps } from "../types";
 import type { WebviewToHost, HostToWebview } from "../protocol";
 import type { DescCount } from "../bootstrap";
@@ -106,10 +106,14 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   }
 
   function loadExpandedPaths() {
-    for (const path of tree.getPathsNeedingLoad()) {
+    const pending = tree.getPathsNeedingLoad();
+    for (const path of pending) {
       tree.setLoading(path);
       post({ c: "expandDir", path });
     }
+    // Ctrl+A select-all drain finished: every lazy subtree has now been
+    // requested, so stop auto-extending the selection on insertions.
+    if (selectAllPending.value && pending.length === 0) selectAllPending.value = false;
   }
 
   function handleRowDblClick(path: string, isDir: boolean) {
@@ -129,6 +133,10 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   // ── Context menu state (ops.newFolder reads the target dir) ────────
 
   const ctxMenu = reactive({ show: false, x: 0, y: 0, paths: [] as string[], dirPath: "" });
+
+  // Ctrl+A select-all marker: active while lazy loads from expand-all are
+  // draining; the dispatcher auto-selects inserted subtrees while set.
+  const selectAllPending = ref(false);
 
   // ── Internal seams ─────────────────────────────────────────────────
 
@@ -153,6 +161,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     pwError: ctx.pwError,
     isEncrypted: ctx.isEncrypted,
     loadExpandedPaths,
+    selectAllPending,
   });
 
   const keyboard = createKeyboardNav({
@@ -167,6 +176,7 @@ export function useArchiveView(ctx: ArchiveViewContext) {
       tree.expandAll();
       loadExpandedPaths();
     },
+    selectAllPending,
     ops,
   });
 
@@ -228,6 +238,9 @@ export function useArchiveView(ctx: ArchiveViewContext) {
   }
 
   function handleRowClick(path: string, _isDir: boolean, shift: boolean, ctrl: boolean) {
+    // Any manual row interaction cancels an in-flight Ctrl+A select-all so
+    // later lazy loads stop auto-extending the selection.
+    selectAllPending.value = false;
     if (shift && selection.state.anchorPath) {
       const flatList = visibleFlatNodes.value;
       const anchorIdx = flatList.findIndex((f) => f.path === selection.state.anchorPath);
@@ -323,6 +336,9 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     selectionBreakdown,
     selectedCount,
     getEffectivePaths: ops.getEffectivePaths,
+    // Select-all marker (exposed for tests)
+    selectAllPending,
+    dispatcher,
     // Row handlers
     handleRowClick,
     handleRowDblClick,

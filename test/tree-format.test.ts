@@ -7,8 +7,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as iconv from "iconv-lite";
 import {
-  buildTree,
-  countTreeStats,
+  buildTreeRootOnly,
+  getDirChildren,
   fixArchiveEncoding,
   getFullExt,
   formatCompactSize,
@@ -41,12 +41,9 @@ describe("tree builder", () => {
       { path: "a.txt", size: 10, type: "REGULAR_FILE" },
       { path: "b.txt", size: 20, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "test.zip");
+    const tree = buildTreeRootOnly(entries, "test.zip");
     expect(tree.length).toBe(2);
-    const stats = countTreeStats(tree);
-    expect(stats.files).toBe(2);
-    expect(stats.dirs).toBe(0);
-    expect(stats.total).toBe(2);
+    expect(tree.map((n) => n.name)).toEqual(["a.txt", "b.txt"]);
   });
 
   it("nested with implicit dirs", () => {
@@ -55,15 +52,16 @@ describe("tree builder", () => {
       { path: "src/lib/util.ts", size: 50, type: "REGULAR_FILE" },
       { path: "readme.md", size: 30, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "test.zip");
+    const tree = buildTreeRootOnly(entries, "test.zip");
     expect(tree.length).toBe(2);
     const src = tree.find((n) => n.kind === "DIRECTORY");
     expect(src).toBeTruthy();
-    expect(src!.children!.length).toBe(2);
-    const stats = countTreeStats(tree);
-    expect(stats.files).toBe(3);
-    expect(stats.dirs).toBe(2);
-    expect(stats.total).toBe(5);
+    expect(src!.hasMore).toBe(true);
+    // Lazy children: getDirChildren("") materializes the root, then "src".
+    const rootChildren = getDirChildren("", entries);
+    expect(rootChildren.find((n) => n.name === "src")!.hasMore).toBe(true);
+    const srcChildren = getDirChildren("src", entries);
+    expect(srcChildren.map((n) => n.name)).toEqual(["lib", "main.ts"]);
   });
 
   it("explicit directory entries", () => {
@@ -71,13 +69,11 @@ describe("tree builder", () => {
       { path: "dir", size: 0, type: "DIRECTORY" },
       { path: "dir/file.txt", size: 10, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "test.zip");
+    const tree = buildTreeRootOnly(entries, "test.zip");
     expect(tree.length).toBe(1);
     expect(tree[0].kind).toBe("DIRECTORY");
-    expect(tree[0].children!.length).toBe(1);
-    const stats = countTreeStats(tree);
-    expect(stats.files).toBe(1);
-    expect(stats.dirs).toBe(1);
+    expect(tree[0].hasMore).toBe(true);
+    expect(getDirChildren("dir", entries).map((n) => n.name)).toEqual(["file.txt"]);
   });
 
   it("dedup dir entry with implicit dir", () => {
@@ -86,13 +82,13 @@ describe("tree builder", () => {
       { path: "node_modules/package.json", size: 200, type: "REGULAR_FILE" },
       { path: "node_modules/index.js", size: 500, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "test.zip");
+    const tree = buildTreeRootOnly(entries, "test.zip");
     expect(tree.length).toBe(1);
     expect(tree[0].name).toBe("node_modules");
-    expect(tree[0].children!.length).toBe(2);
-    const stats = countTreeStats(tree);
-    expect(stats.dirs).toBe(1);
-    expect(stats.files).toBe(2);
+    expect(getDirChildren("node_modules", entries).map((n) => n.name)).toEqual([
+      "index.js",
+      "package.json",
+    ]);
   });
 
   it("archive self-entry filtered", () => {
@@ -100,7 +96,7 @@ describe("tree builder", () => {
       { path: "test.7z", size: 1000, type: "REGULAR_FILE" },
       { path: "data.txt", size: 50, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "test.7z");
+    const tree = buildTreeRootOnly(entries, "test.7z");
     expect(tree.length).toBe(1);
     expect(tree[0].name).toBe("data.txt");
   });
@@ -110,10 +106,13 @@ describe("tree builder", () => {
       { path: "src/main.ts", size: 10, type: "REGULAR_FILE" },
       { path: "empty", size: 0, type: "DIRECTORY" },
     ];
-    const tree = buildTree(entries, "test.zip");
+    const tree = buildTreeRootOnly(entries, "test.zip");
     const src = tree.find((n) => n.name === "src");
     expect(src!.kind).toBe("DIRECTORY");
     expect(src!.hasMore).toBe(true);
+    // Empty directories have no descendants — no expand arrow.
+    const empty = tree.find((n) => n.name === "empty");
+    expect(empty!.hasMore).toBe(false);
   });
 });
 

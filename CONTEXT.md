@@ -16,6 +16,7 @@
 - **Tier**（测试套件）— 环境分层（system7z / bundled7zz / rar5Binding / rar5Cli / rar5Wasm / systemZstd / snappyWasm / outBuild），见 `test/gates.ts`。
 - **Oracle**（测试套件）— 测试侧唯一允许的实现：raw 7zz WASM CLI 构造/校验归档字节，独立于生产编解码逻辑。
 - **Seam manifest**（测试套件）— 生产模块 ↔ 测试文件的登记表（`test/seam-manifest.ts`），由 guard 元测试强制一致。
+- **目录树缓存 (listing cache)** — 包装格式归档的扁平条目列表（`ListEntry[]`）磁盘缓存（`listingCache.ts`）：按归档路径哈希键控，stat 快检 + sha256 回退判定内容未变即直接返回；内容校验是唯一真源，修改操作无需主动失效。
 
 ## 架构语言（codebase-design 词表）
 
