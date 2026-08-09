@@ -4,7 +4,8 @@
  * Backend is configurable via `smart-archive.brotliBackend`:
  * - node (default): Node.js built-in zlib (native, no WASM heap)
  * - wasm: bundled 7zz WASM engine (standard single-stream brotli)
- * - 7z: bundled native 7-Zip binary (planned, not implemented yet)
+ * - 7z: bundled native 7-Zip binary, falling back to node:zlib when the
+ *   binary is missing or the run fails
  *
  * @module engines/brotli-codec
  */
@@ -21,6 +22,12 @@ import {
   wasmDecompress,
   wasmDecompressFile,
 } from "./js7z-codec";
+import {
+  nativeCompress,
+  nativeCompressFile,
+  nativeDecompress,
+  nativeDecompressFile,
+} from "./native-codec";
 
 type BrotliBackend = "node" | "wasm" | "7z";
 
@@ -43,13 +50,13 @@ function resolveBrotliBackend(): BrotliBackend {
   if (shouldUseWasmCodec()) return "wasm";
   const backend = brotliConfig.backend ?? "node";
   if (backend === "wasm") return "wasm";
-  if (backend === "7z") {
-    // Bundled-7z brotli is planned but not implemented yet; stay usable
-    // with node:zlib instead of failing the operation.
-    brotliConfig.warn?.(t("brotli.7zUnavailable"));
-    return "node";
-  }
+  if (backend === "7z") return "7z";
   return "node";
+}
+
+/** Warn once the native 7z path could not be used for brotli. */
+function warn7zUnavailable(): void {
+  brotliConfig.warn?.(t("brotli.7zUnavailable"));
 }
 
 function nodeCompressFile(
@@ -145,6 +152,14 @@ export async function brotliCompress(
   data: Uint8Array,
   level = DEFAULT_COMPRESSION_LEVEL,
 ): Promise<Uint8Array> {
+  if (resolveBrotliBackend() === "7z") {
+    const nativeOut = await nativeCompress(data, "br", level);
+    if (nativeOut) return nativeOut;
+    warn7zUnavailable();
+    return zlib.brotliCompressSync(Buffer.from(data), {
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: level },
+    });
+  }
   if (resolveBrotliBackend() === "node") {
     return zlib.brotliCompressSync(Buffer.from(data), {
       params: { [zlib.constants.BROTLI_PARAM_QUALITY]: level },
@@ -154,6 +169,12 @@ export async function brotliCompress(
 }
 
 export async function brotliDecompress(data: Uint8Array): Promise<Uint8Array> {
+  if (resolveBrotliBackend() === "7z") {
+    const nativeOut = await nativeDecompress(data, "br");
+    if (nativeOut) return nativeOut;
+    warn7zUnavailable();
+    return zlib.brotliDecompressSync(Buffer.from(data));
+  }
   if (resolveBrotliBackend() === "node") {
     const result = zlib.brotliDecompressSync(Buffer.from(data));
     return result;
@@ -168,6 +189,12 @@ export async function brotliCompressFile(
   level: number,
   progress?: ProgressLike,
 ): Promise<void> {
+  if (resolveBrotliBackend() === "7z") {
+    if (await nativeCompressFile(input, output, "br", level, progress)) return;
+    warn7zUnavailable();
+    await nodeCompressFile(input, output, level, progress);
+    return;
+  }
   if (resolveBrotliBackend() === "node") {
     await nodeCompressFile(input, output, level, progress);
     return;
@@ -176,6 +203,12 @@ export async function brotliCompressFile(
 }
 
 export async function brotliDecompressFile(input: string, output: string): Promise<void> {
+  if (resolveBrotliBackend() === "7z") {
+    if (await nativeDecompressFile(input, output, "br")) return;
+    warn7zUnavailable();
+    await nodeDecompressFile(input, output);
+    return;
+  }
   if (resolveBrotliBackend() === "node") {
     await nodeDecompressFile(input, output);
     return;
