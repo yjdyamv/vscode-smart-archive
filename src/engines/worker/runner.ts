@@ -353,6 +353,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
             const err = message.cancelled
               ? new vscode.CancellationError()
               : new Error(message.message);
+            if (message.name) err.name = message.name;
             if (message.stack && !message.cancelled) err.stack = message.stack;
             slot.current.reject(err);
           }

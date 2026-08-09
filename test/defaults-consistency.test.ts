@@ -13,8 +13,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
 import {
-  DEFAULT_MAX_FILE_SIZE,
-  DEFAULT_MAX_TOTAL_SIZE,
+  DEFAULT_MAX_ARCHIVE_SIZE,
+  DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
   DEFAULT_LOG_HISTORY_BYTES,
   WORKER_MEMORY_LIMIT_DEFAULT_MB,
   DEFAULT_COMPRESSION_LEVEL,
@@ -44,11 +44,15 @@ describe("package.json defaults match code defaults", () => {
     expect(DEFAULT_ENGINE_CONFIG.workerMemoryMb).toBe(WORKER_MEMORY_LIMIT_DEFAULT_MB);
   });
 
-  it("maxFileSize / maxTotalSize", () => {
-    expect(parseSize(String(settingDefault("maxFileSize")), -1)).toBe(DEFAULT_MAX_FILE_SIZE);
-    expect(parseSize(String(settingDefault("maxTotalSize")), -1)).toBe(DEFAULT_MAX_TOTAL_SIZE);
-    expect(DEFAULT_ENGINE_CONFIG.limits.maxFileSize).toBe(DEFAULT_MAX_FILE_SIZE);
-    expect(DEFAULT_ENGINE_CONFIG.limits.maxTotalSize).toBe(DEFAULT_MAX_TOTAL_SIZE);
+  it("maxArchiveSize / maxExtractTotalSize", () => {
+    expect(parseSize(String(settingDefault("maxArchiveSize")), -1)).toBe(DEFAULT_MAX_ARCHIVE_SIZE);
+    expect(parseSize(String(settingDefault("maxExtractTotalSize")), -1)).toBe(
+      DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
+    );
+    expect(DEFAULT_ENGINE_CONFIG.limits.maxArchiveSize).toBe(DEFAULT_MAX_ARCHIVE_SIZE);
+    expect(DEFAULT_ENGINE_CONFIG.limits.maxExtractTotalSize).toBe(
+      DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
+    );
   });
 
   it("logLevel", () => {

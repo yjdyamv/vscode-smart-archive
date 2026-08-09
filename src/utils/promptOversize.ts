@@ -19,22 +19,22 @@ function fmtSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function readMaxFileSize(): number {
+function readMaxArchiveSize(): number {
   const raw = vscode.workspace
     .getConfiguration("smart-archive")
-    .get<string | number>("maxFileSize");
+    .get<string | number>("maxArchiveSize");
   return parseSize(raw, 1024 * 1024 * 1024);
 }
 
 /**
- * Prompt the user to confirm extraction of an oversized file.
+ * Prompt the user to confirm extraction of an oversized archive file.
  * Returns true if the user chooses to continue.
  */
 export async function promptOversizeFile(label: string, size: number): Promise<boolean> {
-  const maxSize = readMaxFileSize();
-  if (size <= maxSize) return true;
+  const maxArchiveSize = readMaxArchiveSize();
+  if (size <= maxArchiveSize) return true;
   const choice = await vscode.window.showWarningMessage(
-    t("security.oversizeWarning", label, fmtSize(size), fmtSize(maxSize)),
+    t("security.oversizeWarning", label, fmtSize(size), fmtSize(maxArchiveSize)),
     { modal: true },
     t("security.extractAnyway"),
   );

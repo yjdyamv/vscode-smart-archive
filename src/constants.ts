@@ -607,13 +607,13 @@ export const WORKER_POOL_SIZE_MAX = 2;
 
 // ── Shared size/time limits (single source of truth) ───────────────
 
-/** Default per-file size limit (1 GiB) — matches package.json maxFileSize */
-export const DEFAULT_MAX_FILE_SIZE = 1024 * 1024 * 1024;
-/** Default total decompressed size limit (10 GiB) — matches maxTotalSize */
-export const DEFAULT_MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024;
+/** Default archive-file size limit (1 GiB) — matches package.json maxArchiveSize */
+export const DEFAULT_MAX_ARCHIVE_SIZE = 1024 * 1024 * 1024;
+/** Default extracted-total limit (10 GiB) — matches package.json maxExtractTotalSize */
+export const DEFAULT_MAX_EXTRACT_TOTAL_SIZE = 10 * 1024 * 1024 * 1024;
 /** Default worker RSS memory guard (MiB) — matches workerMemoryMb. Covers
  *  default-config extraction of multi-GB archives (the VFS holds the whole
- *  archive in worker RSS); raise it for near-maxTotalSize extractions. */
+ *  archive in worker RSS); raise it for near-maxExtractTotalSize extractions. */
 export const WORKER_MEMORY_LIMIT_DEFAULT_MB = 8192;
 /** Default compression level (0-9) — matches defaultCompressionLevel.
  *  Single source for EngineConfig and all engine-side fallbacks. */

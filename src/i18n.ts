@@ -529,15 +529,22 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "密码包含换行符",
     "zh-tw": "密碼包含換行符",
   },
-  "security.fileSizeExceeded": {
-    en: "File size {0} exceeds maximum {1}",
-    "zh-cn": "文件大小 {0} 超过最大限制 {1}",
-    "zh-tw": "檔案大小 {0} 超過最大限制 {1}",
+  "security.archiveSizeExceeded": {
+    en: "Archive file size {0} exceeds the archive limit {1} (smart-archive.maxArchiveSize)",
+    "zh-cn": "压缩包大小 {0} 超过压缩包限制 {1}（smart-archive.maxArchiveSize）",
+    "zh-tw": "壓縮檔大小 {0} 超過壓縮檔限制 {1}（smart-archive.maxArchiveSize）",
+  },
+  "webview.isEncryptedOversizeArchive": {
+    en: "This archive is {0}, larger than the Smart Archive archive-size limit of {1} (smart-archive.maxArchiveSize). Encryption detection needs to load the whole archive into memory, so its contents cannot be listed here. Increase smart-archive.maxArchiveSize in settings and reopen it.",
+    "zh-cn":
+      "该压缩包大小为 {0}，超过 Smart Archive 的压缩包限制 {1}（smart-archive.maxArchiveSize）。加密检测需要把整个压缩包读入内存，因此无法列出内容。请在设置中调大 smart-archive.maxArchiveSize 后重新打开。",
+    "zh-tw":
+      "此壓縮檔大小為 {0}，超過 Smart Archive 的壓縮檔限制 {1}（smart-archive.maxArchiveSize）。加密偵測需要把整個壓縮檔讀入記憶體，因此無法列出內容。請在設定中調大 smart-archive.maxArchiveSize 後重新開啟。",
   },
   "security.totalSizeExceeded": {
-    en: "Total decompressed size {0} exceeds maximum {1}",
-    "zh-cn": "解压后总大小 {0} 超过最大限制 {1}",
-    "zh-tw": "解壓後總大小 {0} 超過最大限制 {1}",
+    en: "Extracted total size {0} exceeds the limit {1} (smart-archive.maxExtractTotalSize)",
+    "zh-cn": "解压后总大小 {0} 超过限制 {1}（smart-archive.maxExtractTotalSize）",
+    "zh-tw": "解壓後總大小 {0} 超過限制 {1}（smart-archive.maxExtractTotalSize）",
   },
   "security.decompressionBomb": {
     en: "Decompression bomb: reported {0}B but decompressed to {1}B",
@@ -879,9 +886,11 @@ const messages: Record<string, Record<Locale, string>> = {
 
   // ---- Security dialogs ----
   "security.oversizeWarning": {
-    en: "{0} is {1}, exceeding the limit of {2}.\n\nExtracting may cause high memory usage or disk exhaustion.",
-    "zh-cn": "{0} 大小为 {1}，超过了 {2} 的限制。\n\n解压可能导致高内存占用或磁盘耗尽。",
-    "zh-tw": "{0} 大小為 {1}，超過了 {2} 的限制。\n\n解壓可能導致高記憶體佔用或磁碟耗盡。",
+    en: "{0} is a {1} archive, exceeding the archive-size limit of {2} (smart-archive.maxArchiveSize).\n\nThe system 7-Zip engine can still extract it without loading the whole archive into memory. Increase smart-archive.maxArchiveSize to suppress this warning.",
+    "zh-cn":
+      "{0} 是一个大小为 {1} 的压缩包，超过压缩包限制 {2}（smart-archive.maxArchiveSize）。\n\n系统 7-Zip 引擎可以不把整个压缩包读入内存继续解压。调大 smart-archive.maxArchiveSize 可关闭此提示。",
+    "zh-tw":
+      "{0} 是一個大小為 {1} 的壓縮檔，超過壓縮檔限制 {2}（smart-archive.maxArchiveSize）。\n\n系統 7-Zip 引擎可以不把整個壓縮檔讀入記憶體繼續解壓。調大 smart-archive.maxArchiveSize 可關閉此提示。",
   },
 
   // ---- System 7-Zip ----

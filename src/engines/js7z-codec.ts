@@ -20,7 +20,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import type { ProgressLike } from "../utils/cancellation";
-import { checkFileSize } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { JS7z } from "./js7z-factory";
 import { createPrintBridge, disposeJS7z, INPUT_DIR, OUTPUT_DIR, run7z } from "./js7z-helpers";
@@ -151,16 +150,13 @@ export async function wasmCompress(
  * decompressed bytes reach the caller.
  */
 export async function wasmDecompress(data: Uint8Array, codec: WasmCodec): Promise<Uint8Array> {
-  checkFileSize(data.byteLength);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sawd_"));
   const input = path.join(tmpDir, `${OUTPUT_BASE}.${codec}`);
   const output = path.join(tmpDir, "output.bin");
   try {
     fs.writeFileSync(input, Buffer.from(data));
     await wasmDecompressFile(input, output, codec);
-    const result = fs.readFileSync(output);
-    checkFileSize(result.byteLength);
-    return result;
+    return fs.readFileSync(output);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

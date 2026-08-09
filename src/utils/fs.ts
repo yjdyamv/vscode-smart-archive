@@ -14,7 +14,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
-import { safeJoinPath, checkFileSize, checkTotalSize } from "./security";
+import { safeJoinPath, checkTotalSize } from "./security";
 import { getFullExt, MAX_COLLISION_RETRIES } from "../constants";
 import { logger } from "./logger-core";
 import { streamToVFS } from "../engines/vfs-io";
@@ -213,8 +213,6 @@ function _copyDirFromFS(
       // Read the file data from VFS
       checkWorkerMemory();
       const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
-      if (stat) checkFileSize(stat.size);
-      checkFileSize(data.byteLength);
       totalSize = checkTotalSize(totalSize, data.byteLength);
       // Write errors propagate to caller — silent data loss is worse
       // than a reported failure

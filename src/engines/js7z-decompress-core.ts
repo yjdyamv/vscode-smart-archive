@@ -19,7 +19,7 @@ import { streamToVFS, checkArchiveInputSize } from "./vfs-io";
 import { copyDirFromFS } from "../utils/fs";
 import { t } from "../i18n";
 import { logger } from "../utils/logger-core";
-import { checkTotalSize, checkFileSize, validatePassword } from "../utils/security";
+import { checkTotalSize, validatePassword } from "../utils/security";
 import { JS7z } from "./js7z-factory";
 import {
   getFullExt,
@@ -52,7 +52,7 @@ async function decompressCodecWrapper(
   codecDecompress: (input: string, tmpTar: string) => Promise<void>,
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
-  checkArchiveInputSize(options.inputPath);
+  if (!options.allowOversize) checkArchiveInputSize(options.inputPath);
   prog.report({ message: t("decompress.unwrapTar") });
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), tmpPrefix));
   const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
@@ -146,7 +146,7 @@ export async function decompressWith7z(
   const js7z = await JS7z();
 
   try {
-    checkArchiveInputSize(options.inputPath);
+    if (!options.allowOversize) checkArchiveInputSize(options.inputPath);
     const archiveFsPath = streamToVFS(js7z, options.inputPath);
 
     // Extract into in-memory OUTPUT_DIR, then copy out via copyDirFromFS so the
@@ -218,10 +218,6 @@ export async function unwrapInnerTar(
       const tarPath = path.join(outputDir, tarFile);
       prog.report({ message: t("decompress.unwrapTar") });
 
-      // Only validate file size, not counting towards total — the extracted
-      // contents are counted below via copyDirFromFS to avoid double-counting.
-      const tarStat = fs.statSync(tarPath);
-      checkFileSize(tarStat.size);
       const js7z = await JS7z();
 
       try {

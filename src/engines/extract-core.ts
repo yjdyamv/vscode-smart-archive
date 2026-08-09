@@ -24,7 +24,7 @@ import {
 } from "../constants";
 import { t } from "../i18n";
 import { copyDirFromFS } from "../utils/fs";
-import { checkFileSize, validatePassword, sanitizeCliPath } from "../utils/security";
+import { validatePassword, sanitizeCliPath } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike } from "../utils/cancellation";
@@ -114,19 +114,6 @@ function copyFromFSWithStrip(
 
       let data: Uint8Array | ArrayBuffer;
       try {
-        // Pre-check size from VFS stat before reading into memory.
-        // If the stat size exceeds limits, throw immediately to avoid
-        // reading the oversized file into memory.
-        let statSize: number | undefined;
-        try {
-          statSize = js7z.FS.stat(full).size;
-        } catch {
-          logger.warn(
-            { event: "extraction.statSize.failed" },
-            "Stat may fail for size check, falling through",
-          );
-        }
-        if (statSize !== undefined) checkFileSize(statSize);
         data = js7z.FS.readFile(full, { encoding: "binary" });
       } catch (readErr) {
         logger.warn(
@@ -135,8 +122,6 @@ function copyFromFSWithStrip(
         );
         continue;
       }
-      checkFileSize(data.byteLength);
-
       // Decompression bomb check: verify reported vs actual size ratio
       let reportedSize: number | undefined;
       try {

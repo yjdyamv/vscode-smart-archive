@@ -14,7 +14,7 @@
 
 import * as path from "path";
 import { t } from "../i18n";
-import { DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_TOTAL_SIZE } from "../constants";
+import { DEFAULT_MAX_ARCHIVE_SIZE, DEFAULT_MAX_EXTRACT_TOTAL_SIZE } from "../constants";
 import { logger } from "./logger-core";
 
 /**
@@ -76,22 +76,30 @@ export function parseSize(raw: string | number | undefined, defaultBytes: number
   return bytes;
 }
 
-let _limits: { maxFileSize?: number; maxTotalSize?: number } = {};
+export interface SecurityLimits {
+  /** Compressed archive file itself (including split volumes). Only enforced
+   *  when the whole archive must be loaded into memory (WASM fallback). */
+  maxArchiveSize?: number;
+  /** Total size of all files after one extraction operation. */
+  maxExtractTotalSize?: number;
+}
+
+let _limits: SecurityLimits = {};
 
 /**
  * Inject the configured size limits. Host calls this at activation and on
  * configuration change; worker threads receive the same values at init.
  */
-export function setSecurityLimits(limits: { maxFileSize?: number; maxTotalSize?: number }): void {
+export function setSecurityLimits(limits: SecurityLimits): void {
   _limits = limits;
 }
 
-function getMaxFileSize(): number {
-  return _limits.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
+function getMaxArchiveSize(): number {
+  return _limits.maxArchiveSize ?? DEFAULT_MAX_ARCHIVE_SIZE;
 }
 
-function getMaxTotalSize(): number {
-  return _limits.maxTotalSize ?? DEFAULT_MAX_TOTAL_SIZE;
+function getMaxExtractTotalSize(): number {
+  return _limits.maxExtractTotalSize ?? DEFAULT_MAX_EXTRACT_TOTAL_SIZE;
 }
 
 /** Human-readable size string used in dialogs, matching the config format */
@@ -100,6 +108,30 @@ function fmtSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+/**
+ * Error thrown when the compressed archive file itself exceeds the configured
+ * archive-size limit.
+ */
+export class OversizeArchiveError extends Error {
+  readonly size: number;
+  readonly max: number;
+
+  constructor(size: number, max: number) {
+    super(t("security.archiveSizeExceeded", fmtSize(size), fmtSize(max)));
+    this.name = "OversizeArchiveError";
+    this.size = size;
+    this.max = max;
+  }
+}
+
+/** True for archive-size errors, including errors cloned across worker threads. */
+export function isOversizeError(err: unknown): err is OversizeArchiveError {
+  return (
+    err instanceof OversizeArchiveError ||
+    (err instanceof Error && err.name === "OversizeArchiveError")
+  );
 }
 
 /**
@@ -160,15 +192,13 @@ export function safeJoinPath(outputDir: string, entryName: string): string {
 }
 
 /**
- * Check if a file size exceeds the configured maximum.
- *
- * @param size - File size in bytes
- * @throws If the size exceeds the configured limit
+ * Check that a compressed archive file (including split volumes) does not
+ * exceed the configured archive-size limit.
  */
-export function checkFileSize(size: number): void {
-  const max = getMaxFileSize();
+export function checkArchiveSize(size: number): void {
+  const max = getMaxArchiveSize();
   if (size > max) {
-    throw new Error(t("security.fileSizeExceeded", fmtSize(size), fmtSize(max)));
+    throw new OversizeArchiveError(size, max);
   }
 }
 
@@ -182,7 +212,7 @@ export function checkFileSize(size: number): void {
  */
 export function checkTotalSize(current: number, added: number): number {
   const total = current + added;
-  const max = getMaxTotalSize();
+  const max = getMaxExtractTotalSize();
   if (total > max) {
     throw new Error(t("security.totalSizeExceeded", fmtSize(total), fmtSize(max)));
   }

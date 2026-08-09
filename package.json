@@ -392,23 +392,23 @@
           ],
           "description": "%config.defaultCompressionLevel.description%"
         },
-        "smart-archive.maxFileSize": {
+        "smart-archive.maxArchiveSize": {
           "type": [
             "integer",
             "string"
           ],
           "default": "1g",
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
-          "description": "%config.maxFileSize.description%"
+          "description": "%config.maxArchiveSize.description%"
         },
-        "smart-archive.maxTotalSize": {
+        "smart-archive.maxExtractTotalSize": {
           "type": [
             "integer",
             "string"
           ],
           "default": "10g",
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
-          "description": "%config.maxTotalSize.description%"
+          "description": "%config.maxExtractTotalSize.description%"
         },
         "smart-archive.collapsedDirPatterns": {
           "type": "array",

@@ -15,14 +15,20 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
-import { checkFileSize } from "../../utils/security";
 import { t } from "../../i18n";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
 
 /** Delay before disposing the preview tab cleanup subscription (10 min) */
 const PREVIEW_CLEANUP_DELAY_MS = 600_000;
 import { logger } from "../../utils/logger";
-import { system7zForExt, spawnCapture, renameInArchiveSystem7z } from "../../engines/system7z";
+import {
+  addToArchiveSystem7z,
+  hasSystem7zForFormat,
+  renameInArchiveSystem7z,
+  spawnCapture,
+  system7zForExt,
+  testArchiveWithSystem7z,
+} from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
 import { selectEngine } from "../../engines/select-engine";
 import { rebuildRarArchive, archiveJoin } from "./rar5-modify";
@@ -60,7 +66,25 @@ export async function createFolderInArchive(
     return;
   }
 
-  // No system-7z fast path for folder creation — WASM in the worker.
+  if (engine === "system7z") {
+    // 7-Zip has no mkdir command; add a temp folder carrying the same
+    // .smartarchive marker the WASM path uses so the archive stores it.
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "saf_"));
+    try {
+      const folderAbs = path.join(tmpRoot, folderName);
+      fs.mkdirSync(folderAbs, { recursive: true });
+      fs.writeFileSync(path.join(folderAbs, ".smartarchive"), " ");
+      await addToArchiveSystem7z(archivePath, [folderAbs], targetDir, undefined, password);
+      logger.info({ event: "createFolder.system7z.ok", archivePath, targetDir, folderName });
+    } finally {
+      try {
+        fs.rmSync(tmpRoot, { recursive: true, force: true });
+      } catch {}
+    }
+    return;
+  }
+
+  // Wrapped formats (and no system 7z) still rebuild the inner tar in WASM.
   await runArchiveOp("modify", {
     action: "createFolder",
     archivePath,
@@ -76,13 +100,11 @@ export async function previewFileFromArchive(
   password?: string,
 ): Promise<void> {
   const archiveExt = getFullExt(archivePath);
-  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
-  checkFileSize(stat.size);
   logger.info({
     event: "previewFile.start",
     archivePath,
     file: filePath,
-    sizeBytes: stat.size,
+    sizeBytes: fs.statSync(archivePath).size,
   });
 
   const normalizedFile = filePath.replace(/\\/g, "/");
@@ -283,8 +305,12 @@ async function extractOneWithSystem7z(
 
 export async function testArchive(archivePath: string, password?: string): Promise<string> {
   logger.info({ event: "testArchive.start", archivePath });
-  const stat = await vscode.workspace.fs.stat(vscode.Uri.file(archivePath));
-  checkFileSize(stat.size);
+  const ext = getFullExt(archivePath);
+  if (hasSystem7zForFormat(ext, true)) {
+    logger.info({ event: "testArchive.system7z", archivePath, ext });
+    return testArchiveWithSystem7z(archivePath, password);
+  }
+  logger.info({ event: "testArchive.worker", archivePath, ext });
   return runArchiveOp<string>("modify", { action: "test", archivePath, password });
 }
 
