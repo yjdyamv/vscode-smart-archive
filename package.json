@@ -70,13 +70,13 @@
     "snappy": "^7.3.3"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.2.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.9.2",
     "cross-env": "^7.0.3",
     "https-proxy-agent": "^7.0.0",
     "javascript-obfuscator": "^5.5.0",
-    "oxfmt": "^0.59.0",
+    "oxfmt": "^0.62.0",
     "oxlint": "^1.74.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
