@@ -6,7 +6,15 @@ on:
     tags: [v*]
   pull_request:
     branches: [main]
+  # Manual release: pick an existing tag (e.g. v1.28.2) and this workflow
+  # builds that tag and publishes a GitHub release for it. Leave the input
+  # empty to run a plain build of the default branch.
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing tag to release, e.g. v1.28.2 (empty = plain build)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -16,6 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Manual dispatch with a release_tag builds that tag; everything
+          # else builds the triggering ref (tag push / branch / PR).
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -91,7 +103,9 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Tag pushes release automatically; a manual dispatch releases when a
+    # release_tag input was given (a plain manual build stays a build).
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -101,6 +115,9 @@ jobs:
           name: vsix
       - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
+          # Manual dispatch names its tag explicitly; on a tag push the
+          # input is empty and the action falls back to the pushing ref.
+          tag_name: ${{ github.event.inputs.release_tag }}
           files: "*.vsix"
           generate_release_notes: true
 
