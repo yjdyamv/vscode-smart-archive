@@ -41,6 +41,8 @@ import { disposeBurstLoggers } from "./providers/webview/router";
 import { resetArchiveRunner, reconfigureArchiveWorker } from "./engines/worker/runner";
 import { t } from "./i18n";
 import {
+  CACHE_TEARDOWN_DELAY_MS,
+  CACHE_VERSION_KEY,
   CLEAR_CACHES_COMMAND,
   CONFIG_MAX_FILES,
   CONFIG_MAX_MB,
@@ -61,7 +63,31 @@ import {
 export function activate(context: vscode.ExtensionContext): void {
   logger.info({ event: "extension.activate", vscode: vscode.version });
 
+  // A re-activate cancels a pending teardown (update / re-enable).
+  if (pendingCacheTeardown !== null) {
+    clearTimeout(pendingCacheTeardown);
+    pendingCacheTeardown = null;
+  }
+
   applyHostConfig();
+
+  // Cache lifecycle on extension update: the new version always activates,
+  // so compare the version that last wrote the caches with this one and
+  // clear on change — stale-format leftovers never survive an update.
+  const version = context.extension.packageJSON.version as string | undefined;
+  const lastVersion = context.globalState.get<string>(CACHE_VERSION_KEY);
+  if (cacheVersionChanged(lastVersion, version)) {
+    const preview = clearPreviewCache();
+    const listing = clearListingCache();
+    logger.info({
+      event: "caches.clearedOnVersionChange",
+      from: lastVersion,
+      to: version,
+      preview,
+      listing,
+    });
+  }
+  void context.globalState.update(CACHE_VERSION_KEY, version ?? "unknown");
 
   initExpandedState(context.secrets);
   initPasswordVault(context.secrets);
@@ -164,16 +190,49 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Called when the extension is deactivated.
- * VSCode automatically disposes of all subscriptions.
+ * Called when the extension is deactivated — on VS Code shutdown, disable,
+ * uninstall, and before an update installs the new version. deactivate
+ * gets no reason, so the caches cannot be cleared eagerly: a window close
+ * must KEEP them (they are the point of a persistent cache). Instead a
+ * delayed teardown timer is armed — if the extension host is still alive
+ * after the grace period, the extension was disabled or uninstalled and
+ * the caches are cleared; if the host exited (window closed) or the
+ * extension was re-activated (update / re-enable), the timer never fires
+ * or is cancelled. Best effort: a disabled-then-removed extension cannot
+ * guarantee cleanup, and a host lingering past the window may clear
+ * caches after a plain window close.
  */
 export async function deactivate(): Promise<void> {
   disposeExpandedState();
   await disposePasswordVault();
   disposeBurstLoggers();
   resetArchiveRunner();
+  pendingCacheTeardown = setTimeout(() => {
+    pendingCacheTeardown = null;
+    try {
+      clearPreviewCache();
+      clearListingCache();
+    } catch {
+      // Best effort — the logger is already disposed here.
+    }
+  }, CACHE_TEARDOWN_DELAY_MS);
   logger.info({ event: "extension.deactivate" });
   logger.dispose();
+}
+
+/** Deferred cache cleanup armed by deactivate (see its comment). */
+let pendingCacheTeardown: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Whether an extension update invalidates the persisted caches: a known
+ * previous version that differs from the current one. First install
+ * (undefined previous) keeps whatever exists — nothing was ours.
+ */
+export function cacheVersionChanged(
+  previousVersion: string | undefined,
+  currentVersion: string | undefined,
+): boolean {
+  return previousVersion !== undefined && previousVersion !== currentVersion;
 }
 
 /**

@@ -231,6 +231,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
   ],
   "src/utils/volume-sizes.ts": [
     "volume-sizes.test.ts"
+  ],
+  "src/extension.ts": [
+    "cache-lifecycle.test.ts"
   ]
 };
 
@@ -244,7 +247,6 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/engines/worker/dispatch.ts": "op→core table — exercised via worker.test.ts + InProcessRunner",
   "src/engines/worker/memory-guard.ts": "RSS limit enforcement untested",
   "src/engines/worker/worker.ts": "thread entry — protocol tested via FakePort (worker.test.ts)",
-  "src/extension.ts": "activation wiring (registerCommand) — smoke test TODO",
   "src/providers/archive/add.ts": "webview add-to-archive op — untested",
   "src/providers/archive/delete.ts": "webview delete op — untested",
   "src/providers/archive/index.ts": "re-export barrel",

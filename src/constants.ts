@@ -647,6 +647,12 @@ export const CONFIG_MAX_PREVIEW_MB = "cache.maxPreviewMB";
 export const CONFIG_TTL_DAYS = "cache.ttlDays";
 export const CONFIG_MAX_MB = "cache.maxMB";
 export const CONFIG_MAX_FILES = "cache.maxFiles";
+/** globalState key remembering the version that last wrote the caches */
+export const CACHE_VERSION_KEY = "smartArchiveCacheVersion";
+/** Grace period for cache teardown after deactivate: a live extension host
+ *  within this window means disable/uninstall (clear caches); host exit
+ *  (window close) or a re-activate (update/re-enable) keeps them. */
+export const CACHE_TEARDOWN_DELAY_MS = 60 * 1000;
 /** Worker RSS guard sampling: every Nth 7z print tick */
 export const MEMORY_CHECK_EVERY_PRINT = 10;
 /** Worker RSS guard sampling: every Nth VFS chunk copy */
