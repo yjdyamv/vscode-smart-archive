@@ -253,7 +253,7 @@ describe("content-addressed dedup", () => {
   it("ignores a corrupt or oversized manifest", async () => {
     const a = path.join(dir, "dedup_c_a.bin");
     const b = path.join(dir, "dedup_c_b.bin");
-    fs.writeFileSync(path.join(dir, "dedup-manifest.json"), "{ not json !!!");
+    fs.writeFileSync(path.join(dir, "index.json"), "{ not json !!!");
     const data = Buffer.from("corrupt manifest");
     await storePreviewCache(a, data);
     // The index self-heals: the first store rebuilds it, so the second
@@ -270,8 +270,11 @@ describe("content-addressed dedup", () => {
     const data = Buffer.from("escape attempt");
     await storePreviewCache(a, data);
     fs.writeFileSync(
-      path.join(dir, "dedup-manifest.json"),
-      JSON.stringify({ v: 1, map: { [sha256hex(data)]: "../../outside-target" } }),
+      path.join(dir, "index.json"),
+      JSON.stringify({
+        v: 2,
+        entries: { "../../outside-target": { contentHash: sha256hex(data), archivePath: "", archiveMtimeMs: 0, archiveSize: 0 } },
+      }),
     );
     // Outside link target must not be used; plain write lands correctly.
     await storePreviewCache(b, data);
@@ -289,7 +292,7 @@ describe("content-addressed dedup", () => {
     await storePreviewCache(f1, data);
     await storePreviewCache(f2, data);
     expect(fs.statSync(f1).nlink).toBe(2);
-    expect(fs.existsSync(path.join(cache, "dedup-manifest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cache, "index.json"))).toBe(true);
 
     // TTL-prune everything: the manifest must be dropped with the files.
     const now = Date.now() + 2 * 1000 * 1000;
@@ -321,16 +324,226 @@ describe("content-addressed dedup", () => {
   });
 });
 
+describe("orphan reclamation (origins index)", () => {
+  function setup(tag: string): { td: string; cache: string; arc: string } {
+    const td = tmpDir(`sat_pvc_orphan_${tag}_`);
+    const cache = path.join(td, "cache");
+    const arc = path.join(td, "a.7z");
+    fs.mkdirSync(cache);
+    fs.writeFileSync(arc, "archive bytes");
+    initPreviewCache(cache, () => ({ maxFiles: 100, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
+    return { td, cache, arc };
+  }
+
+  it("reclaims an entry as soon as the source archive is deleted", async () => {
+    const { td, cache, arc } = setup("deleted");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "del.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      fs.rmSync(arc); // user deletes the archive
+      expect(sweepPreviewCache(cache)).toBe(1);
+      expect(fs.existsSync(f)).toBe(false);
+      expect(fs.existsSync(path.join(cache, "index.json"))).toBe(false); // empty index removed
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("reclaims an entry when the archive is modified (stat mismatch)", async () => {
+    const { td, cache, arc } = setup("modified");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "mod.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      fs.writeFileSync(arc, "changed bytes"); // mtime+size change
+      expect(sweepPreviewCache(cache)).toBe(1);
+      expect(fs.existsSync(f)).toBe(false);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("keeps an entry whose archive is unchanged", async () => {
+    const { td, cache, arc } = setup("alive");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "keep.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      expect(sweepPreviewCache(cache)).toBe(0);
+      expect(fs.existsSync(f)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("entries without an origin record are kept (index loss degrades to TTL)", async () => {
+    const { td, cache, arc } = setup("noindex");
+    try {
+      const f = path.join(cache, "plain.bin");
+      await storePreviewCache(f, Buffer.from("content")); // no origin passed
+      fs.rmSync(arc); // archive gone, but we have no record of it
+      expect(sweepPreviewCache(cache)).toBe(0);
+      expect(fs.existsSync(f)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("a corrupt origins index does not cause mass deletion", async () => {
+    const { td, cache, arc } = setup("corrupt");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "corr.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      fs.rmSync(arc); // orphan, but…
+      fs.writeFileSync(path.join(cache, "index.json"), "{ not json !!!");
+      expect(sweepPreviewCache(cache)).toBe(0); // …unreadable index → TTL fallback
+      expect(fs.existsSync(f)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("a lost index (crash between file write and index write) keeps the file for the TTL", async () => {
+    const { td, cache, arc } = setup("lostindex");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "lost.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      fs.rmSync(path.join(cache, "index.json")); // simulate the crash window
+      fs.rmSync(arc); // archive deleted in the meantime
+      // Without the index there is no orphan knowledge — the file must
+      // survive for the TTL, not be mass-deleted.
+      expect(sweepPreviewCache(cache)).toBe(0);
+      expect(fs.existsSync(f)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("dead index references (crash between file unlink and index rewrite) self-heal", async () => {
+    const { td, cache, arc } = setup("deadref");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "dead.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      secureUnlink(f); // simulate: file swept, index rewrite interrupted
+      expect(sweepPreviewCache(cache)).toBe(0); // nothing to reclaim (file gone)
+      // The stale reference is pruned; an emptied index is removed
+      // entirely (writeIndex deletes empty indexes).
+      const indexPath = path.join(cache, "index.json");
+      if (fs.existsSync(indexPath)) {
+        const index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+        expect(index.entries["dead.bin"]).toBeUndefined();
+      }
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("deduped copies are reclaimed independently per origin", async () => {
+    const td = tmpDir("sat_pvc_orphan_dedup_");
+    const cache = path.join(td, "cache");
+    const arcA = path.join(td, "a.7z");
+    const arcB = path.join(td, "b.7z");
+    fs.mkdirSync(cache);
+    fs.writeFileSync(arcA, "archive A");
+    fs.writeFileSync(arcB, "archive B");
+    initPreviewCache(cache, () => ({ maxFiles: 100, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
+    try {
+      const fA = path.join(cache, "da.bin");
+      const fB = path.join(cache, "db.bin");
+      const data = Buffer.from("identical bytes");
+      await storePreviewCache(fA, data, {
+        archivePath: arcA,
+        mtimeMs: fs.statSync(arcA).mtimeMs,
+        size: fs.statSync(arcA).size,
+      });
+      await storePreviewCache(fB, data, {
+        archivePath: arcB,
+        mtimeMs: fs.statSync(arcB).mtimeMs,
+        size: fs.statSync(arcB).size,
+      });
+      expect(fs.statSync(fA).ino).toBe(fs.statSync(fB).ino); // hardlinked
+
+      fs.rmSync(arcA); // only A's archive is deleted
+      expect(sweepPreviewCache(cache)).toBe(1);
+      expect(fs.existsSync(fA)).toBe(false);
+      expect(fs.existsSync(fB)).toBe(true); // B survives
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+});
+
 describe("clearPreviewCache", () => {
   it("removes every cached file and the dedup manifest", async () => {
     const a = path.join(dir, "clear_a.bin");
     await storePreviewCache(a, Buffer.from("to be cleared"));
     expect(fs.existsSync(a)).toBe(true);
-    expect(fs.existsSync(path.join(dir, "dedup-manifest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(dir, "index.json"))).toBe(true);
     const removed = clearPreviewCache();
-    expect(removed).toBeGreaterThanOrEqual(2); // file + manifest
+    expect(removed).toBeGreaterThanOrEqual(2); // file + index
     expect(fs.existsSync(a)).toBe(false);
-    expect(fs.existsSync(path.join(dir, "dedup-manifest.json"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, "index.json"))).toBe(false);
+  });
+
+  it("clears the origins index too", async () => {
+    const td = tmpDir("sat_pvc_orphan_clear_");
+    const cacheDir2 = path.join(td, "cache");
+    const arc2 = path.join(td, "a.7z");
+    fs.mkdirSync(cacheDir2);
+    fs.writeFileSync(arc2, "archive bytes");
+    initPreviewCache(cacheDir2, () => ({ maxFiles: 100, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
+    try {
+      const st = fs.statSync(arc2);
+      const f = path.join(cacheDir2, "clear2.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc2,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      expect(fs.existsSync(path.join(cacheDir2, "index.json"))).toBe(true);
+      clearPreviewCache();
+      expect(fs.existsSync(f)).toBe(false);
+      expect(fs.existsSync(path.join(cacheDir2, "index.json"))).toBe(false);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 });
 

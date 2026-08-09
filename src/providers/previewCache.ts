@@ -16,17 +16,23 @@
  *     the key inputs (no path or content in the name).
  *   - Hardening mirrors listingCache: atomic O_EXCL writes, lstat
  *     regular-file checks, a size-aware count/TTL sweep, 0o700 dir.
- *   - Disk budget: the size/count/TTL caps are injected configuration
+ *  - Disk budget: the size/count/TTL caps are injected configuration
  *     (VS Code settings in production); entries above maxCacheableBytes
  *     are never cached; the byte budget counts unique inodes.
- *   - Content-addressed dedup: identical bytes are hardlinked to the
- *     first stored copy via the dedup-manifest.json index, so a file
- *     inside several archive backups occupies disk once. The index is a
- *     best-effort accelerator — every failure degrades to a plain write.
- *
- * No orphan sweep: the raw content files carry no metadata about their
- * source archive; deleted archives' entries are reclaimed by the TTL and
- * count/byte caps instead.
+ *  - Content-addressed dedup: identical bytes are hardlinked to the
+ *     first stored copy, so a file inside several archive backups
+ *     occupies disk once. Entries without an origin record still dedup
+ *     but are not orphan-tracked.
+ *  - Orphan reclamation: the index records each entry's source archive
+ *     (path + stat); the sweep reclaims entries whose archive was
+ *     deleted, moved, or modified immediately, instead of waiting out
+ *     the TTL. A missing/corrupt index never triggers mass deletion —
+ *     unindexed entries fall back to the TTL.
+ *  - Atomicity (one index.json, one atomic write per change): the cache
+ *     files are the source of truth; the index is a rebuildable
+ *     accelerator. store writes the file first, then the index; sweep
+ *     unlinks files first, then prunes the index; clear removes
+ *     everything. Every crash state self-heals to TTL reclamation.
  *
  * Vscode-free — the dir and config reader are injected via initPreviewCache.
  *
@@ -45,11 +51,59 @@ const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 /** Full content-hash shape enforced on dedup-index entries. */
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
-/** Name of the dedup index file inside the cache dir. */
-const MANIFEST_NAME = "dedup-manifest.json";
-const MANIFEST_SCHEMA = 1;
-/** Cap on the manifest read — a tampered giant file must not be parsed. */
-const MANIFEST_MAX_BYTES = 64 * 1024;
+/** Name of the single index file inside the cache dir. */
+const INDEX_NAME = "index.json";
+const INDEX_SCHEMA = 2;
+/** Cap on the index read — a tampered giant file must not be parsed. */
+const INDEX_MAX_BYTES = 64 * 1024;
+
+/**
+ * Origin of a cached preview: the archive it was extracted from. The
+ * sweep compares it against the archive's live stat — a deleted, moved,
+ * or modified archive makes the entry an orphan, reclaimed immediately
+ * instead of lingering for the TTL.
+ */
+export interface PreviewCacheOrigin {
+  archivePath: string;
+  mtimeMs: number;
+  size: number;
+}
+
+/**
+ * One cache entry: everything the sweep and dedup need, stored together
+ * so a single atomic write keeps the whole index consistent.
+ */
+interface CacheEntryRecord {
+  /** Full content sha256 (64 hex) — dedup key. Never truncated: a
+   *  truncated hash could link the wrong content. */
+  contentHash: string;
+  /** Source archive (orphan reclamation: deleted/moved/modified → reclaim). */
+  archivePath: string;
+  archiveMtimeMs: number;
+  archiveSize: number;
+}
+
+/**
+ * Single-file cache index (index.json, schema 2): cache-file basename →
+ * entry record, merging what used to be two files (dedup manifest +
+ * origin index). One file, one atomic tmp+rename — the whole index is
+ * always consistent or absent.
+ *
+ * Atomicity protocol (the price of JSON over a transactional DB):
+ *   - The cache files are the source of truth; the index is a
+ *     rebuildable accelerator. Every failure degrades safely.
+ *   - store: write the file first (atomic rename), then the index. A
+ *     crash in between leaves a file with no entry — reclaimed by TTL.
+ *   - sweep: unlink files first, rewrite the index last. A crash in
+ *     between leaves dead references — pruned on the next sweep.
+ *   - clear: everything goes; both crash states self-heal.
+ *   - A corrupt/missing index reads as empty — dedup degrades to plain
+ *     writes, orphan reclamation degrades to the TTL. Never mass-delete.
+ */
+interface CacheIndex {
+  v: number;
+  entries: Record<string, CacheEntryRecord>;
+}
 
 /**
  * Disk budget, injected at init (VS Code settings in production; defaults
@@ -74,21 +128,11 @@ const DEFAULT_CONFIG: PreviewCacheConfig = {
 };
 
 /**
- * Dedup index: content sha256 (full 64 hex) → basename of the first cache
- * file holding that content. Repeated stores of identical bytes (same file
- * inside several archive backups, or a re-extraction after touch) hardlink
- * to that file instead of duplicating bytes on disk.
- *
- * The manifest is a best-effort accelerator, never a source of truth:
- * every failure path degrades to a plain write, and the sweep rebuilds it
- * from the surviving files. A truncated hash would risk linking the wrong
- * content, so the full sha256 is used here even though cache file names
- * truncate the key hash.
+ * Dedup: entries whose content matches share one inode via hardlink.
+ * The index maps basename → record; dedup scans it linearly (≤ maxFiles
+ * entries) for the first file with the same content hash. Entries whose
+ * file is gone are skipped — the sweep prunes them.
  */
-interface DedupManifest {
-  v: number;
-  map: Record<string, string>;
-}
 
 let cacheDir: string | null = null;
 let lastSweepAt = 0;
@@ -161,67 +205,82 @@ export function previewCacheHit(cacheFile: string): boolean {
   }
 }
 
-function manifestPath(): string {
-  return path.join(cacheDir!, MANIFEST_NAME);
+function indexPath(): string {
+  return path.join(cacheDir!, INDEX_NAME);
 }
 
-function readManifest(): DedupManifest {
+function readIndex(): CacheIndex {
   try {
-    const st = fs.lstatSync(manifestPath());
-    if (!st.isFile() || st.size > MANIFEST_MAX_BYTES) return { v: MANIFEST_SCHEMA, map: {} };
-    const raw = JSON.parse(fs.readFileSync(manifestPath(), "utf8")) as Partial<DedupManifest>;
-    if (raw.v !== MANIFEST_SCHEMA || typeof raw.map !== "object" || raw.map === null) {
-      return { v: MANIFEST_SCHEMA, map: {} };
+    const st = fs.lstatSync(indexPath());
+    if (!st.isFile() || st.size > INDEX_MAX_BYTES) return { v: INDEX_SCHEMA, entries: {} };
+    const raw = JSON.parse(fs.readFileSync(indexPath(), "utf8")) as Partial<CacheIndex>;
+    if (raw.v !== INDEX_SCHEMA || typeof raw.entries !== "object" || raw.entries === null) {
+      return { v: INDEX_SCHEMA, entries: {} };
     }
-    const map: Record<string, string> = {};
-    for (const [hash, name] of Object.entries(raw.map)) {
-      // Reject malformed hashes and any name that could escape the cache
-      // dir (path separators would turn the link target into an arbitrary
-      // path under the attacker's control).
-      if (!CONTENT_HASH_RE.test(hash)) continue;
-      if (typeof name !== "string" || name !== path.basename(name)) continue;
-      map[hash] = name;
+    const entries: Record<string, CacheEntryRecord> = {};
+    for (const [name, rec] of Object.entries(raw.entries)) {
+      // Keys are cache-file basenames (never escape the dir — a path
+      // separator would turn a dedup link or sweep target into an
+      // arbitrary path under the attacker's control).
+      if (name !== path.basename(name)) continue;
+      // Records must be well-formed; malformed entries degrade to TTL.
+      if (
+        !rec ||
+        typeof rec !== "object" ||
+        !CONTENT_HASH_RE.test(rec.contentHash) ||
+        typeof rec.archivePath !== "string" ||
+        typeof rec.archiveMtimeMs !== "number" ||
+        typeof rec.archiveSize !== "number"
+      ) {
+        continue;
+      }
+      entries[name] = {
+        contentHash: rec.contentHash,
+        archivePath: rec.archivePath,
+        archiveMtimeMs: rec.archiveMtimeMs,
+        archiveSize: rec.archiveSize,
+      };
     }
-    return { v: MANIFEST_SCHEMA, map };
+    return { v: INDEX_SCHEMA, entries };
   } catch {
-    return { v: MANIFEST_SCHEMA, map: {} };
+    return { v: INDEX_SCHEMA, entries: {} };
   }
 }
 
-function writeManifest(manifest: DedupManifest): void {
-  if (Object.keys(manifest.map).length === 0) {
+function writeIndex(index: CacheIndex): void {
+  if (Object.keys(index.entries).length === 0) {
     // An empty index is a stale file: remove it.
     try {
-      secureUnlink(manifestPath());
+      secureUnlink(indexPath());
     } catch {
       // Best effort.
     }
     return;
   }
-  const tmp = `${manifestPath()}.${process.pid}.${crypto.randomBytes(4).toString("hex")}${CACHE_TMP_EXT}`;
+  const tmp = `${indexPath()}.${process.pid}.${crypto.randomBytes(4).toString("hex")}${CACHE_TMP_EXT}`;
   try {
-    fs.writeFileSync(tmp, JSON.stringify(manifest), { flag: "wx" });
-    fs.renameSync(tmp, manifestPath());
+    fs.writeFileSync(tmp, JSON.stringify(index), { flag: "wx" });
+    fs.renameSync(tmp, indexPath());
   } catch {
-    // The manifest is a best-effort accelerator; a failed write degrades
-    // to plain stores (duplicate bytes), never to corruption.
+    // Best-effort accelerator; a failed write degrades to plain stores
+    // and TTL sweeps, never to corruption.
   }
 }
 
-/** Drop manifest entries whose file no longer exists (swept/tampered). */
-function pruneStaleManifestEntries(dir: string): void {
-  const manifest = readManifest();
-  const before = Object.keys(manifest.map).length;
-  for (const [hash, name] of Object.entries(manifest.map)) {
+/** Drop entries whose cache file no longer exists (swept/tampered). */
+function pruneStaleIndexEntries(dir: string): void {
+  const index = readIndex();
+  const before = Object.keys(index.entries).length;
+  for (const name of Object.keys(index.entries)) {
     try {
       const st = fs.lstatSync(path.join(dir, name));
       if (st.isFile()) continue;
     } catch {
       // Fall through: entry's file is gone.
     }
-    delete manifest.map[hash];
+    delete index.entries[name];
   }
-  if (Object.keys(manifest.map).length !== before) writeManifest(manifest);
+  if (Object.keys(index.entries).length !== before) writeIndex(index);
 }
 
 /**
@@ -233,17 +292,33 @@ function pruneStaleManifestEntries(dir: string): void {
  * entry hardlinks to the existing inode instead of duplicating them (a
  * file inside several archive backups, or a re-extraction after a touch,
  * occupies disk once). Every failure path degrades to a plain write.
+ *
+ * `origin` records which archive the bytes came from, so the sweep can
+ * reclaim the entry as an orphan as soon as that archive is deleted,
+ * moved, or modified — instead of waiting out the TTL.
+ *
+ * Atomicity: the cache file lands first (tmp + atomic rename), then the
+ * index (tmp + atomic rename). A crash between the two leaves a file
+ * with no entry — reclaimed by the TTL, never served wrongly.
  */
-export async function storePreviewCache(cacheFile: string, data: Uint8Array): Promise<void> {
-  const manifest = readManifest();
+export async function storePreviewCache(
+  cacheFile: string,
+  data: Uint8Array,
+  origin?: PreviewCacheOrigin,
+): Promise<void> {
+  const index = readIndex();
   const hash = crypto.createHash(CACHE_HASH_ALGO).update(data).digest("hex");
-  const existing = manifest.map[hash];
+  // Linear dedup scan: first index entry with the same content whose
+  // file still exists (≤ maxFiles entries — cheap). Entries whose file
+  // was swept are skipped here and pruned by the sweep.
+  const existing = Object.entries(index.entries).find(([, rec]) => rec.contentHash === hash)?.[0];
   if (existing) {
     const existingPath = path.join(cacheDir!, existing);
     try {
       const st = fs.lstatSync(existingPath);
       if (st.isFile()) {
         fs.linkSync(existingPath, cacheFile);
+        noteIndexEntry(cacheFile, hash, origin);
         maybeSweepPreviewCache();
         return;
       }
@@ -259,15 +334,30 @@ export async function storePreviewCache(cacheFile: string, data: Uint8Array): Pr
     await fs.promises.rm(tmp, { force: true }).catch(() => {});
     throw err;
   }
-  manifest.map[hash] = path.basename(cacheFile);
-  writeManifest(manifest);
+  noteIndexEntry(cacheFile, hash, origin);
   maybeSweepPreviewCache();
 }
 
 /**
- * Remove every cached preview and the dedup index. Used by the
+ * Record the freshly stored file in the index (single atomic write).
+ * Without an origin, the entry still dedups but is not orphan-tracked.
+ */
+function noteIndexEntry(cacheFile: string, contentHash: string, origin?: PreviewCacheOrigin): void {
+  const index = readIndex();
+  index.entries[path.basename(cacheFile)] = {
+    contentHash,
+    archivePath: origin?.archivePath ?? "",
+    archiveMtimeMs: origin?.mtimeMs ?? 0,
+    archiveSize: origin?.size ?? 0,
+  };
+  writeIndex(index);
+}
+
+/**
+ * Remove every cached preview and the index. Used by the
  * "Clear Caches" command; also a fallback if a cache boundary is ever
- * violated. Idempotent; returns the number of files removed.
+ * violated. Idempotent; returns the number of files removed. Both crash
+ * states self-heal: leftover index entries are pruned on the next sweep.
  */
 export function clearPreviewCache(): number {
   if (!cacheDir) return 0;
@@ -288,14 +378,18 @@ export function clearPreviewCache(): number {
 }
 
 /**
- * Throttled sweep: TTL expiry, then LRU pruning by count and total bytes
- * (preview files can be large, so a pure count cap could leave gigabytes
- * on disk). The byte budget counts unique inodes — hardlinked dedup
- * copies occupy disk once. The dedup index is rebuilt from the files
- * that survive.
+ * Throttled sweep: orphan reclamation, TTL expiry, then LRU pruning by
+ * count and total bytes (preview files can be large, so a pure count cap
+ * could leave gigabytes on disk). Orphans are entries whose source
+ * archive was deleted, moved, or modified — the index records the
+ * archive stat, so a mismatch reclaims them immediately instead of
+ * waiting out the TTL. The byte budget counts unique inodes — hardlinked
+ * dedup copies occupy disk once. The index is pruned to the files that
+ * survive.
  */
 export function sweepPreviewCache(dir: string, now = Date.now()): number {
   const config = getPreviewCacheConfig();
+  const index = readIndex();
   let names: string[];
   try {
     names = fs.readdirSync(dir);
@@ -306,7 +400,7 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
   let removed = 0;
   const entries: { file: string; mtime: number; size: number; ino: number }[] = [];
   for (const name of names) {
-    if (name === MANIFEST_NAME) continue; // indexed metadata, not a cache file
+    if (name === INDEX_NAME) continue; // the index is metadata, not a cache file
     const file = path.join(dir, name);
     let st;
     try {
@@ -323,6 +417,20 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
         } catch {
           // Best effort.
         }
+      }
+      continue;
+    }
+    // Orphan: the source archive is gone (deleted/moved) or changed
+    // (mtime/size mismatch). Entries without a record (no origin passed,
+    // or a missing/corrupt index) are kept — that must not cause mass
+    // deletion, only TTL reclamation.
+    const rec = index.entries[name];
+    if (rec && rec.archivePath && !originMatches(rec)) {
+      try {
+        secureUnlink(file);
+        removed++;
+      } catch {
+        // Best effort.
       }
       continue;
     }
@@ -359,8 +467,19 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
     }
   }
 
-  pruneStaleManifestEntries(dir);
+  pruneStaleIndexEntries(dir);
   return removed;
+}
+
+/** Live stat of the origin archive vs the recorded one — deleted, moved,
+ *  or modified archives no longer match. */
+function originMatches(rec: CacheEntryRecord): boolean {
+  try {
+    const st = fs.statSync(rec.archivePath);
+    return st.isFile() && st.mtimeMs === rec.archiveMtimeMs && st.size === rec.archiveSize;
+  } catch {
+    return false;
+  }
 }
 
 function maybeSweepPreviewCache(): void {
