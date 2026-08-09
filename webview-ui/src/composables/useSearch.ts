@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { ui } from "./useUi";
 import type { TreeNodeData } from "../types";
 import { MAX_REGEX_LENGTH } from "../constants";
 
@@ -141,7 +142,7 @@ export function useSearch() {
     if (isRegex.value) {
       try {
         if (!isRedosSafe(raw)) {
-          regexError.value = "Pattern may be unsafe (avoid nested quantifiers like (a+)+)";
+          regexError.value = ui("ui.regexUnsafe");
           return;
         }
         const re = new RegExp(raw, "i");
