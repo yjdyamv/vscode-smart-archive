@@ -173,7 +173,7 @@ describe("7zz-wasm codec fallback", () => {
 describe("bundled-7z brotli backend", () => {
   beforeAll(() => {
     setForceWasmCodec(false);
-    setBrotliConfig({ backend: "7z" });
+    setBrotliConfig({ backend: "bundled" });
   });
 
   afterAll(() => {

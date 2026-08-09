@@ -9,7 +9,7 @@ VSCode extension for creating, extracting, and browsing archives — powered by 
 - **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst, tar.lz4, tar.br
 - **Decompress** from 40+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z and ZIP archives
-- **Native 7-Zip engine** — a full 7-Zip binary is bundled for all platforms (no install needed); a newer system 7-Zip is used automatically if present; the WASM engine is the final fallback. Choose explicitly via `smart-archive.useSystem7z` (`auto`/`always`/`bundled`/`never`)
+- **Native 7-Zip engine** — a full 7-Zip binary is bundled for all platforms (no install needed); a newer system 7-Zip is used automatically if present; the WASM engine is the final fallback. Choose explicitly via `smart-archive.sevenZBackend` (`auto`/`native`/`bundled`/`wasm`)
 - **Archive browser** — opens as the default editor for archives: virtual-scrolled tree, search with regex or fuzzy match, sort by name/size, multi-select for partial extract, add/delete/rename files right inside the view
 - **Keyboard navigation** — Arrow keys, PageUp/PageDown (scroll viewport), Home/End, Space to toggle selection, Enter to extract, Delete to remove, Ctrl+A to select all
 - **File preview** — double-click any file to open it in VS Code
@@ -91,8 +91,8 @@ All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, A
 | `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
 | `smart-archive.maxArchiveSize` | `"1g"` | Max size of the compressed archive file itself; warning threshold when the WASM fallback loads the whole archive into memory. Extraction and single-file preview can continue after confirmation |
 | `smart-archive.maxExtractTotalSize` | `"10g"` | Max total size of all files after one extraction |
-| `smart-archive.useSystem7z` | `"auto"` | 7-Zip engine: `auto` (system→bundled native→WASM), `always` (system only), `bundled` (bundled native only), `never` (WASM only) |
-| `smart-archive.useSystemZstd` | `"auto"` | System zstd: `auto`, `always`, `never` |
+| `smart-archive.sevenZBackend` | `"auto"` | 7-Zip engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
+| `smart-archive.zstdBackend` | `"auto"` | Zstd engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archive.rar5Backend` | `"auto"` | RAR5 engine: `auto` (native binding→WASM), `native` (Node binding only), `wasm` (WASM only) |
 | `smart-archive.snappyBackend` | `"auto"` | Snappy (tar.sz): `auto` (native addon→WASM), `native` (Node addon only), `wasm` (WASM only) |
 | `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
@@ -142,7 +142,7 @@ npm run release          # build + check + package
 ## Security
 
 - **Untrusted archives** — whenever a native 7-Zip is used (the bundled binary by default, or a system install), extraction refuses archives containing symbolic-link entries and enforces the configured size limits *before* writing, guarding against path-traversal writes and decompression bombs. The archive browser renders attacker-controlled entry names under a strict Content-Security-Policy.
-- **Native vs sandboxed parsing** — by default (`auto`) archives are parsed by a native 7-Zip process, which is fast but runs C/C++ format handlers on untrusted input. To parse untrusted archives inside the WebAssembly sandbox instead, set `smart-archive.useSystem7z` to `never`.
+- **Native vs sandboxed parsing** — by default (`auto`) archives are parsed by a native 7-Zip process, which is fast but runs C/C++ format handlers on untrusted input. To parse untrusted archives inside the WebAssembly sandbox instead, set `smart-archive.sevenZBackend` to `wasm`.
 - **Passwords on shared machines** — passwords are piped to native 7-Zip through stdin (`Enter password:` prompt), never passed as a command-line argument, so they do not appear in the process list. The WASM engine similarly keeps passwords inside the extension process.
 
 ## License

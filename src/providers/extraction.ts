@@ -33,7 +33,7 @@ export async function extractSelected(
   const ext = getFullExt(archivePath);
   const rawOutputDir = outputOverride || getOutputPath(archivePath, "extracted");
   const outputDir = path.resolve(rawOutputDir);
-  const useSystem7z = !isWrappedFormat(ext) && hasSystem7zForFormat(ext, true);
+  const useNativeSevenZ = !isWrappedFormat(ext) && hasSystem7zForFormat(ext, true);
 
   logger.info({
     event: "extraction.start",
@@ -42,7 +42,7 @@ export async function extractSelected(
     flat,
     outputDir,
     ext,
-    engine: useSystem7z ? "system7z" : "worker",
+    engine: useNativeSevenZ ? "system7z" : "worker",
   });
 
   await vscode.window.withProgress(
@@ -53,7 +53,7 @@ export async function extractSelected(
     },
     async (progress, token) => {
       progress.report({ message: t("archive.extracting") });
-      if (useSystem7z) {
+      if (useNativeSevenZ) {
         await extractSelectedWithSystem7z(
           archivePath,
           selectedPaths,

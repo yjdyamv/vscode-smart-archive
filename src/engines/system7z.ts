@@ -77,10 +77,10 @@ export function detectSystem7z(): string | null {
 
   const setting = vscode.workspace
     .getConfiguration("smart-archive")
-    .get<string>("useSystem7z", "auto");
+    .get<string>("sevenZBackend", "auto");
 
-  // "never": disable the native engine entirely (→ WASM).
-  if (setting === "never") {
+  // "wasm": disable the native engine entirely (→ WASM).
+  if (setting === "wasm") {
     logger.debug({ event: "system7z.disabledBySetting" });
     _cachedPath = null;
     return null;
@@ -103,8 +103,8 @@ export function detectSystem7z(): string | null {
 
   const system = findSystem7z();
 
-  // "always": force the system install (warn when it is missing).
-  if (setting === "always") {
+  // "native": force the system install (warn when it is missing).
+  if (setting === "native") {
     if (!system) {
       vscode.window.showWarningMessage(t("system7z.notInstalled"));
     }
@@ -184,23 +184,23 @@ function findSystem7z(): string | null {
 
 export function hasSystem7z(): boolean {
   const config = vscode.workspace.getConfiguration("smart-archive");
-  const setting = config.get<string>("useSystem7z", "auto");
+  const setting = config.get<string>("sevenZBackend", "auto");
 
-  if (setting === "never") {
+  if (setting === "wasm") {
     logger.debug({ event: "system7z.disabledBySetting" });
     return false;
   }
 
   const sz = detectSystem7z();
   if (!sz) {
-    if (setting === "always") {
+    if (setting === "native") {
       vscode.window.showWarningMessage(t("system7z.notInstalled"));
     }
     return false;
   }
 
   if (!checkVersion(sz)) {
-    if (setting === "always") {
+    if (setting === "native") {
       vscode.window.showWarningMessage(t("system7z.tooOld"));
     }
     return false;
@@ -231,7 +231,7 @@ const METHOD_FALLBACK: Record<SevenZipMethod, SevenZipMethod> = {
 const _probeCache = new Map<string, SevenZipCapabilities | null>();
 
 /**
- * Reset the cached engine detection so a changed `smart-archive.useSystem7z`
+ * Reset the cached engine detection so a changed `smart-archive.sevenZBackend`
  * setting takes effect without a window reload. Wired to onDidChangeConfiguration
  * in extension.ts.
  */
@@ -421,8 +421,8 @@ const SNAPPY_EXTS = new Set([".tar.sz", ".tsz"]);
  */
 export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): boolean {
   const config = vscode.workspace.getConfiguration("smart-archive");
-  const setting = config.get<string>("useSystem7z", "auto");
-  if (setting === "never") {
+  const setting = config.get<string>("sevenZBackend", "auto");
+  if (setting === "wasm") {
     logger.debug({ event: "system7z.disabledBySetting" });
     return false;
   }
@@ -434,13 +434,13 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
   if (isRarExt(extKey)) {
     const rarSz = system7zForExt(extKey);
     if (!rarSz) {
-      if (setting === "always") {
+      if (setting === "native") {
         vscode.window.showWarningMessage(t("system7z.notInstalled"));
       }
       return false;
     }
     if (!checkVersion(rarSz)) {
-      if (setting === "always") {
+      if (setting === "native") {
         vscode.window.showWarningMessage(t("system7z.tooOld"));
       }
       return false;
@@ -450,7 +450,7 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
 
   const sz = detectSystem7z();
   if (!sz) {
-    if (setting === "always") {
+    if (setting === "native") {
       vscode.window.showWarningMessage(t("system7z.notInstalled"));
     }
     return false;
@@ -486,7 +486,7 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
   const minVer = isZstd && isDecompress ? MIN_VERSION_ZSTD : MIN_VERSION;
 
   if (!checkVersion(sz, minVer)) {
-    if (setting === "always") {
+    if (setting === "native") {
       vscode.window.showWarningMessage(t("system7z.tooOld"));
     }
     return false;

@@ -25,6 +25,9 @@ import {
   snappyDecompress,
   type SnappyBackend,
 } from "../src/engines/snappy-codec";
+import { zstdCompress, zstdDecompress } from "../src/engines/zstd-codec";
+import { lz4Compress, lz4Decompress } from "../src/engines/lz4-codec";
+import { brotliCompress, brotliDecompress } from "../src/engines/brotli-codec";
 import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
 import type { EngineConfig } from "../src/engines/worker/types";
 import { gate } from "./gates";
@@ -138,4 +141,50 @@ describe("backend integration", () => {
       }
     },
   );
+});
+
+describe("unified backend settings (sevenZ/zstd/brotli/lz4)", () => {
+  const DATA = Buffer.from("unified backend ".repeat(64));
+
+  it("zstdBackend 'wasm' round-trips (WASM forced, system + native skipped)", async () => {
+    applyBackends({ zstdBackend: "wasm" });
+    const compressed = await zstdCompress(DATA, 3);
+    const restored = Buffer.from(await zstdDecompress(compressed));
+    expect(restored).toEqual(DATA);
+  });
+
+  it("zstdBackend 'bundled' round-trips (system CLI skipped)", async () => {
+    applyBackends({ zstdBackend: "bundled" });
+    const compressed = await zstdCompress(DATA, 3);
+    const restored = Buffer.from(await zstdDecompress(compressed));
+    expect(restored).toEqual(DATA);
+  });
+
+  it("zstdBackend 'native' round-trips (system CLI forced)", async () => {
+    applyBackends({ zstdBackend: "native" });
+    const compressed = await zstdCompress(DATA, 3);
+    const restored = Buffer.from(await zstdDecompress(compressed));
+    expect(restored).toEqual(DATA);
+  });
+
+  it("lz4Backend 'wasm' round-trips (native skipped)", async () => {
+    applyBackends({ lz4Backend: "wasm" });
+    const compressed = await lz4Compress(DATA);
+    const restored = Buffer.from(await lz4Decompress(compressed));
+    expect(restored).toEqual(DATA);
+  });
+
+  it("brotliBackend 'wasm' round-trips", async () => {
+    applyBackends({ brotliBackend: "wasm" });
+    const compressed = await brotliCompress(DATA, 5);
+    const restored = Buffer.from(await brotliDecompress(compressed));
+    expect(restored).toEqual(DATA);
+  });
+
+  it("brotliBackend 'auto' round-trips via node:zlib", async () => {
+    applyBackends({ brotliBackend: "auto" });
+    const compressed = await brotliCompress(DATA, 5);
+    const restored = Buffer.from(await brotliDecompress(compressed));
+    expect(restored).toEqual(DATA);
+  });
 });

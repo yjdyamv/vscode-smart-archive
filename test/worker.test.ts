@@ -52,7 +52,7 @@ function initWorker(config?: Record<string, unknown>): void {
     config: {
       locale: "en",
       limits: { maxArchiveSize: 10 * 1024 * 1024 * 1024, maxExtractTotalSize: 20 * 1024 * 1024 * 1024 },
-      useSystemZstd: "auto",
+      zstdBackend: "auto",
       ...config,
     },
   });
@@ -387,7 +387,7 @@ describe("createArchiveWorkerHandler", () => {
     initWorker({ locale: "en" });
     port.send({
       type: "reconfigure",
-      config: { locale: "zh-cn", limits: { maxArchiveSize: 123 }, useSystemZstd: "never" },
+      config: { locale: "zh-cn", limits: { maxArchiveSize: 123 }, zstdBackend: "wasm" },
     });
     expect(port.ofType("error")).toHaveLength(0);
 

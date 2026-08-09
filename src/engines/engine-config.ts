@@ -25,6 +25,7 @@ import { setSecurityLimits } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { setZstdConfig, resetZstdDetectionCache } from "./zstd-codec";
 import { setBrotliConfig } from "./brotli-codec";
+import { setLz4Config } from "./lz4-codec";
 import { setRar5Config, resetRar5BindingCache } from "./rar5-engine";
 import { setSnappyConfig, resetSnappyBindingCache } from "./snappy-codec";
 import { setModifyConfig } from "./modify-core";
@@ -45,8 +46,10 @@ export const DEFAULT_ENGINE_CONFIG: Required<EngineConfig> = {
     maxArchiveSize: DEFAULT_MAX_ARCHIVE_SIZE,
     maxExtractTotalSize: DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
   },
-  useSystemZstd: "auto",
-  brotliBackend: "node",
+  sevenZBackend: "auto",
+  zstdBackend: "auto",
+  brotliBackend: "auto",
+  lz4Backend: "auto",
   rar5Backend: "auto",
   snappyBackend: "auto",
   compressionLevel: DEFAULT_COMPRESSION_LEVEL,
@@ -78,8 +81,9 @@ export function applyEngineConfig(config: EngineConfig, deps: EngineConfigDeps):
   setSecurityLimits(cfg.limits);
   logger.setLevel(cfg.logLevel);
 
-  setZstdConfig({ useSystemZstd: cfg.useSystemZstd, warn: deps.warn });
+  setZstdConfig({ zstdBackend: cfg.zstdBackend, warn: deps.warn });
   setBrotliConfig({ backend: cfg.brotliBackend, warn: deps.warn });
+  setLz4Config({ backend: cfg.lz4Backend });
   setRar5Config({ backend: cfg.rar5Backend });
   setSnappyConfig({ backend: cfg.snappyBackend });
   setModifyConfig({ compressionLevel: cfg.compressionLevel });

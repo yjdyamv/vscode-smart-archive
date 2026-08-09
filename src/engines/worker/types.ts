@@ -19,9 +19,14 @@ export type ArchiveOp = "compress" | "decompress" | "list" | "isEncrypted" | "mo
 export interface EngineConfig {
   locale: string;
   limits: { maxArchiveSize?: number; maxExtractTotalSize?: number };
-  useSystemZstd?: string;
-  /** Brotli backend: node | wasm | 7z (bundled 7z planned) */
-  brotliBackend?: string;
+  /** 7-Zip backend: auto | native (system CLI) | bundled (VSIX 7zz) | wasm */
+  sevenZBackend?: "auto" | "native" | "bundled" | "wasm";
+  /** Zstd backend: auto | native (system CLI) | bundled (VSIX 7zz) | wasm */
+  zstdBackend?: "auto" | "native" | "bundled" | "wasm";
+  /** Brotli backend: auto | native (node:zlib) | bundled (VSIX 7zz) | wasm */
+  brotliBackend?: "auto" | "native" | "bundled" | "wasm";
+  /** LZ4 backend: auto | bundled (VSIX 7zz) | wasm */
+  lz4Backend?: "auto" | "bundled" | "wasm";
   /** RAR5 backend: auto | native | wasm */
   rar5Backend?: "auto" | "native" | "wasm";
   /** Snappy backend: auto | native | wasm */
