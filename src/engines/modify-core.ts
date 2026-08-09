@@ -635,7 +635,6 @@ export async function previewFileCore(
   outputPath: string,
 ): Promise<void> {
   const archiveExt = getFullExt(archivePath);
-  checkArchiveSize(fs.statSync(archivePath).size);
   logger.info({
     event: "previewFile.start",
     archivePath,

@@ -77,6 +77,8 @@ export interface DecompressOptions {
   outputDir: string;
   /** Decryption password (empty string = not encrypted) */
   password: string;
+  /** Host already confirmed that the archive exceeds maxArchiveSize. */
+  allowOversize?: boolean;
 }
 
 /**

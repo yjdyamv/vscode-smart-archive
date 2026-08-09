@@ -18,7 +18,7 @@
   "config.defaultCompressionLevel.5": "5 – Normal",
   "config.defaultCompressionLevel.7": "7 – Maximum",
   "config.defaultCompressionLevel.9": "9 – Ultra (slowest, best ratio)",
-  "config.maxArchiveSize.description": "Maximum size of the compressed archive file itself (including split volumes). Only enforced when the whole archive must be loaded into memory by the WASM fallback; the system 7-Zip engine streams from disk and is not limited by this. Supports units: k/m/g (e.g. '100m', '1g', '500k'). Default: '1g' (= 1 GiB).",
+  "config.maxArchiveSize.description": "Maximum size of the compressed archive file itself (including split volumes). Warning threshold when the whole archive must be loaded into memory by the WASM fallback; extraction and single-file preview can continue after confirmation. The system 7-Zip engine streams from disk and is not limited by this. Supports units: k/m/g (e.g. '100m', '1g', '500k'). Default: '1g' (= 1 GiB).",
   "config.maxExtractTotalSize.description": "Maximum total size of all files after one extraction operation. Supports units: k/m/g (e.g. '10g', '1g', '500m'). Default: '10g' (= 10 GiB).",
   "config.collapsedDirPatterns.description": "Directory name patterns to keep collapsed by default in the archive preview.",
   "config.compressExcludePatterns.description": "Glob patterns (gitignore syntax) for files/directories to exclude when compressing.",

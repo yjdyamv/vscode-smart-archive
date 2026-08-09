@@ -18,7 +18,7 @@
   "config.defaultCompressionLevel.5": "5 – 标准",
   "config.defaultCompressionLevel.7": "7 – 最大压缩",
   "config.defaultCompressionLevel.9": "9 – 极限（最慢，最高压缩率）",
-  "config.maxArchiveSize.description": "压缩包文件本身的最大大小（含分卷）。仅在 WASM 回退引擎需要把整个压缩包读入内存时生效；系统 7-Zip 引擎从磁盘流式读取，不受此限制。支持单位：k/m/g（如 '100m'、'1g'、'500k'）。默认：'1g'（= 1 GiB）。",
+  "config.maxArchiveSize.description": "压缩包文件本身的最大大小（含分卷）。当 WASM 回退引擎需要把整个压缩包读入内存时作为提示阈值；解压和单文件预览在确认后可以继续。系统 7-Zip 引擎从磁盘流式读取，不受此限制。支持单位：k/m/g（如 '100m'、'1g'、'500k'）。默认：'1g'（= 1 GiB）。",
   "config.maxExtractTotalSize.description": "单次解压操作中所有文件解压后总大小的最大限制。支持单位：k/m/g（如 '10g'、'1g'、'500m'）。默认：'10g'（= 10 GiB）。",
   "config.collapsedDirPatterns.description": "在归档预览中默认保持折叠的目录名称模式。",
   "config.compressExcludePatterns.description": "压缩时排除的文件/目录的 Glob 模式（gitignore 语法）。",
