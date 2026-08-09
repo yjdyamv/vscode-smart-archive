@@ -22,14 +22,14 @@
     },
     {
       "type": "npm",
-      "script": "dev:webview",
+      "script": "build:watch",
       "problemMatcher": [],
       "isBackground": true,
-      "label": "npm: dev webview"
+      "label": "npm: build webview (watch)"
     },
     {
       "label": "watch",
-      "dependsOn": ["npm: watch (tsc)", "npm: dev webview"],
+      "dependsOn": ["npm: watch (tsc)", "npm: build webview (watch)"],
       "group": "build",
       "problemMatcher": []
     },

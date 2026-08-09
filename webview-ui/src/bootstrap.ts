@@ -1,4 +1,5 @@
 import type { ArchiveProps, TreeNodeData } from "./types";
+import { mockInitialState } from "./devMock";
 
 export interface DescCount {
   files: number;
@@ -40,6 +41,9 @@ function readJson<T>(id: string): T | null {
 }
 
 export function loadInitialState(): InitialState {
+  // Browser dev preview (vite dev server): there is no VS Code host to
+  // inject state, so render the mock archive instead.
+  if (import.meta.env.MODE === "development") return mockInitialState();
   return {
     tree: readJson<TreeNodeData[]>("_xTree") ?? [],
     props: readJson<ArchiveProps | null>("_xProps"),
