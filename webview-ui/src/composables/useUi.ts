@@ -65,6 +65,17 @@ const FALLBACKS: Record<string, string> = {
   "ui.match": "match",
   "ui.matches": "matches",
   "ui.archive": "Archive",
+  "ui.copy": "Copy",
+  "ui.extractSelected": "Extract Selected",
+  "ui.rename": "Rename",
+  "ui.addFilesHere": "Add Files Here",
+  "ui.newFolder": "New Folder",
+  "ui.root": "(root)",
+  "ui.item": "item",
+  "ui.items": "items",
+  "ui.file": "file",
+  "ui.dir": "dir",
+  "ui.regexUnsafe": "Pattern may be unsafe (avoid nested quantifiers like (a+)+)",
 };
 
 /** Localized string with a fallback for missing blobs (tests / early boot). */

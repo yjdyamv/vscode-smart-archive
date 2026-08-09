@@ -34,8 +34,10 @@ const descLabel = computed(() => {
   const counts = props.descCounts[node.value.path];
   if (!counts) return "";
   const parts: string[] = [];
-  if (counts.files > 0) parts.push(`${counts.files} file${counts.files > 1 ? "s" : ""}`);
-  if (counts.dirs > 0) parts.push(`${counts.dirs} dir${counts.dirs > 1 ? "s" : ""}`);
+  if (counts.files > 0)
+    parts.push(`${counts.files} ${counts.files > 1 ? ui("ui.selFiles") : ui("ui.file")}`);
+  if (counts.dirs > 0)
+    parts.push(`${counts.dirs} ${counts.dirs > 1 ? ui("ui.selDirs") : ui("ui.dir")}`);
   return parts.length > 0 ? `(${parts.join(", ")})` : "";
 });
 

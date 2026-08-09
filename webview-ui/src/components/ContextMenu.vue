@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, type ComputedRef } from "vue";
+import { ui } from "../composables/useUi";
 
 const props = defineProps<{
   x: number;
@@ -21,7 +22,9 @@ const lastAddDir = inject<ComputedRef<string>>(
   "lastAddDir",
   computed(() => ""),
 );
-const dirLabel = computed(() => (lastAddDir.value ? ` → ${lastAddDir.value}` : " → (root)"));
+const dirLabel = computed(() =>
+  lastAddDir.value ? ` → ${lastAddDir.value}` : ` → ${ui("ui.root")}`,
+);
 const menuRef = ref<HTMLElement | null>(null);
 function onMouseDown(e: MouseEvent) {
   if (menuRef.value && !menuRef.value.contains(e.target as Node)) emit("close");
@@ -52,34 +55,32 @@ const isReadOnly = computed(() => props.readOnly);
     :style="style"
   >
     <div class="cmi" @click="emit('copy')">
-      <span class="codicon codicon-copy cmi-icon"></span>Copy<span class="cmi-shortcut"
-        >Ctrl+C</span
-      >
+      <span class="codicon codicon-copy cmi-icon"></span>{{ ui("ui.copy")
+      }}<span class="cmi-shortcut">Ctrl+C</span>
     </div>
     <div class="cmi" @click="emit('extract')">
-      <span class="codicon codicon-archive cmi-icon"></span>Extract Selected<span
-        class="cmi-shortcut"
-        >Enter</span
-      >
+      <span class="codicon codicon-archive cmi-icon"></span>{{ ui("ui.extractSelected")
+      }}<span class="cmi-shortcut">Enter</span>
     </div>
     <div class="cmi-sep"></div>
     <div class="cmi" :class="{ disabled: isReadOnly }" @click="emit('rename')">
-      <span class="codicon codicon-edit cmi-icon"></span>Rename<span class="cmi-shortcut">F2</span>
+      <span class="codicon codicon-edit cmi-icon"></span>{{ ui("ui.rename")
+      }}<span class="cmi-shortcut">F2</span>
     </div>
     <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('delete')">
-      <span class="codicon codicon-trash cmi-icon"></span>Delete<span class="cmi-shortcut"
-        >Del</span
-      >
+      <span class="codicon codicon-trash cmi-icon"></span>{{ ui("ui.delete")
+      }}<span class="cmi-shortcut">Del</span>
     </div>
     <div class="cmi-sep"></div>
     <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('add-here')">
-      <span class="codicon codicon-add cmi-icon"></span>Add Files Here{{ dirLabel }}
+      <span class="codicon codicon-add cmi-icon"></span>{{ ui("ui.addFilesHere") }}{{ dirLabel }}
     </div>
     <div class="cmi" :class="{ disabled: isReadOnly }" @click="!isReadOnly && emit('new-folder')">
-      <span class="codicon codicon-new-folder cmi-icon"></span>New Folder{{ dirLabel }}
+      <span class="codicon codicon-new-folder cmi-icon"></span>{{ ui("ui.newFolder")
+      }}{{ dirLabel }}
     </div>
     <div class="px-4 py-0.5 text-sa-sm text-[var(--vscode-descriptionForeground)] cursor-default">
-      {{ paths.length }} item(s)
+      {{ paths.length }} {{ paths.length > 1 ? ui("ui.items") : ui("ui.item") }}
     </div>
   </div>
 </template>

@@ -58,6 +58,17 @@ const UI_STRING_KEYS = [
   "ui.match",
   "ui.matches",
   "ui.archive",
+  "ui.copy",
+  "ui.extractSelected",
+  "ui.rename",
+  "ui.addFilesHere",
+  "ui.newFolder",
+  "ui.root",
+  "ui.item",
+  "ui.items",
+  "ui.file",
+  "ui.dir",
+  "ui.regexUnsafe",
 ] as const;
 
 /** Resolve the webview string blob from the host locale (single source). */
