@@ -21,10 +21,17 @@ import {
   dispose as disposeExpandedState,
 } from "./providers/webview/expandedState";
 import { initTempCleanup } from "./providers/tempFiles";
-import { clearListingCache, initListingCache } from "./providers/listingCache";
+import {
+  clearListingCache,
+  getListingCacheDir,
+  initListingCache,
+  sweepListingCache,
+} from "./providers/listingCache";
 import {
   clearPreviewCache,
+  getPreviewCacheDir,
   initPreviewCache,
+  sweepPreviewCache,
   type PreviewCacheConfig,
 } from "./providers/previewCache";
 import { initPasswordVault, disposePasswordVault } from "./providers/passwordVault";
@@ -53,6 +60,26 @@ export function activate(context: vscode.ExtensionContext): void {
     path.join(context.globalStorageUri.fsPath, "preview-cache"),
     readPreviewCacheConfig,
   );
+
+  // Daily sweep: activation and post-store sweeps alone let expired files
+  // linger while VS Code stays open without previews. A 24h timer keeps
+  // the caches at their budget even in a long-lived session.
+  const dailyCacheSweep = setInterval(
+    () => {
+      const previewDir = getPreviewCacheDir();
+      if (previewDir) {
+        const pruned = sweepPreviewCache(previewDir);
+        if (pruned > 0) logger.info({ event: "previewCache.dailySweep", pruned });
+      }
+      const listingDir = getListingCacheDir();
+      if (listingDir) {
+        const pruned = sweepListingCache(listingDir);
+        if (pruned > 0) logger.info({ event: "listingCache.dailySweep", pruned });
+      }
+    },
+    24 * 60 * 60 * 1000,
+  );
+  context.subscriptions.push({ dispose: () => clearInterval(dailyCacheSweep) });
 
   // Invalidate the caches on demand.
   context.subscriptions.push(
