@@ -10,7 +10,12 @@ test/__mocks__/**
 .vscode/**
 tsconfig.json
 vite.extension.config.ts
+vite.extension.config.mts
 vitest.config.ts
+vitest.config.mts
+TESTING-STANDARDS.md
+ROADMAP.md
+CONTEXT.md
 .agents/**
 .claude/**
 skills-lock.json
