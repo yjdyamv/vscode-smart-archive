@@ -33,6 +33,14 @@
  *     accelerator. store writes the file first, then the index; sweep
  *     unlinks files first, then prunes the index; clear removes
  *     everything. Every crash state self-heals to TTL reclamation.
+ *  - Content integrity: caches are rebuildable accelerators, so the
+ *     worst case of any tampering is a re-extraction, never data loss.
+ *     Both reuse points re-hash the bytes against the index record —
+ *     a cache hit refuses mismatched content and the caller re-extracts
+ *     (overwriting the bad copy), and a dedup hardlink only targets a
+ *     verified file so a tampered inode does not spread. Files without
+ *     an index record (the crash window between file and index write)
+ *     are trusted. Encrypted archives never enter the cache.
  *
  * Vscode-free — the dir and config reader are injected via initPreviewCache.
  *
@@ -195,11 +203,31 @@ export function previewCachePath(
  * hang it. Non-regular files are refused and the caller extracts fresh.
  * Files above the cacheable size are refused too — they should never be
  * in the cache (old leftovers get extracted fresh and swept).
+ *
+ * Content integrity: when the index records a hash for this file, the
+ * bytes are re-hashed and compared — a file tampered in place (or an
+ * index entry pointing at the wrong content) fails the check and the
+ * caller re-extracts, overwriting the bad copy (self-healing). A file
+ * without an index record is trusted: it was written by us in the crash
+ * window before the index landed, and the alternative (refusing) would
+ * turn a plain crash into a lost cache.
  */
 export function previewCacheHit(cacheFile: string): boolean {
+  let st;
   try {
-    const st = fs.lstatSync(cacheFile);
-    return st.isFile() && st.size <= getPreviewCacheConfig().maxCacheableBytes;
+    st = fs.lstatSync(cacheFile);
+    if (!st.isFile() || st.size > getPreviewCacheConfig().maxCacheableBytes) return false;
+  } catch {
+    return false;
+  }
+  const rec = readIndex().entries[path.basename(cacheFile)];
+  if (!rec) return true; // no record → trusted (crash window write)
+  try {
+    const actual = crypto
+      .createHash(CACHE_HASH_ALGO)
+      .update(fs.readFileSync(cacheFile))
+      .digest("hex");
+    return actual === rec.contentHash;
   } catch {
     return false;
   }
@@ -316,7 +344,10 @@ export async function storePreviewCache(
     const existingPath = path.join(cacheDir!, existing);
     try {
       const st = fs.lstatSync(existingPath);
-      if (st.isFile()) {
+      // Re-hash the target before hardlinking: the dedup target is the
+      // source of truth for every future copy, so a tampered file must
+      // not spread — degrade to a plain write instead.
+      if (st.isFile() && fileHashMatches(existingPath, hash)) {
         fs.linkSync(existingPath, cacheFile);
         noteIndexEntry(cacheFile, hash, origin);
         maybeSweepPreviewCache();
@@ -336,6 +367,16 @@ export async function storePreviewCache(
   }
   noteIndexEntry(cacheFile, hash, origin);
   maybeSweepPreviewCache();
+}
+
+/** Re-hash a file and compare against an expected content hash. */
+function fileHashMatches(file: string, expectedHash: string): boolean {
+  try {
+    const actual = crypto.createHash(CACHE_HASH_ALGO).update(fs.readFileSync(file)).digest("hex");
+    return actual === expectedHash;
+  } catch {
+    return false;
+  }
 }
 
 /**

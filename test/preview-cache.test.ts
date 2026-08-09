@@ -105,6 +105,60 @@ describe("previewCacheHit", () => {
   });
 });
 
+describe("content integrity (tamper self-healing)", () => {
+  it("refuses a cache file modified in place (same size)", async () => {
+    const a = path.join(dir, "tamper_a.bin");
+    await storePreviewCache(a, Buffer.from("original bytes"));
+    expect(previewCacheHit(a)).toBe(true);
+    fs.writeFileSync(a, "TAMPERED!! bytes"); // same length, different bytes
+    expect(previewCacheHit(a)).toBe(false);
+  });
+
+  it("refuses when the index points at the wrong content hash", async () => {
+    const a = path.join(dir, "tamper_b.bin");
+    await storePreviewCache(a, Buffer.from("original bytes"));
+    // Reindex the file under the hash of different content: a poisoned
+    // index must not make us serve bytes that do not match it.
+    const index = JSON.parse(fs.readFileSync(path.join(dir, "index.json"), "utf8"));
+    index.entries[path.basename(a)].contentHash = sha256hex(Buffer.from("wrong content"));
+    fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(index));
+    expect(previewCacheHit(a)).toBe(false);
+  });
+
+  it("trusts files without an index record (crash window)", async () => {
+    const a = path.join(dir, "tamper_c.bin");
+    await storePreviewCache(a, Buffer.from("crash window bytes"));
+    secureUnlink(path.join(dir, "index.json")); // index lost in the crash
+    expect(previewCacheHit(a)).toBe(true);
+  });
+
+  it("re-extraction overwrites the bad copy (self-healing loop)", async () => {
+    const a = path.join(dir, "tamper_d.bin");
+    const data = Buffer.from("good content");
+    await storePreviewCache(a, data);
+    fs.writeFileSync(a, "evilsame len!"); // tampered, same length
+    expect(previewCacheHit(a)).toBe(false);
+
+    // The caller re-extracts and re-stores: the atomic rename overwrites
+    // the tampered file and the index is rebuilt for the fresh bytes.
+    await storePreviewCache(a, data);
+    expect(previewCacheHit(a)).toBe(true);
+    expect(fs.readFileSync(a, "utf8")).toBe("good content");
+  });
+
+  it("dedup does not hardlink to a tampered target", async () => {
+    const a = path.join(dir, "tamper_e_a.bin");
+    const b = path.join(dir, "tamper_e_b.bin");
+    const data = Buffer.from("dedup target bytes");
+    await storePreviewCache(a, data);
+    fs.writeFileSync(a, "tampered-dedup-bytes"); // corrupt the target inode
+    await storePreviewCache(b, data);
+    // The bad target was not linked — b got a fresh plain write.
+    expect(fs.readFileSync(b, "utf8")).toBe("dedup target bytes");
+    expect(fs.statSync(b).nlink).toBe(1);
+  });
+});
+
 describe("sweepPreviewCache", () => {
   it("removes TTL-expired files and keeps fresh ones", async () => {
     const td = tmpDir("sat_pvc_sweep_");
