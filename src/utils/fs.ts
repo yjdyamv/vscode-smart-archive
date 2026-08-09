@@ -221,3 +221,53 @@ function _copyDirFromFS(
   }
   return totalSize;
 }
+
+const SECURE_UNLINK_CHUNK = 64 * 1024;
+
+/** O_NOFOLLOW where the platform provides it (Linux); 0 elsewhere. */
+const O_NOFOLLOW = (fs.constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+
+/**
+ * Securely delete a file: overwrite its bytes with zeros, fsync, then
+ * unlink. A plain unlink leaves the content recoverable from disk (HDDs,
+ * and SSDs before TRIM), which matters when the file holds extracted
+ * archive content or decrypted bytes.
+ *
+ * The overwrite must never follow symlinks: only regular files (verified
+ * with lstat, then opened with O_NOFOLLOW where available) are rewritten;
+ * a symlink or any other non-regular entry is unlinked as the directory
+ * entry itself, leaving the target untouched. Missing files are a no-op.
+ */
+export function secureUnlink(file: string): void {
+  let st;
+  try {
+    st = fs.lstatSync(file);
+  } catch {
+    return; // missing — nothing to delete
+  }
+  if (st.isFile()) {
+    try {
+      const fd = fs.openSync(file, fs.constants.O_RDWR | O_NOFOLLOW);
+      try {
+        const size = fs.fstatSync(fd).size;
+        const zeros = Buffer.alloc(SECURE_UNLINK_CHUNK);
+        let pos = 0;
+        while (pos < size) {
+          const chunk = zeros.subarray(0, Math.min(zeros.length, size - pos));
+          fs.writeSync(fd, chunk, 0, chunk.length, pos);
+          pos += chunk.length;
+        }
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch {
+      // Best effort — unlink anyway.
+    }
+  }
+  try {
+    fs.unlinkSync(file);
+  } catch {
+    // Best effort.
+  }
+}

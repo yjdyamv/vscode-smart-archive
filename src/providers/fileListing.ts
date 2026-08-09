@@ -43,6 +43,11 @@ export async function fetchFileList(
   // Note: a cache hit intentionally bypasses the archive-size gate in the
   // listing core — the gate protects the worker from reading an oversized
   // archive into memory, and a hit reads nothing at all.
+  //
+  // Security: encrypted archives must never enter this cache — the entry
+  // list leaks the (hidden) file structure. That is guaranteed twice over:
+  // no wrapped format supports encryption, and the !password guard below
+  // excludes any password-bearing listing regardless of format.
   const cacheDir = isWrappedFormat(ext) && !data && !password ? getListingCacheDir() : null;
   if (cacheDir) {
     const cached = await readListingCache(cacheDir, filePath);

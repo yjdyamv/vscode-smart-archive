@@ -16,6 +16,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { logger } from "../utils/logger";
+import { secureUnlink } from "../utils/fs";
 
 const PREVIEW_TMP_PREFIX = path.join(os.tmpdir(), "vscode-7z-preview-");
 let PREVIEW_TMP_DIR = "";
@@ -30,7 +31,7 @@ export function registerPreviewCleanup(tmpPath: string, docUri: vscode.Uri): vsc
   return vscode.workspace.onDidCloseTextDocument((closed) => {
     if (closed.uri.toString() === docUri.toString()) {
       try {
-        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        if (fs.existsSync(tmpPath)) secureUnlink(tmpPath);
         logger.info({ event: "tempFiles.preview.closed", tmpPath });
       } catch (err) {
         logger.warn({ event: "tempFiles.preview.cleanupFailed", tmpPath, err });
@@ -107,7 +108,7 @@ function pruneOldPreviews(): void {
     while (withMtime.length > MAX_PREVIEW_FILES) {
       const oldest = withMtime.shift()!;
       try {
-        fs.unlinkSync(path.join(dir, oldest.name));
+        secureUnlink(path.join(dir, oldest.name));
         pruned++;
       } catch {
         logger.warn(

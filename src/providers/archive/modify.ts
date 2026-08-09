@@ -18,6 +18,7 @@ import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../consta
 import { t } from "../../i18n";
 import { PreviewTooLargeError } from "../../utils/errors";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
+import { getPreviewCacheDir, storePreviewCache } from "../previewCache";
 
 /** Delay before disposing the preview tab cleanup subscription (10 min) */
 const PREVIEW_CLEANUP_DELAY_MS = 600_000;
@@ -101,23 +102,48 @@ export async function previewFileFromArchive(
   password?: string,
 ): Promise<void> {
   const archiveExt = getFullExt(archivePath);
+  // Stat once up front: the size feeds the log and both mtimeMs and size
+  // key the preview cache, so a modified archive gets a fresh extraction
+  // instead of a stale cached file.
+  const archiveStat = fs.statSync(archivePath);
   logger.info({
     event: "previewFile.start",
     archivePath,
     file: filePath,
-    sizeBytes: fs.statSync(archivePath).size,
+    sizeBytes: archiveStat.size,
   });
 
   const normalizedFile = filePath.replace(/\\/g, "/");
+  const ext = getFullExt(normalizedFile) || path.extname(normalizedFile);
 
-  const previewDir = getPreviewTmpDir();
+  // Encrypted archives never persist: the decrypted bytes would leak to
+  // disk indefinitely. They keep the session temp dir (deleted when the
+  // preview document closes). Unencrypted previews go to the persistent
+  // preview cache — closing the tab or VS Code does not lose them.
+  const encrypted = !!password;
+  const previewDir = encrypted ? getPreviewTmpDir() : (getPreviewCacheDir() ?? getPreviewTmpDir());
   const hash = crypto
     .createHash("sha256")
-    .update(`${archivePath}|${normalizedFile}`)
+    .update(`${archivePath}|${archiveStat.mtimeMs}|${archiveStat.size}|${normalizedFile}`)
     .digest("hex")
     .slice(0, 16);
-  const ext = getFullExt(normalizedFile) || path.extname(normalizedFile);
   const tmpPath = path.join(previewDir, `${hash}${ext}`);
+
+  // Cache hit: the archive (path + mtime + size) and the entry are
+  // unchanged — serve the previously extracted file without touching
+  // either engine. A modified archive produces a different key, so the
+  // old cache file just becomes an orphan and is pruned later.
+  if (fs.existsSync(tmpPath)) {
+    logger.debug({ event: "previewFile.cacheHit", archivePath, filePath, tmpPath });
+    const uri = vscode.Uri.file(tmpPath);
+    await vscode.commands.executeCommand("vscode.open", uri, {
+      preview: true,
+      preserveFocus: false,
+      viewColumn: vscode.ViewColumn.Beside,
+    });
+    logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath, cached: true });
+    return;
+  }
 
   let extracted = false;
 
@@ -142,8 +168,12 @@ export async function previewFileFromArchive(
         );
       }
       if (!fs.existsSync(tmpPath)) {
-        pruneOldPreviews();
-        fs.writeFileSync(tmpPath, buf, { flag: "wx" });
+        if (encrypted) {
+          pruneOldPreviews();
+          fs.writeFileSync(tmpPath, buf, { flag: "wx" });
+        } else {
+          await storePreviewCache(tmpPath, buf);
+        }
       }
       extracted = true;
     } catch (err) {
@@ -174,16 +204,19 @@ export async function previewFileFromArchive(
     preserveFocus: false,
     viewColumn: vscode.ViewColumn.Beside,
   });
-  // Best-effort cleanup when tab closes (works for text files; binary
-  // files are handled by pruneOldPreviews which caps at 100 files).
-  const cleanupDisposable = registerPreviewCleanup(tmpPath, uri);
-  setTimeout(() => {
-    try {
-      cleanupDisposable.dispose();
-    } catch {
-      logger.warn({ event: "preview.cleanup.failed" }, "Failed to dispose preview cleanup");
-    }
-  }, PREVIEW_CLEANUP_DELAY_MS);
+  // Persistent cache files survive tab close (the cache sweeps them by
+  // TTL/count). Encrypted previews live in the session temp dir and are
+  // deleted when their document closes.
+  if (encrypted) {
+    const cleanupDisposable = registerPreviewCleanup(tmpPath, uri);
+    setTimeout(() => {
+      try {
+        cleanupDisposable.dispose();
+      } catch {
+        logger.warn({ event: "preview.cleanup.failed" }, "Failed to dispose preview cleanup");
+      }
+    }, PREVIEW_CLEANUP_DELAY_MS);
+  }
   logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
 }
 
@@ -216,24 +249,35 @@ async function extractOneWithSystem7z(
       const { code } = await spawnCapture(sz, args, { password });
       if (code !== 0) throw new Error(`7z x non-wrapped exit ${code}`);
     } else {
-      // Two step: first extract outer layer, then inner tar
+      // Two step: first extract outer layer, then inner tar. 7-Zip
+      // auto-unpacks the inner tar for some wraps (tar.xz/tar.bz2/tar.gz
+      // produce the file tree directly in tmpOuter, with no intermediate
+      // .tar kept) — in that case the second step is skipped and the
+      // locate logic below finds the file inside the tree.
       const tmpOuter = path.join(tmpDir, "_outer");
       fs.mkdirSync(tmpOuter);
       const args1: string[] = ["x", archivePath, `-o${tmpOuter}`, "-y"];
       const r1 = await spawnCapture(sz, args1, { password });
       if (r1.code !== 0) throw new Error(`7z x outer exit ${r1.code}`);
 
-      // Find the inner tar
       const entries = fs.readdirSync(tmpOuter);
       const innerTar = entries.find((e) => e.endsWith(".tar"));
-      if (!innerTar) throw new Error("No inner tar found in wrapped archive");
-      const innerPath = path.join(tmpOuter, innerTar);
-
-      const tmpInner = path.join(tmpDir, "_inner");
-      fs.mkdirSync(tmpInner);
-      const args2: string[] = ["x", innerPath, `-o${tmpInner}`, "-aoa", "-y", "--", normalizedFile];
-      const r2 = await spawnCapture(sz, args2);
-      if (r2.code !== 0) throw new Error(`7z x inner exit ${r2.code}`);
+      if (innerTar) {
+        const innerPath = path.join(tmpOuter, innerTar);
+        const tmpInner = path.join(tmpDir, "_inner");
+        fs.mkdirSync(tmpInner);
+        const args2: string[] = [
+          "x",
+          innerPath,
+          `-o${tmpInner}`,
+          "-aoa",
+          "-y",
+          "--",
+          normalizedFile,
+        ];
+        const r2 = await spawnCapture(sz, args2);
+        if (r2.code !== 0) throw new Error(`7z x inner exit ${r2.code}`);
+      }
     }
 
     // Locate the extracted file — try exact expected path first, then walk.

@@ -161,6 +161,14 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/providers/listingCache.ts": [
     "listing-cache.test.ts"
   ],
+  "src/providers/passwordVault.ts": [
+    "password-vault.test.ts",
+    "setup-encrypted.test.ts"
+  ],
+  "src/providers/previewCache.ts": [
+    "preview-cache.test.ts",
+    "single-file-stream.test.ts"
+  ],
   "src/providers/tempFiles.ts": [
     "single-file-stream.test.ts"
   ],

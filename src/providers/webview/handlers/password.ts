@@ -17,6 +17,7 @@ import {
   getCompressedArchiveSize,
 } from "../../../constants";
 import { fetchFileList } from "../../fileListing";
+import { saveArchivePassword } from "../../passwordVault";
 import {
   buildTreeRootOnly,
   buildEntryIndex,
@@ -55,6 +56,10 @@ export const handlePassword: MessageHandler = async (ctx) => {
         return;
       }
     }
+
+    // Verified — remember the password for this session (OS keychain), so
+    // re-opening the archive after closing the tab skips the prompt.
+    await saveArchivePassword(s.filePath, msg.pw);
 
     if (token.isCancellationRequested) throw new vscode.CancellationError();
 

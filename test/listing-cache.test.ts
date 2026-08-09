@@ -21,6 +21,8 @@ import {
   sweepListingCache,
   writeListingCache,
 } from "../src/providers/listingCache";
+import { fetchFileList } from "../src/providers/fileListing";
+import { createWrapped } from "./helpers";
 import { tmpDir } from "./tmp";
 import type { ListEntry } from "../src/engines/fileListing-core";
 
@@ -361,5 +363,53 @@ describe("initListingCache / pruneListingCache", () => {
     fs.mkdirSync(cache, { recursive: true });
     fs.writeFileSync(path.join(cache, "a.json"), "{}");
     expect(pruneListingCache(cache, 5)).toBe(0);
+  });
+});
+
+describe("fetchFileList integration (wrapped-only + password guard)", () => {
+  async function buildWrapped(td: string): Promise<string> {
+    const buf = await createWrapped({ "a.txt": "hello\n" }, "tar.gz");
+    const arc = path.join(td, "wrapped.tar.gz");
+    fs.writeFileSync(arc, Buffer.from(buf));
+    return arc;
+  }
+
+  it("caches a wrapped listing (no password) into the cache dir", async () => {
+    const td = tmpDir("sat_lc_integ_");
+    const cache = path.join(td, "cache");
+    initListingCache(cache);
+    try {
+      const arc = await buildWrapped(td);
+      const entries = await fetchFileList(arc);
+      expect(entries.some((e) => e.path.endsWith("a.txt"))).toBe(true);
+      const files = fs.readdirSync(cache).filter((f) => f.endsWith(".json"));
+      expect(files.length).toBe(1);
+      // Second call is served from the cache (same entries, no new file).
+      const again = await fetchFileList(arc);
+      expect(again.map((e) => e.path)).toEqual(entries.map((e) => e.path));
+      expect(fs.readdirSync(cache).filter((f) => f.endsWith(".json")).length).toBe(1);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
+
+  it("never writes the cache for a password-bearing listing", async () => {
+    const td = tmpDir("sat_lc_integ_pw_");
+    const cache = path.join(td, "cache");
+    initListingCache(cache);
+    try {
+      const arc = await buildWrapped(td);
+      // Wrapped archives cannot be encrypted, but the !password guard must
+      // hold regardless: a password-bearing listing never touches the cache
+      // (the listing itself may fail — that must not write either).
+      try {
+        await fetchFileList(arc, "hunter2");
+      } catch {
+        // Listing failure is fine; the assertion is about the cache dir.
+      }
+      expect(fs.readdirSync(cache)).toEqual([]);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
   });
 });
