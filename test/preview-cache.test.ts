@@ -10,6 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import {
+  clearPreviewCache,
   previewCacheHit,
   getPreviewCacheDir,
   initPreviewCache,
@@ -191,5 +192,148 @@ describe("initPreviewCache", () => {
       expect(fs.statSync(cache).mode & 0o077).toBe(0);
     }
     fs.rmSync(td, { recursive: true, force: true });
+    initPreviewCache(dir); // restore the module-level cache dir
+  });
+
+  it("accepts an injected config reader and applies it live", () => {
+    const td = tmpDir("sat_pvc_cfg_");
+    const cache = path.join(td, "cache");
+    let maxFiles = 5;
+    initPreviewCache(cache, () => ({ maxFiles }));
+    for (let i = 0; i < 10; i++) {
+      fs.writeFileSync(path.join(cache, `f${i}.bin`), "x".repeat(10));
+    }
+    expect(sweepPreviewCache(cache)).toBe(5); // pruned to the injected cap
+    expect(fs.readdirSync(cache).length).toBe(5);
+
+    // Live change applies on the next sweep.
+    maxFiles = 2;
+    expect(sweepPreviewCache(cache)).toBe(3);
+    expect(fs.readdirSync(cache).length).toBe(2);
+    fs.rmSync(td, { recursive: true, force: true });
+    initPreviewCache(dir); // restore the module-level cache dir
   });
 });
+
+describe("content-addressed dedup", () => {
+  it("hardlinks identical bytes to the first stored copy", async () => {
+    const a = path.join(dir, "dedup_a.bin");
+    const b = path.join(dir, "dedup_b.bin");
+    const data = Buffer.from("the same preview bytes, twice");
+    await storePreviewCache(a, data);
+    await storePreviewCache(b, data);
+
+    const sa = fs.statSync(a);
+    const sb = fs.statSync(b);
+    expect(sa.ino).toBe(sb.ino); // same inode — one copy on disk
+    expect(sa.nlink).toBe(2);
+    expect(fs.readFileSync(a, "utf8")).toBe(fs.readFileSync(b, "utf8"));
+  });
+
+  it("stores distinct content as separate inodes", async () => {
+    const a = path.join(dir, "dedup_x.bin");
+    const b = path.join(dir, "dedup_y.bin");
+    await storePreviewCache(a, Buffer.from("aaaa"));
+    await storePreviewCache(b, Buffer.from("bbbb"));
+    expect(fs.statSync(a).ino).not.toBe(fs.statSync(b).ino);
+  });
+
+  it("recovers when the indexed target disappears (plain write)", async () => {
+    const a = path.join(dir, "dedup_r_a.bin");
+    const b = path.join(dir, "dedup_r_b.bin");
+    const data = Buffer.from("recover me");
+    await storePreviewCache(a, data);
+    // Tamper: delete the indexed copy, then store the same bytes again.
+    secureUnlink(a);
+    await storePreviewCache(b, data);
+    expect(fs.readFileSync(b, "utf8")).toBe("recover me");
+    expect(fs.statSync(b).nlink).toBe(1);
+  });
+
+  it("ignores a corrupt or oversized manifest", async () => {
+    const a = path.join(dir, "dedup_c_a.bin");
+    const b = path.join(dir, "dedup_c_b.bin");
+    fs.writeFileSync(path.join(dir, "dedup-manifest.json"), "{ not json !!!");
+    const data = Buffer.from("corrupt manifest");
+    await storePreviewCache(a, data);
+    // The index self-heals: the first store rebuilds it, so the second
+    // store of identical bytes dedups again.
+    await storePreviewCache(b, data);
+    expect(fs.readFileSync(a, "utf8")).toBe("corrupt manifest");
+    expect(fs.readFileSync(b, "utf8")).toBe("corrupt manifest");
+    expect(fs.statSync(b).nlink).toBe(2);
+  });
+
+  it("a manifest entry that escapes the cache dir is ignored", async () => {
+    const a = path.join(dir, "dedup_e_a.bin");
+    const b = path.join(dir, "dedup_e_b.bin");
+    const data = Buffer.from("escape attempt");
+    await storePreviewCache(a, data);
+    fs.writeFileSync(
+      path.join(dir, "dedup-manifest.json"),
+      JSON.stringify({ v: 1, map: { [sha256hex(data)]: "../../outside-target" } }),
+    );
+    // Outside link target must not be used; plain write lands correctly.
+    await storePreviewCache(b, data);
+    expect(fs.readFileSync(b, "utf8")).toBe("escape attempt");
+  });
+
+  it("the sweep keeps the manifest and rebuilds it when entries are pruned", async () => {
+    const td = tmpDir("sat_pvc_dedupsweep_");
+    const cache = path.join(td, "cache");
+    fs.mkdirSync(cache);
+    const f1 = path.join(cache, "s1.bin");
+    const f2 = path.join(cache, "s2.bin");
+    const data = Buffer.from("sweep me");
+    initPreviewCache(cache, () => ({ maxFiles: 1, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
+    await storePreviewCache(f1, data);
+    await storePreviewCache(f2, data);
+    expect(fs.statSync(f1).nlink).toBe(2);
+    expect(fs.existsSync(path.join(cache, "dedup-manifest.json"))).toBe(true);
+
+    // TTL-prune everything: the manifest must be dropped with the files.
+    const now = Date.now() + 2 * 1000 * 1000;
+    fs.utimesSync(f1, new Date(now - 3 * 1000 * 1000), new Date(now - 3 * 1000 * 1000));
+    fs.utimesSync(f2, new Date(now - 3 * 1000 * 1000), new Date(now - 3 * 1000 * 1000));
+    expect(sweepPreviewCache(cache, now)).toBe(2);
+    expect(fs.readdirSync(cache).filter((n) => n.endsWith(".json"))).toEqual([]);
+    fs.rmSync(td, { recursive: true, force: true });
+    initPreviewCache(dir); // restore the module-level cache dir
+  });
+
+  it("the byte budget counts deduplicated copies once", async () => {
+    const td = tmpDir("sat_pvc_dedupbytes_");
+    const cache = path.join(td, "cache");
+    fs.mkdirSync(cache);
+    const f1 = path.join(cache, "b1.bin");
+    const f2 = path.join(cache, "b2.bin");
+    const data = Buffer.alloc(1024, 9);
+    initPreviewCache(cache, () => ({ maxFiles: 100, maxBytes: 1536, ttlMs: 1000 * 1000 }));
+    await storePreviewCache(f1, data);
+    await storePreviewCache(f2, data); // hardlink — same inode
+    // Unique bytes = 1024 <= 1536, so the budget is NOT exceeded; a naive
+    // per-file sum (2048) would prune one.
+    expect(sweepPreviewCache(cache)).toBe(0);
+    expect(fs.existsSync(f1)).toBe(true);
+    expect(fs.existsSync(f2)).toBe(true);
+    fs.rmSync(td, { recursive: true, force: true });
+    initPreviewCache(dir); // restore the module-level cache dir
+  });
+});
+
+describe("clearPreviewCache", () => {
+  it("removes every cached file and the dedup manifest", async () => {
+    const a = path.join(dir, "clear_a.bin");
+    await storePreviewCache(a, Buffer.from("to be cleared"));
+    expect(fs.existsSync(a)).toBe(true);
+    expect(fs.existsSync(path.join(dir, "dedup-manifest.json"))).toBe(true);
+    const removed = clearPreviewCache();
+    expect(removed).toBeGreaterThanOrEqual(2); // file + manifest
+    expect(fs.existsSync(a)).toBe(false);
+    expect(fs.existsSync(path.join(dir, "dedup-manifest.json"))).toBe(false);
+  });
+});
+
+function sha256hex(data: Buffer): string {
+  return require("crypto").createHash("sha256").update(data).digest("hex");
+}

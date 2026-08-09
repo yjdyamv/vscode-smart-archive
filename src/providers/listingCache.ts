@@ -92,6 +92,28 @@ export function cacheFilePath(dir: string, filePath: string): string {
 }
 
 /**
+ * Remove every cached listing (the "Clear Caches" command). Idempotent;
+ * returns the number of files removed.
+ */
+export function clearListingCache(): number {
+  if (!_cacheDir) return 0;
+  let removed = 0;
+  try {
+    for (const name of fs.readdirSync(_cacheDir)) {
+      try {
+        secureUnlink(path.join(_cacheDir, name));
+        removed++;
+      } catch {
+        // Best effort.
+      }
+    }
+  } catch {
+    // Best effort.
+  }
+  return removed;
+}
+
+/**
  * Streaming sha256 of a file — the content-verification fallback. A full
  * read is still an order of magnitude cheaper than the wrapped listing it
  * guards.

@@ -668,6 +668,31 @@
           "minimum": 65536,
           "maximum": 16777216,
           "description": "%config.logHistoryBytes.description%"
+        },
+        "smart-archive.cache.maxPreviewMB": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 0,
+          "description": "%config.cache.maxPreviewMB.description%"
+        },
+        "smart-archive.cache.ttlDays": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 365,
+          "description": "%config.cache.ttlDays.description%"
+        },
+        "smart-archive.cache.maxMB": {
+          "type": "integer",
+          "default": 1024,
+          "minimum": 1,
+          "description": "%config.cache.maxMB.description%"
+        },
+        "smart-archive.cache.maxFiles": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "description": "%config.cache.maxFiles.description%"
         }
       }
     }

@@ -913,6 +913,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "在内层压缩包中未找到预览文件: {0}",
     "zh-tw": "在內層壓縮檔中未找到預覽檔案: {0}",
   },
+  "cache.cleared": {
+    en: "Smart Archive: cleared {0} cache file(s).",
+    "zh-cn": "Smart Archive：已清除 {0} 个缓存文件。",
+    "zh-tw": "Smart Archive：已清除 {0} 個快取檔案。",
+  },
   "preview.fileTooLarge": {
     en: "File too large for preview ({0} bytes, max {1} bytes). Use Extract instead.",
     "zh-cn": "文件过大，无法预览 ({0} 字节，最大 {1} 字节)。请使用提取功能。",
