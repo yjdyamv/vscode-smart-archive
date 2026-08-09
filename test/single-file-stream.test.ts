@@ -15,7 +15,7 @@ import { fetchFileList } from "../src/providers/fileListing";
 import { decompressWith7z } from "../src/engines/js7z-decompress";
 import { previewFileFromArchive } from "../src/providers/archive/modify";
 import { getPreviewTmpDir } from "../src/providers/tempFiles";
-import { getPreviewCacheDir, initPreviewCache } from "../src/providers/previewCache";
+import { getPreviewCacheDir, initPreviewCache, PREVIEW_CACHE_MAX_CACHEABLE_BYTES } from "../src/providers/previewCache";
 
 function previewDir(): string {
   return getPreviewCacheDir() ?? getPreviewTmpDir();
@@ -295,14 +295,15 @@ describe("wrapped preview fast path (7z auto-unpacks the inner tar)", () => {
         const cachedMtime = fs.statSync(cachedPath).mtimeMs;
         expect(cold).toBeLessThan(100);
 
-        // Warm: cache hit — same file untouched, no new files.
+        // Warm: cache hit — same file untouched, no new files, and the hit
+        // refreshes mtime (idle-TTL LRU: revisited entries keep their slot).
         const t1 = Date.now();
         await previewFileFromArchive(arc, main);
         const warm = Date.now() - t1;
         const createdAfter = fs
           .readdirSync(previewDir())
           .filter((f) => !before.has(f) && f !== first[0]);
-        expect(fs.statSync(cachedPath).mtimeMs).toBe(cachedMtime);
+        expect(fs.statSync(cachedPath).mtimeMs).toBeGreaterThanOrEqual(cachedMtime);
         expect(createdAfter.length).toBe(0);
         expect(warm).toBeLessThan(50);
       } finally {
@@ -310,4 +311,46 @@ describe("wrapped preview fast path (7z auto-unpacks the inner tar)", () => {
       }
     });
   }
+});
+
+describe("preview disk budget", () => {
+  itIf(
+    "system7z",
+    "a large unencrypted preview never enters the persistent cache",
+    async () => {
+      const td = tmpDir("sat_bigprev_");
+      try {
+        const src = path.join(td, "big.bin");
+        fs.writeFileSync(src, Buffer.alloc(PREVIEW_CACHE_MAX_CACHEABLE_BYTES + 1024, 7));
+        const arc = path.join(td, "big.7z");
+        const r = spawnSync(sz!, ["a", arc, src], { stdio: "pipe" });
+        expect(r.status).toBe(0);
+
+        const entries = await fetchFileList(arc);
+        stubVscodePreviewApis(arc);
+        const cacheBefore = new Set(fs.readdirSync(getPreviewCacheDir()!));
+        const tmpBefore = new Set(fs.readdirSync(getPreviewTmpDir()));
+
+        // Cold preview: extracted to the session temp dir, NOT promoted.
+        await previewFileFromArchive(arc, entries[0].path);
+        const cacheCreated = fs
+          .readdirSync(getPreviewCacheDir()!)
+          .filter((f) => !cacheBefore.has(f));
+        const tmpCreated = fs.readdirSync(getPreviewTmpDir()).filter((f) => !tmpBefore.has(f));
+        expect(cacheCreated).toEqual([]);
+        expect(tmpCreated.length).toBe(1);
+
+        // Warm preview: still no cache file — large files are re-extracted
+        // from the temp staging (which dies with the tab) rather than
+        // occupying the cache for up to the idle-TTL.
+        await previewFileFromArchive(arc, entries[0].path);
+        const cacheCreated2 = fs
+          .readdirSync(getPreviewCacheDir()!)
+          .filter((f) => !cacheBefore.has(f));
+        expect(cacheCreated2).toEqual([]);
+      } finally {
+        fs.rmSync(td, { recursive: true, force: true });
+      }
+    },
+  );
 });

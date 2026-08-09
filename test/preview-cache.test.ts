@@ -10,6 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import {
+  previewCacheHit,
   getPreviewCacheDir,
   initPreviewCache,
   previewCachePath,
@@ -59,6 +60,47 @@ describe("storePreviewCache", () => {
     expect(fs.readFileSync(target, "utf8")).toBe("identical");
     const leftovers = fs.readdirSync(dir).filter((f) => f.endsWith(".tmp"));
     expect(leftovers).toEqual([]);
+  });
+});
+
+describe("previewCacheHit", () => {
+  it("accepts a stored regular file", async () => {
+    const target = path.join(dir, "hit1.bin");
+    await storePreviewCache(target, Buffer.from("ok"));
+    expect(previewCacheHit(target)).toBe(true);
+  });
+
+  it("refuses a planted symlink (would open the attacker's file in the editor)", async () => {
+    const victim = path.join(dir, "victim.txt");
+    fs.writeFileSync(victim, "attacker-chosen content");
+    const target = path.join(dir, "hit2.bin");
+    fs.symlinkSync(victim, target);
+    expect(previewCacheHit(target)).toBe(false);
+  });
+
+  it("refuses a FIFO (would hang the editor read)", async () => {
+    const target = path.join(dir, "hit3.bin");
+    await new Promise<void>((resolve, reject) => {
+      const mk = require("child_process").spawn("mkfifo", [target]);
+      mk.on("exit", (code: number) => (code === 0 ? resolve() : reject(new Error(`mkfifo exited ${code}`))));
+    });
+    expect(previewCacheHit(target)).toBe(false);
+    try {
+      secureUnlink(target);
+    } catch {
+      // Best effort — the dir is cleaned up by tmpDir teardown.
+    }
+  });
+
+  it("refuses an oversized tampered file", async () => {
+    const target = path.join(dir, "hit4.bin");
+    await storePreviewCache(target, Buffer.from("small"));
+    fs.writeFileSync(target, Buffer.alloc(100 * 1024 * 1024 + 1));
+    expect(previewCacheHit(target)).toBe(false);
+  });
+
+  it("is false for a missing file", () => {
+    expect(previewCacheHit(path.join(dir, "nope.bin"))).toBe(false);
   });
 });
 

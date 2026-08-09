@@ -37,6 +37,15 @@ const PREVIEW_CACHE_MAX_FILES = 100;
 const PREVIEW_CACHE_MAX_BYTES = 1024 * 1024 * 1024;
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
+/**
+ * Disk budget: entries above this size are never promoted into the
+ * persistent cache. Large previews stay in the per-session temp dir and
+ * are deleted when their tab closes — re-previewing costs a re-extraction,
+ * not 30 days of disk. Small text/source previews (the common case) are
+ * exactly what the cache is for.
+ */
+export const PREVIEW_CACHE_MAX_CACHEABLE_BYTES = 10 * 1024 * 1024;
+
 let cacheDir: string | null = null;
 let lastSweepAt = 0;
 
@@ -75,6 +84,24 @@ export function previewCachePath(
     .digest("hex")
     .slice(0, 16);
   return path.join(cacheDir, `${digest}${ext}`);
+}
+
+/**
+ * Verify a cache hit before serving it. The path is derived from public
+ * inputs (archive path + stat), so a same-user attacker can plant a
+ * symlink or FIFO at the computed location: opening a symlink in the
+ * editor would disclose the attacker's chosen file, and a FIFO would
+ * hang it. Non-regular files are refused and the caller extracts fresh.
+ * Files above the cacheable size are refused too — they should never be
+ * in the cache (old leftovers get extracted fresh and swept).
+ */
+export function previewCacheHit(cacheFile: string): boolean {
+  try {
+    const st = fs.lstatSync(cacheFile);
+    return st.isFile() && st.size <= PREVIEW_CACHE_MAX_CACHEABLE_BYTES;
+  } catch {
+    return false;
+  }
 }
 
 /**

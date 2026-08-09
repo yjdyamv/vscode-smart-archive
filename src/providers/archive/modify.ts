@@ -18,7 +18,13 @@ import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../consta
 import { t } from "../../i18n";
 import { PreviewTooLargeError } from "../../utils/errors";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
-import { getPreviewCacheDir, storePreviewCache } from "../previewCache";
+import {
+  PREVIEW_CACHE_MAX_CACHEABLE_BYTES,
+  previewCacheHit,
+  previewCachePath,
+  storePreviewCache,
+} from "../previewCache";
+import { secureUnlink } from "../../utils/fs";
 
 /** Delay before disposing the preview tab cleanup subscription (10 min) */
 const PREVIEW_CLEANUP_DELAY_MS = 600_000;
@@ -121,27 +127,49 @@ export async function previewFileFromArchive(
   // preview document closes). Unencrypted previews go to the persistent
   // preview cache — closing the tab or VS Code does not lose them.
   const encrypted = !!password;
-  const previewDir = encrypted ? getPreviewTmpDir() : (getPreviewCacheDir() ?? getPreviewTmpDir());
+  // Extraction staging is always the per-session temp dir (deleted on tab
+  // close / session end). Small unencrypted previews are promoted into the
+  // persistent cache after extraction; large files never enter the cache —
+  // re-previewing them costs a re-extraction, not 30 days of disk. Encrypted
+  // archives never persist (decrypted bytes would leak to disk indefinitely).
+  const cacheFile = encrypted
+    ? null
+    : previewCachePath(archivePath, archiveStat.mtimeMs, archiveStat.size, normalizedFile, ext);
   const hash = crypto
     .createHash("sha256")
     .update(`${archivePath}|${archiveStat.mtimeMs}|${archiveStat.size}|${normalizedFile}`)
     .digest("hex")
     .slice(0, 16);
-  const tmpPath = path.join(previewDir, `${hash}${ext}`);
+  const tmpPath = path.join(getPreviewTmpDir(), `${hash}${ext}`);
 
   // Cache hit: the archive (path + mtime + size) and the entry are
   // unchanged — serve the previously extracted file without touching
   // either engine. A modified archive produces a different key, so the
-  // old cache file just becomes an orphan and is pruned later.
-  if (fs.existsSync(tmpPath)) {
-    logger.debug({ event: "previewFile.cacheHit", archivePath, filePath, tmpPath });
-    const uri = vscode.Uri.file(tmpPath);
+  // old cache file just becomes an orphan and is pruned later. The hit
+  // check lstat-verifies a regular file: the key is derived from public
+  // inputs, so a planted symlink/FIFO must not be opened in the editor.
+  if (cacheFile && previewCacheHit(cacheFile)) {
+    // Refresh mtime so the sweep's LRU is an idle-TTL: only entries that
+    // are actually revisited keep occupying disk.
+    try {
+      fs.utimesSync(cacheFile, new Date(), new Date());
+    } catch {
+      // Best effort.
+    }
+    logger.debug({ event: "previewFile.cacheHit", archivePath, filePath, tmpPath: cacheFile });
+    const uri = vscode.Uri.file(cacheFile);
     await vscode.commands.executeCommand("vscode.open", uri, {
       preview: true,
       preserveFocus: false,
       viewColumn: vscode.ViewColumn.Beside,
     });
-    logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath, cached: true });
+    logger.info({
+      event: "previewFile.ok",
+      archivePath,
+      filePath,
+      tmpPath: cacheFile,
+      cached: true,
+    });
     return;
   }
 
@@ -168,12 +196,8 @@ export async function previewFileFromArchive(
         );
       }
       if (!fs.existsSync(tmpPath)) {
-        if (encrypted) {
-          pruneOldPreviews();
-          fs.writeFileSync(tmpPath, buf, { flag: "wx" });
-        } else {
-          await storePreviewCache(tmpPath, buf);
-        }
+        pruneOldPreviews();
+        fs.writeFileSync(tmpPath, buf, { flag: "wx" });
       }
       extracted = true;
     } catch (err) {
@@ -198,16 +222,34 @@ export async function previewFileFromArchive(
     });
   }
 
-  const uri = vscode.Uri.file(tmpPath);
+  // Promote into the persistent cache: unencrypted and within the disk
+  // budget. The cache copy survives tab close (the cache sweeps it by
+  // idle-TTL/count); anything else keeps the temp staging, which dies
+  // with the tab. A failed promote (race, IO) degrades to temp — the
+  // preview still works.
+  let openPath = tmpPath;
+  if (cacheFile) {
+    try {
+      const st = fs.statSync(tmpPath);
+      if (st.size <= PREVIEW_CACHE_MAX_CACHEABLE_BYTES) {
+        await storePreviewCache(cacheFile, fs.readFileSync(tmpPath));
+        openPath = cacheFile;
+        secureUnlink(tmpPath);
+      }
+    } catch (err) {
+      logger.warn({ event: "previewFile.promote.failed", err }, "Preview cache promote failed");
+    }
+  }
+
+  const uri = vscode.Uri.file(openPath);
   await vscode.commands.executeCommand("vscode.open", uri, {
     preview: true,
     preserveFocus: false,
     viewColumn: vscode.ViewColumn.Beside,
   });
-  // Persistent cache files survive tab close (the cache sweeps them by
-  // TTL/count). Encrypted previews live in the session temp dir and are
-  // deleted when their document closes.
-  if (encrypted) {
+  // Temp staging dies with the tab (encrypted, or too large to cache);
+  // promoted cache files survive tab close.
+  if (openPath === tmpPath) {
     const cleanupDisposable = registerPreviewCleanup(tmpPath, uri);
     setTimeout(() => {
       try {
@@ -217,7 +259,7 @@ export async function previewFileFromArchive(
       }
     }, PREVIEW_CLEANUP_DELAY_MS);
   }
-  logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath });
+  logger.info({ event: "previewFile.ok", archivePath, filePath, tmpPath: openPath });
 }
 
 /**
