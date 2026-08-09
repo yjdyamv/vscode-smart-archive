@@ -66,6 +66,36 @@ export function sanitize(obj: Record<string, unknown>): Record<string, unknown> 
   return out;
 }
 
+/**
+ * Normalize an `err` field before pino serializes it. pino's default
+ * serializer turns Error instances into plain objects ({type,message,stack})
+ * and non-Error throws (e.g. emscripten ErrnoError) may be objects too —
+ * the output panel's String(obj.err) would render either as
+ * "[object Object]" and hide the failure. Errors become the message plus a
+ * short stack; other objects keep their name/errno/message parts joined.
+ */
+function errField(err: unknown): Record<string, unknown> {
+  if (err == null) return { err };
+  if (err instanceof Error) {
+    return { err: err.message, stack: err.stack?.split("\n").slice(0, 3).join(" | ") };
+  }
+  if (typeof err === "object") {
+    const e = err as { name?: unknown; errno?: unknown; message?: unknown };
+    const parts: string[] = [];
+    if (typeof e.name === "string" && e.name) parts.push(e.name);
+    if (typeof e.errno === "number") parts.push(`errno=${e.errno}`);
+    if (typeof e.message === "string" && e.message) parts.push(e.message);
+    if (parts.length > 0) return { err: parts.join(": ") };
+  }
+  return { err: String(err) };
+}
+
+/** Apply the err-field normalization to a record that carries one. */
+function normalizeErr(obj: Record<string, unknown>): Record<string, unknown> {
+  if (!("err" in obj)) return obj;
+  return { ...obj, ...errField(obj.err) };
+}
+
 const p = pino(
   {
     level: "info",
@@ -86,23 +116,18 @@ export const logger = {
   },
 
   debug(obj: Record<string, unknown>, msg?: string): void {
-    p.debug(sanitize(obj), msg);
+    p.debug(sanitize(normalizeErr(obj)), msg);
   },
 
   info(obj: Record<string, unknown>, msg?: string): void {
-    p.info(sanitize(obj), msg);
+    p.info(sanitize(normalizeErr(obj)), msg);
   },
 
   warn(obj: Record<string, unknown>, msg?: string): void {
-    p.warn(sanitize(obj), msg);
+    p.warn(sanitize(normalizeErr(obj)), msg);
   },
 
   error(obj: Record<string, unknown>, msg?: string): void {
-    if (obj.err instanceof Error) {
-      const e = obj.err;
-      obj.err = e.message;
-      obj.stack = e.stack?.split("\n").slice(0, 3).join(" | ");
-    }
-    p.error(sanitize(obj), msg);
+    p.error(sanitize(normalizeErr(obj)), msg);
   },
 };

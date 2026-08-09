@@ -16,6 +16,7 @@ import * as os from "os";
 import * as crypto from "crypto";
 import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
 import { t } from "../../i18n";
+import { PreviewTooLargeError } from "../../utils/errors";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
 
 /** Delay before disposing the preview tab cleanup subscription (10 min) */
@@ -134,8 +135,10 @@ export async function previewFileFromArchive(
       );
       const buf = Buffer.from(fileData);
       if (buf.length > MAX_PREVIEW_FILE_SIZE) {
-        throw new Error(
+        throw new PreviewTooLargeError(
           t("preview.fileTooLarge", String(buf.length), String(MAX_PREVIEW_FILE_SIZE)),
+          buf.length,
+          MAX_PREVIEW_FILE_SIZE,
         );
       }
       if (!fs.existsSync(tmpPath)) {
@@ -144,6 +147,9 @@ export async function previewFileFromArchive(
       }
       extracted = true;
     } catch (err) {
+      // The WASM fallback hits the identical size limit after another full
+      // decompression — rethrow instead of paying for it twice.
+      if (err instanceof PreviewTooLargeError) throw err;
       logger.warn(
         { event: "previewFile.system7z.failed", err },
         "System 7z preview failed, falling back to WASM",
