@@ -427,7 +427,6 @@ export async function renameInArchiveCore(
       token,
     );
     logger.info({ event: "rename.wrapped.ok", archivePath, oldPath, newPath });
-    logger.info({ event: "rename.wrapped.ok", archivePath, oldPath, newPath });
     return;
   }
 
