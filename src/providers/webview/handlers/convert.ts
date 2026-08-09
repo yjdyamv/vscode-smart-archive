@@ -13,6 +13,7 @@ import { getFullExt } from "../../../constants";
 import { convertArchive } from "../../../services/archiveService";
 import { startOperation, endOperation } from "../state";
 import { promptConvertFormat } from "./shared";
+import { uniquePath } from "../helpers";
 
 export const handleConvert: MessageHandler = async (ctx) => {
   const { webview, state: s } = ctx;
@@ -26,7 +27,9 @@ export const handleConvert: MessageHandler = async (ctx) => {
     }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     const oldExt = getFullExt(s.filePath);
-    const dst = s.filePath.slice(0, -oldExt.length) + `.${fmt}`;
+    // uniquePath: converting must never silently overwrite (or, with the
+    // system-7z engine, merge into) an existing archive at the target name.
+    const dst = uniquePath(s.filePath.slice(0, -oldExt.length) + `.${fmt}`);
     webview.postMessage({ c: "loading", t: t("archive.converting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
     logger.info({ event: "webview.convert.ok", dst });
