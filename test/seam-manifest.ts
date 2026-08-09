@@ -178,6 +178,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "router-burst.test.ts",
     "split-volume.test.ts"
   ],
+  "src/utils/errors.ts": [
+    "preview-oversize.test.ts"
+  ],
   "src/utils/exclude.ts": [
     "rar5-modify.test.ts"
   ],
@@ -269,7 +272,6 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/utils/cancellation.ts": "TokenLike/ProgressLike structural types",
   "src/utils/config.ts": "host config reads — partially via commands-e2e",
   "src/utils/errorClassifier.ts": "error classification — untested",
-  "src/utils/errors.ts": "error types — untested",
   "src/utils/platform.ts": "platform helpers — untested",
   "src/utils/progress-scale.ts": "progress scaling — untested",
   "src/utils/promptOversize.ts": "oversize dialog — exercised via decompress command flow",

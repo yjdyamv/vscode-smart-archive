@@ -104,6 +104,25 @@ describe("logger.setLevel", () => {
     }
   });
 
+  it("renders error messages instead of [object Object] for every level", async () => {
+    const { freshLogger, rendered, spy } = await freshLoggerAndChannel();
+    try {
+      freshLogger.warn({ event: "err.warn", err: new Error("boom message") });
+      freshLogger.info({ event: "err.info", err: { name: "ErrnoError", errno: 44 } });
+      freshLogger.error({ event: "err.error", err: new Error("fatal error") });
+      await flush();
+
+      expect(rendered.some((l) => l.includes("err.warn") && l.includes("boom message"))).toBe(true);
+      expect(
+        rendered.some((l) => l.includes("err.info") && l.includes("ErrnoError: errno=44")),
+      ).toBe(true);
+      expect(rendered.some((l) => l.includes("err.error") && l.includes("fatal error"))).toBe(true);
+      expect(rendered.join("\n")).not.toContain("[object Object]");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("raising the level preserves rendered history and streams debug live", async () => {
     const { freshLogger, channel, rendered, spy } = await freshLoggerAndChannel();
     try {
