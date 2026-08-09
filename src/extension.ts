@@ -22,6 +22,8 @@ import {
 } from "./providers/webview/expandedState";
 import { initTempCleanup } from "./providers/tempFiles";
 import { initListingCache } from "./providers/listingCache";
+import { initPreviewCache } from "./providers/previewCache";
+import { initPasswordVault, disposePasswordVault } from "./providers/passwordVault";
 import { resetDetectionCache } from "./engines/system7z";
 import { applyHostConfig } from "./utils/config";
 import { disposeBurstLoggers } from "./providers/webview/router";
@@ -39,8 +41,10 @@ export function activate(context: vscode.ExtensionContext): void {
   applyHostConfig();
 
   initExpandedState(context.secrets);
+  initPasswordVault(context.secrets);
   initTempCleanup(context);
   initListingCache(path.join(context.globalStorageUri.fsPath, "listing-cache"));
+  initPreviewCache(path.join(context.globalStorageUri.fsPath, "preview-cache"));
 
   // Register custom editor as default viewer for archive files (.7z, .zip, …)
   registerArchiveEditor(context);
@@ -110,8 +114,9 @@ export function activate(context: vscode.ExtensionContext): void {
  * Called when the extension is deactivated.
  * VSCode automatically disposes of all subscriptions.
  */
-export function deactivate(): void {
+export async function deactivate(): Promise<void> {
   disposeExpandedState();
+  await disposePasswordVault();
   disposeBurstLoggers();
   resetArchiveRunner();
   logger.info({ event: "extension.deactivate" });

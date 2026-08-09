@@ -15,6 +15,12 @@ import { fetchFileList } from "../src/providers/fileListing";
 import { decompressWith7z } from "../src/engines/js7z-decompress";
 import { previewFileFromArchive } from "../src/providers/archive/modify";
 import { getPreviewTmpDir } from "../src/providers/tempFiles";
+import { getPreviewCacheDir, initPreviewCache } from "../src/providers/previewCache";
+
+function previewDir(): string {
+  return getPreviewCacheDir() ?? getPreviewTmpDir();
+}
+import { beforeAll } from "vitest";
 import { itIf } from "./gates";
 import { __setWorkspaceFs } from "./__mocks__/vscode";
 import { tmpDir } from "./tmp";
@@ -32,6 +38,13 @@ function find7z(): string | null {
 }
 
 const sz = find7z();
+
+// Unencrypted previews now persist in the preview cache (globalStorage in
+// production); point it at a test dir so the cache-hit tests can inspect it.
+beforeAll(() => {
+  initPreviewCache(tmpDir("sat_pvcache_"));
+});
+
 
 function stubVscodePreviewApis(archivePath: string): void {
   __setWorkspaceFs({
@@ -81,9 +94,9 @@ describe("single-file streams", () => {
 
       const entries = await fetchFileList(arc);
       stubVscodePreviewApis(arc);
-      const before = new Set(fs.readdirSync(getPreviewTmpDir()));
+      const before = new Set(fs.readdirSync(previewDir()));
       await previewFileFromArchive(arc, entries[0].path);
-      const created = fs.readdirSync(getPreviewTmpDir()).filter((f) => !before.has(f));
+      const created = fs.readdirSync(previewDir()).filter((f) => !before.has(f));
       expect(created.length).toBeGreaterThan(0);
       fs.rmSync(td, { recursive: true, force: true });
     });
@@ -145,12 +158,156 @@ describe("wrapped vs stream confusion", () => {
       const td = tmpDir("sat_wrap3_");
       const arc = mkArchive(td, ext, flag);
       stubVscodePreviewApis(arc);
-      const before = new Set(fs.readdirSync(getPreviewTmpDir()));
+      const before = new Set(fs.readdirSync(previewDir()));
       await previewFileFromArchive(arc, "src/a.txt");
-      const after = fs.readdirSync(getPreviewTmpDir());
+      const after = fs.readdirSync(previewDir());
       const created = after.filter((f) => !before.has(f));
       expect(created.length).toBeGreaterThan(0);
       fs.rmSync(td, { recursive: true, force: true });
+    });
+  }
+});
+
+describe("preview cache", () => {
+  function buildArchive(td: string): { arc: string; entry: string } {
+    const src = path.join(td, "data.bin");
+    const arc = path.join(td, "data.7z");
+    fs.writeFileSync(src, "content version one\n");
+    const r = spawnSync(sz!, ["a", arc, src], { stdio: "pipe" });
+    expect(r.status).toBe(0);
+    stubVscodePreviewApis(arc);
+    return { arc, entry: "data.bin" };
+  }
+
+  function createdInPreviewDir(before: Set<string>): string[] {
+    return fs.readdirSync(previewDir()).filter((f) => !before.has(f));
+  }
+
+  itIf("system7z", "re-extracts after the archive changes (key includes mtime + size)", async () => {
+    const td = tmpDir("sat_pvc_change_");
+    try {
+      const { arc, entry } = buildArchive(td);
+      const before0 = new Set(fs.readdirSync(previewDir()));
+      await previewFileFromArchive(arc, entry);
+      const first = createdInPreviewDir(before0);
+      expect(first.length).toBe(1);
+      expect(fs.readFileSync(path.join(previewDir(), first[0]), "utf8")).toBe(
+        "content version one\n",
+      );
+
+      // Rebuild the archive with different content — mtime and size change.
+      const src = path.join(td, "data.bin");
+      fs.writeFileSync(src, "content version two, longer\n");
+      const r = spawnSync(sz!, ["a", arc, src], { stdio: "pipe" });
+      expect(r.status).toBe(0);
+
+      await previewFileFromArchive(arc, entry);
+      const created = createdInPreviewDir(before0).filter((f) => !first.includes(f));
+      expect(created.length).toBe(1);
+      expect(fs.readFileSync(path.join(previewDir(), created[0]), "utf8")).toBe(
+        "content version two, longer\n",
+      );
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
+
+  itIf("system7z", "serves the cached file without touching the engine (hit)", async () => {
+    const td = tmpDir("sat_pvc_hit_");
+    try {
+      const { arc, entry } = buildArchive(td);
+      // Freeze the archive mtime at a whole-millisecond value first —
+      // utimes can only SET whole milliseconds, so this makes the cache
+      // key exactly reproducible after the restore below.
+      const FROZEN = new Date(1_700_000_000_000);
+      fs.utimesSync(arc, FROZEN, FROZEN);
+      const before0 = new Set(fs.readdirSync(previewDir()));
+      await previewFileFromArchive(arc, entry);
+      const first = createdInPreviewDir(before0);
+      expect(first.length).toBe(1);
+      const cachedPath = path.join(previewDir(), first[0]);
+      expect(fs.readFileSync(cachedPath, "utf8")).toBe("content version one\n");
+
+      // Corrupt the archive with same-size garbage and restore the frozen
+      // mtime — the cache key stays identical, so the preview must be
+      // served from the cache. Extracting the garbage would fail instead.
+      const st = fs.statSync(arc);
+      fs.writeFileSync(arc, Buffer.alloc(st.size, 0x42));
+      fs.utimesSync(arc, FROZEN, FROZEN);
+
+      await expect(previewFileFromArchive(arc, entry)).resolves.toBeUndefined();
+      expect(fs.existsSync(cachedPath)).toBe(true);
+      expect(fs.readFileSync(cachedPath, "utf8")).toBe("content version one\n");
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
+
+  itIf("system7z", "re-extracts when only the archive mtime changes", async () => {
+    const td = tmpDir("sat_pvc_mtime_");
+    try {
+      const { arc, entry } = buildArchive(td);
+      await previewFileFromArchive(arc, entry);
+      const before = new Set(fs.readdirSync(previewDir()));
+
+      const st = fs.statSync(arc);
+      fs.utimesSync(arc, new Date(st.mtimeMs + 5000), new Date(st.mtimeMs + 5000));
+
+      await previewFileFromArchive(arc, entry);
+      const created = createdInPreviewDir(before);
+      expect(created.length).toBe(1);
+      expect(fs.readFileSync(path.join(previewDir(), created[0]), "utf8")).toBe(
+        "content version one\n",
+      );
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("wrapped preview fast path (7z auto-unpacks the inner tar)", () => {
+  for (const ext of ["tar.gz", "tar.xz", "tar.bz2", "tar.zst"] as const) {
+    itIf("system7z", `preview inside .${ext} uses system7z and the cache`, async () => {
+      const td = tmpDir(`sat_pvf_${ext.replace(".", "_")}_`);
+      try {
+        const srcDir = path.join(td, "src");
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.writeFileSync(path.join(srcDir, "main.typ"), "inside " + ext + "\n".repeat(1000));
+        const arc = path.join(td, `wrapped.${ext}`);
+        const r = spawnSync(sz, ["a", "-ttar", arc, srcDir], { stdio: "pipe", timeout: 120_000 });
+        expect(r.status).toBe(0);
+        stubVscodePreviewApis(arc);
+
+        const entries = (await fetchFileList(arc)).map((e) => e.path);
+        const main = entries.find((e) => e.endsWith("main.typ"))!;
+        const before = new Set(fs.readdirSync(previewDir()));
+
+        // Cold: 7-Zip auto-unpacks the inner tar for these wraps — the old
+        // code required an intermediate .tar and silently fell back to WASM
+        // ("No inner tar found"). The fast path completes in ms.
+        const t0 = Date.now();
+        await previewFileFromArchive(arc, main);
+        const cold = Date.now() - t0;
+        const first = fs.readdirSync(previewDir()).filter((f) => !before.has(f));
+        expect(first.length).toBe(1);
+        const cachedPath = path.join(previewDir(), first[0]);
+        expect(fs.readFileSync(cachedPath, "utf8")).toBe("inside " + ext + "\n".repeat(1000));
+        const cachedMtime = fs.statSync(cachedPath).mtimeMs;
+        expect(cold).toBeLessThan(100);
+
+        // Warm: cache hit — same file untouched, no new files.
+        const t1 = Date.now();
+        await previewFileFromArchive(arc, main);
+        const warm = Date.now() - t1;
+        const createdAfter = fs
+          .readdirSync(previewDir())
+          .filter((f) => !before.has(f) && f !== first[0]);
+        expect(fs.statSync(cachedPath).mtimeMs).toBe(cachedMtime);
+        expect(createdAfter.length).toBe(0);
+        expect(warm).toBeLessThan(50);
+      } finally {
+        fs.rmSync(td, { recursive: true, force: true });
+      }
     });
   }
 });

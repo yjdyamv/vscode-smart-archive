@@ -361,11 +361,19 @@ export class Uri {
 
 export const CancellationError = class extends Error {};
 
+export const extensions = {
+  getExtension: (_id: string) => ({
+    id: "yjdyamv.smart-archive",
+    extensionUri: new Uri("file", "/ext", "/ext"),
+  }),
+};
+
 export default {
   env,
   window,
   workspace,
   commands,
+  extensions,
   ProgressLocation,
   ViewColumn,
   QuickInputButtons,

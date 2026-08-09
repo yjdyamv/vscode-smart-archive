@@ -35,6 +35,7 @@ import { handlerStates, handlerRegistered } from "./state";
 import { getNoisyPatterns, isReadOnlyExt, getWebviewUris } from "./helpers";
 import { registerHandler } from "./router";
 import { loadExpandedPaths } from "./expandedState";
+import { getCachedArchivePassword } from "../passwordVault";
 
 function renderOversizeMessage(
   webview: vscode.Webview,
@@ -137,13 +138,27 @@ export async function setupWebview(
     }
     if (encrypted) isEnc = true;
 
+    // Same-session re-open: the tab may be gone but the session password
+    // (SecretStorage, OS keychain) is not — skip the password prompt.
+    if ((encrypted || encryptionDetectionFailed) && !password) {
+      const cached = await getCachedArchivePassword(filePath);
+      if (cached) {
+        logger.info({ event: "webview.setup.password.cached" });
+        password = cached;
+      }
+    }
+
     if ((encrypted || encryptionDetectionFailed) && password) {
       logger.info({ event: "webview.setup.password.retry" });
       try {
         const pwEntries = await fetchFileList(filePath, password);
         if (pwEntries.length > 0) {
+          // The archive IS encrypted — keep isEnc true so the UI shows
+          // Decrypt (and expanded paths use SecretStorage). Only the
+          // password-view trigger is cleared; clearing isEnc here made
+          // re-opened encrypted archives (vault or state password) render
+          // the Encrypt button instead.
           encrypted = false;
-          isEnc = false;
           encryptionDetectionFailed = false;
           logger.info({ event: "webview.setup.password.retrySuccess", count: pwEntries.length });
         }

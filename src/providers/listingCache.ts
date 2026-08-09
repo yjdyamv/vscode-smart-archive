@@ -38,6 +38,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { ListEntry } from "../engines/fileListing-core";
 import { logger } from "../utils/logger-core";
+import { secureUnlink } from "../utils/fs";
 
 const SCHEMA_VERSION = 1;
 const MAX_CACHE_FILES = 100;
@@ -255,7 +256,7 @@ export function pruneListingCache(cacheDir: string, maxFiles = MAX_CACHE_FILES):
   while (byMtime.length > maxFiles) {
     const oldest = byMtime.shift()!;
     try {
-      fs.unlinkSync(path.join(cacheDir, oldest.name));
+      secureUnlink(path.join(cacheDir, oldest.name));
       pruned++;
     } catch {
       // Best effort.
@@ -283,7 +284,7 @@ export function sweepListingCache(cacheDir: string, now = Date.now()): number {
     if (name.endsWith(".tmp")) {
       if (isStaleTmp(cacheFile, now)) {
         try {
-          fs.unlinkSync(cacheFile);
+          secureUnlink(cacheFile);
           removed++;
         } catch {
           // Best effort.
@@ -294,7 +295,7 @@ export function sweepListingCache(cacheDir: string, now = Date.now()): number {
     if (!name.endsWith(".json")) continue;
     if (!shouldKeepSnapshot(cacheFile, now)) {
       try {
-        fs.unlinkSync(cacheFile);
+        secureUnlink(cacheFile);
         removed++;
       } catch {
         // Best effort.
