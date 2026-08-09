@@ -120,7 +120,7 @@ npm run format           # oxfmt code formatting
 npm run check            # format + lint + typecheck
 npm run test             # vitest (extension + webview)
 npm run clean            # remove build output
-npm run package          # create .vsix
+npm run package:cross    # create .vsix (clean install + staged natives)
 npm run release          # build + check + package
 ```
 
