@@ -15,7 +15,7 @@ import { fetchFileList } from "../src/providers/fileListing";
 import { decompressWith7z } from "../src/engines/js7z-decompress";
 import { previewFileFromArchive } from "../src/providers/archive/modify";
 import { getPreviewTmpDir } from "../src/providers/tempFiles";
-import { getPreviewCacheDir, initPreviewCache, PREVIEW_CACHE_MAX_CACHEABLE_BYTES } from "../src/providers/previewCache";
+import { getPreviewCacheConfig, getPreviewCacheDir, initPreviewCache } from "../src/providers/previewCache";
 
 function previewDir(): string {
   return getPreviewCacheDir() ?? getPreviewTmpDir();
@@ -321,7 +321,7 @@ describe("preview disk budget", () => {
       const td = tmpDir("sat_bigprev_");
       try {
         const src = path.join(td, "big.bin");
-        fs.writeFileSync(src, Buffer.alloc(PREVIEW_CACHE_MAX_CACHEABLE_BYTES + 1024, 7));
+        fs.writeFileSync(src, Buffer.alloc(getPreviewCacheConfig().maxCacheableBytes + 1024, 7));
         const arc = path.join(td, "big.7z");
         const r = spawnSync(sz!, ["a", arc, src], { stdio: "pipe" });
         expect(r.status).toBe(0);

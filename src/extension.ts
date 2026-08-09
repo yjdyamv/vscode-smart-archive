@@ -21,13 +21,18 @@ import {
   dispose as disposeExpandedState,
 } from "./providers/webview/expandedState";
 import { initTempCleanup } from "./providers/tempFiles";
-import { initListingCache } from "./providers/listingCache";
-import { initPreviewCache } from "./providers/previewCache";
+import { clearListingCache, initListingCache } from "./providers/listingCache";
+import {
+  clearPreviewCache,
+  initPreviewCache,
+  type PreviewCacheConfig,
+} from "./providers/previewCache";
 import { initPasswordVault, disposePasswordVault } from "./providers/passwordVault";
 import { resetDetectionCache } from "./engines/system7z";
 import { applyHostConfig } from "./utils/config";
 import { disposeBurstLoggers } from "./providers/webview/router";
 import { resetArchiveRunner, reconfigureArchiveWorker } from "./engines/worker/runner";
+import { t } from "./i18n";
 
 /**
  * Called when the extension is activated.
@@ -44,7 +49,20 @@ export function activate(context: vscode.ExtensionContext): void {
   initPasswordVault(context.secrets);
   initTempCleanup(context);
   initListingCache(path.join(context.globalStorageUri.fsPath, "listing-cache"));
-  initPreviewCache(path.join(context.globalStorageUri.fsPath, "preview-cache"));
+  initPreviewCache(
+    path.join(context.globalStorageUri.fsPath, "preview-cache"),
+    readPreviewCacheConfig,
+  );
+
+  // Invalidate the caches on demand.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("yjdyamv.smart-archive.clearCaches", () => {
+      const preview = clearPreviewCache();
+      const listing = clearListingCache();
+      logger.info({ event: "caches.cleared", preview, listing });
+      void vscode.window.showInformationMessage(t("cache.cleared", String(preview + listing)));
+    }),
+  );
 
   // Register custom editor as default viewer for archive files (.7z, .zip, …)
   registerArchiveEditor(context);
@@ -121,4 +139,21 @@ export async function deactivate(): Promise<void> {
   resetArchiveRunner();
   logger.info({ event: "extension.deactivate" });
   logger.dispose();
+}
+
+/**
+ * Live-read the preview-cache disk budget from VS Code settings (MB-based
+ * for humans, bytes internally). Called on every store/sweep, so changing
+ * a setting applies immediately. maxPreviewMB: 0 disables the persistent
+ * cache entirely.
+ */
+function readPreviewCacheConfig(): Partial<PreviewCacheConfig> {
+  const c = vscode.workspace.getConfiguration("smart-archive");
+  const maxPreviewMB = c.get<number>("cache.maxPreviewMB", 10);
+  return {
+    maxCacheableBytes: maxPreviewMB <= 0 ? 0 : maxPreviewMB * 1024 * 1024,
+    ttlMs: c.get<number>("cache.ttlDays", 30) * 24 * 60 * 60 * 1000,
+    maxBytes: c.get<number>("cache.maxMB", 1024) * 1024 * 1024,
+    maxFiles: c.get<number>("cache.maxFiles", 100),
+  };
 }

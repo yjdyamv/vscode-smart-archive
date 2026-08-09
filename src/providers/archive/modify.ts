@@ -19,7 +19,7 @@ import { t } from "../../i18n";
 import { PreviewTooLargeError } from "../../utils/errors";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
 import {
-  PREVIEW_CACHE_MAX_CACHEABLE_BYTES,
+  getPreviewCacheConfig,
   previewCacheHit,
   previewCachePath,
   storePreviewCache,
@@ -231,7 +231,7 @@ export async function previewFileFromArchive(
   if (cacheFile) {
     try {
       const st = fs.statSync(tmpPath);
-      if (st.size <= PREVIEW_CACHE_MAX_CACHEABLE_BYTES) {
+      if (st.size <= getPreviewCacheConfig().maxCacheableBytes) {
         await storePreviewCache(cacheFile, fs.readFileSync(tmpPath));
         openPath = cacheFile;
         secureUnlink(tmpPath);
