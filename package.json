@@ -32,7 +32,6 @@
   "publisher": "yjdyamv",
   "main": "./out/extension.js",
   "scripts": {
-    "clean": "node -e \"['out','media/vue','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
     "postinstall": "node scripts/install-7zz-wasm.mjs && npm --prefix webview-ui install",
     "compile": "vite build --config vite.extension.config.mts",
     "compile:dev": "cross-env SOURCEMAP=true vite build --config vite.extension.config.mts",
@@ -44,7 +43,6 @@
     "obfuscate": "node scripts/obfuscate.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui",
     "format": "oxfmt --write src/ test/ webview-ui/src/ scripts/",
     "format:check": "oxfmt --check src/ test/ webview-ui/src/ scripts/",
     "lint": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort -A unicorn/consistent-function-scoping -A no-control-regex src/ test/ webview-ui/src/ scripts/",
@@ -55,10 +53,7 @@
     "stage:natives": "node scripts/install-7zz-wasm.mjs && node scripts/install-snappy-platforms.mjs && node scripts/install-7z-platforms.mjs && node scripts/install-rar5-platforms.mjs",
     "verify:downloads": "node scripts/verify-downloads.mjs",
     "package:cross": "npm ci --ignore-scripts && npm --prefix webview-ui ci --ignore-scripts && node scripts/install-7zz-wasm.mjs && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.mjs && vsce package",
-    "package:ovsx": "npm run stage:natives && npm run build && npx ovsx package",
-    "publish:ovsx": "npm run stage:natives && npm run build && npx ovsx publish",
-    "vscode:prepublish": "npm run stage:natives && npm run build",
-    "publish": "npm run build && npx vsce publish"
+    "vscode:prepublish": "npm run stage:natives && npm run build"
   },
   "dependencies": {
     "@napi-rs/wasm-runtime": "^1.2.2",
