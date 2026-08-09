@@ -16,9 +16,9 @@
     {
       "type": "npm",
       "script": "watch",
-      "problemMatcher": "$tsc-watch",
+      "problemMatcher": [],
       "isBackground": true,
-      "label": "npm: watch (tsc)"
+      "label": "npm: watch (extension)"
     },
     {
       "type": "npm",
@@ -29,7 +29,7 @@
     },
     {
       "label": "watch",
-      "dependsOn": ["npm: watch (tsc)", "npm: build webview (watch)"],
+      "dependsOn": ["npm: watch (extension)", "npm: build webview (watch)"],
       "group": "build",
       "problemMatcher": []
     },
