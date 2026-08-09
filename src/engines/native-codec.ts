@@ -1,10 +1,11 @@
 /**
- * Native 7-Zip ZS codec fast path (zstd / lz4 single-file streams).
+ * Native 7-Zip ZS codec fast path (zstd / lz4 / brotli single-file streams).
  *
  * Uses the bundled native 7zz (mcmilk fork) when present; callers fall back
  * to the WASM engine when this returns false/null. The bundled binary is the
  * only native tier for these codecs — stock system 7-Zip cannot create
- * standard .zst/.lz4 files reliably, and the user chose bundled-native first.
+ * standard .zst/.lz4/.br files reliably, and the user chose bundled-native
+ * first.
  *
  * @module engines/native-codec
  */
@@ -17,7 +18,7 @@ import type { ProgressLike } from "../utils/cancellation";
 import { logger } from "../utils/logger-core";
 import { bundled7zPath } from "./bundled7z";
 
-export type NativeCodec = "zst" | "lz4";
+export type NativeCodec = "zst" | "lz4" | "br";
 
 // bundled7zPath() re-validates the binary on every call; cache per session.
 let _cachedBundled: string | null | undefined;
@@ -27,7 +28,7 @@ function native7zz(): string | null {
   return _cachedBundled;
 }
 
-/** zstd has an official MT format; lz4 stays standard single-stream. */
+/** zstd has an official MT format; lz4 and brotli stay standard single-stream. */
 function mtArg(codec: NativeCodec): string {
   return codec === "zst" ? "-mmt=on" : "-mmt=off";
 }

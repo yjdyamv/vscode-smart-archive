@@ -12,14 +12,14 @@ import * as path from "path";
 import * as zlib from "node:zlib";
 import { spawnSync } from "child_process";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
-import { gate } from "./gates";
+import { gate, itIf } from "./gates";
 import {
   wasmCompress,
   wasmCompressFile,
   wasmDecompress,
   wasmDecompressFile,
 } from "../src/engines/js7z-codec";
-import { brotliDecompressFile } from "../src/engines/brotli-codec";
+import { brotliCompress, brotliDecompress, brotliCompressFile, brotliDecompressFile, setBrotliConfig } from "../src/engines/brotli-codec";
 import { lz4DecompressFile } from "../src/engines/lz4-codec";
 import { tmpDir } from "./tmp";
 
@@ -168,4 +168,54 @@ describe("7zz-wasm codec fallback", () => {
     expect(Buffer.from(restored)).toEqual(data);
   });
 
+});
+
+describe("bundled-7z brotli backend", () => {
+  beforeAll(() => {
+    setForceWasmCodec(false);
+    setBrotliConfig({ backend: "7z" });
+  });
+
+  afterAll(() => {
+    setForceWasmCodec(false);
+    setBrotliConfig({});
+  });
+
+  let tdir: string;
+
+  beforeEach(() => {
+    tdir = tmpDir("sat_br7z_");
+  });
+
+  afterEach(() => {
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("bundled7zz", "round-trips a buffer through the bundled native 7zz", async () => {
+    const data = makeData(256 * 1024);
+    const compressed = await brotliCompress(data, 5);
+    const restored = await brotliDecompress(compressed);
+    expect(Buffer.from(restored)).toEqual(data);
+  });
+
+  itIf("bundled7zz", "produces a standard brotli stream (node zlib decodes it)", async () => {
+    const data = makeData(128 * 1024);
+    const compressed = Buffer.from(await brotliCompress(data, 5));
+    const decoded = zlib.brotliDecompressSync(compressed);
+    expect(decoded).toEqual(data);
+  });
+
+  itIf("bundled7zz", "round-trips files through the bundled native 7zz", async () => {
+    const data = makeData(512 * 1024);
+    const input = path.join(tdir, "input.bin");
+    const compressed = path.join(tdir, "out.br");
+    const restored = path.join(tdir, "restored.bin");
+    fs.writeFileSync(input, data);
+
+    await brotliCompressFile(input, compressed, 5);
+    expect(fs.statSync(compressed).size).toBeGreaterThan(0);
+
+    await brotliDecompressFile(compressed, restored);
+    expect(fs.readFileSync(restored)).toEqual(data);
+  });
 });

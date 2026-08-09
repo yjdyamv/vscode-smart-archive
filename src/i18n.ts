@@ -872,9 +872,9 @@ const messages: Record<string, Record<Locale, string>> = {
 
   // ---- Brotli ----
   "brotli.7zUnavailable": {
-    en: "The bundled 7-Zip brotli backend is not implemented yet; using Node.js zlib instead.",
-    "zh-cn": "捆绑 7-Zip 的 brotli 后端尚未实现，已改用 Node.js zlib。",
-    "zh-tw": "綁定 7-Zip 的 brotli 後端尚未實作，已改用 Node.js zlib。",
+    en: "The bundled 7-Zip brotli backend is unavailable; using Node.js zlib instead.",
+    "zh-cn": "捆绑 7-Zip 的 brotli 后端不可用，已改用 Node.js zlib。",
+    "zh-tw": "綁定 7-Zip 的 brotli 後端不可用，已改用 Node.js zlib。",
   },
 
   // ---- Archive operations ----
