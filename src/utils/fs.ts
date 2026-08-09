@@ -271,3 +271,36 @@ export function secureUnlink(file: string): void {
     // Best effort.
   }
 }
+
+/**
+ * Securely delete a directory tree: every file inside is overwritten
+ * with zeros before unlink (secureUnlink), then the directories are
+ * removed. Use for temp dirs holding extracted or decrypted content —
+ * a plain rmSync leaves the bytes recoverable from disk. Symlink
+ * entries are unlinked as links (never followed). Missing dir is a no-op.
+ */
+export function secureRmDir(dir: string): void {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return; // missing — nothing to delete
+  }
+  for (const entry of entries) {
+    const p = path.join(dir, entry.name);
+    try {
+      if (entry.isDirectory()) {
+        secureRmDir(p);
+      } else {
+        secureUnlink(p);
+      }
+    } catch {
+      // Best effort — unlink is still attempted by the rmdir below.
+    }
+  }
+  try {
+    fs.rmdirSync(dir);
+  } catch {
+    // Best effort — the tree may be gone already.
+  }
+}

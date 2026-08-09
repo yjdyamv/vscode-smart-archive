@@ -16,7 +16,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { logger } from "../utils/logger";
-import { secureUnlink } from "../utils/fs";
+import { secureRmDir, secureUnlink } from "../utils/fs";
 
 const PREVIEW_TMP_PREFIX = path.join(os.tmpdir(), "vscode-7z-preview-");
 let PREVIEW_TMP_DIR = "";
@@ -51,7 +51,9 @@ function getPreviewTmpDir(): string {
 function cleanupPreviewTemp(): void {
   if (!PREVIEW_TMP_DIR) return;
   try {
-    fs.rmSync(PREVIEW_TMP_DIR, { recursive: true, force: true });
+    // The session temp dir holds decrypted previews — wipe the bytes
+    // (secureUnlink) before removing the tree.
+    secureRmDir(PREVIEW_TMP_DIR);
   } catch (err) {
     logger.warn({ event: "tempFiles.cleanup.failed", err }, "Failed to clean up temp files");
   }
@@ -64,7 +66,7 @@ function initTempCleanup(context: vscode.ExtensionContext): void {
   const previewDir = path.join(os.tmpdir(), "vscode-7z-preview");
   try {
     if (fs.existsSync(previewDir)) {
-      fs.rmSync(previewDir, { recursive: true, force: true });
+      secureRmDir(previewDir);
     }
   } catch {
     logger.warn(

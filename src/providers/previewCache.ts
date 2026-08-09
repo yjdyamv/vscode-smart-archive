@@ -26,21 +26,32 @@
  *  - Orphan reclamation: the index records each entry's source archive
  *     (path + stat); the sweep reclaims entries whose archive was
  *     deleted, moved, or modified immediately, instead of waiting out
- *     the TTL. A missing/corrupt index never triggers mass deletion —
- *     unindexed entries fall back to the TTL.
+ *     the TTL. Orphan checks also run before every store (no hourly
+ *     throttle), so deleting an archive shrinks the cache on the very
+ *     next preview. A missing/corrupt index never triggers mass
+ *     deletion — unindexed entries fall back to the TTL.
  *  - Atomicity (one index.json, one atomic write per change): the cache
  *     files are the source of truth; the index is a rebuildable
  *     accelerator. store writes the file first, then the index; sweep
  *     unlinks files first, then prunes the index; clear removes
  *     everything. Every crash state self-heals to TTL reclamation.
+ *  - Untracked files: a cache file without an index record cannot dedup
+ *     and cannot be orphan-checked — it is junk. While the index is
+ *     healthy, the sweep drops such files outright (the crash window
+ *     between file and index write self-heals via re-extraction) and
+ *     the hit path refuses to serve them.
  *  - Content integrity: caches are rebuildable accelerators, so the
  *     worst case of any tampering is a re-extraction, never data loss.
  *     Both reuse points re-hash the bytes against the index record —
  *     a cache hit refuses mismatched content and the caller re-extracts
  *     (overwriting the bad copy), and a dedup hardlink only targets a
- *     verified file so a tampered inode does not spread. Files without
- *     an index record (the crash window between file and index write)
- *     are trusted. Encrypted archives never enter the cache.
+ *     verified file so a tampered inode does not spread. A cache file
+ *     without an index record is untracked junk: the hit refuses it and
+ *     the sweep unlinks it (the crash window between file and index
+ *     write self-heals via re-extraction). The only files granted TTL
+ *     grace are those seen while the index itself is missing/corrupt —
+ *     an unreadable index must not trigger mass deletion. Encrypted
+ *     archives never enter the cache.
  *
  * Vscode-free — the dir and config reader are injected via initPreviewCache.
  *
@@ -64,6 +75,9 @@ const INDEX_NAME = "index.json";
 const INDEX_SCHEMA = 2;
 /** Cap on the index read — a tampered giant file must not be parsed. */
 const INDEX_MAX_BYTES = 64 * 1024;
+/** Pre-schema-2 index files — dead names, removed once by the sweep. */
+const V1_MANIFEST_NAME = "dedup-manifest.json";
+const V1_ORIGINS_NAME = "origins.json";
 
 /**
  * Origin of a cached preview: the archive it was extracted from. The
@@ -208,9 +222,12 @@ export function previewCachePath(
  * bytes are re-hashed and compared — a file tampered in place (or an
  * index entry pointing at the wrong content) fails the check and the
  * caller re-extracts, overwriting the bad copy (self-healing). A file
- * without an index record is trusted: it was written by us in the crash
- * window before the index landed, and the alternative (refusing) would
- * turn a plain crash into a lost cache.
+ * without an index record is untracked junk and is refused too — the
+ * caller re-extracts and re-stores it, which overwrites the junk with
+ * a properly indexed copy. The only files served without a record are
+ * those seen while the index itself is missing or corrupt: without the
+ * index nothing can be verified, and refusing everything would turn a
+ * plain crash into a lost cache.
  */
 export function previewCacheHit(cacheFile: string): boolean {
   let st;
@@ -220,8 +237,9 @@ export function previewCacheHit(cacheFile: string): boolean {
   } catch {
     return false;
   }
-  const rec = readIndex().entries[path.basename(cacheFile)];
-  if (!rec) return true; // no record → trusted (crash window write)
+  const { entries, usable } = readIndex();
+  const rec = entries[path.basename(cacheFile)];
+  if (!rec) return !usable;
   try {
     const actual = crypto
       .createHash(CACHE_HASH_ALGO)
@@ -237,13 +255,20 @@ function indexPath(): string {
   return path.join(cacheDir!, INDEX_NAME);
 }
 
-function readIndex(): CacheIndex {
+/**
+ * Read the index. `usable` is false only when the index itself is
+ * missing or unreadable (crash, corruption, a huge tampered file): with
+ * no index, nothing can be verified, so every unindexed file gets TTL
+ * grace instead of being dropped as junk. When `usable`, the entries
+ * are the single source of truth — a file without a record is junk.
+ */
+function readIndex(): { entries: Record<string, CacheEntryRecord>; usable: boolean } {
   try {
     const st = fs.lstatSync(indexPath());
-    if (!st.isFile() || st.size > INDEX_MAX_BYTES) return { v: INDEX_SCHEMA, entries: {} };
+    if (!st.isFile() || st.size > INDEX_MAX_BYTES) return { entries: {}, usable: false };
     const raw = JSON.parse(fs.readFileSync(indexPath(), "utf8")) as Partial<CacheIndex>;
     if (raw.v !== INDEX_SCHEMA || typeof raw.entries !== "object" || raw.entries === null) {
-      return { v: INDEX_SCHEMA, entries: {} };
+      return { entries: {}, usable: false };
     }
     const entries: Record<string, CacheEntryRecord> = {};
     for (const [name, rec] of Object.entries(raw.entries)) {
@@ -269,14 +294,14 @@ function readIndex(): CacheIndex {
         archiveSize: rec.archiveSize,
       };
     }
-    return { v: INDEX_SCHEMA, entries };
+    return { entries, usable: true };
   } catch {
-    return { v: INDEX_SCHEMA, entries: {} };
+    return { entries: {}, usable: false };
   }
 }
 
-function writeIndex(index: CacheIndex): void {
-  if (Object.keys(index.entries).length === 0) {
+function writeIndex(entries: Record<string, CacheEntryRecord>): void {
+  if (Object.keys(entries).length === 0) {
     // An empty index is a stale file: remove it.
     try {
       secureUnlink(indexPath());
@@ -285,6 +310,7 @@ function writeIndex(index: CacheIndex): void {
     }
     return;
   }
+  const index: CacheIndex = { v: INDEX_SCHEMA, entries };
   const tmp = `${indexPath()}.${process.pid}.${crypto.randomBytes(4).toString("hex")}${CACHE_TMP_EXT}`;
   try {
     fs.writeFileSync(tmp, JSON.stringify(index), { flag: "wx" });
@@ -295,20 +321,51 @@ function writeIndex(index: CacheIndex): void {
   }
 }
 
-/** Drop entries whose cache file no longer exists (swept/tampered). */
-function pruneStaleIndexEntries(dir: string): void {
-  const index = readIndex();
-  const before = Object.keys(index.entries).length;
-  for (const name of Object.keys(index.entries)) {
+/**
+ * Drop entries whose cache file no longer exists (swept/tampered).
+ * Mutates the passed index; returns whether it changed (the caller
+ * writes once).
+ */
+function pruneStaleIndexEntries(dir: string, entries: Record<string, CacheEntryRecord>): boolean {
+  let changed = false;
+  for (const name of Object.keys(entries)) {
     try {
       const st = fs.lstatSync(path.join(dir, name));
       if (st.isFile()) continue;
     } catch {
       // Fall through: entry's file is gone.
     }
-    delete index.entries[name];
+    delete entries[name];
+    changed = true;
   }
-  if (Object.keys(index.entries).length !== before) writeIndex(index);
+  return changed;
+}
+
+/**
+ * Reclaim untrackable entries right now: every entry whose source
+ * archive was deleted, moved, or modified (stat mismatch) — and every
+ * entry with no origin record at all. An entry without an origin cannot
+ * be verified against anything, so while the index is usable it is
+ * dropped: production stores always pass an origin (modify.ts), so
+ * origin-less entries are legacy back-fills and no-origin callers, not
+ * working caches. Runs before every store (cheap: ≤ maxFiles stat
+ * calls) so the cache shrinks on the very next preview after an archive
+ * disappears, instead of waiting out the hourly throttle. Returns
+ * whether the index changed (the caller writes once).
+ */
+function reclaimOrphans(entries: Record<string, CacheEntryRecord>): boolean {
+  let changed = false;
+  for (const [name, rec] of Object.entries(entries)) {
+    if (rec.archivePath && originMatches(rec)) continue; // verifiable and alive
+    try {
+      secureUnlink(path.join(cacheDir!, name));
+      delete entries[name];
+      changed = true;
+    } catch {
+      // Best effort — the sweep retries.
+    }
+  }
+  return changed;
 }
 
 /**
@@ -321,25 +378,28 @@ function pruneStaleIndexEntries(dir: string): void {
  * file inside several archive backups, or a re-extraction after a touch,
  * occupies disk once). Every failure path degrades to a plain write.
  *
- * `origin` records which archive the bytes came from, so the sweep can
- * reclaim the entry as an orphan as soon as that archive is deleted,
- * moved, or modified — instead of waiting out the TTL.
+ * `origin` records which archive the bytes came from, so the store
+ * itself reclaims this entry as an orphan the moment that archive is
+ * deleted, moved, or modified — the sweep only cleans up what the
+ * store-based reclamation has not reached yet.
  *
  * Atomicity: the cache file lands first (tmp + atomic rename), then the
  * index (tmp + atomic rename). A crash between the two leaves a file
- * with no entry — reclaimed by the TTL, never served wrongly.
+ * with no entry — dropped as junk by the next sweep, never served
+ * wrongly.
  */
 export async function storePreviewCache(
   cacheFile: string,
   data: Uint8Array,
   origin?: PreviewCacheOrigin,
 ): Promise<void> {
-  const index = readIndex();
+  const { entries, usable } = readIndex();
+  if (usable && reclaimOrphans(entries)) writeIndex(entries);
   const hash = crypto.createHash(CACHE_HASH_ALGO).update(data).digest("hex");
   // Linear dedup scan: first index entry with the same content whose
   // file still exists (≤ maxFiles entries — cheap). Entries whose file
   // was swept are skipped here and pruned by the sweep.
-  const existing = Object.entries(index.entries).find(([, rec]) => rec.contentHash === hash)?.[0];
+  const existing = Object.entries(entries).find(([, rec]) => rec.contentHash === hash)?.[0];
   if (existing) {
     const existingPath = path.join(cacheDir!, existing);
     try {
@@ -349,7 +409,13 @@ export async function storePreviewCache(
       // not spread — degrade to a plain write instead.
       if (st.isFile() && fileHashMatches(existingPath, hash)) {
         fs.linkSync(existingPath, cacheFile);
-        noteIndexEntry(cacheFile, hash, origin);
+        entries[path.basename(cacheFile)] = {
+          contentHash: hash,
+          archivePath: origin?.archivePath ?? "",
+          archiveMtimeMs: origin?.mtimeMs ?? 0,
+          archiveSize: origin?.size ?? 0,
+        };
+        writeIndex(entries);
         maybeSweepPreviewCache();
         return;
       }
@@ -362,10 +428,20 @@ export async function storePreviewCache(
     await fs.promises.writeFile(tmp, data, { flag: "wx" });
     await fs.promises.rename(tmp, cacheFile);
   } catch (err) {
-    await fs.promises.rm(tmp, { force: true }).catch(() => {});
+    try {
+      secureUnlink(tmp);
+    } catch {
+      // Best effort.
+    }
     throw err;
   }
-  noteIndexEntry(cacheFile, hash, origin);
+  entries[path.basename(cacheFile)] = {
+    contentHash: hash,
+    archivePath: origin?.archivePath ?? "",
+    archiveMtimeMs: origin?.mtimeMs ?? 0,
+    archiveSize: origin?.size ?? 0,
+  };
+  writeIndex(entries);
   maybeSweepPreviewCache();
 }
 
@@ -377,21 +453,6 @@ function fileHashMatches(file: string, expectedHash: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Record the freshly stored file in the index (single atomic write).
- * Without an origin, the entry still dedups but is not orphan-tracked.
- */
-function noteIndexEntry(cacheFile: string, contentHash: string, origin?: PreviewCacheOrigin): void {
-  const index = readIndex();
-  index.entries[path.basename(cacheFile)] = {
-    contentHash,
-    archivePath: origin?.archivePath ?? "",
-    archiveMtimeMs: origin?.mtimeMs ?? 0,
-    archiveSize: origin?.size ?? 0,
-  };
-  writeIndex(index);
 }
 
 /**
@@ -419,18 +480,24 @@ export function clearPreviewCache(): number {
 }
 
 /**
- * Throttled sweep: orphan reclamation, TTL expiry, then LRU pruning by
- * count and total bytes (preview files can be large, so a pure count cap
- * could leave gigabytes on disk). Orphans are entries whose source
- * archive was deleted, moved, or modified — the index records the
- * archive stat, so a mismatch reclaims them immediately instead of
- * waiting out the TTL. The byte budget counts unique inodes — hardlinked
- * dedup copies occupy disk once. The index is pruned to the files that
- * survive.
+ * Throttled sweep: unindexed junk, orphan reclamation, TTL expiry, then
+ * LRU pruning by count and total bytes (preview files can be large, so
+ * a pure count cap could leave gigabytes on disk). Orphans are entries
+ * whose source archive was deleted, moved, or modified — the index
+ * records the archive stat, so a mismatch reclaims them immediately
+ * instead of waiting out the TTL (the store also reclaims them before
+ * every write, so the sweep only catches what the store has not).
+ * Unindexed files are junk: while the index is healthy they are
+ * dropped, and with it the crash window between file and index write
+ * self-heals. The byte budget counts unique inodes — hardlinked dedup
+ * copies occupy disk once. Surviving duplicates from before dedup
+ * existed are merged (see mergeDuplicates). The index is pruned and
+ * corrected in one write.
  */
 export function sweepPreviewCache(dir: string, now = Date.now()): number {
   const config = getPreviewCacheConfig();
-  const index = readIndex();
+  const { entries, usable } = readIndex();
+  const isOwnDir = dir === cacheDir;
   let names: string[];
   try {
     names = fs.readdirSync(dir);
@@ -439,7 +506,7 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
   }
 
   let removed = 0;
-  const entries: { file: string; mtime: number; size: number; ino: number }[] = [];
+  const survivors: { file: string; name: string; mtime: number; size: number; ino: number }[] = [];
   for (const name of names) {
     if (name === INDEX_NAME) continue; // the index is metadata, not a cache file
     const file = path.join(dir, name);
@@ -448,6 +515,17 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
       st = fs.lstatSync(file);
       if (!st.isFile()) continue;
     } catch {
+      continue;
+    }
+    if (name === V1_MANIFEST_NAME || name === V1_ORIGINS_NAME) {
+      // Pre-schema-2 index files: dead since the single index.json — one
+      // sweep removes them once and for all.
+      try {
+        secureUnlink(file);
+        removed++;
+      } catch {
+        // Best effort.
+      }
       continue;
     }
     if (name.endsWith(CACHE_TMP_EXT)) {
@@ -461,12 +539,27 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
       }
       continue;
     }
-    // Orphan: the source archive is gone (deleted/moved) or changed
-    // (mtime/size mismatch). Entries without a record (no origin passed,
-    // or a missing/corrupt index) are kept — that must not cause mass
-    // deletion, only TTL reclamation.
-    const rec = index.entries[name];
+    const rec = entries[name];
     if (rec && rec.archivePath && !originMatches(rec)) {
+      // Orphan: the source archive is gone (deleted/moved) or changed
+      // (mtime/size mismatch).
+      try {
+        secureUnlink(file);
+        removed++;
+      } catch {
+        // Best effort.
+      }
+      continue;
+    }
+    if ((!rec || !rec.archivePath) && usable && isOwnDir) {
+      // Untracked junk: a file the index does not know (crash-window
+      // leftover, foreign copy) or an entry with no origin record
+      // (legacy back-fill, no-origin caller) — neither can be verified
+      // against any archive. With a healthy index the entries are the
+      // single source of truth — the file is dropped and the caller
+      // re-extracts on demand. Not applied to foreign dirs (a sweep over
+      // an arbitrary directory must not delete what it cannot verify)
+      // nor when the index itself is unusable (mass deletion risk).
       try {
         secureUnlink(file);
         removed++;
@@ -484,23 +577,23 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
       }
       continue;
     }
-    entries.push({ file, mtime: st.mtimeMs, size: st.size, ino: st.ino });
+    survivors.push({ file, name, mtime: st.mtimeMs, size: st.size, ino: st.ino });
   }
 
-  entries.sort((a, b) => a.mtime - b.mtime);
+  survivors.sort((a, b) => a.mtime - b.mtime);
   const inodeBytes = new Map<number, number>();
-  for (const e of entries) {
+  for (const e of survivors) {
     if (!inodeBytes.has(e.ino)) inodeBytes.set(e.ino, e.size);
   }
   let totalBytes = [...inodeBytes.values()].reduce((sum, v) => sum + v, 0);
-  while (entries.length > config.maxFiles || totalBytes > config.maxBytes) {
-    const oldest = entries.shift();
+  while (survivors.length > config.maxFiles || totalBytes > config.maxBytes) {
+    const oldest = survivors.shift();
     if (!oldest) break;
     try {
       secureUnlink(oldest.file);
       removed++;
       // Free the bytes only when no other surviving entry shares the inode.
-      if (!entries.some((e) => e.ino === oldest.ino)) {
+      if (!survivors.some((e) => e.ino === oldest.ino)) {
         totalBytes -= oldest.size;
       }
     } catch {
@@ -508,8 +601,86 @@ export function sweepPreviewCache(dir: string, now = Date.now()): number {
     }
   }
 
-  pruneStaleIndexEntries(dir);
+  const { merged, tampered } = mergeDuplicates(dir, survivors, entries);
+  if (merged > 0) {
+    // Merged copies are relinked, not deleted — the file count is
+    // unchanged, only the disk bytes shrink, so `removed` is unaffected.
+    logger.info({ event: "previewCache.dedupMerged", merged });
+  }
+  if (tampered > 0) removed += tampered;
+  if (pruneStaleIndexEntries(dir, entries) || merged > 0 || tampered > 0) writeIndex(entries);
   return removed;
+}
+
+/**
+ * Collapse surviving duplicates: files written before dedup existed (or
+ * copied in from outside) occupy separate inodes for identical bytes.
+ * Same-size groups with more than one inode are re-hashed (cheap
+ * pre-filter: different sizes cannot be equal content) and hardlinked to
+ * the first copy — the only surviving duplicates that were not merged at
+ * write time.
+ *
+ * Doubles as an integrity pass for hashed files: a file whose bytes no
+ * longer match its index record was tampered with — it is deleted, not
+ * re-indexed, so the caller re-extracts the real bytes (self-healing;
+ * re-indexing would bless the tampered copy).
+ */
+function mergeDuplicates(
+  dir: string,
+  entries: { file: string; name: string; size: number; ino: number }[],
+  index: Record<string, CacheEntryRecord>,
+): { merged: number; tampered: number } {
+  const bySize = new Map<number, { file: string; name: string; ino: number }[]>();
+  for (const e of entries) {
+    const group = bySize.get(e.size);
+    if (group) group.push({ file: e.file, name: e.name, ino: e.ino });
+    else bySize.set(e.size, [{ file: e.file, name: e.name, ino: e.ino }]);
+  }
+
+  let merged = 0;
+  let tampered = 0;
+  for (const group of bySize.values()) {
+    if (new Set(group.map((g) => g.ino)).size < 2) continue; // single copy — hit-time check covers it
+    const byHash = new Map<string, string[]>();
+    for (const g of group) {
+      let hash: string;
+      try {
+        hash = crypto.createHash(CACHE_HASH_ALGO).update(fs.readFileSync(g.file)).digest("hex");
+      } catch {
+        continue; // unreadable — leave it to TTL
+      }
+      const rec = index[g.name];
+      if (rec && rec.contentHash !== hash) {
+        // Indexed file whose bytes changed: tampered. Delete the bad
+        // copy — the next preview re-extracts the real bytes.
+        try {
+          secureUnlink(g.file);
+          tampered++;
+        } catch {
+          // Best effort.
+        }
+        continue;
+      }
+      const names = byHash.get(hash);
+      if (names) names.push(g.name);
+      else byHash.set(hash, [g.name]);
+    }
+    for (const names of byHash.values()) {
+      if (names.length >= 2) {
+        const keep = names[0];
+        for (const n of names.slice(1)) {
+          try {
+            secureUnlink(path.join(dir, n));
+            fs.linkSync(path.join(dir, keep), path.join(dir, n));
+            merged++;
+          } catch {
+            // Best effort — the duplicate just stays.
+          }
+        }
+      }
+    }
+  }
+  return { merged, tampered };
 }
 
 /** Live stat of the origin archive vs the recorded one — deleted, moved,
