@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+import fs from "fs";
+import path from "path";
+import os from "os";
+import { fetchReleaseAsset, resolveLatestReleaseTag } from "./lib/github.mjs";
+import { downloadWithCache, countStatuses } from "./lib/download.mjs";
+import { writeFileAtomic } from "./lib/fs.mjs";
+import { persistBootstrapHash } from "./lib/hash-pins.mjs";
+import { mapLimit } from "./lib/async.mjs";
+import { pathToFileURL } from "node:url";
 /**
  * Stage the rar5 native binding (smart-archive-rar, napi-rs) under
  * vendor/rar5-bin/
@@ -20,14 +29,6 @@
  * The loader (src/engines/rar5-engine.ts) resolves
  * vendor/rar5-bin/<platform>/<arch>/smart-archive-rar.<triple>.node
  */
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const { fetchReleaseAsset, resolveLatestReleaseTag } = require("./lib/github");
-const { downloadWithCache, countStatuses } = require("./lib/download");
-const { writeFileAtomic } = require("./lib/fs");
-const { persistBootstrapHash } = require("./lib/hash-pins");
-const { mapLimit } = require("./lib/async");
 
 // Binding repo, overridable (e.g. a fork):
 //   SA_RAR5_REPO=me/smart-archive-rar
@@ -55,7 +56,7 @@ async function resolveVersion() {
 // chunk-level parallel compression); fail-closed. Verify against the
 // official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test) after a new
 // release, then regenerate here (bootstrap prints and persists):
-//   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.js
+//   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
   "linux-x64-gnu": "c63372b82303d5c4a4b24b5123da105a27e326f478584d56e70949300e734bef",
   "linux-x64-musl": "15e26aa59bc6c828438ceb5b75a57c19d2659913a34731f91e9f39330d951a81",
@@ -100,14 +101,14 @@ const WASM_ASSETS = [
   "wasi-path-map.cjs",
   "wasi-worker.mjs",
 ];
-const wasmDestDir = path.join(__dirname, "..", "vendor", "rar5-wasm");
+const wasmDestDir = path.join(import.meta.dirname, "..", "vendor", "rar5-wasm");
 
 function devProject() {
   return process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "smart-archive-rar");
 }
 
-const destDir = path.join(__dirname, "..", "vendor", "rar5-bin");
-const cacheDir = path.join(__dirname, "..", ".cache", "rar5-platforms");
+const destDir = path.join(import.meta.dirname, "..", "vendor", "rar5-bin");
+const cacheDir = path.join(import.meta.dirname, "..", ".cache", "rar5-platforms");
 fs.mkdirSync(cacheDir, { recursive: true });
 
 function stageNode(nodeData, triple) {
@@ -197,7 +198,7 @@ async function stageWasmAssets(strict) {
       statuses.push("cached");
     } else if (result.status === "downloaded") {
       console.log("  downloaded + cached");
-      persistBootstrapHash(__filename, destPath, name);
+      persistBootstrapHash(import.meta.filename, destPath, name);
       statuses.push("downloaded");
     } else if (strict) {
       console.error("  FAILED");
@@ -286,7 +287,7 @@ async function releaseMode(strict) {
     }
     if (result.status === "downloaded") {
       console.log("  downloaded + cached");
-      persistBootstrapHash(__filename, job.destPath, job.triple);
+      persistBootstrapHash(import.meta.filename, job.destPath, job.triple);
       return "downloaded";
     }
     if (strict) {
@@ -347,15 +348,18 @@ async function main() {
 let releaseBase = "";
 let resolvedVersion = "";
 
-if (require.main === module) {
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
   main();
 }
 
-module.exports = {
+const getReleaseBase = () => releaseBase;
+
+export {
   REPO,
   PKG_VERSION_FALLBACK,
   resolveVersion,
-  getReleaseBase: () => releaseBase,
+  getReleaseBase,
   TRIPLES,
   WASM_ASSETS,
   EXPECTED_HASHES,

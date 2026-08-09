@@ -1,6 +1,6 @@
-const fs = require("fs");
-const path = require("path");
-const { execFileSync } = require("child_process");
+import fs from "fs";
+import path from "path";
+import { execFileSync } from "child_process";
 
 /**
  * Extract the first file ending with ".node" from a gzipped npm tarball (tgz).
@@ -153,10 +153,4 @@ function extractArchive(
   execFileSync(sz, ["x", "-y", `-o${destDir}`, archivePath], { stdio: "inherit" });
 }
 
-module.exports = {
-  extractNodeFromTgz,
-  extractFileFromTgz,
-  findFileInTree,
-  findHostSevenZip,
-  extractArchive,
-};
+export { extractNodeFromTgz, extractFileFromTgz, findFileInTree, findHostSevenZip, extractArchive };

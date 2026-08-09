@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
+import zlib from "zlib";
+import fs from "fs";
+import path from "path";
+import { httpGet, httpGetJson } from "./lib/http.mjs";
+import { extractNodeFromTgz, extractFileFromTgz } from "./lib/archive.mjs";
+import { downloadWithCache, countStatuses } from "./lib/download.mjs";
+import { persistBootstrapHash, sha256 } from "./lib/hash-pins.mjs";
+import { writeFileAtomic } from "./lib/fs.mjs";
 /**
  * Stage platform-specific snappy native binaries plus the official
  * wasm32-wasip1-threads WASI bundle for all desktop platforms so the
@@ -16,20 +25,12 @@
  * loader + wasm files are staged alongside the natives.
  *
  * To (re)generate hashes after a snappy version bump, run once:
- *   SA_HASH_BOOTSTRAP=1 node scripts/install-snappy-platforms.js
+ *   SA_HASH_BOOTSTRAP=1 node scripts/install-snappy-platforms.mjs
  * The script prints the new hashes and persists them into EXPECTED_HASHES.
  */
-const zlib = require("zlib");
-const fs = require("fs");
-const path = require("path");
-const { httpGet, httpGetJson } = require("./lib/http");
-const { extractNodeFromTgz, extractFileFromTgz } = require("./lib/archive");
-const { downloadWithCache, countStatuses } = require("./lib/download");
-const { persistBootstrapHash, sha256 } = require("./lib/hash-pins");
-const { writeFileAtomic } = require("./lib/fs");
 
 function getSnappyVersion() {
-  const pkgPath = path.join(__dirname, "..", "node_modules", "snappy", "package.json");
+  const pkgPath = path.join(import.meta.dirname, "..", "node_modules", "snappy", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
   return pkg.version;
 }
@@ -57,7 +58,7 @@ const WASM_ASSETS = ["snappy.wasi.cjs", "snappy.wasm32-wasi.wasm", "wasi-worker.
 // SHA-256 of each platform's .node binary, verified on download.
 // This map MUST be populated before release: with requireHash the build
 // refuses any binary lacking a pinned hash. To (re)generate after bump:
-//   SA_HASH_BOOTSTRAP=1 node scripts/install-snappy-platforms.js
+//   SA_HASH_BOOTSTRAP=1 node scripts/install-snappy-platforms.mjs
 const EXPECTED_HASHES = {
   "linux-x64-gnu": "42ac694666e35e21b96d09c374b89918acd7d95297d1adfd9d31edb4fb7a5ebb",
   "linux-x64-musl": "31eb00fd08d44f3379d51074159bae843ed94c84c2c83dc13612e3664627084e",
@@ -76,8 +77,8 @@ const EXPECTED_HASHES = {
   "wasi-worker.mjs": "4c6ba7435bce4ae8bcfd02e10fc6ae09a97b71ec5269fe828eb521b07ab67c0c",
 };
 
-const destDir = path.join(__dirname, "..", "node_modules", "snappy");
-const cacheDir = path.join(__dirname, "..", ".cache", "snappy-platforms");
+const destDir = path.join(import.meta.dirname, "..", "node_modules", "snappy");
+const cacheDir = path.join(import.meta.dirname, "..", ".cache", "snappy-platforms");
 
 fs.mkdirSync(destDir, { recursive: true });
 fs.mkdirSync(cacheDir, { recursive: true });
@@ -112,7 +113,7 @@ async function resolvePackage(pkg) {
   });
 
   if (result.status === "downloaded") {
-    persistBootstrapHash(__filename, destPath, pkg);
+    persistBootstrapHash(import.meta.filename, destPath, pkg);
   }
 
   return result;
@@ -153,7 +154,7 @@ async function stageWasmAssets() {
     }
     writeFileAtomic(destPath, data);
     console.log(`  staged ${name} -> node_modules/snappy/`);
-    if (bootstrapping) persistBootstrapHash(__filename, destPath, name);
+    if (bootstrapping) persistBootstrapHash(import.meta.filename, destPath, name);
     statuses.push("downloaded");
   }
 
@@ -212,16 +213,11 @@ async function main() {
   }
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);
   });
 }
 
-module.exports = {
-  PACKAGES,
-  WASM_ASSETS,
-  EXPECTED_HASHES,
-  getSnappyVersion,
-};
+export { PACKAGES, WASM_ASSETS, EXPECTED_HASHES, getSnappyVersion };

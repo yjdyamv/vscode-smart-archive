@@ -12,4 +12,4 @@ async function mapLimit(items, limit, fn) {
   return results;
 }
 
-module.exports = { mapLimit };
+export { mapLimit };

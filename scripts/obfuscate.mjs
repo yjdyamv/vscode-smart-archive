@@ -1,6 +1,6 @@
-const obfuscator = require("javascript-obfuscator");
-const fs = require("fs");
-const path = require("path");
+import obfuscator from "javascript-obfuscator";
+import fs from "fs";
+import path from "path";
 
 const BASE = {
   compact: true,

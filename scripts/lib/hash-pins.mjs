@@ -1,7 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
-const { writeFileAtomic } = require("./fs");
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { writeFileAtomic } from "./fs.mjs";
 
 function sha256(data) {
   return crypto.createHash("sha256").update(data).digest("hex");
@@ -90,9 +90,4 @@ function persistBootstrapHash(scriptPath, destPath, label) {
   return false;
 }
 
-module.exports = {
-  sha256,
-  checkHash,
-  updatePinnedHash,
-  persistBootstrapHash,
-};
+export { sha256, checkHash, updatePinnedHash, persistBootstrapHash };

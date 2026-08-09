@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { execFileSync } from "child_process";
+import path from "path";
 /**
  * Verify the download scripts with fresh downloads only.
  *
@@ -8,17 +10,15 @@
  * mode (SA_RAR5_REQUIRE=1). No manual cache cleanup needed.
  *
  * Usage:
- *   node scripts/verify-downloads.js              # all four installers
- *   node scripts/verify-downloads.js 7zz snappy   # only the named ones
+ *   node scripts/verify-downloads.mjs              # all four installers
+ *   node scripts/verify-downloads.mjs 7zz snappy   # only the named ones
  */
-const { execFileSync } = require("child_process");
-const path = require("path");
 
 const STEPS = [
-  ["7zz", "install-7zz-wasm.js", {}],
-  ["snappy", "install-snappy-platforms.js", {}],
-  ["7z", "install-7z-platforms.js", {}],
-  ["rar5", "install-rar5-platforms.js", { SA_RAR5_REQUIRE: "1" }],
+  ["7zz", "install-7zz-wasm.mjs", {}],
+  ["snappy", "install-snappy-platforms.mjs", {}],
+  ["7z", "install-7z-platforms.mjs", {}],
+  ["rar5", "install-rar5-platforms.mjs", { SA_RAR5_REQUIRE: "1" }],
 ];
 
 const args = process.argv.slice(2);
@@ -35,7 +35,7 @@ if (selected.length === 0) {
 for (const [name, file, extraEnv] of selected) {
   console.log(`\n=== verify ${name}: ${file} (fresh download) ===`);
   try {
-    execFileSync(process.execPath, [path.join(__dirname, file)], {
+    execFileSync(process.execPath, [path.join(import.meta.dirname, file)], {
       stdio: "inherit",
       env: { ...process.env, SA_FORCE_DOWNLOAD: "1", ...extraEnv },
     });

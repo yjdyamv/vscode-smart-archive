@@ -1,7 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-const { copyFileAtomic, writeFileAtomic } = require("./fs");
-const { sha256, checkHash } = require("./hash-pins");
+import fs from "fs";
+import path from "path";
+import { copyFileAtomic, writeFileAtomic } from "./fs.mjs";
+import { sha256, checkHash } from "./hash-pins.mjs";
 
 async function downloadWithCache({
   cacheDir,
@@ -91,7 +91,4 @@ function countStatuses(statuses) {
   };
 }
 
-module.exports = {
-  downloadWithCache,
-  countStatuses,
-};
+export { downloadWithCache, countStatuses };

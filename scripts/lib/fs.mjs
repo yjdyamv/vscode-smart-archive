@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+import fs from "fs";
+import path from "path";
 
 /**
  * Atomically replace a file (temp + rename). A previously staged binary may
@@ -26,7 +26,4 @@ function copyFileAtomic(srcPath, destPath) {
   writeFileAtomic(destPath, fs.readFileSync(srcPath));
 }
 
-module.exports = {
-  writeFileAtomic,
-  copyFileAtomic,
-};
+export { writeFileAtomic, copyFileAtomic };
