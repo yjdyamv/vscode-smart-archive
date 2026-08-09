@@ -19,8 +19,8 @@ import {
   walkFS,
   disposeJS7z,
 } from "./helpers";
-import type { FlatEntry } from "../src/providers/treeBuilder";
-import { buildTree } from "../src/providers/treeBuilder";
+import type { FlatEntry, TreeNode } from "../src/providers/treeBuilder";
+import { buildTreeRootOnly, getDirChildren } from "../src/providers/treeBuilder";
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
 import { parse7zListing } from "../src/utils/parse7z";
 import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
@@ -625,6 +625,22 @@ describe("parse7zListing", () => {
 });
 
 describe("markNoisyDirs", () => {
+  // Materialize a full tree the way production does: root-only build, then
+  // lazy getDirChildren expansion (the former full-tree builder is gone).
+  function buildFullTree(entries: FlatEntry[]): TreeNode[] {
+    const expand = (nodes: TreeNode[]): void => {
+      for (const n of nodes) {
+        if (n.kind !== "DIRECTORY") continue;
+        n.children = getDirChildren(n.path, entries);
+        n.hasMore = n.children.length > 0;
+        expand(n.children);
+      }
+    };
+    const root = buildTreeRootOnly(entries, "a.7z");
+    expand(root);
+    return root;
+  }
+
   it("collapses node_modules at root", () => {
     const entries: FlatEntry[] = [
       { path: "node_modules", size: 0, type: "DIRECTORY" },
@@ -632,7 +648,7 @@ describe("markNoisyDirs", () => {
       { path: "node_modules/express/index.js", size: 100, type: "REGULAR_FILE" },
       { path: "src/index.js", size: 42, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "a.7z");
+    const tree = buildFullTree(entries);
     markNoisyDirs(tree, ["node_modules", ".git"]);
     const nm = tree.find((n) => n.name === "node_modules");
     expect(nm).toBeTruthy();
@@ -651,7 +667,7 @@ describe("markNoisyDirs", () => {
       { path: "project/.git", size: 0, type: "DIRECTORY" },
       { path: "project/.git/HEAD", size: 5, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "a.7z");
+    const tree = buildFullTree(entries);
     markNoisyDirs(tree, ["node_modules", ".git"]);
     const project = tree.find((n) => n.name === "project");
     expect(project!.collapsed).toBeUndefined();
@@ -670,7 +686,7 @@ describe("markNoisyDirs", () => {
       { path: "node_modules/express/lib", size: 0, type: "DIRECTORY" },
       { path: "node_modules/express/lib/app.js", size: 50, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "a.7z");
+    const tree = buildFullTree(entries);
     markNoisyDirs(tree, ["node_modules"]);
     const nm = tree[0];
     expect(nm.collapsed).toBe(true);
@@ -684,7 +700,7 @@ describe("markNoisyDirs", () => {
     const entries: FlatEntry[] = [
       { path: "node_modules/lib.js", size: 10, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "a.7z");
+    const tree = buildFullTree(entries);
     markNoisyDirs(tree, []);
     expect(tree[0].collapsed).toBeUndefined();
   });
@@ -696,7 +712,7 @@ describe("markNoisyDirs", () => {
       { path: "logs/info.log", size: 15, type: "REGULAR_FILE" },
       { path: "src/main.ts", size: 30, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "a.7z");
+    const tree = buildFullTree(entries);
     markNoisyDirs(tree, ["*.log"]);
     const logs = tree.find((n) => n.name === "logs");
     expect(logs!.collapsed).toBeUndefined();
@@ -710,7 +726,7 @@ describe("markNoisyDirs", () => {
       { path: ".vscode/settings.json", size: 8, type: "REGULAR_FILE" },
       { path: "src/app.ts", size: 12, type: "REGULAR_FILE" },
     ];
-    const tree = buildTree(entries, "a.7z");
+    const tree = buildFullTree(entries);
     markNoisyDirs(tree, [".npm", ".vscode"]);
     expect(tree.find((n) => n.name === ".npm")!.collapsed).toBe(true);
     expect(tree.find((n) => n.name === ".vscode")!.collapsed).toBe(true);
