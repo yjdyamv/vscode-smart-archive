@@ -12,6 +12,7 @@ import {
   compressWithSystem7z,
   decompressWithSystem7z,
   detectSystem7z,
+  extractSelectedWithSystem7z,
   listWithSystem7z,
   resetDetectionCache,
   spawnCapture,
@@ -410,6 +411,28 @@ describe("system 7-Zip", () => {
         password: "wrong",
       }),
     ).rejects.toThrow();
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("system7z", "selective extraction extracts only selected entries", async () => {
+    const tdir = tmpDir("sat_sz_sel_");
+    const srcA = path.join(tdir, "a.txt");
+    const srcB = path.join(tdir, "b.txt");
+    fs.writeFileSync(srcA, "A");
+    fs.writeFileSync(srcB, "B");
+    const archive = path.join(tdir, "sel.7z");
+
+    const r = spawnSync(sz!, ["a", "-t7z", archive, srcA, srcB], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(r.status).toBe(0);
+
+    const outDir = path.join(tdir, "out");
+    await extractSelectedWithSystem7z(archive, ["a.txt"], undefined, false, outDir, undefined);
+    expect(fs.readFileSync(path.join(outDir, "a.txt"), "utf8")).toBe("A");
+    expect(fs.existsSync(path.join(outDir, "b.txt"))).toBe(false);
 
     fs.rmSync(tdir, { recursive: true, force: true });
   });
