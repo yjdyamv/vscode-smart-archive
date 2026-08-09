@@ -3,41 +3,36 @@
     class="flex items-center gap-2 px-3 py-1 text-[0.85em] text-[var(--vscode-descriptionForeground)] bg-[var(--vscode-statusBar-background,var(--vscode-sideBarSectionHeader-background))] border-t border-[var(--vscode-sideBarSectionHeader-border)] flex-shrink-0"
   >
     <div class="flex items-center gap-1.5">
-      <button
-        v-if="isSplit"
-        class="btn"
-        title="Merge split volumes into a single archive"
-        @click="$emit('merge')"
-      >
-        <span class="codicon codicon-merge"></span> Merge
+      <button v-if="isSplit" class="btn" :title="ui('ui.mergeTitle')" @click="$emit('merge')">
+        <span class="codicon codicon-merge"></span> {{ ui("ui.merge") }}
       </button>
       <button
         v-if="canSplit && !isSplit"
         class="btn"
-        title="Split into volumes"
+        :title="ui('ui.splitTitle')"
         @click="$emit('split')"
       >
-        <span class="codicon codicon-split-horizontal"></span> Split
+        <span class="codicon codicon-split-horizontal"></span> {{ ui("ui.split") }}
       </button>
       <template v-if="canEncrypt">
         <button
           v-if="isEncrypted"
           class="btn"
-          title="Remove encryption and re-pack"
+          :title="ui('ui.decryptTitle')"
           @click="$emit('decrypt')"
         >
-          <span class="codicon codicon-unlock"></span> Decrypt
+          <span class="codicon codicon-unlock"></span> {{ ui("ui.decrypt") }}
         </button>
         <button
           v-if="!isEncrypted"
           class="btn"
-          title="Add encryption to this archive"
+          :title="ui('ui.encryptTitle')"
           @click="$emit('encrypt')"
         >
-          <span class="codicon codicon-lock"></span> Encrypt
+          <span class="codicon codicon-lock"></span> {{ ui("ui.encrypt") }}
         </button>
       </template>
-      <button class="btn-ico" title="Test Archive Integrity" @click="$emit('test')">
+      <button class="btn-ico" :title="ui('ui.testTitle')" @click="$emit('test')">
         <span class="codicon codicon-verified"></span>
       </button>
     </div>
@@ -47,17 +42,17 @@
       <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
       {{ format }}
       <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
-      Items:
+      {{ ui("ui.itemsLabel") }}
       <b>{{ count }}</b>
       <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
-      Files: <b>{{ files }}</b>
+      {{ ui("ui.filesLabel") }} <b>{{ files }}</b>
       <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
-      Dirs: <b>{{ dirs }}</b>
+      {{ ui("ui.dirsLabel") }} <b>{{ dirs }}</b>
       <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
-      Size:
+      {{ ui("ui.sizeLabel") }}
       <b class="text-[var(--vscode-foreground)]">{{ size }}</b>
       <span class="meta-div text-[var(--vscode-descriptionForeground)] opacity-50 mx-0.5">|</span>
-      Ratio:
+      {{ ui("ui.ratioLabel") }}
       <b class="text-[var(--vscode-foreground)]">{{
         ratio === 0 ? "—" : (ratio * 100).toFixed(2) + "%"
       }}</b>
@@ -66,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { ui } from "../composables/useUi";
 defineProps<{
   name: string;
   format: string;

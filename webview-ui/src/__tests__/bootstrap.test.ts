@@ -47,6 +47,7 @@ describe("loadInitialState", () => {
     setTag("_xCanEncrypt", "true");
     setTag("_xDescCounts", JSON.stringify({ a: { files: 2, dirs: 0, size: 10 } }));
     setTag("_xExpanded", JSON.stringify(["a"]));
+    setTag("_xStrings", JSON.stringify({ "ui.extract": "提取", "ui.merge": "合并" }));
 
     const s = loadInitialState();
     expect(s.viewState).toBe("content");
@@ -62,6 +63,8 @@ describe("loadInitialState", () => {
     expect(s.canEncrypt).toBe(true);
     expect(s.descCounts.a.size).toBe(10);
     expect(s.expanded).toEqual(["a"]);
+    expect(s.ui["ui.extract"]).toBe("提取");
+    expect(s.ui["ui.merge"]).toBe("合并");
   });
 
   it("parses the password view state", () => {
@@ -88,6 +91,7 @@ describe("loadInitialState", () => {
     expect(s.canEncrypt).toBe(false);
     expect(s.descCounts).toEqual({});
     expect(s.expanded).toEqual([]);
+    expect(s.ui).toEqual({});
   });
 
   it("falls back on malformed JSON", () => {

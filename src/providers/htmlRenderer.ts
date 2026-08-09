@@ -8,6 +8,64 @@
  */
 
 import type { TreeNode } from "./treeBuilder";
+import { t } from "../i18n";
+
+/** Every user-visible string the webview chrome needs, keyed for injection. */
+const UI_STRING_KEYS = [
+  "ui.extract",
+  "ui.delete",
+  "ui.addFiles",
+  "ui.addTo",
+  "ui.archiveRoot",
+  "ui.extractAll",
+  "ui.convert",
+  "ui.expandAll",
+  "ui.collapseAll",
+  "ui.selFiles",
+  "ui.selDirs",
+  "ui.name",
+  "ui.size",
+  "ui.filter",
+  "ui.regex",
+  "ui.fuzzySearch",
+  "ui.useRegex",
+  "ui.merge",
+  "ui.mergeTitle",
+  "ui.split",
+  "ui.splitTitle",
+  "ui.decrypt",
+  "ui.decryptTitle",
+  "ui.encrypt",
+  "ui.encryptTitle",
+  "ui.testTitle",
+  "ui.itemsLabel",
+  "ui.filesLabel",
+  "ui.dirsLabel",
+  "ui.sizeLabel",
+  "ui.ratioLabel",
+  "ui.encryptedHint",
+  "ui.password",
+  "ui.unlock",
+  "ui.wrongPassword",
+  "ui.select",
+  "ui.collapse",
+  "ui.expand",
+  "ui.readingArchive",
+  "ui.failedToInit",
+  "ui.noMatchingFiles",
+  "ui.noMatchingHint",
+  "ui.noFiles",
+  "ui.match",
+  "ui.matches",
+  "ui.archive",
+] as const;
+
+/** Resolve the webview string blob from the host locale (single source). */
+export function webviewUiStrings(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of UI_STRING_KEYS) out[key] = t(key);
+  return out;
+}
 
 function esc(s: string): string {
   return s
@@ -80,7 +138,7 @@ ${codiconCssUri ? cssLink(codiconCssUri) : ""}
   @keyframes sp{to{transform:rotate(360deg)}}
   .msg{display:flex;align-items:center;color:var(--vscode-descriptionForeground)}
 </style></head>
-<body><div class="msg"><div class="sp"></div>Reading archive...</div></body></html>`;
+<body><div class="msg"><div class="sp"></div>${t("ui.readingArchive")}</div></body></html>`;
 }
 
 export function contentHtml(
@@ -110,6 +168,7 @@ ${cssLink(cssUri)}
 <script type="application/json" id="_xDirs">${dirCount}</script>
 <script type="application/json" id="_xProps">${escapeJsonForScript(JSON.stringify(props ?? null))}</script>
 <script type="application/json" id="_xNoisy">${escapeJsonForScript(JSON.stringify(noisyPatterns ?? []))}</script>
+<script type="application/json" id="_xStrings">${escapeJsonForScript(JSON.stringify(webviewUiStrings()))}</script>
 ${toast ? `<script type="application/json" id="_xToast">${escapeJsonForScript(JSON.stringify(toast))}</script>` : ""}
 ${viewState ? `<script type="application/json" id="_xViewState">${escapeJsonForScript(JSON.stringify(viewState))}</script>` : ""}
 ${jsModule(jsUri, n)}
