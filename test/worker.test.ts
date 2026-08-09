@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import type { HostMessage, WorkerMessage } from "../src/engines/worker/types";
-import { createArchiveWorkerHandler } from "../src/engines/worker/handler";
+import { createArchiveWorkerHandler, serializeWorkerError } from "../src/engines/worker/handler";
 import { verifyArchiveContents } from "./verify";
 import { tmpDir } from "./tmp";
 
@@ -185,6 +185,23 @@ describe("createArchiveWorkerHandler", () => {
     });
     await done;
     expect(port.ofType("progress").length).toBeGreaterThan(0);
+  });
+
+  it("serializes non-Error throws with their fields instead of [object Object]", () => {
+    expect(serializeWorkerError({ name: "ErrnoError", errno: 44 })).toEqual({
+      message: "ErrnoError: errno=44",
+      name: "ErrnoError",
+    });
+    expect(serializeWorkerError({ errno: 5 })).toEqual({ message: "errno=5", name: undefined });
+    expect(serializeWorkerError({ message: "boom" })).toEqual({
+      message: "boom",
+      name: undefined,
+    });
+    expect(serializeWorkerError("plain string")).toEqual({ message: "plain string" });
+    expect(serializeWorkerError(new Error("real"))).toEqual({
+      message: "real",
+      name: "Error",
+    });
   });
 
   it("reports cancelled error when a request is cancelled mid-flight", async () => {
