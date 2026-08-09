@@ -135,7 +135,11 @@ async function decompressSingleFile(
       try {
         fs.mkdirSync(outputDir, { recursive: true });
         progress.report({ message: t("archive.extracting") });
-        await decompressWith7z({ inputPath, outputDir, password }, progress, token);
+        await decompressWith7z(
+          { inputPath, outputDir, password, allowOversize: true },
+          progress,
+          token,
+        );
         const elapsed = formatDuration(Date.now() - startTime);
         vscode.window.showInformationMessage(
           t("decompress.done") + outputDir + t("time.elapsed", elapsed),

@@ -52,7 +52,7 @@ async function decompressCodecWrapper(
   codecDecompress: (input: string, tmpTar: string) => Promise<void>,
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
-  checkArchiveInputSize(options.inputPath);
+  if (!options.allowOversize) checkArchiveInputSize(options.inputPath);
   prog.report({ message: t("decompress.unwrapTar") });
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), tmpPrefix));
   const tmpTar = path.join(tmpDir, path.basename(options.inputPath, ext) + ".tar");
@@ -146,7 +146,7 @@ export async function decompressWith7z(
   const js7z = await JS7z();
 
   try {
-    checkArchiveInputSize(options.inputPath);
+    if (!options.allowOversize) checkArchiveInputSize(options.inputPath);
     const archiveFsPath = streamToVFS(js7z, options.inputPath);
 
     // Extract into in-memory OUTPUT_DIR, then copy out via copyDirFromFS so the
