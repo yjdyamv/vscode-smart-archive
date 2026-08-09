@@ -26,6 +26,7 @@ export interface InitialState {
   canEncrypt: boolean;
   descCounts: Record<string, DescCount>;
   expanded: string[];
+  ui: Record<string, string>;
 }
 
 function readJson<T>(id: string): T | null {
@@ -53,5 +54,6 @@ export function loadInitialState(): InitialState {
     canEncrypt: !!readJson<boolean>("_xCanEncrypt"),
     descCounts: readJson<Record<string, DescCount>>("_xDescCounts") ?? {},
     expanded: readJson<string[]>("_xExpanded") ?? [],
+    ui: readJson<Record<string, string>>("_xStrings") ?? {},
   };
 }

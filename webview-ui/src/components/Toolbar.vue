@@ -4,35 +4,35 @@
   >
     <div class="flex flex-wrap items-center gap-1">
       <button class="btn" :disabled="selectedCount === 0" @click="$emit('extract-selected')">
-        <span class="codicon codicon-arrow-down"></span> Extract
+        <span class="codicon codicon-arrow-down"></span> {{ ui("ui.extract") }}
       </button>
       <button
         class="btn"
         :disabled="readOnly || selectedCount === 0"
         @click="$emit('delete-selected')"
       >
-        <span class="codicon codicon-trash"></span> Delete
+        <span class="codicon codicon-trash"></span> {{ ui("ui.delete") }}
       </button>
       <button
         class="btn"
         :disabled="readOnly"
         @click="$emit('add-files')"
-        :title="'Add to ' + (lastAddDir || 'archive root')"
+        :title="ui('ui.addTo') + (lastAddDir || ui('ui.archiveRoot'))"
       >
-        <span class="codicon codicon-add"></span> Add Files
+        <span class="codicon codicon-add"></span> {{ ui("ui.addFiles") }}
       </button>
       <span class="sep"></span>
       <button class="btn" @click="$emit('extract-all')">
-        <span class="codicon codicon-desktop-download"></span> Extract All
+        <span class="codicon codicon-desktop-download"></span> {{ ui("ui.extractAll") }}
       </button>
       <button class="btn" @click="$emit('convert')">
-        <span class="codicon codicon-arrow-swap"></span> Convert
+        <span class="codicon codicon-arrow-swap"></span> {{ ui("ui.convert") }}
       </button>
       <span class="sep"></span>
-      <button class="btn-ico" title="Expand All" @click="$emit('expand-all')">
+      <button class="btn-ico" :title="ui('ui.expandAll')" @click="$emit('expand-all')">
         <span class="codicon codicon-expand-all"></span>
       </button>
-      <button class="btn-ico" title="Collapse All" @click="$emit('collapse-all')">
+      <button class="btn-ico" :title="ui('ui.collapseAll')" @click="$emit('collapse-all')">
         <span class="codicon codicon-collapse-all"></span>
       </button>
     </div>
@@ -40,19 +40,23 @@
       <span
         class="sel-count text-sa-sm text-[var(--vscode-descriptionForeground)] whitespace-nowrap"
       >
-        <b class="text-[var(--vscode-foreground)]">{{ selectedFiles }}/{{ totalFiles }}</b> files
-        <b class="ml-2 text-[var(--vscode-foreground)]">{{ selectedDirs }}/{{ totalDirs }}</b> dirs
+        <b class="text-[var(--vscode-foreground)]">{{ selectedFiles }}/{{ totalFiles }}</b>
+        {{ ui("ui.selFiles") }}
+        <b class="ml-2 text-[var(--vscode-foreground)]">{{ selectedDirs }}/{{ totalDirs }}</b>
+        {{ ui("ui.selDirs") }}
       </span>
       <span class="sep"></span>
       <span class="sort-lbl" :class="{ on: sortKey === 'name' }" @click="$emit('sort', 'name')"
-        >Name<span
+        >{{ ui("ui.name")
+        }}<span
           v-if="sortKey === 'name'"
           class="codicon ml-1"
           :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"
         ></span
       ></span>
       <span class="sort-lbl" :class="{ on: sortKey === 'size' }" @click="$emit('sort', 'size')"
-        >Size<span
+        >{{ ui("ui.size")
+        }}<span
           v-if="sortKey === 'size'"
           class="codicon ml-1"
           :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"
@@ -64,7 +68,7 @@
         :title="regexError || ''"
         type="text"
         :value="searchQuery"
-        :placeholder="isRegex ? 'Regex…' : 'Filter…'"
+        :placeholder="ui(isRegex ? 'ui.regex' : 'ui.filter')"
         @input="$emit('search', ($event.target as HTMLInputElement).value)"
       />
       <button
@@ -74,7 +78,7 @@
             ? 'text-[var(--vscode-focusBorder,#007acc)] bg-[var(--vscode-toolbar-hoverBackground)]'
             : '',
         ]"
-        :title="isRegex ? 'Switch to fuzzy search' : 'Use regular expression'"
+        :title="ui(isRegex ? 'ui.fuzzySearch' : 'ui.useRegex')"
         @click="$emit('toggle-regex')"
       >
         <span class="codicon codicon-regex"></span>
@@ -82,13 +86,15 @@
       <span
         v-if="searchQuery && (searchMatchCount ?? 0) > 0"
         class="search-match text-sa-2xs text-[var(--vscode-descriptionForeground)] whitespace-nowrap"
-        >{{ searchMatchCount }} match{{ (searchMatchCount ?? 0) > 1 ? "es" : "" }}</span
+        >{{ searchMatchCount }}
+        {{ (searchMatchCount ?? 0) > 1 ? ui("ui.matches") : ui("ui.match") }}</span
       >
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ui } from "../composables/useUi";
 defineProps<{
   selectedCount: number;
   selectedFiles: number;

@@ -9,6 +9,7 @@ import { useSort, type SortKey } from "./composables/useSort";
 import { useSearch } from "./composables/useSearch";
 import { useTreeFlatten } from "./composables/useTree";
 import { useArchiveView } from "./composables/useArchiveView";
+import { ui } from "./composables/useUi";
 import LoadingSpinner from "./components/LoadingSpinner.vue";
 import PasswordBox from "./components/PasswordBox.vue";
 import Toolbar from "./components/Toolbar.vue";
@@ -26,7 +27,7 @@ const treeData = ref<TreeNodeData[]>([]);
 const archiveProps = ref<ArchiveProps | null>(null);
 const totalFiles = ref(0);
 const totalDirs = ref(0);
-const loadingMsg = ref("Reading archive...");
+const loadingMsg = ref(ui("ui.readingArchive"));
 const readOnly = ref(false);
 const isSplit = ref(false);
 const canSplit = ref(false);
@@ -153,10 +154,7 @@ onMounted(() => {
     }
   } catch (err) {
     viewState.value = "empty";
-    av.showToast(
-      "Failed to initialize archive view: " + (err instanceof Error ? err.message : String(err)),
-      false,
-    );
+    av.showToast(ui("ui.failedToInit") + (err instanceof Error ? err.message : String(err)), false);
   }
 
   document.addEventListener("keydown", av.handleKeyboard);
@@ -177,14 +175,14 @@ const emptyState = computed(() => {
   if (search.query.value.trim()) {
     return {
       icon: "codicon-search",
-      title: "No matching files",
-      hint: "Try adjusting your search terms or clear the query",
+      title: ui("ui.noMatchingFiles"),
+      hint: ui("ui.noMatchingHint"),
     };
   }
   return {
     icon: "codicon-archive",
-    title: archiveProps.value?.name ?? "Archive",
-    hint: "No files to display",
+    title: archiveProps.value?.name ?? ui("ui.archive"),
+    hint: ui("ui.noFiles"),
   };
 });
 </script>

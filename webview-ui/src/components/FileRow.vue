@@ -4,6 +4,7 @@ import type { FlatNode } from "../types";
 import { getFileIcon, formatSize } from "../utils/icons";
 import { INDENT_PX } from "../constants";
 import { segmentHighlight } from "../composables/useSearch";
+import { ui } from "../composables/useUi";
 import type { DescCount } from "../bootstrap";
 
 const props = defineProps<{
@@ -92,7 +93,7 @@ function onExpandClick(e: MouseEvent) {
       @click="onCheckClick"
       role="checkbox"
       :aria-checked="selected || undefined"
-      :aria-label="'Select ' + node.name"
+      :aria-label="ui('ui.select') + node.name"
     >
       <span class="checkmark" :class="{ on: selected }"></span>
     </span>
@@ -100,7 +101,7 @@ function onExpandClick(e: MouseEvent) {
       class="arrow"
       :class="{ rot: flatNode.expanded, empty: isDir && !flatNode.hasChildren }"
       role="button"
-      :aria-label="flatNode.expanded ? 'Collapse ' + node.name : 'Expand ' + node.name"
+      :aria-label="(flatNode.expanded ? ui('ui.collapse') : ui('ui.expand')) + node.name"
       :tabindex="isDir && flatNode.hasChildren ? 0 : -1"
       @click="isDir ? onExpandClick($event) : undefined"
     >
