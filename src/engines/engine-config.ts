@@ -31,8 +31,8 @@ import { setModifyConfig } from "./modify-core";
 import { setWorkerMemoryLimitMb } from "./worker/memory-guard";
 import {
   DEFAULT_COMPRESSION_LEVEL,
-  DEFAULT_MAX_FILE_SIZE,
-  DEFAULT_MAX_TOTAL_SIZE,
+  DEFAULT_MAX_ARCHIVE_SIZE,
+  DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
   WORKER_MEMORY_LIMIT_DEFAULT_MB,
 } from "../constants";
 
@@ -42,8 +42,8 @@ import {
 export const DEFAULT_ENGINE_CONFIG: Required<EngineConfig> = {
   locale: "en",
   limits: {
-    maxFileSize: DEFAULT_MAX_FILE_SIZE,
-    maxTotalSize: DEFAULT_MAX_TOTAL_SIZE,
+    maxArchiveSize: DEFAULT_MAX_ARCHIVE_SIZE,
+    maxExtractTotalSize: DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
   },
   useSystemZstd: "auto",
   brotliBackend: "node",

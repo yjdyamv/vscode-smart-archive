@@ -13,7 +13,7 @@ import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { getBaseName } from "../utils/path";
 import { t } from "../i18n";
-import { checkFileSize } from "../utils/security";
+import { checkArchiveSize } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { checkWorkerMemory } from "./worker/memory-guard";
 import { VFS_CHUNK, MEMORY_CHECK_EVERY_CHUNKS } from "../constants";
@@ -192,9 +192,9 @@ export function checkArchiveInputSize(filePath: string): void {
   const totalSplit = calcSplitVolumeTotalSize(filePath);
   if (totalSplit > 0) {
     logger.info({ event: "vfsio.checkArchiveInputSize", totalBytes: totalSplit, filePath });
-    checkFileSize(totalSplit);
+    checkArchiveSize(totalSplit);
   } else {
-    checkFileSize(fs.statSync(filePath).size);
+    checkArchiveSize(fs.statSync(filePath).size);
   }
 }
 

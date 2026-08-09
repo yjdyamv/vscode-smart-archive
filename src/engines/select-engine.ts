@@ -111,10 +111,13 @@ export function selectEngine(request: SelectEngineRequest): EngineSelection {
       return selectModifyEngine(ext);
 
     case "createFolder":
-      // No system-7z fast path for folder creation — WASM in the worker.
+      // 7-Zip has no mkdir command, but adding a temp folder with a
+      // .smartarchive marker via `7z a` works for non-wrapped formats.
       return isRarExt(ext)
         ? { engine: "rarRebuild", reason: "rar-format" }
-        : { engine: "worker", reason: "no-system7z-path" };
+        : !isWrappedFormat(ext) && hasSystem7zForFormat(ext)
+          ? { engine: "system7z", reason: "system7z-available" }
+          : { engine: "worker", reason: "wrapped-or-no-system7z" };
 
     case "preview":
       // Best-effort fast path: caller tries system 7z and falls back to the

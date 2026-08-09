@@ -13,7 +13,7 @@ import * as fs from "fs";
 import { disposeJS7z } from "./js7z-helpers";
 import { streamToVFS } from "./vfs-io";
 import { getBaseName } from "../utils/path";
-import { checkFileSize, validatePassword } from "../utils/security";
+import { checkArchiveSize, validatePassword } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
 import { JS7z } from "./js7z-factory";
@@ -47,7 +47,7 @@ export async function listFilesWasm(
       js7z.FS.writeFile(`/${archiveName}`, data);
       archiveFsPath = `/${archiveName}`;
     } else {
-      checkFileSize(fs.statSync(filePath).size);
+      checkArchiveSize(fs.statSync(filePath).size);
       archiveFsPath = streamToVFS(js7z, filePath);
     }
 
@@ -74,7 +74,7 @@ export async function listFilesWasm(
 }
 
 export async function isEncryptedWasm(filePath: string): Promise<boolean> {
-  checkFileSize(fs.statSync(filePath).size);
+  checkArchiveSize(fs.statSync(filePath).size);
   let stdout = "",
     stderr = "";
   const js7z = await JS7z({

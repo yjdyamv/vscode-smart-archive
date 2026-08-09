@@ -14,7 +14,6 @@ import * as os from "os";
 import * as path from "path";
 import { spawn } from "child_process";
 import type { ProgressLike } from "../utils/cancellation";
-import { checkFileSize } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { bundled7zPath } from "./bundled7z";
 
@@ -211,7 +210,6 @@ export async function nativeDecompress(
   data: Uint8Array,
   codec: NativeCodec,
 ): Promise<Buffer | null> {
-  checkFileSize(data.byteLength);
   if (!native7zz()) return null;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7nzd_"));
   const input = path.join(tmpDir, `archive.${codec}`);
@@ -219,9 +217,7 @@ export async function nativeDecompress(
   try {
     fs.writeFileSync(input, Buffer.from(data));
     if (!(await nativeDecompressFile(input, output, codec))) return null;
-    const result = fs.readFileSync(output);
-    checkFileSize(result.byteLength);
-    return result;
+    return fs.readFileSync(output);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

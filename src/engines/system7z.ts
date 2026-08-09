@@ -23,7 +23,7 @@ import * as path from "path";
 import * as os from "os";
 import { spawn, spawnSync } from "child_process";
 import * as vscode from "vscode";
-import type { TokenLike, ProgressLike } from "../utils/cancellation";
+import { CancelledError, type TokenLike, type ProgressLike } from "../utils/cancellation";
 import * as iconv from "iconv-lite";
 import type { CompressOptions, DecompressOptions, SevenZipMethod } from "../types";
 import {
@@ -34,7 +34,7 @@ import {
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
-import { validatePassword, checkFileSize, sanitizeCliPath } from "../utils/security";
+import { validatePassword, sanitizeCliPath } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { withStage } from "../utils/progress-scale";
 import { getBaseName } from "../utils/path";
@@ -44,11 +44,14 @@ import {
   CHILD_CAPTURE_MAX_BYTES,
   SPAWN_CAPTURE_TIMEOUT,
   getFullExt,
+  TAR_INNER_PATTERNS,
+  UNWRAP_MAX_DEPTH,
+  UNWRAP_MAX_TAR_FILES,
 } from "../constants";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
 import type { ExclusionSet } from "../utils/exclude";
-import { checkArchiveInputSize, calcSplitVolumeTotalSize } from "./vfs-io";
+import { calcSplitVolumeTotalSize } from "./vfs-io";
 import { checkTotalSize } from "../utils/security";
 import { createTarFile } from "./tar-writer";
 import { isRarExt } from "../utils/rar";
@@ -961,7 +964,12 @@ function verifyStagingDir(stagingDir: string): void {
  * A genuine listing failure (e.g. wrong password) is tolerated: the subsequent
  * extraction will surface that error itself.
  */
-async function preflightSystem7z(sz: string, inputPath: string, password: string): Promise<void> {
+async function preflightSystem7z(
+  sz: string,
+  inputPath: string,
+  password: string,
+  enforceTotalSize = true,
+): Promise<void> {
   const args: string[] = ["l", "-slt"];
   args.push("--", inputPath);
 
@@ -990,11 +998,13 @@ async function preflightSystem7z(sz: string, inputPath: string, password: string
   // /^Size = / does not match "Packed Size =", "Physical Size =" or "Headers
   // Size =". checkTotalSize throws — aborting extraction — the moment the
   // running total exceeds the limit, so we stop early on a bomb.
-  let total = 0;
-  const sizeRe = /^Size = (\d+)/gm;
-  let m: RegExpExecArray | null;
-  while ((m = sizeRe.exec(stdout)) !== null) {
-    total = checkTotalSize(total, parseInt(m[1], 10) || 0);
+  if (enforceTotalSize) {
+    let total = 0;
+    const sizeRe = /^Size = (\d+)/gm;
+    let m: RegExpExecArray | null;
+    while ((m = sizeRe.exec(stdout)) !== null) {
+      total = checkTotalSize(total, parseInt(m[1], 10) || 0);
+    }
   }
 }
 
@@ -1007,7 +1017,6 @@ export async function decompressWithSystem7z(
   const sz = system7zForExt(getFullExt(options.inputPath));
   if (!sz) throw new Error("System 7-Zip not available");
 
-  checkArchiveInputSize(options.inputPath);
   await preflightSystem7z(sz, options.inputPath, options.password ?? "");
 
   // Stage on the SAME filesystem as the output dir so the post-extraction move
@@ -1054,6 +1063,150 @@ export async function decompressWithSystem7z(
   } catch {}
 }
 
+/**
+ * System 7-Zip selective extraction (webview "Extract Selected" / copy-paste).
+ * Streams from disk, so large archives (notably RAR) do not need to be loaded
+ * into WASM memory. Non-wrapped formats only; wrapped formats keep the WASM path.
+ */
+export async function extractSelectedWithSystem7z(
+  archivePath: string,
+  selectedPaths: string[],
+  password: string | undefined,
+  flat: boolean | undefined,
+  outputDir: string,
+  excludes: string[] | undefined,
+  progress?: ProgressLike,
+  token?: TokenLike,
+): Promise<void> {
+  const sz = system7zForExt(getFullExt(archivePath));
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  // Symlink entries are refused before extraction (path-traversal write-through
+  // happens DURING extraction). Total-size enforcement is skipped here because
+  // only the selected entries are extracted, not the whole archive.
+  await preflightSystem7z(sz, archivePath, password ?? "", false);
+
+  // Stage on the SAME filesystem as the output dir so the post-extraction move
+  // is an atomic same-device rename.
+  const stagingParent = path.dirname(path.resolve(outputDir));
+  fs.mkdirSync(stagingParent, { recursive: true });
+  const stagingDir = fs.mkdtempSync(path.join(stagingParent, ".sa7zs_"));
+
+  const args: string[] = [flat ? "e" : "x", archivePath, `-o${stagingDir}`];
+  if (flat) args.push("-aou");
+  else args.push("-y");
+  for (const ex of excludes ?? []) {
+    args.push("-xr!" + ex.replace(/\\/g, "/"));
+  }
+  args.push("--");
+  for (const p of selectedPaths) {
+    args.push(sanitizeCliPath(p.replace(/\\/g, "/")));
+  }
+
+  logger.info({
+    event: "system7z.selective.start",
+    input: archivePath,
+    output: outputDir,
+    staging: stagingDir,
+    pathCount: selectedPaths.length,
+    flat: !!flat,
+    argsPreview: maskArgs(args),
+  });
+
+  try {
+    // No -p switch: 7z prompts for the password and run7z feeds it via stdin.
+    await run7z(sz, args, progress, token, undefined, password);
+    verifyStagingDir(stagingDir);
+    moveMerge(stagingDir, outputDir);
+    logger.info({ event: "system7z.selective.ok", output: outputDir });
+  } catch (err) {
+    logger.error(
+      { event: "system7z.selective.failed", err },
+      "System 7z selective extraction failed",
+    );
+    if (fs.existsSync(stagingDir)) {
+      try {
+        fs.rmSync(stagingDir, { recursive: true, force: true });
+      } catch {}
+    }
+    throw err;
+  }
+
+  try {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+  } catch {}
+}
+
+/**
+ * Unwrap inner .tar files after a system-7z extraction using 7-Zip itself,
+ * instead of loading each tar into the WASM worker. Mirrors the worker's
+ * depth/count limits and keeps the symlink + total-size guards.
+ */
+export async function unwrapInnerTarsWithSystem7z(
+  outputDir: string,
+  progress?: ProgressLike,
+  token?: TokenLike,
+): Promise<void> {
+  const sz = system7zForExt(".tar");
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
+  if (entries.length === 0) return;
+
+  let depth = 0;
+  let tarCount = 0;
+  let totalSize = 0;
+
+  while (depth < UNWRAP_MAX_DEPTH) {
+    depth++;
+    const tarFiles = entries.filter((e) => TAR_INNER_PATTERNS.some((ext) => e.endsWith(ext)));
+    if (tarFiles.length === 0) break;
+
+    for (const tarFile of tarFiles) {
+      if (token?.isCancellationRequested) throw new CancelledError();
+      tarCount++;
+      if (tarCount > UNWRAP_MAX_TAR_FILES) {
+        logger.warn(
+          { event: "system7z.unwrap.tooManyTars", tarCount, maxTarFiles: UNWRAP_MAX_TAR_FILES },
+          "Too many inner tar files, stopping unwrap",
+        );
+        return;
+      }
+
+      const tarPath = path.join(outputDir, tarFile);
+      progress?.report({ message: t("decompress.unwrapTar") });
+
+      await preflightSystem7z(sz, tarPath, "", false);
+      const stagingDir = fs.mkdtempSync(path.join(outputDir, ".sa7zu_"));
+      try {
+        await run7z(sz, ["x", tarPath, `-o${stagingDir}`, "-y"], progress, token);
+        verifyStagingDir(stagingDir);
+        let tarTotal = 0;
+        for (const item of walkDir(stagingDir)) {
+          if (!item.symlink) tarTotal += fs.statSync(item.path).size;
+        }
+        totalSize = checkTotalSize(totalSize, tarTotal);
+        moveMerge(stagingDir, outputDir);
+      } finally {
+        try {
+          fs.rmSync(stagingDir, { recursive: true, force: true });
+        } catch {}
+      }
+
+      try {
+        fs.unlinkSync(tarPath);
+      } catch (err) {
+        logger.warn(
+          { event: "system7z.unwrap.unlinkFailed", path: tarPath, err },
+          "Failed to remove intermediate tar archive",
+        );
+      }
+    }
+
+    entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
+  }
+}
+
 // ── List ─────────────────────────────────────────────────────────────
 
 export async function listWithSystem7z(
@@ -1088,8 +1241,6 @@ export async function listWithSystem7z(
 export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
   const sz = system7zForExt(getFullExt(filePath));
   if (!sz) throw new Error("System 7-Zip not available");
-
-  checkFileSize(fs.statSync(filePath).size);
 
   // Strategy: `7z l -slt -p` with empty password piped via stdin.
   // Non-header-encrypted archives list normally and show "Encrypted = +".
@@ -1137,6 +1288,35 @@ export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
       return false;
     }
   }
+}
+
+/**
+ * Integrity-test an archive with the system 7-Zip binary. Streams from disk
+ * and never loads the whole archive into WASM memory.
+ */
+export async function testArchiveWithSystem7z(
+  archivePath: string,
+  password?: string,
+): Promise<string> {
+  const sz = system7zForExt(getFullExt(archivePath));
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  logger.info({
+    event: "system7z.test.start",
+    archivePath,
+    encrypted: !!password,
+  });
+
+  // No -p switch: 7z prompts for the archive password and spawnCapture feeds
+  // it via stdin (never argv). Large archives can take a while, so use the
+  // same long timeout as run7z instead of the short capture default.
+  const { stdout } = await spawnCapture(sz, ["t", archivePath], {
+    password,
+    timeoutMs: RUN7Z_TIMEOUT,
+  });
+  const ok = stdout.includes("Everything is Ok");
+  logger.info({ event: "system7z.test.ok", archivePath, passed: ok });
+  return ok ? t("test.passed") : t("test.warnings") + stdout.slice(-200);
 }
 
 // ── Shared spawn utilities ───────────────────────────────────────────
