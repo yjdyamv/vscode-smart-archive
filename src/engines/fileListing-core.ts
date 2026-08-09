@@ -29,7 +29,7 @@ import { t } from "../i18n";
 import { isNotAnArchiveError } from "../utils/errors";
 import { JS7z } from "./js7z-factory";
 import { brotliDecompress } from "./brotli-codec";
-import { decompressLz4Frames } from "./lz4-codec";
+import { lz4Decompress } from "./lz4-codec";
 import { snappyDecompress } from "./snappy-codec";
 
 /**
@@ -132,7 +132,7 @@ export async function listViaExtract(
     // generic path below. Avoids 7z l -slt which doesn't support ustar
     // prefix / LongLink in WASM.
     if (ext === ".tar.lz4" || ext === ".tlz4") {
-      const innerTar = await decompressLz4Frames(Buffer.from(buf));
+      const innerTar = await lz4Decompress(buf);
       const innerName = path.basename(filePath, ext) + ".tar";
       logger.info({ event: "fileListing.extract.lz4", size: innerTar.length });
       return extractAndList(innerName, innerTar);

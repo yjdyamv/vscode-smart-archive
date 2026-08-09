@@ -12,7 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { streamToVFS } from "./vfs-io";
-import { decompressLz4Frames } from "./lz4-codec";
+import { lz4Decompress } from "./lz4-codec";
 import { brotliDecompress } from "./brotli-codec";
 import { snappyDecompress } from "./snappy-codec";
 import {
@@ -206,7 +206,7 @@ export async function extractSelectedCore(
       let innerTarVfsPath: string;
       if (ext === ".tar.lz4" || ext === ".tlz4") {
         const buf = fs.readFileSync(archivePath);
-        const innerTar = await decompressLz4Frames(Buffer.from(buf));
+        const innerTar = await lz4Decompress(buf);
         innerTarName = path.basename(archivePath, ext) + ".tar";
         innerTarVfsPath = `/${innerTarName}`;
         js7z.FS.writeFile(innerTarVfsPath, new Uint8Array(innerTar));
