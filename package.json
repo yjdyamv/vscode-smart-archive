@@ -74,7 +74,7 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.9.2",
     "cross-env": "^7.0.3",
-    "https-proxy-agent": "^7.0.0",
+    "https-proxy-agent": "^9.1.0",
     "javascript-obfuscator": "^5.5.0",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.74.0",
