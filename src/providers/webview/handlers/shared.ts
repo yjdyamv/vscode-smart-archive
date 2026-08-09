@@ -21,6 +21,7 @@ import { t } from "../../../i18n";
 import { JS7z } from "../../../engines/js7z-factory";
 import { disposeJS7z } from "../../../engines/js7z-lifecycle";
 import { streamToVFS } from "../../../engines/vfs-io";
+import { uniquePath } from "../helpers";
 
 export function pwInputBox(
   prompt: string,
@@ -109,6 +110,22 @@ export function getSplitVolumeStem(filePath: string): string {
   if (m2) return m2[1];
   const ext = getFullExt(filePath);
   return removeVolumeSuffix(filePath).slice(0, -ext.length);
+}
+
+/**
+ * Destination for merging a split-volume set back into a single archive.
+ *
+ * The base name is the normal target (archive.7z.001 → archive.7z). Two
+ * special cases:
+ *   - A .rNN set redirects the webview to the set's base file itself
+ *     (archive.rar), so the target IS the current file — replacing the first
+ *     volume with a single archive is the merge intent, not a collision.
+ *   - Any other existing target must not be silently overwritten (or, with
+ *     the system-7z engine, merged into) — uniquify like encrypt/decrypt do.
+ */
+export function mergeOutputPath(filePath: string, fmt: string): string {
+  const dst = getSplitVolumeStem(filePath) + "." + fmt;
+  return dst === filePath ? dst : uniquePath(dst);
 }
 
 export function getSplitOutputPath(
