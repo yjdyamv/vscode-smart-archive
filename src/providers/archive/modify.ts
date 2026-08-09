@@ -14,7 +14,12 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
-import { getFullExt, isWrappedFormat, MAX_PREVIEW_FILE_SIZE } from "../../constants";
+import {
+  CACHE_HASH_ALGO,
+  getFullExt,
+  isWrappedFormat,
+  MAX_PREVIEW_FILE_SIZE,
+} from "../../constants";
 import { t } from "../../i18n";
 import { PreviewTooLargeError } from "../../utils/errors";
 import { getPreviewTmpDir, pruneOldPreviews, registerPreviewCleanup } from "../tempFiles";
@@ -136,7 +141,7 @@ export async function previewFileFromArchive(
     ? null
     : previewCachePath(archivePath, archiveStat.mtimeMs, archiveStat.size, normalizedFile, ext);
   const hash = crypto
-    .createHash("sha256")
+    .createHash(CACHE_HASH_ALGO)
     .update(`${archivePath}|${archiveStat.mtimeMs}|${archiveStat.size}|${normalizedFile}`)
     .digest("hex")
     .slice(0, 16);

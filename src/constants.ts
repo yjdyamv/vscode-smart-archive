@@ -625,6 +625,28 @@ export const MIN_LOG_HISTORY_BYTES = 64 * 1024;
 export const MAX_LOG_HISTORY_BYTES = 16 * 1024 * 1024;
 /** Hard size cap for previewing a single archive entry (100 MB) */
 export const MAX_PREVIEW_FILE_SIZE = 100 * 1024 * 1024;
+
+// ── Persistent caches (preview + listing) ──────────────────────────
+
+/** Hash algorithm for all cache keying / content indexing */
+export const CACHE_HASH_ALGO = "sha256";
+/** Staging suffix for atomic cache writes; leftovers are swept */
+export const CACHE_TMP_EXT = ".tmp";
+/** Entry-file suffix of listing snapshots (sweep filter) */
+export const LISTING_CACHE_FILE_EXT = ".json";
+/** Cache directory names inside globalStorage */
+export const LISTING_CACHE_DIR = "listing-cache";
+export const PREVIEW_CACHE_DIR = "preview-cache";
+/** How often the caches are swept in a long-lived session */
+export const DAILY_CACHE_SWEEP_MS = 24 * 60 * 60 * 1000;
+/** Command palette ID for cache clearing (package.json contributes) */
+export const CLEAR_CACHES_COMMAND = "yjdyamv.smart-archive.clearCaches";
+/** Settings section + keys for the preview-cache disk budget */
+export const CONFIG_SECTION = "smart-archive";
+export const CONFIG_MAX_PREVIEW_MB = "cache.maxPreviewMB";
+export const CONFIG_TTL_DAYS = "cache.ttlDays";
+export const CONFIG_MAX_MB = "cache.maxMB";
+export const CONFIG_MAX_FILES = "cache.maxFiles";
 /** Worker RSS guard sampling: every Nth 7z print tick */
 export const MEMORY_CHECK_EVERY_PRINT = 10;
 /** Worker RSS guard sampling: every Nth VFS chunk copy */
