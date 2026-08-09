@@ -8,7 +8,6 @@ export interface HostOpsContext {
   post: (msg: WebviewToHost) => void;
   tree: TreeController;
   selection: SelectionController;
-  showToast: (msg: string, ok?: boolean) => void;
   viewState: Ref<string>;
   loadingMsg: Ref<string>;
   pwError: Ref<boolean>;
@@ -16,9 +15,14 @@ export interface HostOpsContext {
   getCtxDir: () => string;
 }
 
-/** All webview → host operations. Internal seam of the archive view. */
+/**
+ * All webview → host operations. Internal seam of the archive view.
+ * Feedback strings are not produced here — every user-facing message
+ * comes from the host (localized in src/i18n.ts), so the webview never
+ * keeps a parallel translation table.
+ */
 export function createHostOps(ctx: HostOpsContext) {
-  const { post, tree, selection, showToast } = ctx;
+  const { post, tree, selection } = ctx;
 
   function isAnyDirSelected(paths: string[]): boolean {
     for (const p of paths) {
@@ -53,35 +57,32 @@ export function createHostOps(ctx: HostOpsContext) {
 
   function extAll() {
     post({ c: "extAll" });
-    showToast("Extracting all files...", true);
   }
 
   function extSel() {
     const { paths, excludes } = getEffectivePaths();
     if (!paths.length) return;
     post({ c: "extSel", paths, excludes, flat: !isAnyDirSelected(paths) });
-    showToast("Extracting " + paths.length + " item(s)...", true);
   }
 
   function copySel() {
     const { paths } = getEffectivePaths();
     if (!paths.length) return;
     post({ c: "copy", paths, flat: !isAnyDirSelected(paths) });
-    showToast("Copied " + paths.length + " item(s)", true);
   }
 
   function delSel() {
     const { paths } = getEffectivePaths();
     if (!paths.length) return;
     post({ c: "delSel", paths });
-    ctx.loadingMsg.value = "Deleting " + paths.length + " item(s)...";
+    // Lock the tree while the host shows the confirm dialog; the host's
+    // localized loading message replaces the overlay text after confirm.
     ctx.viewState.value = "loading";
   }
 
   function addFiles() {
     const dir = selection.state.lastAddDir;
     post({ c: "addFiles", dir });
-    showToast("Adding to " + (dir || "archive root"), true);
   }
 
   function previewFile(path: string) {
@@ -99,7 +100,6 @@ export function createHostOps(ctx: HostOpsContext) {
 
   function testArchive() {
     post({ c: "test" });
-    showToast("Testing archive integrity...", true);
   }
 
   function convertFormat() {
@@ -108,7 +108,6 @@ export function createHostOps(ctx: HostOpsContext) {
 
   function mergeVolumes() {
     post({ c: "merge" });
-    showToast("Merging split volumes...", true);
   }
 
   function splitVolumes() {
@@ -117,12 +116,10 @@ export function createHostOps(ctx: HostOpsContext) {
 
   function encryptArchive() {
     post({ c: "encrypt" });
-    showToast("Adding encryption...", true);
   }
 
   function decryptArchive() {
     post({ c: "decrypt" });
-    showToast("Removing encryption...", true);
   }
 
   function submitPassword(pw: string) {

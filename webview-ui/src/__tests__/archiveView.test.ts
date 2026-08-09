@@ -135,12 +135,12 @@ describe("computeNavigationTarget", () => {
 });
 
 describe("createHostOps", () => {
-  it("extAll posts the command and toasts", () => {
+  it("extAll posts the command (feedback is host-side, localized)", () => {
     const f = makeFixture();
     const ops = createHostOps({ ...f, getCtxDir: () => "" });
     ops.extAll();
     expect(f.post).toHaveBeenCalledWith({ c: "extAll" });
-    expect(f.showToast).toHaveBeenCalledWith("Extracting all files...", true);
+    expect(f.showToast).not.toHaveBeenCalled();
   });
 
   it("extSel posts effective paths and flat=true when no dir selected", () => {
@@ -178,8 +178,8 @@ describe("createHostOps", () => {
     f.selection.toggle("dir/a.txt");
     ops.delSel();
     expect(f.post).toHaveBeenCalledWith({ c: "delSel", paths: ["dir/a.txt"] });
+    // Tree locks during the host confirm dialog; the message text is host-side.
     expect(f.viewState.value).toBe("loading");
-    expect(f.loadingMsg.value).toContain("Deleting");
   });
 
   it("copySel posts deduped paths and flat flag", () => {

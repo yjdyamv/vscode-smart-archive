@@ -144,7 +144,6 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     post,
     tree,
     selection,
-    showToast,
     viewState,
     loadingMsg,
     pwError: ctx.pwError,

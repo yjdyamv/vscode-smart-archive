@@ -371,6 +371,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "正在解压文件...",
     "zh-tw": "正在解壓檔案...",
   },
+  "archive.testing": {
+    en: "Testing archive integrity...",
+    "zh-cn": "正在测试归档完整性...",
+    "zh-tw": "正在測試封存檔完整性...",
+  },
   "archive.writingFiles": {
     en: "Writing {0} file(s)...",
     "zh-cn": "正在写入 {0} 个文件...",
