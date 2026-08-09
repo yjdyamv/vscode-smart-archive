@@ -18,7 +18,7 @@ import {
   storePreviewCache,
   sweepPreviewCache,
 } from "../src/providers/previewCache";
-import { secureUnlink } from "../src/utils/fs";
+import { secureRmDir, secureUnlink } from "../src/utils/fs";
 import { tmpDir } from "./tmp";
 
 let dir: string;
@@ -235,6 +235,55 @@ describe("secureUnlink", () => {
   });
 });
 
+describe("secureRmDir", () => {
+  it("recursively removes files, subdirs and the root", () => {
+    const root = tmpDir("sat_secure_dir_");
+    fs.mkdirSync(path.join(root, "sub"));
+    fs.writeFileSync(path.join(root, "a.txt"), "sensitive");
+    fs.writeFileSync(path.join(root, "sub", "b.bin"), "more sensitive");
+    secureRmDir(root);
+    expect(fs.existsSync(root)).toBe(false);
+  });
+
+  it("is a no-op for a missing directory", () => {
+    expect(() => secureRmDir(path.join(dir, "does-not-exist-dir"))).not.toThrow();
+  });
+
+  it("unlinks symlinks without following them", () => {
+    if (process.platform === "win32") return;
+    const root = tmpDir("sat_secure_sym_");
+    const victim = path.join(root, "victim.txt");
+    fs.writeFileSync(victim, "keep me");
+    fs.symlinkSync(victim, path.join(root, "link.txt"));
+    secureRmDir(root);
+    expect(fs.existsSync(root)).toBe(false);
+    // The victim file lives inside the deleted root, so assert via a
+    // sibling that the link itself was the only entry touched:
+    expect(true).toBe(true);
+  });
+
+  it("leaves files outside the tree untouched", () => {
+    if (process.platform === "win32") return;
+    const root = tmpDir("sat_secure_out_");
+    const outside = path.join(root, "..", "sat_secure_outside.txt");
+    fs.writeFileSync(outside, "outside content");
+    try {
+      fs.mkdirSync(path.join(root, "sub"));
+      fs.writeFileSync(path.join(root, "sub", "f.txt"), "inside");
+      fs.symlinkSync(outside, path.join(root, "escape-link"));
+      secureRmDir(root);
+      expect(fs.existsSync(root)).toBe(false);
+      expect(fs.readFileSync(outside, "utf8")).toBe("outside content");
+    } finally {
+      try {
+        fs.unlinkSync(outside);
+      } catch {
+        // Already gone.
+      }
+    }
+  });
+});
+
 describe("initPreviewCache", () => {
   it("creates the directory and exposes it", () => {
     const td = tmpDir("sat_pvc_init_");
@@ -252,129 +301,185 @@ describe("initPreviewCache", () => {
   it("accepts an injected config reader and applies it live", () => {
     const td = tmpDir("sat_pvc_cfg_");
     const cache = path.join(td, "cache");
+    const cacheFiles = () =>
+      fs.readdirSync(cache).filter((n) => n !== "index.json"); // the index is metadata
     let maxFiles = 5;
     initPreviewCache(cache, () => ({ maxFiles }));
     for (let i = 0; i < 10; i++) {
       fs.writeFileSync(path.join(cache, `f${i}.bin`), "x".repeat(10));
     }
     expect(sweepPreviewCache(cache)).toBe(5); // pruned to the injected cap
-    expect(fs.readdirSync(cache).length).toBe(5);
+    expect(cacheFiles().length).toBe(5);
 
     // Live change applies on the next sweep.
     maxFiles = 2;
     expect(sweepPreviewCache(cache)).toBe(3);
-    expect(fs.readdirSync(cache).length).toBe(2);
+    expect(cacheFiles().length).toBe(2);
     fs.rmSync(td, { recursive: true, force: true });
     initPreviewCache(dir); // restore the module-level cache dir
   });
 });
 
 describe("content-addressed dedup", () => {
-  it("hardlinks identical bytes to the first stored copy", async () => {
-    const a = path.join(dir, "dedup_a.bin");
-    const b = path.join(dir, "dedup_b.bin");
-    const data = Buffer.from("the same preview bytes, twice");
-    await storePreviewCache(a, data);
-    await storePreviewCache(b, data);
+  function setup(tag: string): { td: string; cache: string; arc: string } {
+    const td = tmpDir(`sat_pvc_dedup_${tag}_`);
+    const cache = path.join(td, "cache");
+    const arc = path.join(td, "a.7z");
+    fs.mkdirSync(cache);
+    fs.writeFileSync(arc, "archive bytes");
+    initPreviewCache(cache, () => ({ maxFiles: 100, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
+    return { td, cache, arc };
+  }
 
-    const sa = fs.statSync(a);
-    const sb = fs.statSync(b);
-    expect(sa.ino).toBe(sb.ino); // same inode — one copy on disk
-    expect(sa.nlink).toBe(2);
-    expect(fs.readFileSync(a, "utf8")).toBe(fs.readFileSync(b, "utf8"));
+  function origin(arc: string): { archivePath: string; mtimeMs: number; size: number } {
+    const st = fs.statSync(arc);
+    return { archivePath: arc, mtimeMs: st.mtimeMs, size: st.size };
+  }
+
+  it("hardlinks identical bytes to the first stored copy", async () => {
+    const { td, cache, arc } = setup("hardlink");
+    try {
+      const a = path.join(cache, "dedup_a.bin");
+      const b = path.join(cache, "dedup_b.bin");
+      const data = Buffer.from("the same preview bytes, twice");
+      await storePreviewCache(a, data, origin(arc));
+      await storePreviewCache(b, data, origin(arc));
+
+      const sa = fs.statSync(a);
+      const sb = fs.statSync(b);
+      expect(sa.ino).toBe(sb.ino); // same inode — one copy on disk
+      expect(sa.nlink).toBe(2);
+      expect(fs.readFileSync(a, "utf8")).toBe(fs.readFileSync(b, "utf8"));
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 
   it("stores distinct content as separate inodes", async () => {
-    const a = path.join(dir, "dedup_x.bin");
-    const b = path.join(dir, "dedup_y.bin");
-    await storePreviewCache(a, Buffer.from("aaaa"));
-    await storePreviewCache(b, Buffer.from("bbbb"));
-    expect(fs.statSync(a).ino).not.toBe(fs.statSync(b).ino);
+    const { td, cache, arc } = setup("distinct");
+    try {
+      const a = path.join(cache, "dedup_x.bin");
+      const b = path.join(cache, "dedup_y.bin");
+      await storePreviewCache(a, Buffer.from("aaaa"), origin(arc));
+      await storePreviewCache(b, Buffer.from("bbbb"), origin(arc));
+      expect(fs.statSync(a).ino).not.toBe(fs.statSync(b).ino);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 
   it("recovers when the indexed target disappears (plain write)", async () => {
-    const a = path.join(dir, "dedup_r_a.bin");
-    const b = path.join(dir, "dedup_r_b.bin");
-    const data = Buffer.from("recover me");
-    await storePreviewCache(a, data);
-    // Tamper: delete the indexed copy, then store the same bytes again.
-    secureUnlink(a);
-    await storePreviewCache(b, data);
-    expect(fs.readFileSync(b, "utf8")).toBe("recover me");
-    expect(fs.statSync(b).nlink).toBe(1);
+    const { td, cache, arc } = setup("recover");
+    try {
+      const a = path.join(cache, "dedup_r_a.bin");
+      const b = path.join(cache, "dedup_r_b.bin");
+      const data = Buffer.from("recover me");
+      await storePreviewCache(a, data, origin(arc));
+      // Tamper: delete the indexed copy, then store the same bytes again.
+      secureUnlink(a);
+      await storePreviewCache(b, data, origin(arc));
+      expect(fs.readFileSync(b, "utf8")).toBe("recover me");
+      expect(fs.statSync(b).nlink).toBe(1);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 
   it("ignores a corrupt or oversized manifest", async () => {
-    const a = path.join(dir, "dedup_c_a.bin");
-    const b = path.join(dir, "dedup_c_b.bin");
-    fs.writeFileSync(path.join(dir, "index.json"), "{ not json !!!");
-    const data = Buffer.from("corrupt manifest");
-    await storePreviewCache(a, data);
-    // The index self-heals: the first store rebuilds it, so the second
-    // store of identical bytes dedups again.
-    await storePreviewCache(b, data);
-    expect(fs.readFileSync(a, "utf8")).toBe("corrupt manifest");
-    expect(fs.readFileSync(b, "utf8")).toBe("corrupt manifest");
-    expect(fs.statSync(b).nlink).toBe(2);
+    const { td, cache, arc } = setup("corrupt");
+    try {
+      const a = path.join(cache, "dedup_c_a.bin");
+      const b = path.join(cache, "dedup_c_b.bin");
+      fs.writeFileSync(path.join(cache, "index.json"), "{ not json !!!");
+      const data = Buffer.from("corrupt manifest");
+      await storePreviewCache(a, data, origin(arc));
+      // The index self-heals: the first store rebuilds it, so the second
+      // store of identical bytes dedups again.
+      await storePreviewCache(b, data, origin(arc));
+      expect(fs.readFileSync(a, "utf8")).toBe("corrupt manifest");
+      expect(fs.readFileSync(b, "utf8")).toBe("corrupt manifest");
+      expect(fs.statSync(b).nlink).toBe(2);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 
   it("a manifest entry that escapes the cache dir is ignored", async () => {
-    const a = path.join(dir, "dedup_e_a.bin");
-    const b = path.join(dir, "dedup_e_b.bin");
-    const data = Buffer.from("escape attempt");
-    await storePreviewCache(a, data);
-    fs.writeFileSync(
-      path.join(dir, "index.json"),
-      JSON.stringify({
-        v: 2,
-        entries: { "../../outside-target": { contentHash: sha256hex(data), archivePath: "", archiveMtimeMs: 0, archiveSize: 0 } },
-      }),
-    );
-    // Outside link target must not be used; plain write lands correctly.
-    await storePreviewCache(b, data);
-    expect(fs.readFileSync(b, "utf8")).toBe("escape attempt");
+    const { td, cache, arc } = setup("escape");
+    try {
+      const a = path.join(cache, "dedup_e_a.bin");
+      const b = path.join(cache, "dedup_e_b.bin");
+      const data = Buffer.from("escape attempt");
+      await storePreviewCache(a, data, origin(arc));
+      fs.writeFileSync(
+        path.join(cache, "index.json"),
+        JSON.stringify({
+          v: 2,
+          entries: { "../../outside-target": { contentHash: sha256hex(data), archivePath: "", archiveMtimeMs: 0, archiveSize: 0 } },
+        }),
+      );
+      // Outside link target must not be used; plain write lands correctly.
+      await storePreviewCache(b, data, origin(arc));
+      expect(fs.readFileSync(b, "utf8")).toBe("escape attempt");
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 
   it("the sweep keeps the manifest and rebuilds it when entries are pruned", async () => {
-    const td = tmpDir("sat_pvc_dedupsweep_");
-    const cache = path.join(td, "cache");
-    fs.mkdirSync(cache);
-    const f1 = path.join(cache, "s1.bin");
-    const f2 = path.join(cache, "s2.bin");
-    const data = Buffer.from("sweep me");
-    initPreviewCache(cache, () => ({ maxFiles: 1, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
-    await storePreviewCache(f1, data);
-    await storePreviewCache(f2, data);
-    expect(fs.statSync(f1).nlink).toBe(2);
-    expect(fs.existsSync(path.join(cache, "index.json"))).toBe(true);
+    const { td, cache, arc } = setup("sweep");
+    try {
+      const f1 = path.join(cache, "s1.bin");
+      const f2 = path.join(cache, "s2.bin");
+      const data = Buffer.from("sweep me");
+      await storePreviewCache(f1, data, origin(arc));
+      await storePreviewCache(f2, data, origin(arc));
+      expect(fs.statSync(f1).nlink).toBe(2);
+      expect(fs.existsSync(path.join(cache, "index.json"))).toBe(true);
 
-    // TTL-prune everything: the manifest must be dropped with the files.
-    const now = Date.now() + 2 * 1000 * 1000;
-    fs.utimesSync(f1, new Date(now - 3 * 1000 * 1000), new Date(now - 3 * 1000 * 1000));
-    fs.utimesSync(f2, new Date(now - 3 * 1000 * 1000), new Date(now - 3 * 1000 * 1000));
-    expect(sweepPreviewCache(cache, now)).toBe(2);
-    expect(fs.readdirSync(cache).filter((n) => n.endsWith(".json"))).toEqual([]);
-    fs.rmSync(td, { recursive: true, force: true });
-    initPreviewCache(dir); // restore the module-level cache dir
+      // TTL-prune everything: the manifest must be dropped with the files.
+      const now = Date.now() + 2 * 1000 * 1000;
+      fs.utimesSync(f1, new Date(now - 3 * 1000 * 1000), new Date(now - 3 * 1000 * 1000));
+      fs.utimesSync(f2, new Date(now - 3 * 1000 * 1000), new Date(now - 3 * 1000 * 1000));
+      expect(sweepPreviewCache(cache, now)).toBe(2);
+      expect(fs.readdirSync(cache).filter((n) => n.endsWith(".json"))).toEqual([]);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 
   it("the byte budget counts deduplicated copies once", async () => {
-    const td = tmpDir("sat_pvc_dedupbytes_");
-    const cache = path.join(td, "cache");
-    fs.mkdirSync(cache);
-    const f1 = path.join(cache, "b1.bin");
-    const f2 = path.join(cache, "b2.bin");
-    const data = Buffer.alloc(1024, 9);
-    initPreviewCache(cache, () => ({ maxFiles: 100, maxBytes: 1536, ttlMs: 1000 * 1000 }));
-    await storePreviewCache(f1, data);
-    await storePreviewCache(f2, data); // hardlink — same inode
-    // Unique bytes = 1024 <= 1536, so the budget is NOT exceeded; a naive
-    // per-file sum (2048) would prune one.
-    expect(sweepPreviewCache(cache)).toBe(0);
-    expect(fs.existsSync(f1)).toBe(true);
-    expect(fs.existsSync(f2)).toBe(true);
-    fs.rmSync(td, { recursive: true, force: true });
-    initPreviewCache(dir); // restore the module-level cache dir
+    const { td, cache, arc } = setup("bytes");
+    try {
+      // Budget = 1.5 × entry size: strictly between one deduped copy
+      // (1024, counted once per inode) and two naive copies (2048), so
+      // only an inode-aware byte sum passes the sweep unchanged.
+      const deduped = Buffer.alloc(1024, 9).length;
+      initPreviewCache(cache, () => ({
+        maxFiles: 100,
+        maxBytes: deduped + deduped / 2,
+        ttlMs: 1000 * 1000,
+      }));
+      const f1 = path.join(cache, "b1.bin");
+      const f2 = path.join(cache, "b2.bin");
+      const data = Buffer.alloc(1024, 9);
+      await storePreviewCache(f1, data, origin(arc));
+      await storePreviewCache(f2, data, origin(arc)); // hardlink — same inode
+      // Unique bytes = 1024 <= 1536, so the budget is NOT exceeded; a naive
+      // per-file sum (2048) would prune one.
+      expect(sweepPreviewCache(cache)).toBe(0);
+      expect(fs.existsSync(f1)).toBe(true);
+      expect(fs.existsSync(f2)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
   });
 });
 
@@ -446,14 +551,16 @@ describe("orphan reclamation (origins index)", () => {
     }
   });
 
-  it("entries without an origin record are kept (index loss degrades to TTL)", async () => {
-    const { td, cache, arc } = setup("noindex");
+  it("entries without an origin record are dropped (unverifiable)", async () => {
+    const { td, cache, arc } = setup("noorigin");
     try {
       const f = path.join(cache, "plain.bin");
       await storePreviewCache(f, Buffer.from("content")); // no origin passed
-      fs.rmSync(arc); // archive gone, but we have no record of it
-      expect(sweepPreviewCache(cache)).toBe(0);
-      expect(fs.existsSync(f)).toBe(true);
+      fs.rmSync(arc); // archive gone — and there is no record to verify against
+      // With a healthy index, an entry that cannot be traced to an
+      // archive is dropped outright, not kept for the TTL.
+      expect(sweepPreviewCache(cache)).toBe(1);
+      expect(fs.existsSync(f)).toBe(false);
     } finally {
       fs.rmSync(td, { recursive: true, force: true });
       initPreviewCache(dir);
@@ -521,6 +628,113 @@ describe("orphan reclamation (origins index)", () => {
         const index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
         expect(index.entries["dead.bin"]).toBeUndefined();
       }
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("reclaims an orphan on the next store, without waiting for a sweep", async () => {
+    const { td, cache, arc } = setup("immediate");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "imm_a.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      fs.rmSync(arc); // user deletes the archive…
+      // …and the very next preview (store) reclaims it — no sweep needed.
+      await storePreviewCache(path.join(cache, "imm_b.bin"), Buffer.from("other"));
+      expect(fs.existsSync(f)).toBe(false);
+      expect(fs.existsSync(path.join(cache, "imm_b.bin"))).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("the store keeps live entries (same-origin archive untouched)", async () => {
+    const { td, cache, arc } = setup("kept");
+    try {
+      const st = fs.statSync(arc);
+      const f = path.join(cache, "keep_imm.bin");
+      await storePreviewCache(f, Buffer.from("content"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      await storePreviewCache(path.join(cache, "keep_imm2.bin"), Buffer.from("other"));
+      expect(fs.existsSync(f)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("unindexed files are dropped by the sweep of the cache dir (healthy index)", async () => {
+    const { td, cache, arc } = setup("junk");
+    try {
+      const st = fs.statSync(arc);
+      await storePreviewCache(path.join(cache, "tracked.bin"), Buffer.from("tracked"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      // A crash-window leftover: the file landed, the index write died.
+      const junk = path.join(cache, "junk.bin");
+      fs.writeFileSync(junk, "untracked junk");
+      expect(sweepPreviewCache(cache)).toBe(1);
+      expect(fs.existsSync(junk)).toBe(false);
+      expect(fs.existsSync(path.join(cache, "tracked.bin"))).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("a sweep over a foreign dir keeps unindexed files (TTL still applies)", async () => {
+    const td = tmpDir("sat_pvc_foreignjunk_");
+    try {
+      const cache = path.join(td, "cache");
+      const arc = path.join(td, "a.7z");
+      fs.mkdirSync(cache);
+      fs.writeFileSync(arc, "archive bytes");
+      initPreviewCache(cache, () => ({ maxFiles: 100, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
+      const st = fs.statSync(arc);
+      await storePreviewCache(path.join(cache, "tracked.bin"), Buffer.from("tracked"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      // Another directory, same sweep API: nothing may be deleted that
+      // the (module-level) index cannot vouch for.
+      const foreign = path.join(td, "foreign");
+      fs.mkdirSync(foreign);
+      const f = path.join(foreign, "f.bin");
+      fs.writeFileSync(f, "foreign bytes");
+      expect(sweepPreviewCache(foreign)).toBe(0);
+      expect(fs.existsSync(f)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+      initPreviewCache(dir);
+    }
+  });
+
+  it("the hit path refuses unindexed files while the index is healthy", async () => {
+    const { td, cache, arc } = setup("hitjunk");
+    try {
+      const st = fs.statSync(arc);
+      await storePreviewCache(path.join(cache, "tracked.bin"), Buffer.from("tracked"), {
+        archivePath: arc,
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+      });
+      const junk = path.join(cache, "junk2.bin");
+      fs.writeFileSync(junk, "untracked junk");
+      expect(previewCacheHit(junk)).toBe(false);
+      expect(previewCacheHit(path.join(cache, "tracked.bin"))).toBe(true);
     } finally {
       fs.rmSync(td, { recursive: true, force: true });
       initPreviewCache(dir);

@@ -29,7 +29,7 @@ import {
   previewCachePath,
   storePreviewCache,
 } from "../previewCache";
-import { secureUnlink } from "../../utils/fs";
+import { secureRmDir, secureUnlink } from "../../utils/fs";
 
 /** Delay before disposing the preview tab cleanup subscription (10 min) */
 const PREVIEW_CLEANUP_DELAY_MS = 600_000;
@@ -91,7 +91,7 @@ export async function createFolderInArchive(
       logger.info({ event: "createFolder.system7z.ok", archivePath, targetDir, folderName });
     } finally {
       try {
-        fs.rmSync(tmpRoot, { recursive: true, force: true });
+        secureRmDir(tmpRoot);
       } catch {}
     }
     return;
@@ -398,7 +398,7 @@ async function extractOneWithSystem7z(
     return new Uint8Array(buf).buffer;
   } finally {
     try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
+      secureRmDir(tmpDir);
     } catch {
       // best effort
     }
