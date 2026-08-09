@@ -16,7 +16,10 @@ import {
   listWithSystem7z,
   resetDetectionCache,
   spawnCapture,
+  testArchiveWithSystem7z,
+  unwrapInnerTarsWithSystem7z,
 } from "../src/engines/system7z";
+import { createTarFile } from "../src/engines/tar-writer";
 import { itIf } from "./gates";
 import { tmpDir } from "./tmp";
 
@@ -433,6 +436,42 @@ describe("system 7-Zip", () => {
     await extractSelectedWithSystem7z(archive, ["a.txt"], undefined, false, outDir, undefined);
     expect(fs.readFileSync(path.join(outDir, "a.txt"), "utf8")).toBe("A");
     expect(fs.existsSync(path.join(outDir, "b.txt"))).toBe(false);
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("system7z", "integrity-tests an archive with system 7-Zip", async () => {
+    const tdir = tmpDir("sat_sz_test_");
+    const src = path.join(tdir, "data.txt");
+    fs.writeFileSync(src, "data");
+    const archive = path.join(tdir, "ok.7z");
+
+    const r = spawnSync(sz!, ["a", "-t7z", archive, src], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    expect(r.status).toBe(0);
+
+    const result = await testArchiveWithSystem7z(archive);
+    expect(result.length).toBeGreaterThan(0);
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("system7z", "unwraps inner tars with system 7-Zip", async () => {
+    const tdir = tmpDir("sat_sz_unwrap_");
+    const src = path.join(tdir, "src.txt");
+    fs.writeFileSync(src, "inner content");
+    const tarPath = path.join(tdir, "bundle.tar");
+    await createTarFile(tarPath, [src]);
+
+    const outDir = path.join(tdir, "out");
+    fs.mkdirSync(outDir);
+    fs.copyFileSync(tarPath, path.join(outDir, "bundle.tar"));
+
+    await unwrapInnerTarsWithSystem7z(outDir);
+    expect(fs.readFileSync(path.join(outDir, "src.txt"), "utf8")).toBe("inner content");
+    expect(fs.existsSync(path.join(outDir, "bundle.tar"))).toBe(false);
 
     fs.rmSync(tdir, { recursive: true, force: true });
   });

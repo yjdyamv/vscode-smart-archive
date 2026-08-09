@@ -12,7 +12,7 @@
 import * as vscode from "vscode";
 import type { DecompressOptions } from "../types";
 import { runArchiveOp } from "./worker/runner";
-import { decompressWithSystem7z } from "./system7z";
+import { decompressWithSystem7z, unwrapInnerTarsWithSystem7z } from "./system7z";
 import { selectEngine } from "./select-engine";
 import { isCancellationError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
@@ -44,11 +44,9 @@ export async function decompressWith7z(
 
   if (engine === "system7z") {
     await decompressWithSystem7z(options, progress, token);
-    // Inner-tar unwrap also runs in the worker — the system-7z fast path
-    // must not leave any WASM work on the host thread.
-    await runArchiveOp(
-      "unwrap",
-      { outputDir: options.outputDir },
+    // Unwrap inner tars with 7-Zip itself so no WASM work remains on this path.
+    await unwrapInnerTarsWithSystem7z(
+      options.outputDir,
       progress as ProgressLike | undefined,
       token as TokenLike | undefined,
     );

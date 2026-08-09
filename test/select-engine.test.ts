@@ -135,9 +135,13 @@ describe("selectEngine · archive mutation (add/delete/rename)", () => {
 describe("selectEngine · createFolder / preview", () => {
   beforeEach(() => systemAvailable());
 
-  it("rebuilds RAR archives, otherwise always the worker", () => {
+  it("rebuilds RAR archives and uses system 7z for plain formats", () => {
     expectChoice({ op: "createFolder", ext: ".rar" }, "rarRebuild");
-    expectChoice({ op: "createFolder", ext: ".zip" }, "worker");
+    expectChoice({ op: "createFolder", ext: ".zip" }, "system7z");
+  });
+
+  it("keeps wrapped formats in the worker", () => {
+    expectChoice({ op: "createFolder", ext: ".tar.zst" }, "worker");
   });
 
   it("offers the system fast path for preview when capable", () => {

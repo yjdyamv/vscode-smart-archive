@@ -23,7 +23,7 @@ import * as path from "path";
 import * as os from "os";
 import { spawn, spawnSync } from "child_process";
 import * as vscode from "vscode";
-import type { TokenLike, ProgressLike } from "../utils/cancellation";
+import { CancelledError, type TokenLike, type ProgressLike } from "../utils/cancellation";
 import * as iconv from "iconv-lite";
 import type { CompressOptions, DecompressOptions, SevenZipMethod } from "../types";
 import {
@@ -44,6 +44,9 @@ import {
   CHILD_CAPTURE_MAX_BYTES,
   SPAWN_CAPTURE_TIMEOUT,
   getFullExt,
+  TAR_INNER_PATTERNS,
+  UNWRAP_MAX_DEPTH,
+  UNWRAP_MAX_TAR_FILES,
 } from "../constants";
 import { toBinaryVolumeSize } from "../utils/volume-sizes";
 import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/exclude";
@@ -1134,6 +1137,76 @@ export async function extractSelectedWithSystem7z(
   } catch {}
 }
 
+/**
+ * Unwrap inner .tar files after a system-7z extraction using 7-Zip itself,
+ * instead of loading each tar into the WASM worker. Mirrors the worker's
+ * depth/count limits and keeps the symlink + total-size guards.
+ */
+export async function unwrapInnerTarsWithSystem7z(
+  outputDir: string,
+  progress?: ProgressLike,
+  token?: TokenLike,
+): Promise<void> {
+  const sz = system7zForExt(".tar");
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
+  if (entries.length === 0) return;
+
+  let depth = 0;
+  let tarCount = 0;
+  let totalSize = 0;
+
+  while (depth < UNWRAP_MAX_DEPTH) {
+    depth++;
+    const tarFiles = entries.filter((e) => TAR_INNER_PATTERNS.some((ext) => e.endsWith(ext)));
+    if (tarFiles.length === 0) break;
+
+    for (const tarFile of tarFiles) {
+      if (token?.isCancellationRequested) throw new CancelledError();
+      tarCount++;
+      if (tarCount > UNWRAP_MAX_TAR_FILES) {
+        logger.warn(
+          { event: "system7z.unwrap.tooManyTars", tarCount, maxTarFiles: UNWRAP_MAX_TAR_FILES },
+          "Too many inner tar files, stopping unwrap",
+        );
+        return;
+      }
+
+      const tarPath = path.join(outputDir, tarFile);
+      progress?.report({ message: t("decompress.unwrapTar") });
+
+      await preflightSystem7z(sz, tarPath, "", false);
+      const stagingDir = fs.mkdtempSync(path.join(outputDir, ".sa7zu_"));
+      try {
+        await run7z(sz, ["x", tarPath, `-o${stagingDir}`, "-y"], progress, token);
+        verifyStagingDir(stagingDir);
+        let tarTotal = 0;
+        for (const item of walkDir(stagingDir)) {
+          if (!item.symlink) tarTotal += fs.statSync(item.path).size;
+        }
+        totalSize = checkTotalSize(totalSize, tarTotal);
+        moveMerge(stagingDir, outputDir);
+      } finally {
+        try {
+          fs.rmSync(stagingDir, { recursive: true, force: true });
+        } catch {}
+      }
+
+      try {
+        fs.unlinkSync(tarPath);
+      } catch (err) {
+        logger.warn(
+          { event: "system7z.unwrap.unlinkFailed", path: tarPath, err },
+          "Failed to remove intermediate tar archive",
+        );
+      }
+    }
+
+    entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
+  }
+}
+
 // ── List ─────────────────────────────────────────────────────────────
 
 export async function listWithSystem7z(
@@ -1215,6 +1288,35 @@ export async function isEncryptedSystem7z(filePath: string): Promise<boolean> {
       return false;
     }
   }
+}
+
+/**
+ * Integrity-test an archive with the system 7-Zip binary. Streams from disk
+ * and never loads the whole archive into WASM memory.
+ */
+export async function testArchiveWithSystem7z(
+  archivePath: string,
+  password?: string,
+): Promise<string> {
+  const sz = system7zForExt(getFullExt(archivePath));
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  logger.info({
+    event: "system7z.test.start",
+    archivePath,
+    encrypted: !!password,
+  });
+
+  // No -p switch: 7z prompts for the archive password and spawnCapture feeds
+  // it via stdin (never argv). Large archives can take a while, so use the
+  // same long timeout as run7z instead of the short capture default.
+  const { stdout } = await spawnCapture(sz, ["t", archivePath], {
+    password,
+    timeoutMs: RUN7Z_TIMEOUT,
+  });
+  const ok = stdout.includes("Everything is Ok");
+  logger.info({ event: "system7z.test.ok", archivePath, passed: ok });
+  return ok ? t("test.passed") : t("test.warnings") + stdout.slice(-200);
 }
 
 // ── Shared spawn utilities ───────────────────────────────────────────
