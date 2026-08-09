@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
+import fs from "fs";
+import path from "path";
+import { fetchReleaseAsset } from "./lib/github.mjs";
+import { SEVEN_ZIP_ZSTD_WASM_REPO, SEVEN_ZIP_ZSTD_TAG } from "./lib/releases.mjs";
+import { downloadWithCache } from "./lib/download.mjs";
+import { persistBootstrapHash } from "./lib/hash-pins.mjs";
+import { writeFileAtomic } from "./lib/fs.mjs";
 /**
  * Stage the 7-Zip ZS (26.02) WebAssembly engine under vendor/7zz-wasm/.
  *
@@ -25,13 +33,6 @@
  * after a release bump, run once with SA_HASH_BOOTSTRAP=1: the script prints
  * and persists the new hashes into EXPECTED_HASHES below, then stages them.
  */
-const fs = require("fs");
-const path = require("path");
-const { fetchReleaseAsset } = require("./lib/github");
-const { SEVEN_ZIP_ZSTD_WASM_REPO, SEVEN_ZIP_ZSTD_TAG } = require("./lib/releases");
-const { downloadWithCache } = require("./lib/download");
-const { persistBootstrapHash } = require("./lib/hash-pins");
-const { writeFileAtomic } = require("./lib/fs");
 
 const REPO = SEVEN_ZIP_ZSTD_WASM_REPO;
 const TAG = SEVEN_ZIP_ZSTD_TAG;
@@ -39,15 +40,15 @@ const VER = TAG.replace(/^v/, "").split("-")[0];
 
 // SHA-256 of each downloaded file (release assets). Fail-closed: with no
 // pinned hash the install refuses unless SA_HASH_BOOTSTRAP=1.
-//   SA_HASH_BOOTSTRAP=1 node scripts/install-7zz-wasm.js
+//   SA_HASH_BOOTSTRAP=1 node scripts/install-7zz-wasm.mjs
 const EXPECTED_HASHES = {
   "7zz.js": "a22596301fea5c3733d1da86c305a457453e872073d784ae9853b97fe046675f",
   "7zz.wasm": "1ce935e1dab25155186a7d25652fe178d923640bab6c3536e6d9b7fe8a966e67",
   LICENSE: "efd01ecf087d0345468c57f7146879952c39c8daf4c461876a95de1c0d1722f3",
 };
 
-const OUT = path.join(__dirname, "..", "vendor", "7zz-wasm");
-const cacheDir = path.join(__dirname, "..", ".cache", "7zz-wasm");
+const OUT = path.join(import.meta.dirname, "..", "vendor", "7zz-wasm");
+const cacheDir = path.join(import.meta.dirname, "..", ".cache", "7zz-wasm");
 
 const FILES = ["7zz.js", "7zz.wasm", "LICENSE"];
 
@@ -77,7 +78,7 @@ async function main() {
       );
     }
     if (result.status === "downloaded") {
-      persistBootstrapHash(__filename, destPath, name);
+      persistBootstrapHash(import.meta.filename, destPath, name);
     }
   }
 
@@ -105,17 +106,11 @@ async function main() {
   console.log(`[7zz-wasm] staged ${FILES.join(", ")} in vendor/7zz-wasm/`);
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(`[7zz-wasm] FAILED: ${err && err.message ? err.message : err}`);
     process.exit(1);
   });
 }
 
-module.exports = {
-  REPO,
-  TAG,
-  VER,
-  FILES,
-  EXPECTED_HASHES,
-};
+export { REPO, TAG, VER, FILES, EXPECTED_HASHES };

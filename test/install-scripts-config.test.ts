@@ -9,23 +9,23 @@ import {
   REPO as REPO7Z,
   TAG as TAG7Z,
   TARGETS,
-} from "../scripts/install-7z-platforms.js";
+} from "../scripts/install-7z-platforms.mjs";
 import {
   EXPECTED_HASHES as HWASM,
   FILES,
   REPO as REPOWASM,
   TAG as TAGWASM,
-} from "../scripts/install-7zz-wasm.js";
+} from "../scripts/install-7zz-wasm.mjs";
 import {
   EXPECTED_HASHES as HSN,
   PACKAGES,
   WASM_ASSETS,
-} from "../scripts/install-snappy-platforms.js";
+} from "../scripts/install-snappy-platforms.mjs";
 import {
   SEVEN_ZIP_ZSTD_REPO,
   SEVEN_ZIP_ZSTD_TAG,
   SEVEN_ZIP_ZSTD_WASM_REPO,
-} from "../scripts/lib/releases.js";
+} from "../scripts/lib/releases.mjs";
 
 const HASH_RE = /^[0-9a-f]{64}$/;
 const PLATFORMS = ["linux", "darwin", "win32"];

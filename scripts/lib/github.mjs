@@ -1,7 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-const { httpGet, httpGetRetry, httpGetMirrored } = require("./http");
-const { sha256 } = require("./hash-pins");
+import fs from "fs";
+import path from "path";
+import { httpGet, httpGetRetry, httpGetMirrored } from "./http.mjs";
+import { sha256 } from "./hash-pins.mjs";
 
 const API_HEADERS = {
   "User-Agent": "smart-archive-vscode",
@@ -132,7 +132,4 @@ async function resolveLatestReleaseTag(
   }
 }
 
-module.exports = {
-  fetchReleaseAsset,
-  resolveLatestReleaseTag,
-};
+export { fetchReleaseAsset, resolveLatestReleaseTag };

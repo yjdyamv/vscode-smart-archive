@@ -73,7 +73,7 @@ jobs:
         env:
           SA_RAR5_PLATFORMS: ""
           SA_RAR5_REQUIRE: "1"
-        run: node scripts/install-rar5-platforms.js
+        run: node scripts/install-rar5-platforms.mjs
       - run: npx vitest run test/rar5-wasm.test.ts
 
   test-snappy-wasm:
@@ -86,7 +86,7 @@ jobs:
           node-version: 24
       - run: npm ci
       - name: Stage snappy native + WASI assets
-        run: node scripts/install-snappy-platforms.js
+        run: node scripts/install-snappy-platforms.mjs
       - run: npx vitest run test/snappy-wasm.test.ts
 
   release:
@@ -128,8 +128,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          REPO=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_REPO")
-          TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
+          REPO=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_REPO")
+          TAG=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_TAG")
           VER=${TAG#v}; VER=${VER%%-*}
           echo "Testing 7-Zip $VER on $(uname -m) — macOS $(sw_vers -productVersion)"
 
@@ -184,8 +184,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          REPO=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_REPO")
-          TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
+          REPO=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_REPO")
+          TAG=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_TAG")
           VER=${TAG#v}; VER=${VER%%-*}
           echo "Testing 7-Zip $VER on Windows"
           curl -fsSL -o 7zz-windows-x64.zip "https://github.com/${REPO}/releases/download/${TAG}/7zz-windows-x64.zip"
@@ -226,8 +226,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          REPO=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_REPO")
-          TAG=$(node -p "require('./scripts/lib/releases.js').SEVEN_ZIP_ZSTD_TAG")
+          REPO=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_REPO")
+          TAG=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_TAG")
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             ASSET=7zz-windows-x64.zip
           else

@@ -25,7 +25,7 @@ import {
   WASM_ASSETS,
   REPO,
   resolveVersion,
-} from "../scripts/install-rar5-platforms.js";
+} from "../scripts/install-rar5-platforms.mjs";
 
 const HASH_RE = /^[0-9a-f]{64}$/;
 

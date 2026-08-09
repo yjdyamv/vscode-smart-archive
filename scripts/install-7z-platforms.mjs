@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import { fetchReleaseAsset } from "./lib/github.mjs";
+import { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } from "./lib/releases.mjs";
+import { downloadWithCache } from "./lib/download.mjs";
+import { persistBootstrapHash } from "./lib/hash-pins.mjs";
+import { writeFileAtomic } from "./lib/fs.mjs";
+import { findFileInTree, extractArchive } from "./lib/archive.mjs";
 /**
  * Stage native 7-Zip ZS (7zz) console binaries for the platforms that have
  * builds under vendor/7z-bin/, so the extension can bundle a native fast-path
@@ -23,15 +33,6 @@
  * confirmed on first run — a wrong name fails loudly (download or extract
  * error), never silently. Requires `tar` (with xz/gzip) on the build host.
  */
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const { fetchReleaseAsset } = require("./lib/github");
-const { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } = require("./lib/releases");
-const { downloadWithCache } = require("./lib/download");
-const { persistBootstrapHash } = require("./lib/hash-pins");
-const { writeFileAtomic } = require("./lib/fs");
-const { findFileInTree, extractArchive } = require("./lib/archive");
 
 // Native 7-Zip ZS (mcmilk/7-Zip-zstd fork) release published in our own repo.
 const REPO = SEVEN_ZIP_ZSTD_REPO;
@@ -39,7 +40,7 @@ const TAG = SEVEN_ZIP_ZSTD_TAG;
 
 // SHA-256 of each downloaded ARCHIVE, keyed by asset filename. Fail-closed:
 // with no pinned hash the build refuses the binary unless SA_HASH_BOOTSTRAP=1.
-//   SA_HASH_BOOTSTRAP=1 node scripts/install-7z-platforms.js
+//   SA_HASH_BOOTSTRAP=1 node scripts/install-7z-platforms.mjs
 const EXPECTED_HASHES = {
   "7zz-linux-x64.tar.gz": "4b8185422d870425862c410854d352af30ab9c7e3b284589d14778236db32e96",
   "7zz-linux-arm64.tar.gz": "eb766d7a642241ded7c4544f43ea48b3c80a41aac344fd4fe10685b0be4eb476",
@@ -48,8 +49,8 @@ const EXPECTED_HASHES = {
   "7zz-windows-arm64.zip": "67b0dac184c2ba13fec818140b513fd06edc195992d4598ed5b0dbe131256250",
 };
 
-const OUT = path.join(__dirname, "..", "vendor", "7z-bin");
-const cacheDir = path.join(__dirname, "..", ".cache", "7z-platforms");
+const OUT = path.join(import.meta.dirname, "..", "vendor", "7z-bin");
+const cacheDir = path.join(import.meta.dirname, "..", ".cache", "7z-platforms");
 
 // asset : release file to download
 // kind  : "tgz" (tar.gz, extract via system tar) | "zip" (extract via 7zz)
@@ -125,7 +126,7 @@ async function processTarget(t) {
     );
   }
   if (result.status === "downloaded") {
-    persistBootstrapHash(__filename, archivePath, t.asset);
+    persistBootstrapHash(import.meta.filename, archivePath, t.asset);
   }
 
   fs.mkdirSync(unpackDir, { recursive: true });
@@ -230,16 +231,11 @@ async function main() {
   console.log(`\n=== 7-Zip ZS ${TAG}: staged ${new Set(staged).size} platform dirs ===`);
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err.message || err);
     process.exit(1);
   });
 }
 
-module.exports = {
-  REPO,
-  TAG,
-  TARGETS,
-  EXPECTED_HASHES,
-};
+export { REPO, TAG, TARGETS, EXPECTED_HASHES };

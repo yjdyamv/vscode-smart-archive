@@ -3,10 +3,10 @@ import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
 
-import { mapLimit } from "../scripts/lib/async";
-import { countStatuses, downloadWithCache } from "../scripts/lib/download";
-import { extractNodeFromTgz, findFileInTree } from "../scripts/lib/archive";
-import { sha256 } from "../scripts/lib/hash-pins";
+import { mapLimit } from "../scripts/lib/async.mjs";
+import { countStatuses, downloadWithCache } from "../scripts/lib/download.mjs";
+import { extractNodeFromTgz, findFileInTree } from "../scripts/lib/archive.mjs";
+import { sha256 } from "../scripts/lib/hash-pins.mjs";
 import { tmpDir } from "./tmp";
 
 /** Build a minimal ustar entry for tests. */

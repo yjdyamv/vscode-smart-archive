@@ -1,4 +1,4 @@
-const https = require("https");
+import https from "https";
 
 // https-proxy-agent ≥ 8 is ESM-only — dynamic import keeps this CJS module
 // loadable by every install script. The agent is created lazily so a plain
@@ -111,9 +111,4 @@ async function httpGetJson(url) {
   return JSON.parse(buf.toString("utf8"));
 }
 
-module.exports = {
-  httpGet,
-  httpGetRetry,
-  httpGetJson,
-  httpGetMirrored,
-};
+export { httpGet, httpGetRetry, httpGetJson, httpGetMirrored };
