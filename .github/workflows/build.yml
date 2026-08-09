@@ -120,6 +120,10 @@ jobs:
           tag_name: ${{ github.event.inputs.release_tag }}
           files: "*.vsix"
           generate_release_notes: true
+          # Re-running a release (manual dispatch on an existing tag)
+          # must overwrite the previous assets and notes, not fail.
+          allow_overwrite: true
+          update_release_body: true
 
   # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
   # Downloads the same 7-Zip ZS arm64 binary the install script stages from
