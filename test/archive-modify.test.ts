@@ -15,7 +15,8 @@ import {
   j7zCompressDir,
   j7zDecompress,
   copyFS,
-  buildTree,
+  buildTreeRootOnly,
+  getDirChildren,
   disposeJS7z,
   createWrapped,
   trackedJS7z,
@@ -110,19 +111,19 @@ describe("add-to-archive", () => {
     expect(f["f.txt"]).toBe("x");
     expect(f["sub/newdir/.smartarchive"]).toBe(".");
 
-    const tree = buildTree(
-      [
-        { path: "f.txt", size: 1, type: "REGULAR_FILE" },
-        { path: "sub/newdir/.smartarchive", size: 1, type: "REGULAR_FILE" },
-      ],
-      "test.7z",
-    );
+    const entries = [
+      { path: "f.txt", size: 1, type: "REGULAR_FILE" },
+      { path: "sub/newdir/.smartarchive", size: 1, type: "REGULAR_FILE" },
+    ];
+    const tree = buildTreeRootOnly(entries, "test.7z");
     expect(tree.length).toBe(2);
     const subDir = tree.find((n: any) => n.kind === "DIRECTORY" && n.name === "sub") as any;
     expect(subDir).toBeTruthy();
-    expect(subDir!.children!.length).toBe(1);
-    expect(subDir!.children![0].name).toBe("newdir");
-    expect(subDir!.children![0].kind).toBe("DIRECTORY");
+    expect(subDir!.hasMore).toBe(true);
+    const subChildren = getDirChildren("sub", entries);
+    expect(subChildren.length).toBe(1);
+    expect(subChildren[0].name).toBe("newdir");
+    expect(subChildren[0].kind).toBe("DIRECTORY");
   });
 });
 

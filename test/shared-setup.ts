@@ -32,8 +32,8 @@ export { testCompress, testDecompress } from "./test-helpers";
 // ── Production logic under test (one implementation, no mirrors) ──
 
 export {
-  buildTree,
-  countTreeStats,
+  buildTreeRootOnly,
+  getDirChildren,
 } from "../src/providers/treeBuilder";
 export type { TreeNode, FlatEntry } from "../src/providers/treeBuilder";
 
