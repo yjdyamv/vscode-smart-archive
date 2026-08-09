@@ -34,9 +34,9 @@
   "scripts": {
     "clean": "node -e \"['out','media/vue','coverage'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\"",
     "postinstall": "node scripts/install-7zz-wasm.js && npm --prefix webview-ui install",
-    "compile": "vite build --config vite.extension.config.ts",
-    "compile:dev": "cross-env SOURCEMAP=true vite build --config vite.extension.config.ts",
-    "watch": "vite build --config vite.extension.config.ts --watch",
+    "compile": "vite build --config vite.extension.config.mts",
+    "compile:dev": "cross-env SOURCEMAP=true vite build --config vite.extension.config.mts",
+    "watch": "vite build --config vite.extension.config.mts --watch",
     "build:webview": "npm --prefix webview-ui run build",
     "build:webview:dev": "cross-env SOURCEMAP=true npm --prefix webview-ui run build",
     "dev:webview": "npm --prefix webview-ui run dev",

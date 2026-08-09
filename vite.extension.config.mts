@@ -6,8 +6,8 @@ export default defineConfig({
   build: {
     lib: {
       entry: {
-        extension: path.resolve(__dirname, "src/extension.ts"),
-        "worker/worker": path.resolve(__dirname, "src/engines/worker/worker.ts"),
+        extension: path.resolve(import.meta.dirname, "src/extension.ts"),
+        "worker/worker": path.resolve(import.meta.dirname, "src/engines/worker/worker.ts"),
       },
       formats: ["cjs"],
       fileName: (format, entryName) => `${entryName}.js`,
