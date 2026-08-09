@@ -229,15 +229,20 @@ export async function previewFileFromArchive(
 
   // Promote into the persistent cache: unencrypted and within the disk
   // budget. The cache copy survives tab close (the cache sweeps it by
-  // idle-TTL/count); anything else keeps the temp staging, which dies
-  // with the tab. A failed promote (race, IO) degrades to temp — the
-  // preview still works.
+  // idle-TTL/orphan/count); anything else keeps the temp staging, which
+  // dies with the tab. A failed promote (race, IO) degrades to temp — the
+  // preview still works. The origin (archive path + stat) is recorded so
+  // deleting/moving/modifying the archive reclaims the entry as an orphan.
   let openPath = tmpPath;
   if (cacheFile) {
     try {
       const st = fs.statSync(tmpPath);
       if (st.size <= getPreviewCacheConfig().maxCacheableBytes) {
-        await storePreviewCache(cacheFile, fs.readFileSync(tmpPath));
+        await storePreviewCache(cacheFile, fs.readFileSync(tmpPath), {
+          archivePath,
+          mtimeMs: archiveStat.mtimeMs,
+          size: archiveStat.size,
+        });
         openPath = cacheFile;
         secureUnlink(tmpPath);
       }
