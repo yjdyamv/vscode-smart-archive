@@ -34,6 +34,8 @@ node_modules/
 !node_modules/@emnapi/package.json
 !node_modules/@tybys/**
 !node_modules/@tybys/package.json
+!node_modules/tslib/**
+!node_modules/tslib/package.json
 
 # ── 输出 & 杂项 ──
 .cache/**
