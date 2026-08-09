@@ -17,3 +17,21 @@ export function isNotAnArchiveError(err: unknown): boolean {
   const msg = (err as Error).message || "";
   return /can\s*not\s*open|unexpected\s+end|missing\s+volume/i.test(msg);
 }
+
+/**
+ * The previewed entry exceeds MAX_PREVIEW_FILE_SIZE. Sentinel class so the
+ * host preview path can tell "extraction failed" (fall back to WASM) from
+ * "file is simply too large" — a WASM retry would hit the same limit after
+ * another full decompression, so the error must propagate instead.
+ */
+export class PreviewTooLargeError extends Error {
+  readonly size: number;
+  readonly max: number;
+
+  constructor(message: string, size: number, max: number) {
+    super(message);
+    this.name = "PreviewTooLargeError";
+    this.size = size;
+    this.max = max;
+  }
+}

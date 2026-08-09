@@ -25,6 +25,7 @@ import {
   VFS_INNER_TAR,
 } from "../constants";
 import { checkArchiveSize, validatePassword, sanitizeCliPath } from "../utils/security";
+import { PreviewTooLargeError } from "../utils/errors";
 import { getBaseName } from "../utils/path";
 import { logger } from "../utils/logger-core";
 import { t } from "../i18n";
@@ -747,7 +748,11 @@ export async function previewFileCore(
 
   const buf = Buffer.from(fileData);
   if (buf.length > MAX_PREVIEW_FILE_SIZE) {
-    throw new Error(t("preview.fileTooLarge", String(buf.length), String(MAX_PREVIEW_FILE_SIZE)));
+    throw new PreviewTooLargeError(
+      t("preview.fileTooLarge", String(buf.length), String(MAX_PREVIEW_FILE_SIZE)),
+      buf.length,
+      MAX_PREVIEW_FILE_SIZE,
+    );
   }
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, buf);
