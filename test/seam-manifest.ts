@@ -155,6 +155,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/providers/fileListing.ts": [
     "single-file-stream.test.ts"
   ],
+  "src/providers/listingCache.ts": [
+    "listing-cache.test.ts"
+  ],
   "src/providers/tempFiles.ts": [
     "single-file-stream.test.ts"
   ],
@@ -219,7 +222,6 @@ export const SEAM_COVERED: Record<string, string[]> = {
 
 export const SEAM_GAPS: Record<string, string> = {
   "src/api/index.ts": "re-export barrel — api/compress.ts + api/decompress.ts covered",
-  "src/engines/extract-core.ts": "exercised via worker extract op only transitively",
   "src/engines/js7z-helpers.ts": "WASM primitives — exercised transitively by every WASM op",
   "src/engines/js7z-lifecycle.ts": "dispose lifecycle — exercised via helpers.disposeJS7z path",
   "src/engines/js7z-list.ts": "host list dispatcher — exercised via decompress isEncrypted flow",
