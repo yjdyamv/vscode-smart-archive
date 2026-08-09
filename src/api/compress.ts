@@ -119,17 +119,6 @@ interface ProgressReporter {
  *     format: "7z",
  *     password: "secret",
  *     level: 9,
- * @param signal - Optional AbortSignal to cancel a long-running operation.
- *
- * @returns The absolute path to the created archive file.
- * @throws On format errors, password validation failures, or 7z errors.
- *
- * @example
- *   const outPath = await compress({
- *     targets: ["/home/user/project"],
- *     format: "7z",
- *     password: "secret",
- *     level: 9,
  *     excludePatterns: ["node_modules", ".git"],
  *     onProgress: (msg) => console.log(msg),
  *   });

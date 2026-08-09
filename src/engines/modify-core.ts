@@ -34,7 +34,6 @@ import { zstdCompress } from "./zstd-codec";
 import { brotliCompress, brotliDecompress } from "./brotli-codec";
 import { lz4Compress, lz4Decompress } from "./lz4-codec";
 import { snappyCompress, snappyDecompress } from "./snappy-codec";
-import { decompressLz4Frames } from "./lz4-codec";
 import { JS7z } from "./js7z-factory";
 import { disposeJS7z } from "./js7z-lifecycle";
 import { CancelledError } from "../utils/cancellation";
@@ -654,7 +653,7 @@ export async function previewFileCore(
     // decompresses to a raw tar, which 7z then extracts.
     if (archiveExt === ".tar.lz4" || archiveExt === ".tlz4") {
       const buf = fs.readFileSync(archivePath);
-      const innerTar = await decompressLz4Frames(Buffer.from(buf));
+      const innerTar = await lz4Decompress(buf);
       const tarName = path.basename(archivePath, archiveExt) + ".tar";
       archiveFsPath = `/${tarName}`;
       writeLargeVFS(js7z, archiveFsPath, innerTar);
