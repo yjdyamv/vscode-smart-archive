@@ -11,11 +11,13 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { getFullExt } from "../constants";
+import { getFullExt, isWrappedFormat } from "../constants";
 import { t } from "../i18n";
 import { getOutputPath } from "../utils/fs";
 import { logger } from "../utils/logger";
 import { runArchiveOp } from "../engines/worker/runner";
+import { extractSelectedWithSystem7z, hasSystem7zForFormat } from "../engines/system7z";
+import type { ProgressLike, TokenLike } from "../utils/cancellation";
 
 /**
  * Extract selected files from an archive (webview "Extract Selected").
@@ -31,6 +33,7 @@ export async function extractSelected(
   const ext = getFullExt(archivePath);
   const rawOutputDir = outputOverride || getOutputPath(archivePath, "extracted");
   const outputDir = path.resolve(rawOutputDir);
+  const useSystem7z = !isWrappedFormat(ext) && hasSystem7zForFormat(ext, true);
 
   logger.info({
     event: "extraction.start",
@@ -39,17 +42,46 @@ export async function extractSelected(
     flat,
     outputDir,
     ext,
+    engine: useSystem7z ? "system7z" : "worker",
   });
 
-  await runArchiveOp("modify", {
-    action: "extract",
-    archivePath,
-    paths: selectedPaths,
-    password,
-    flat,
-    outputDir,
-    excludes,
-  });
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: t("decompress.progressTitle"),
+      cancellable: true,
+    },
+    async (progress, token) => {
+      progress.report({ message: t("archive.extracting") });
+      if (useSystem7z) {
+        await extractSelectedWithSystem7z(
+          archivePath,
+          selectedPaths,
+          password,
+          flat,
+          outputDir,
+          excludes,
+          progress as ProgressLike,
+          token as TokenLike,
+        );
+      } else {
+        await runArchiveOp(
+          "modify",
+          {
+            action: "extract",
+            archivePath,
+            paths: selectedPaths,
+            password,
+            flat,
+            outputDir,
+            excludes,
+          },
+          progress as ProgressLike,
+          token as TokenLike,
+        );
+      }
+    },
+  );
 
   if (fs.existsSync(outputDir)) {
     await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputDir));

@@ -961,7 +961,12 @@ function verifyStagingDir(stagingDir: string): void {
  * A genuine listing failure (e.g. wrong password) is tolerated: the subsequent
  * extraction will surface that error itself.
  */
-async function preflightSystem7z(sz: string, inputPath: string, password: string): Promise<void> {
+async function preflightSystem7z(
+  sz: string,
+  inputPath: string,
+  password: string,
+  enforceTotalSize = true,
+): Promise<void> {
   const args: string[] = ["l", "-slt"];
   args.push("--", inputPath);
 
@@ -990,11 +995,13 @@ async function preflightSystem7z(sz: string, inputPath: string, password: string
   // /^Size = / does not match "Packed Size =", "Physical Size =" or "Headers
   // Size =". checkTotalSize throws — aborting extraction — the moment the
   // running total exceeds the limit, so we stop early on a bomb.
-  let total = 0;
-  const sizeRe = /^Size = (\d+)/gm;
-  let m: RegExpExecArray | null;
-  while ((m = sizeRe.exec(stdout)) !== null) {
-    total = checkTotalSize(total, parseInt(m[1], 10) || 0);
+  if (enforceTotalSize) {
+    let total = 0;
+    const sizeRe = /^Size = (\d+)/gm;
+    let m: RegExpExecArray | null;
+    while ((m = sizeRe.exec(stdout)) !== null) {
+      total = checkTotalSize(total, parseInt(m[1], 10) || 0);
+    }
   }
 }
 
@@ -1040,6 +1047,80 @@ export async function decompressWithSystem7z(
     logger.info({ event: "system7z.decompress.ok", output: options.outputDir });
   } catch (err) {
     logger.error({ event: "system7z.decompress.failed", err }, "System 7z decompression failed");
+    if (fs.existsSync(stagingDir)) {
+      try {
+        fs.rmSync(stagingDir, { recursive: true, force: true });
+      } catch {}
+    }
+    throw err;
+  }
+
+  try {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+  } catch {}
+}
+
+/**
+ * System 7-Zip selective extraction (webview "Extract Selected" / copy-paste).
+ * Streams from disk, so large archives (notably RAR) do not need to be loaded
+ * into WASM memory. Non-wrapped formats only; wrapped formats keep the WASM path.
+ */
+export async function extractSelectedWithSystem7z(
+  archivePath: string,
+  selectedPaths: string[],
+  password: string | undefined,
+  flat: boolean | undefined,
+  outputDir: string,
+  excludes: string[] | undefined,
+  progress?: ProgressLike,
+  token?: TokenLike,
+): Promise<void> {
+  const sz = system7zForExt(getFullExt(archivePath));
+  if (!sz) throw new Error("System 7-Zip not available");
+
+  // Symlink entries are refused before extraction (path-traversal write-through
+  // happens DURING extraction). Total-size enforcement is skipped here because
+  // only the selected entries are extracted, not the whole archive.
+  await preflightSystem7z(sz, archivePath, password ?? "", false);
+
+  // Stage on the SAME filesystem as the output dir so the post-extraction move
+  // is an atomic same-device rename.
+  const stagingParent = path.dirname(path.resolve(outputDir));
+  fs.mkdirSync(stagingParent, { recursive: true });
+  const stagingDir = fs.mkdtempSync(path.join(stagingParent, ".sa7zs_"));
+
+  const args: string[] = [flat ? "e" : "x", archivePath, `-o${stagingDir}`];
+  if (flat) args.push("-aou");
+  else args.push("-y");
+  for (const ex of excludes ?? []) {
+    args.push("-xr!" + ex.replace(/\\/g, "/"));
+  }
+  args.push("--");
+  for (const p of selectedPaths) {
+    args.push(sanitizeCliPath(p.replace(/\\/g, "/")));
+  }
+
+  logger.info({
+    event: "system7z.selective.start",
+    input: archivePath,
+    output: outputDir,
+    staging: stagingDir,
+    pathCount: selectedPaths.length,
+    flat: !!flat,
+    argsPreview: maskArgs(args),
+  });
+
+  try {
+    // No -p switch: 7z prompts for the password and run7z feeds it via stdin.
+    await run7z(sz, args, progress, token, undefined, password);
+    verifyStagingDir(stagingDir);
+    moveMerge(stagingDir, outputDir);
+    logger.info({ event: "system7z.selective.ok", output: outputDir });
+  } catch (err) {
+    logger.error(
+      { event: "system7z.selective.failed", err },
+      "System 7z selective extraction failed",
+    );
     if (fs.existsSync(stagingDir)) {
       try {
         fs.rmSync(stagingDir, { recursive: true, force: true });
