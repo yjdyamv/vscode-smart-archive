@@ -12,8 +12,7 @@ import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
 import { convertArchive } from "../../../services/archiveService";
 import { startOperation, endOperation } from "../state";
-import { getSplitVolumeStem, resolveWritableFormat } from "./shared";
-import { uniquePath } from "../helpers";
+import { resolveWritableFormat, mergeOutputPath } from "./shared";
 
 export const handleMerge: MessageHandler = async (ctx) => {
   const { webview, state: s } = ctx;
@@ -28,10 +27,7 @@ export const handleMerge: MessageHandler = async (ctx) => {
       return;
     }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
-    const base = getSplitVolumeStem(s.filePath);
-    // uniquePath: a re-merge (or any pre-existing base archive) must never
-    // silently merge into the old result.
-    const dst = uniquePath(base + "." + fmt);
+    const dst = mergeOutputPath(s.filePath, fmt);
     webview.postMessage({ c: "loading", t: t("archive.merging") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", undefined, undefined, token);
     logger.info({ event: "webview.merge.ok", dst });
