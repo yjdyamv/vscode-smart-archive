@@ -40,6 +40,9 @@ export async function fetchFileList(
 
   // Wrapped formats only: repeat previews skip the full in-memory
   // extraction via the disk cache (stat + sha256 verified on read).
+  // Note: a cache hit intentionally bypasses the archive-size gate in the
+  // listing core — the gate protects the worker from reading an oversized
+  // archive into memory, and a hit reads nothing at all.
   const cacheDir = isWrappedFormat(ext) && !data && !password ? getListingCacheDir() : null;
   if (cacheDir) {
     const cached = await readListingCache(cacheDir, filePath);

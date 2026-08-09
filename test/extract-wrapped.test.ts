@@ -13,10 +13,12 @@
  * must read from where they wrote.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { extractSelectedCore } from "../src/engines/extract-core";
+import { setWorkerMemoryLimitMb } from "../src/engines/worker/memory-guard";
+import { t } from "../src/i18n";
 import { createWrapped, j7zCompressDir } from "./helpers";
 import { tmpDir } from "./tmp";
 
@@ -140,6 +142,25 @@ describe("extractSelectedCore wrapped", () => {
     const files = collectFiles(out);
     expect(files.has(".smartarchive")).toBe(false);
     expect(files.get("pkg/a.txt")).toBe("hello a\n");
+  });
+});
+
+describe("extractSelectedCore memory guard", () => {
+  afterEach(() => {
+    setWorkerMemoryLimitMb(0);
+  });
+
+  it("fails with the memory-limit error when RSS exceeds the ceiling", async () => {
+    const td = tmpDir("sat_ext_memguard_");
+    const archive = await buildWrappedArchive(td, "tar.gz");
+    const out = path.join(td, "out");
+
+    // 1 MiB ceiling: the WASM engine alone exceeds it, so the guard fires at
+    // the first file copy inside copyFromFSWithStrip.
+    setWorkerMemoryLimitMb(1);
+    await expect(
+      extractSelectedCore(archive, ["pkg/a.txt"], undefined, false, out, undefined),
+    ).rejects.toThrow(t("worker.memoryLimit", String(1)));
   });
 });
 
