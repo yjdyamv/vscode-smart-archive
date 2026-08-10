@@ -14,7 +14,8 @@ import { logger } from "../../utils/logger";
 import { deleteFromArchiveSystem7z } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
 import { selectEngine } from "../../engines/select-engine";
-import { rebuildRarArchive, archiveJoin } from "./rar5-modify";
+import { deleteWithRar5 } from "../../engines/rar5-engine";
+import { rebuildRarArchive, archiveJoin, detectRarVersion } from "./rar5-modify";
 import type { TokenLike, ProgressLike } from "../../utils/cancellation";
 
 export async function deleteFromArchive(
@@ -39,8 +40,29 @@ export async function deleteFromArchive(
     return;
   }
 
-  // 7-Zip cannot modify RAR archives (E_NOTIMPL) — rebuild instead.
+  // 7-Zip cannot modify RAR archives (E_NOTIMPL) — RAR5 archives are
+  // rewritten surgically by the rar5 binding (kept members keep their exact
+  // bytes, solid chains are recompressed from the chain start, multi-volume
+  // sets are re-split); RAR4 (or any failure) falls back to a full rebuild.
   if (engine === "rarRebuild") {
+    if (detectRarVersion(archivePath) === "rar5") {
+      try {
+        logger.info({
+          event: "deleteFromArchive.rar5.direct",
+          archivePath,
+          ext,
+          count: selectedPaths.length,
+        });
+        const deleted = deleteWithRar5(archivePath, selectedPaths, password ?? "");
+        logger.info({ event: "deleteFromArchive.rar5.direct.ok", archivePath, deleted });
+        return;
+      } catch (err) {
+        logger.warn(
+          { event: "deleteFromArchive.rar5.direct.failed", archivePath, err },
+          "Surgical delete failed, falling back to full rebuild",
+        );
+      }
+    }
     logger.info({
       event: "deleteFromArchive.rar5.rebuild",
       archivePath,

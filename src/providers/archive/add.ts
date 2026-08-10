@@ -17,7 +17,14 @@ import { t } from "../../i18n";
 import { addToArchiveSystem7z } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
 import { selectEngine } from "../../engines/select-engine";
-import { rebuildRarArchive, archiveJoin, copyIntoArchive } from "./rar5-modify";
+import { appendWithRar5 } from "../../engines/rar5-engine";
+import {
+  rebuildRarArchive,
+  archiveJoin,
+  copyIntoArchive,
+  detectRarVersion,
+} from "./rar5-modify";
+import { isRarVolume } from "../../utils/rar";
 
 // ── Per-archive pending state for add-to-archive ──
 
@@ -172,8 +179,29 @@ export async function addToArchive(
 
   const { engine } = selectEngine({ op: "add", ext, password });
 
-  // 7-Zip cannot add files to RAR archives (E_NOTIMPL) — rebuild instead.
+  // 7-Zip cannot add files to RAR archives (E_NOTIMPL) — for single-volume
+  // RAR5 archives the rar5 binding appends without rebuilding (existing
+  // members keep their exact bytes); anything else falls back to a full
+  // rebuild.
   if (engine === "rarRebuild") {
+    const multiVolume = isRarVolume(ext) || /\.part\d+\.rar$/i.test(archivePath);
+    if (!multiVolume && detectRarVersion(archivePath) === "rar5") {
+      try {
+        logger.info({
+          event: "addToArchive.rar5.append",
+          archivePath,
+          files: localPaths.length,
+          targetDir,
+        });
+        await appendWithRar5(archivePath, localPaths, targetDir, password ?? "", patterns);
+        return;
+      } catch (err) {
+        logger.warn(
+          { event: "addToArchive.rar5.append.failed", archivePath, err },
+          "Append failed, falling back to full rebuild",
+        );
+      }
+    }
     logger.info({
       event: "addToArchive.rar5.rebuild",
       archivePath,

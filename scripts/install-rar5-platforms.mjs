@@ -37,7 +37,7 @@ const REPO = process.env.SA_RAR5_REPO || "yjdyamv/smart-archive-rar";
 // Fallback version used only when the GitHub API is unreachable. Prefer
 // SA_RAR5_VERSION (explicit) — otherwise the latest release tag is resolved
 // automatically (cached for 1 h under .cache/rar5-platforms/).
-const PKG_VERSION_FALLBACK = "0.3.1";
+const PKG_VERSION_FALLBACK = "0.3.2";
 
 const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -58,24 +58,24 @@ async function resolveVersion() {
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "f236f0020c066eed9037f68af0a2b6156e9434a272efcd394199e50441a8645c",
-  "linux-x64-musl": "00383fe3ef55ef5ac21e4b7bee18256dcfdcbd4dd0b1227229e2e7e1c73a0b58",
-  "linux-arm64-gnu": "f8e1917edb85c7237ed466b4b2a70e9d4ccf99aa559acaff12ce0d3dd491477a",
-  "linux-arm64-musl": "cfb5493b651335e4c8d41663b55631f58706b2f0a1199bb7660a89ed04650be0",
-  "linux-arm-gnueabihf": "308c21319ceb2b3795180b4c035cc00cd95ec8cd47955160ebb17f78f54f50cf",
-  "darwin-arm64": "c45263acca73fc3a3ba3611bf43c696bbbbc2219351e18a05a32a1726f28c182",
-  "win32-x64-msvc": "32f78aa8461faac8b645e5dd6e711395624f9a2f5f1a2b5aebc349e238f79e66",
-  "win32-ia32-msvc": "dade1dbfb33b4da37010bb9a229eb6026b5bd1e4385006cc5691eb56d1755e6e",
-  "win32-arm64-msvc": "68ea3efa091846f6fd01a4df729a75931c182a05d913e79105eb138e39681fe5",
+  "linux-x64-gnu": "054f14361b474aabe26e9afa0ccf7d445acde05bc94e758fb6aad135700287e6",
+  "linux-x64-musl": "4d564a11f98d79ce8247ac3c6963016202aaf3240593b81c82929ae71b1a76c0",
+  "linux-arm64-gnu": "693679b0a84424b6fbf7514ede8377381396b4d37be7e0c432af946a742b8689",
+  "linux-arm64-musl": "b5383bddc7e98b9a8d235bef9e06217574f4310a9ac4f79496a9676f95756ae8",
+  "linux-arm-gnueabihf": "0e765235177677df55995888f6d99f1b0efe71f388d4f25475aaec3b99e1ca32",
+  "darwin-arm64": "cff7c0c3e71ecdc1b99ddcc603cd9e29ca6a3aca28bee8e95a3a15294eabf16b",
+  "win32-x64-msvc": "93a033119eb1c2de3290188993e5f0afa9fd3df8b34d97f6282b2ab911c04eee",
+  "win32-ia32-msvc": "6ca1ac4f72f0033264f2e65dee8813de0ed33bb332ac7573a91a0e916cddd980",
+  "win32-arm64-msvc": "d1936a4937acfacdce1e91422fdafd8883476dc0f155470062850e9fe456e0bf",
   // WASI fallback bundle (smart-archive-rar >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "smart-archive-rar.wasm32-wasi.wasm":
-    "e8860fea6ffc168109f76f48feaed9d10832bf75e38677b45b1afea076c61ee0",
+    "35bfe2ecc3eff495273d83aac3c963e011297918e92b96513ae23dc9e333f23e",
   "smart-archive-rar.wasm32-wasi.debug.wasm":
-    "6f14e3747c3e1bd3f019287935f3a5d0c1a13b704db3844195fd19d5ad80e5cc",
-  "smart-archive-rar.wasi.cjs": "a60accf33fcb97ce96d91dec15c0f68a28d2a30a32dd8a800ccf7fec099b1088",
-  "wasi-path-map.cjs": "a40aac4ca3be9ff05cf28a027c979a2779a2e0f5c6cf6d8dbead2a059a8db3cd",
+    "16489be9a45845df2e6f71e64940f876fb3de4ad155be6d7985a634c298914a4",
+  "smart-archive-rar.wasi.cjs": "0e71c3b9eab238c5a8018cd36a14acaf2a6ff6fd658d9db6a047cdf1164fd0bb",
+  "wasi-path-map.cjs": "ca428d68155e0f2f2dc051d5ee32ac700b7644c02005ccfcffdf2b89f20f56be",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
 };
 

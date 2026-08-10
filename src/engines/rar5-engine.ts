@@ -77,6 +77,23 @@ interface Rar5Binding {
     onProgress?: (err: Error | null, p: { done: number; total: number }) => void,
     signal?: AbortSignal,
   ): Promise<{ files: string[] }>;
+  appendEntries(
+    opts: {
+      archivePath: string;
+      entries: Array<{
+        kind: "file" | "dir" | "bytes";
+        path?: string;
+        name?: string;
+        data?: Uint8Array;
+      }>;
+      level?: number;
+      password?: string;
+    },
+    onProgress?: (err: Error | null, p: { done: number; total: number }) => void,
+    signal?: AbortSignal,
+  ): Promise<{ files: string[] }>;
+  deleteEntries(archivePath: string, names: string[], password?: string): number;
+  listEntries(archivePath: string, password?: string): string[];
   repairArchive(inputPath: string, outputPath: string): void;
 }
 
@@ -423,4 +440,134 @@ function cleanupPartialOutput(outputPath: string): void {
   } catch {
     // best-effort cleanup
   }
+}
+
+/** List the member names of a RAR5 archive (for directory expansion). */
+export function listRar5Entries(archivePath: string, password?: string): string[] {
+  const mod = loadBinding();
+  return mod.listEntries(archivePath, password || undefined);
+}
+
+/**
+ * Expand an archive-view selection into exact member names: a selected
+ * directory matches itself and every member under its `dir/` prefix; a
+ * selected file matches its exact member name.
+ */
+export function expandRarSelection(
+  allNames: string[],
+  selected: string[],
+): string[] {
+  const names = new Set<string>();
+  for (const sel of selected) {
+    const norm = sel.replace(/\\/g, "/").replace(/^\/+/, "");
+    if (norm === "") continue;
+    if (names.has(norm)) continue;
+    if (allNames.includes(norm)) {
+      names.add(norm);
+      continue;
+    }
+    const prefix = norm.endsWith("/") ? norm : `${norm}/`;
+    let matched = 0;
+    for (const n of allNames) {
+      if (n.startsWith(prefix)) {
+        names.add(n);
+        matched++;
+      }
+    }
+    if (matched === 0) {
+      // A directory entry that carries no children is itself a member.
+      names.add(norm);
+    }
+  }
+  return [...names];
+}
+
+/**
+ * Append local files/folders to an existing single-volume RAR5 archive
+ * without rebuilding it: existing members are preserved verbatim, only the
+ * trailing quick-open/recovery/end blocks are truncated and rewritten.
+ * Throws when the archive is multi-volume, locked, or not RAR5.
+ */
+export async function appendWithRar5(
+  archivePath: string,
+  localPaths: string[],
+  targetDir: string,
+  password: string,
+  excludePatterns: string[],
+  progress?: ProgressLike,
+  token?: TokenLike,
+): Promise<void> {
+  const prog: ProgressLike = withStage(progress ?? { report: () => {} }, "append");
+  const mod = loadBinding();
+  const entries = collectEntries(
+    localPaths.map((p) => ({ fsPath: p })),
+    excludePatterns,
+  );
+  if (entries.length === 0) {
+    throw new Error("No files to add (all targets excluded)");
+  }
+  const bindingEntries = entries.map((e) => ({
+    kind: e.kind,
+    path: e.path,
+    name: targetDir ? `${targetDir.replace(/\\/g, "/")}/${e.name}` : e.name,
+  }));
+
+  const controller = new AbortController();
+  let disposable: { dispose(): void } | undefined;
+  if (token) {
+    disposable = token.onCancellationRequested?.(() => controller.abort());
+    if (token.isCancellationRequested) controller.abort();
+  }
+
+  let lastPct = -1;
+  const reportPct = (pct: number) => {
+    if (pct <= 0 || pct <= lastPct) return;
+    const delta = pct - (lastPct < 0 ? 0 : lastPct);
+    lastPct = pct;
+    prog.report({ message: `${pct}%`, increment: delta });
+  };
+
+  try {
+    await mod.appendEntries(
+      {
+        archivePath,
+        entries: bindingEntries,
+        level: 3,
+        password: password || undefined,
+      },
+      (err, p) => {
+        if (err) return;
+        const pct = Math.min(100, Math.floor((p.done / Math.max(p.total, 1)) * 100));
+        reportPct(pct);
+      },
+      controller.signal,
+    );
+  } catch (err) {
+    if (isCancellationError(err)) {
+      throw new CancelledError();
+    }
+    throw err;
+  } finally {
+    disposable?.dispose();
+  }
+  reportPct(100);
+}
+
+/**
+ * Delete members from a RAR5 archive without rebuilding it. Directories in
+ * the selection are expanded to all members below them via
+ * {@link expandRarSelection}. Returns the number of deleted members.
+ */
+export function deleteWithRar5(
+  archivePath: string,
+  selectedPaths: string[],
+  password: string,
+): number {
+  const mod = loadBinding();
+  const allNames = mod.listEntries(archivePath, password || undefined);
+  const names = expandRarSelection(allNames, selectedPaths);
+  if (names.length === 0) {
+    throw new Error("No members match the selection");
+  }
+  return mod.deleteEntries(archivePath, names, password || undefined);
 }
