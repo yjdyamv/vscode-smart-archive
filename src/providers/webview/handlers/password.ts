@@ -18,6 +18,7 @@ import {
 } from "../../../constants";
 import { fetchFileList } from "../../fileListing";
 import { saveArchivePassword } from "../../passwordVault";
+import { getRarPayloadSize } from "../../archive/rar5-modify";
 import {
   buildTreeRootOnly,
   buildEntryIndex,
@@ -87,7 +88,12 @@ export const handlePassword: MessageHandler = async (ctx) => {
         format: ext,
         count: pwStats.total,
         size: formatCompactSize(pwStats.totalSize),
-        ratio: pwStats.totalSize > 0 ? getCompressedArchiveSize(s.filePath) / pwStats.totalSize : 0,
+        // Exclude the recovery-record parity tail from the ratio.
+        ratio:
+          pwStats.totalSize > 0
+            ? getRarPayloadSize(s.filePath, getCompressedArchiveSize(s.filePath)) /
+              pwStats.totalSize
+            : 0,
       },
       getNoisyPatterns(),
       pwToast,
