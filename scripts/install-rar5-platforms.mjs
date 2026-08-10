@@ -72,8 +72,6 @@ const EXPECTED_HASHES = {
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "smart-archive-rar.wasm32-wasi.wasm":
     "35bfe2ecc3eff495273d83aac3c963e011297918e92b96513ae23dc9e333f23e",
-  "smart-archive-rar.wasm32-wasi.debug.wasm":
-    "16489be9a45845df2e6f71e64940f876fb3de4ad155be6d7985a634c298914a4",
   "smart-archive-rar.wasi.cjs": "0e71c3b9eab238c5a8018cd36a14acaf2a6ff6fd658d9db6a047cdf1164fd0bb",
   "wasi-path-map.cjs": "ca428d68155e0f2f2dc051d5ee32ac700b7644c02005ccfcffdf2b89f20f56be",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
@@ -91,12 +89,13 @@ const TRIPLES = {
 };
 
 // WASI fallback bundle (smart-archive-rar >= 0.3.0): generated Node loader +
-// release/debug WASM modules + threads worker. Staged to vendor/rar5-wasm/
-// so src/engines/rar5-engine.ts can require the loader when no native .node
-// matches the host.
+// release WASM module + threads worker. Staged to vendor/rar5-wasm/ so
+// src/engines/rar5-engine.ts can require the loader when no native .node
+// matches the host. The `.debug.wasm` variant is deliberately not staged:
+// the napi loader prefers it whenever it exists, which would make
+// production run the debug build.
 const WASM_ASSETS = [
   "smart-archive-rar.wasm32-wasi.wasm",
-  "smart-archive-rar.wasm32-wasi.debug.wasm",
   "smart-archive-rar.wasi.cjs",
   "wasi-path-map.cjs",
   "wasi-worker.mjs",

@@ -77,3 +77,5 @@ coverage/**
 **/*.map
 **/.gitignore
 **/.DS_Store
+# 调试构建绝不进 release 包（loader 存在时优先加载它）
+**/*.debug.wasm
