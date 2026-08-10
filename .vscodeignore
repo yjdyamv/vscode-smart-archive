@@ -23,8 +23,11 @@ skills-lock.json
 
 # ── 排除整个 node_modules，只反选需要的文件 ──
 node_modules/
-!node_modules/@vscode/codicons/dist/**
+# webview 只引用 codicon.css + 字体
+!node_modules/@vscode/codicons/dist/codicon.css
+!node_modules/@vscode/codicons/dist/codicon.ttf
 !node_modules/@vscode/codicons/LICENSE
+# snappy (zstd) native binding + WASI fallback
 !node_modules/snappy/index.js
 !node_modules/snappy/index.d.ts
 !node_modules/snappy/snappy.*.node
@@ -33,14 +36,39 @@ node_modules/
 !node_modules/snappy/wasi-worker.mjs
 !node_modules/snappy/package.json
 !node_modules/snappy/LICENSE
-!node_modules/@napi-rs/wasm-runtime/**
+# napi-rs wasm runtime: 只保留 CommonJS require 链（runtime.cjs →
+# dist/emnapi-plugins.cjs + dist/fs-proxy.cjs → @emnapi/core/@emnapi/runtime）
+!node_modules/@napi-rs/wasm-runtime/runtime.js
+!node_modules/@napi-rs/wasm-runtime/runtime.cjs
 !node_modules/@napi-rs/wasm-runtime/package.json
-!node_modules/@emnapi/**
-!node_modules/@emnapi/package.json
-!node_modules/@tybys/**
-!node_modules/@tybys/package.json
-!node_modules/tslib/**
+!node_modules/@napi-rs/wasm-runtime/fs-proxy.js
+!node_modules/@napi-rs/wasm-runtime/dist/fs.js
+!node_modules/@napi-rs/wasm-runtime/dist/fs-proxy.cjs
+!node_modules/@napi-rs/wasm-runtime/dist/emnapi-plugins.js
+!node_modules/@napi-rs/wasm-runtime/dist/emnapi-plugins.cjs
+# @emnapi core/runtime: index.js 只 require 两个 CJS dist 变体
+!node_modules/@emnapi/core/index.js
+!node_modules/@emnapi/core/package.json
+!node_modules/@emnapi/core/LICENSE
+!node_modules/@emnapi/core/dist/emnapi-core.cjs.js
+!node_modules/@emnapi/core/dist/emnapi-core.cjs.min.js
+!node_modules/@emnapi/runtime/index.js
+!node_modules/@emnapi/runtime/package.json
+!node_modules/@emnapi/runtime/LICENSE
+!node_modules/@emnapi/runtime/dist/emnapi.cjs.js
+!node_modules/@emnapi/runtime/dist/emnapi.cjs.min.js
+# emnapi 传递依赖：只保留 CommonJS require 链
+# (@tybys/wasm-util main = lib/cjs/index.js，且其 CJS 链 require tslib)
+!node_modules/@emnapi/wasi-threads/index.js
+!node_modules/@emnapi/wasi-threads/package.json
+!node_modules/@emnapi/wasi-threads/LICENSE
+!node_modules/@emnapi/wasi-threads/dist/wasi-threads.cjs.js
+!node_modules/@emnapi/wasi-threads/dist/wasi-threads.cjs.min.js
+!node_modules/@tybys/wasm-util/package.json
+!node_modules/@tybys/wasm-util/lib/cjs/**
+!node_modules/tslib/tslib.js
 !node_modules/tslib/package.json
+!node_modules/tslib/LICENSE
 
 # ── 输出 & 杂项 ──
 .cache/**
