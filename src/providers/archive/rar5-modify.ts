@@ -249,6 +249,102 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
   }
 }
 
+/**
+ * Size of the RAR5 payload protected by the recovery record — every
+ * header and file-data block before the `{RB}` parity tail. The on-disk
+ * archive size includes the recovery record, which inflates the
+ * compression ratio shown in the archive view. Falls back to `fullSize`
+ * when the archive is not RAR5 or has no readable recovery record
+ * (header-encrypted archives cannot be sniffed without the password).
+ */
+export function getRarPayloadSize(archivePath: string, fullSize: number): number {
+  const fd = fs.openSync(archivePath, "r");
+  try {
+    const readVintAt = (pos: number): { value: number; len: number } | null => {
+      let val = 0;
+      let shift = 0;
+      const buf = Buffer.alloc(10);
+      const n = fs.readSync(fd, buf, 0, 10, pos);
+      for (let i = 0; i < n; i++) {
+        const b = buf[i];
+        val |= (b & 0x7f) << shift;
+        if ((b & 0x80) === 0) return { value: val, len: i + 1 };
+        shift += 7;
+        if (shift > 56) return null;
+      }
+      return null;
+    };
+    const sig = Buffer.alloc(8);
+    if (fs.readSync(fd, sig, 0, 8, 0) < 8 || !sig.equals(RAR5_SIGNATURE)) return fullSize;
+    let pos = 8;
+    for (let i = 0; i < 4096; i++) {
+      if (pos < 8 || pos > 1 << 30) return fullSize;
+      const hsize = readVintAt(pos + 4);
+      if (!hsize) return fullSize;
+      const contentStart = pos + 4 + hsize.len;
+      const type = readVintAt(contentStart);
+      if (!type) return fullSize;
+      const flags = readVintAt(contentStart + type.len);
+      if (!flags) return fullSize;
+      let p = contentStart + type.len + flags.len;
+      let dataSize = 0;
+      if (flags.value & 0x0001) {
+        const v = readVintAt(p);
+        if (!v) return fullSize;
+        p += v.len;
+      }
+      if (flags.value & 0x0002) {
+        const v = readVintAt(p);
+        if (!v) return fullSize;
+        dataSize = v.value;
+        p += v.len;
+      }
+      if (type.value === 4) return fullSize; // encrypted headers — cannot sniff
+      if (type.value === 3) {
+        const fflags = readVintAt(p);
+        if (!fflags) return fullSize;
+        p += fflags.len;
+        const usize = readVintAt(p);
+        if (!usize) return fullSize;
+        p += usize.len;
+        const attrs = readVintAt(p);
+        if (!attrs) return fullSize;
+        p += attrs.len;
+        if (fflags.value & 0x0002) p += 4; // mtime
+        if (fflags.value & 0x0004) p += 4; // crc
+        const cinfo = readVintAt(p);
+        if (!cinfo) return fullSize;
+        p += cinfo.len;
+        const host = readVintAt(p);
+        if (!host) return fullSize;
+        p += host.len;
+        const nlen = readVintAt(p);
+        if (!nlen) return fullSize;
+        p += nlen.len;
+        const name = Buffer.alloc(nlen.value);
+        fs.readSync(fd, name, 0, nlen.value, p);
+        if (name.toString("utf8") === "RR") {
+          // The {RB} chunk starts at the service block's data area; its
+          // protected_size field lives at chunk offset 0x22 (u64 LE).
+          const rbStart = contentStart + hsize.value;
+          const ps = Buffer.alloc(8);
+          const n = fs.readSync(fd, ps, 0, 8, rbStart + 0x22);
+          if (n < 8) return fullSize;
+          const protectedSize = Number(ps.readBigUInt64LE());
+          if (protectedSize > 0 && protectedSize <= fullSize) return protectedSize;
+          return fullSize;
+        }
+      }
+      if (dataSize > 1 << 30) return fullSize; // implausible — malformed header
+      pos = contentStart + hsize.value + dataSize;
+      if (type.value === 5) return fullSize; // end of archive
+    }
+    return fullSize;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export interface RebuildRarOptions {
   archivePath: string;
   password?: string;
