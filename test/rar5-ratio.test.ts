@@ -10,7 +10,6 @@ import * as path from "path";
 import { describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
 import { getRarPayloadSize } from "../src/providers/archive/rar5-modify";
-import { gate } from "./gates";
 import { tmpDir } from "./tmp";
 
 const FORMAT = {

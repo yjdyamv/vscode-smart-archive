@@ -9,7 +9,6 @@ import * as path from "path";
 import { describe, expect, it } from "vitest";
 import { decompressWith7z } from "../src/engines/js7z-decompress-core";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
-import { listRar5Entries } from "../src/engines/rar5-engine";
 import { tmpDir } from "./tmp";
 
 const FORMAT = {

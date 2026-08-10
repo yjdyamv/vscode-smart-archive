@@ -136,6 +136,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "正在压缩...",
     "zh-tw": "正在壓縮...",
   },
+  "compress.stage.append": {
+    en: "Appending...",
+    "zh-cn": "正在追加...",
+    "zh-tw": "正在追加...",
+  },
   "compress.stage.copyShort": {
     en: "Copy",
     "zh-cn": "复制",
@@ -150,6 +155,11 @@ const messages: Record<string, Record<Locale, string>> = {
     en: "Compress",
     "zh-cn": "压缩",
     "zh-tw": "壓縮",
+  },
+  "compress.stage.appendShort": {
+    en: "Append",
+    "zh-cn": "追加",
+    "zh-tw": "追加",
   },
   "compress.stageTimes": {
     en: " (stages: {0})",

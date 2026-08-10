@@ -453,10 +453,7 @@ export function listRar5Entries(archivePath: string, password?: string): string[
  * directory matches itself and every member under its `dir/` prefix; a
  * selected file matches its exact member name.
  */
-export function expandRarSelection(
-  allNames: string[],
-  selected: string[],
-): string[] {
+export function expandRarSelection(allNames: string[], selected: string[]): string[] {
   const names = new Set<string>();
   for (const sel of selected) {
     const norm = sel.replace(/\\/g, "/").replace(/^\/+/, "");

@@ -31,6 +31,7 @@ const STAGE_TITLE_KEYS: Record<ProgressStage, string> = {
   copy: "compress.stage.copy",
   pack: "compress.stage.pack",
   compress: "compress.stage.compress",
+  append: "compress.stage.append",
 };
 
 /**

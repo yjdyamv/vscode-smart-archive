@@ -18,12 +18,7 @@ import { addToArchiveSystem7z } from "../../engines/system7z";
 import { runArchiveOp } from "../../engines/worker/runner";
 import { selectEngine } from "../../engines/select-engine";
 import { appendWithRar5 } from "../../engines/rar5-engine";
-import {
-  rebuildRarArchive,
-  archiveJoin,
-  copyIntoArchive,
-  detectRarVersion,
-} from "./rar5-modify";
+import { rebuildRarArchive, archiveJoin, copyIntoArchive, detectRarVersion } from "./rar5-modify";
 import { isRarVolume } from "../../utils/rar";
 
 // ── Per-archive pending state for add-to-archive ──
