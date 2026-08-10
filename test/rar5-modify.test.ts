@@ -25,7 +25,6 @@ import {
   archiveJoin,
   rebuildRarArchive,
   copyIntoArchive,
-  getRarPayloadSize,
 } from "../src/providers/archive/rar5-modify";
 import { prepareExclusions } from "../src/utils/exclude";
 import { tmpDir } from "./tmp";

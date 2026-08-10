@@ -42,7 +42,7 @@ export interface TokenLike {
 }
 
 /** Compression pipeline stages reported by engines. */
-export type ProgressStage = "copy" | "pack" | "compress";
+export type ProgressStage = "copy" | "pack" | "compress" | "append";
 
 /** Minimal progress shape (matches vscode.Progress<T>). */
 export interface ProgressLike<T = { message?: string; increment?: number; stage?: ProgressStage }> {

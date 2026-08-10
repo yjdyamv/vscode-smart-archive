@@ -41,6 +41,7 @@ function formatStageSummary(durations: StageDuration[]): string {
     copy: t("compress.stage.copyShort"),
     pack: t("compress.stage.packShort"),
     compress: t("compress.stage.compressShort"),
+    append: t("compress.stage.appendShort"),
   };
   const parts = durations.map(({ stage, ms }) => `${labels[stage]} ${formatDuration(ms)}`);
   return t("compress.stageTimes", parts.join(" · "));
