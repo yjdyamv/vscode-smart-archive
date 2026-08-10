@@ -176,11 +176,10 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
     const sig = Buffer.alloc(8);
     if (fs.readSync(fd, sig, 0, 8, 0) < 8 || !sig.equals(RAR5_SIGNATURE)) return undefined;
     let pos = 8;
-    for (let i = 0; i < 4096; i++) {
+    while (pos < fs.statSync(archivePath).size && pos > 7) {
       // Header-encrypted archives encrypt every block after the type-0x04
       // encryption header — their headers cannot be sniffed without the
       // password, so treat them as having no readable recovery record.
-      if (pos < 8 || pos > 1 << 30) return undefined;
       const hsize = readVintAt(pos + 4);
       if (!hsize) return undefined;
       const contentStart = pos + 4 + hsize.len;
@@ -239,8 +238,12 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
           return pct > 100 ? undefined : pct;
         }
       }
-      if (dataSize > 1 << 30) return undefined; // implausible — malformed header
-      pos = contentStart + hsize.value + dataSize;
+      if (dataSize > fs.statSync(archivePath).size) {
+        return undefined; // implausible — malformed header
+      }
+      const next = contentStart + hsize.value + dataSize;
+      if (next <= pos) return undefined; // malformed — no forward progress
+      pos = next;
       if (type.value === 5) return undefined; // end of archive
     }
     return undefined;
@@ -260,13 +263,30 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
 export function getRarPayloadSize(archivePath: string, fullSize: number): number {
   const fd = fs.openSync(archivePath, "r");
   try {
-    const readVintAt = (pos: number): { value: number; len: number } | null => {
+    const sig = Buffer.alloc(8);
+    if (fs.readSync(fd, sig, 0, 8, 0) < 8 || !sig.equals(RAR5_SIGNATURE)) return fullSize;
+
+    // Buffered walk: parse the header blocks from a sliding 1 MiB window
+    // instead of one readSync per vint. The header area of any realistic
+    // archive fits in one or two reads, so this is O(1) syscalls for the
+    // archive-view hot path.
+    const CHUNK = 1 << 20;
+    const buf = Buffer.alloc(CHUNK);
+    let winStart = 0; // file offset of buf[0]
+    let winLen = 0; // valid bytes in buf
+    const ensure = (from: number, need: number): boolean => {
+      if (from >= winStart && from + need <= winStart + winLen) return true;
+      winStart = from;
+      const n = fs.readSync(fd, buf, 0, CHUNK, winStart);
+      winLen = n;
+      return from + need <= winStart + winLen;
+    };
+    const vintAt = (pos: number): { value: number; len: number } | null => {
       let val = 0;
       let shift = 0;
-      const buf = Buffer.alloc(10);
-      const n = fs.readSync(fd, buf, 0, 10, pos);
-      for (let i = 0; i < n; i++) {
-        const b = buf[i];
+      for (let i = 0; i < 10; i++) {
+        if (!ensure(pos + i, 1)) return null;
+        const b = buf[pos + i - winStart];
         val |= (b & 0x7f) << shift;
         if ((b & 0x80) === 0) return { value: val, len: i + 1 };
         shift += 7;
@@ -274,69 +294,69 @@ export function getRarPayloadSize(archivePath: string, fullSize: number): number
       }
       return null;
     };
-    const sig = Buffer.alloc(8);
-    if (fs.readSync(fd, sig, 0, 8, 0) < 8 || !sig.equals(RAR5_SIGNATURE)) return fullSize;
+    const byteAt = (pos: number): number | null => {
+      if (!ensure(pos, 1)) return null;
+      return buf[pos - winStart];
+    };
+
     let pos = 8;
-    for (let i = 0; i < 4096; i++) {
-      if (pos < 8 || pos > 1 << 30) return fullSize;
-      const hsize = readVintAt(pos + 4);
+    while (pos < fullSize && pos > 7) {
+      const hsize = vintAt(pos + 4);
       if (!hsize) return fullSize;
       const contentStart = pos + 4 + hsize.len;
-      const type = readVintAt(contentStart);
+      const type = vintAt(contentStart);
       if (!type) return fullSize;
-      const flags = readVintAt(contentStart + type.len);
+      const flags = vintAt(contentStart + type.len);
       if (!flags) return fullSize;
       let p = contentStart + type.len + flags.len;
       let dataSize = 0;
       if (flags.value & 0x0001) {
-        const v = readVintAt(p);
+        const v = vintAt(p);
         if (!v) return fullSize;
         p += v.len;
       }
       if (flags.value & 0x0002) {
-        const v = readVintAt(p);
+        const v = vintAt(p);
         if (!v) return fullSize;
         dataSize = v.value;
         p += v.len;
       }
       if (type.value === 4) return fullSize; // encrypted headers — cannot sniff
       if (type.value === 3) {
-        const fflags = readVintAt(p);
+        const fflags = vintAt(p);
         if (!fflags) return fullSize;
         p += fflags.len;
-        const usize = readVintAt(p);
+        const usize = vintAt(p);
         if (!usize) return fullSize;
         p += usize.len;
-        const attrs = readVintAt(p);
+        const attrs = vintAt(p);
         if (!attrs) return fullSize;
         p += attrs.len;
         if (fflags.value & 0x0002) p += 4; // mtime
         if (fflags.value & 0x0004) p += 4; // crc
-        const cinfo = readVintAt(p);
+        const cinfo = vintAt(p);
         if (!cinfo) return fullSize;
         p += cinfo.len;
-        const host = readVintAt(p);
+        const host = vintAt(p);
         if (!host) return fullSize;
         p += host.len;
-        const nlen = readVintAt(p);
+        const nlen = vintAt(p);
         if (!nlen) return fullSize;
         p += nlen.len;
-        const name = Buffer.alloc(nlen.value);
-        fs.readSync(fd, name, 0, nlen.value, p);
-        if (name.toString("utf8") === "RR") {
+        if (nlen.value >= 2 && nlen.value <= 8 && byteAt(p) === 0x52 && byteAt(p + 1) === 0x52) {
           // The {RB} chunk starts at the service block's data area; its
           // protected_size field lives at chunk offset 0x22 (u64 LE).
           const rbStart = contentStart + hsize.value;
-          const ps = Buffer.alloc(8);
-          const n = fs.readSync(fd, ps, 0, 8, rbStart + 0x22);
-          if (n < 8) return fullSize;
-          const protectedSize = Number(ps.readBigUInt64LE());
+          if (!ensure(rbStart + 0x22, 8)) return fullSize;
+          const protectedSize = Number(buf.readBigUInt64LE(rbStart + 0x22 - winStart));
           if (protectedSize > 0 && protectedSize <= fullSize) return protectedSize;
           return fullSize;
         }
       }
-      if (dataSize > 1 << 30) return fullSize; // implausible — malformed header
-      pos = contentStart + hsize.value + dataSize;
+      if (dataSize > fullSize) return fullSize; // implausible — malformed header
+      const next = contentStart + hsize.value + dataSize;
+      if (next <= pos) return fullSize; // malformed — no forward progress
+      pos = next;
       if (type.value === 5) return fullSize; // end of archive
     }
     return fullSize;
