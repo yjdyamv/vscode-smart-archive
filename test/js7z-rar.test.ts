@@ -9,7 +9,12 @@ import * as path from "path";
 import { describe, expect, it } from "vitest";
 import { decompressWith7z } from "../src/engines/js7z-decompress-core";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
+import { gate } from "./gates";
 import { tmpDir } from "./tmp";
+
+// Fixture creation needs a real RAR5 engine (native binding or WASI
+// fallback); skipped in the bare `check` CI job where neither is staged.
+const HAS_RAR5_ENGINE = gate("rar5Binding") || gate("rar5Wasm");
 
 const FORMAT = {
   label: "rar",
@@ -22,7 +27,7 @@ async function roundtrip(archive: string, password: string | undefined, out: str
   await decompressWith7z({ inputPath: archive, outputDir: out, password });
 }
 
-describe("js7z RAR5 decompression (pure-WASM package gate)", () => {
+describe.runIf(HAS_RAR5_ENGINE)("js7z RAR5 decompression (pure-WASM package gate)", () => {
   it("decompresses a plain RAR5 archive", async () => {
     const dir = tmpDir("sat_jrar-");
     try {
