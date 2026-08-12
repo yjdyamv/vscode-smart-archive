@@ -2,13 +2,13 @@
 
 [![Build](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml)
 
-VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4 codecs** plus Node.js built-in **brotli**, with the bundled 7-Zip ZS WASM engine as the final fallback for zstd/brotli/lz4. Works out of the box with no local 7-Zip install, at near-desktop speed.
+VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4/brotli** codecs (brotli via Node.js zlib), with the WASM engine as the final fallback. Works out of the box with no local 7-Zip install, at near-desktop speed.
 
 ## Features
 
-- **Compress** to 7z, ZIP, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst, tar.lz4, tar.br
+- **Compress** to 7z, ZIP, RAR5, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst, tar.lz4, tar.br, tar.sz
 - **Decompress** from 40+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
-- **AES-256 encryption** — password-protect 7z and ZIP archives
+- **AES-256 encryption** — password-protect 7z, ZIP, and RAR5 archives
 - **Native 7-Zip engine** — a full 7-Zip binary is bundled for all platforms (no install needed); a newer system 7-Zip is used automatically if present; the WASM engine is the final fallback. Choose explicitly via `smart-archive.sevenZBackend` (`auto`/`native`/`bundled`/`wasm`)
 - **Archive browser** — opens as the default editor for archives: virtual-scrolled tree, search with regex or fuzzy match, sort by name/size, multi-select for partial extract, add/delete/rename files right inside the view
 - **Keyboard navigation** — Arrow keys, PageUp/PageDown (scroll viewport), Home/End, Space to toggle selection, Enter to extract, Delete to remove, Ctrl+A to select all
@@ -70,6 +70,7 @@ Press `F5` in VS Code to launch the Extension Development Host.
 |--------|------------|-------|
 | 7z | AES-256 | Best ratio, solid archive, header encryption |
 | zip | AES-256 | Universal compatibility |
+| rar | AES-256 | RAR5 creation, header encryption, multi-volume, recovery records |
 | tar | — | No compression, archive only |
 | tar.gz | — | TAR + GZip |
 | tar.bz2 | — | TAR + BZip2 |
@@ -77,6 +78,7 @@ Press `F5` in VS Code to launch the Extension Development Host.
 | tar.zst | — | TAR + Zstandard |
 | tar.lz4 | — | TAR + LZ4 |
 | tar.br | — | TAR + Brotli |
+| tar.sz | — | TAR + Snappy |
 | wim | — | Windows Imaging Format |
 
 ### Decompression (extract)
@@ -93,11 +95,13 @@ All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, A
 | `smart-archive.maxExtractTotalSize` | `"10g"` | Max total size of all files after one extraction |
 | `smart-archive.sevenZBackend` | `"auto"` | 7-Zip engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archive.zstdBackend` | `"auto"` | Zstd engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
+| `smart-archive.brotliBackend` | `"auto"` | Brotli engine: `auto`/`native` (Node.js zlib), `bundled` (bundled native 7-Zip), `wasm` (WASM only) |
+| `smart-archive.lz4Backend` | `"auto"` | LZ4 engine: `auto` (bundled native→WASM), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archive.rar5Backend` | `"auto"` | RAR5 engine: `auto` (native binding→WASM), `native` (Node binding only), `wasm` (WASM only) |
 | `smart-archive.snappyBackend` | `"auto"` | Snappy (tar.sz): `auto` (native addon→WASM), `native` (Node addon only), `wasm` (WASM only) |
 | `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
 | `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Patterns excluded when compressing |
-| `smart-archive.volumeSizes` | `{}` | Custom split volume size presets |
+| `smart-archive.volumeSizes` | `[built-in presets]` | Custom split volume size presets (empty `{}` falls back to the built-in presets) |
 
 ## Requirements
 
@@ -128,7 +132,7 @@ npm run release          # check + package:cross (pre-release validation)
 > **UI development, two flows:**
 >
 > - **Browser preview (fastest):** `npm run dev:webview` serves the webview UI
->   at http://localhost:5173 with HMR and a mock archive (`src/devMock.ts`
+>   at http://localhost:5173 with HMR and a mock archive (`webview-ui/src/devMock.ts`
 >   simulates the host: lazy tree expansion, search, selection). No VS Code
 >   needed — ideal for iterating on components.
 > - **Real panel:** run the VS Code `watch` build task (extension compile +
@@ -141,11 +145,11 @@ npm run release          # check + package:cross (pre-release validation)
 
 | Package | Purpose |
 |---------|---------|
-| [7-Zip ZS 26.02 WebAssembly](https://github.com/yjdyamv/7-Zip-zstd-wasm) | Bundled WASM fallback (`vendor/7zz-wasm`, downloaded at install; all compression & extraction; parallel zstd, standard lz4; brotli backend configurable — node:zlib default / WASM / bundled 7z planned) |
+| [7-Zip ZS WebAssembly](https://github.com/yjdyamv/7-Zip-zstd-wasm) | Bundled WASM fallback (`vendor/7zz-wasm`, downloaded at install) — all compression & extraction; final fallback for zstd/brotli/lz4 |
+| [7-Zip ZS native](https://github.com/yjdyamv/7-Zip-zstd-native) | Bundled native binary (`vendor/7z-bin`, staged at build) — main engine and the native fast path for zstd/lz4/brotli streams |
 | [smart-archive-rar](https://github.com/yjdyamv/smart-archive-rar) | RAR5 creation engine — native napi-rs binding with a WASI (`wasm32-wasip1-threads`) fallback; AES-256, header encryption, multi-volume, recovery records, progress |
-| [zstd-napi](https://github.com/drakedevel/zstd-napi) | Zstandard compression fast path (decompression runs on WASM) |
-| [lz4-napi](https://github.com/antoniomuso/lz4-napi) | LZ4 native binding used by tests/verification; runtime codec is WASM |
-| Node.js `zlib` (built-in) | Brotli native binding used by tests/verification; runtime codec is WASM |
+| [snappy](https://github.com/Brooooooklyn/snappy) | Snappy codec for tar.sz — napi-rs binding with a WASI fallback |
+| Node.js `zlib` (built-in) | Brotli native fast path |
 | [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | CJK filename encoding recovery |
 | [Vue 3](https://vuejs.org/) | Archive browser UI |
 | [TanStack Virtual](https://tanstack.com/virtual) | Virtual scrolling for large archives |
