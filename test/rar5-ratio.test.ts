@@ -10,7 +10,12 @@ import * as path from "path";
 import { describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
 import { getRarPayloadSize } from "../src/providers/archive/rar5-modify";
+import { gate } from "./gates";
 import { tmpDir } from "./tmp";
+
+// Needs a real RAR5 engine (native binding or WASI fallback); the bare
+// `check` CI job stages neither, so these tests run where one is available.
+const HAS_RAR5_ENGINE = gate("rar5Binding") || gate("rar5Wasm");
 
 const FORMAT = {
   label: "rar",
@@ -20,7 +25,7 @@ const FORMAT = {
 };
 
 describe("getRarPayloadSize (recovery record)", () => {
-  it("excludes the RR parity tail from the ratio size", async () => {
+  it.runIf(HAS_RAR5_ENGINE)("excludes the RR parity tail from the ratio size", async () => {
     const dir = tmpDir("sat_ratio-");
     try {
       const file = path.join(dir, "data.bin");
@@ -53,7 +58,7 @@ describe("getRarPayloadSize (recovery record)", () => {
     }
   });
 
-  it("falls back to the full size for archives without RR or non-RAR", async () => {
+  it.runIf(HAS_RAR5_ENGINE)("falls back to the full size for archives without RR or non-RAR", async () => {
     const dir = tmpDir("sat_ratio2-");
     try {
       const plain = path.join(dir, "plain.bin");
