@@ -86,7 +86,9 @@ jobs:
           SA_RAR5_PLATFORMS: ""
           SA_RAR5_REQUIRE: "1"
         run: node scripts/install-rar5-platforms.mjs
-      - run: npx vitest run test/rar5-wasm.test.ts
+      # js7z-rar is the pure-WASM package gate (RAR5 extraction without a
+      # native 7zz) — runs here where the WASI engine is staged.
+      - run: npx vitest run test/rar5-wasm.test.ts test/js7z-rar.test.ts
 
   test-snappy-wasm:
     name: Test snappy WASI fallback

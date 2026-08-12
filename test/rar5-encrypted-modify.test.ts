@@ -14,8 +14,12 @@ import {
   deleteWithRar5,
   listRar5Entries,
 } from "../src/engines/rar5-engine";
-import { rar5CliBinaries } from "./gates";
+import { rar5CliBinaries, gate } from "./gates";
 import { tmpDir } from "./tmp";
+
+// Manual e2e: needs the rar-rs CLI plus the staged native binding (CI
+// `check` stages neither); opt in on the dev machine where both exist.
+const HAVE_BINARIES = gate("rar5Cli") && gate("rar5Binding");
 
 const RAR5_FORMAT = {
   label: "rar",
@@ -105,7 +109,7 @@ async function scenario(dir: string, label: string, encryptHeaders: boolean) {
   console.log(`[${label}] append=${appendMs}ms delete=${deleteMs}ms, all members IDENTICAL`);
 }
 
-describe("encrypted archive direct modify (manual)", () => {
+describe.runIf(HAVE_BINARIES)("encrypted archive direct modify (manual)", () => {
   it("file-encrypted archive", async () => {
     const dir = tmpDir("sat_encfile-");
     try {

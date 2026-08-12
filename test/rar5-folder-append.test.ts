@@ -12,8 +12,12 @@ import {
   appendWithRar5,
   listRar5Entries,
 } from "../src/engines/rar5-engine";
-import { rar5CliBinaries } from "./gates";
+import { rar5CliBinaries, gate } from "./gates";
 import { tmpDir } from "./tmp";
+
+// Manual e2e: needs the rar-rs CLI plus the staged native binding (CI
+// `check` stages neither); opt in on the dev machine where both exist.
+const HAVE_BINARIES = gate("rar5Cli") && gate("rar5Binding");
 
 const RAR5_FORMAT = {
   label: "rar",
@@ -28,7 +32,7 @@ function run(bin: string, args: string[]): string {
   return childProcess.execFileSync(bin, args, { encoding: "utf8", maxBuffer: 1 << 28 });
 }
 
-describe("folder append (manual)", () => {
+describe.runIf(HAVE_BINARIES)("folder append (manual)", () => {
   it("adds nested folders, empty folders and folders into a target dir", async () => {
     const dir = tmpDir("sat_fold-");
     try {
