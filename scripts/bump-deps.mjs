@@ -59,9 +59,7 @@ async function npmLatestVersion(pkgName, fetchJson) {
  */
 export function updateVersionConstant(scriptPath, constantName, newValue) {
   const text = fs.readFileSync(scriptPath, "utf8");
-  const re = new RegExp(
-    `(export\\s+const\\s+${constantName}\\s*=\\s*["'])[^"']*(["'])`,
-  );
+  const re = new RegExp(`(export\\s+const\\s+${constantName}\\s*=\\s*["'])[^"']*(["'])`);
   if (!re.test(text)) return false;
   const next = text.replace(re, `$1${newValue}$2`);
   const mode = fs.statSync(scriptPath).mode;
@@ -99,7 +97,10 @@ export function stripCaret(v) {
  * @param {{fetchJson?: Function, snappyRootPkg?: string}} [opts]
  * @returns {Promise<BumpPlan[]>}
  */
-export async function planUpdates({ fetchJson = defaultFetchJson, snappyRootPkg = ROOT_PACKAGE_JSON } = {}) {
+export async function planUpdates({
+  fetchJson = defaultFetchJson,
+  snappyRootPkg = ROOT_PACKAGE_JSON,
+} = {}) {
   const updates = [];
 
   const mirrorTag = await latestGithubTag(SEVEN_ZIP_ZSTD_REPO, fetchJson);
@@ -133,7 +134,9 @@ export async function planUpdates({ fetchJson = defaultFetchJson, snappyRootPkg 
   const snappyLatest = await npmLatestVersion("snappy", fetchJson);
   let declared = "unknown";
   if (fs.existsSync(snappyRootPkg)) {
-    declared = String(JSON.parse(fs.readFileSync(snappyRootPkg, "utf8")).dependencies?.snappy ?? "unknown");
+    declared = String(
+      JSON.parse(fs.readFileSync(snappyRootPkg, "utf8")).dependencies?.snappy ?? "unknown",
+    );
   }
   if (declared !== "unknown" && stripCaret(declared) !== snappyLatest) {
     updates.push({

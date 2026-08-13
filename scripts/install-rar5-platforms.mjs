@@ -352,12 +352,4 @@ if (isMain) {
 
 const getReleaseBase = () => releaseBase;
 
-export {
-  REPO,
-  resolveVersion,
-  getReleaseBase,
-  TRIPLES,
-  WASM_ASSETS,
-  EXPECTED_HASHES,
-  devProject,
-};
+export { REPO, resolveVersion, getReleaseBase, TRIPLES, WASM_ASSETS, EXPECTED_HASHES, devProject };
