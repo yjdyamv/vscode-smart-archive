@@ -62,7 +62,7 @@
     "iconv-lite": "^0.7.3",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1",
-    "snappy": "^7.3.3"
+    "snappy": "^7.4.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
@@ -703,6 +703,6 @@
     "vscode": "^1.85.0"
   },
   "allowScripts": {
-    "snappy@7.2.2": true
+    "snappy@7.4.0": true
   }
 }
