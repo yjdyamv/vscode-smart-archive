@@ -38,6 +38,7 @@
 
 import * as vscode from "vscode";
 import { logger } from "../../utils/logger";
+import { isValidArchivePath } from "../../utils/security";
 import { handlerStates } from "./state";
 import { getDirChildren, markNoisyDirs } from "../treeBuilder";
 import { getNoisyPatterns } from "./helpers";
@@ -121,9 +122,10 @@ export function disposeBurstLoggers(): void {
  * Reject structurally malformed webview → extension messages before they reach
  * a handler. Defense-in-depth: with the CSP in place the webview is not
  * attacker-controlled, but a buggy or crafted message must not drive
- * filesystem/spawn operations with the wrong types or an unbounded array.
+ * filesystem/spawn operations with the wrong types, an unbounded array, or
+ * dangerous entry paths ("", ".", "..", absolute). Exported for tests.
  */
-function isValidMsg(msg: WebviewMsg): boolean {
+export function isValidMsg(msg: WebviewMsg): boolean {
   const m = msg as unknown as Record<string, unknown>;
   for (const k of ["path", "dir", "pw", "msg"]) {
     if (m[k] !== undefined && typeof m[k] !== "string") return false;
@@ -131,9 +133,14 @@ function isValidMsg(msg: WebviewMsg): boolean {
   if (m.paths !== undefined) {
     if (!Array.isArray(m.paths) || m.paths.length > MAX_MSG_PATHS) return false;
     for (const p of m.paths) {
-      if (typeof p !== "string") return false;
+      if (typeof p !== "string" || !isValidArchivePath(p)) return false;
     }
   }
+  // Single entry paths (preview / renamePrompt / expandDir). Note `dir`
+  // carries either an entry path (newFolderPrompt) or a local filesystem
+  // path (addFiles) depending on the command, so it is type-checked above
+  // but content-checked in its handlers.
+  if (typeof m.path === "string" && !isValidArchivePath(m.path)) return false;
   return true;
 }
 

@@ -256,3 +256,51 @@ export function sanitizeTargetDir(dir: string): string {
   }
   return safe;
 }
+
+/**
+ * Validate an archive entry path coming from the webview (defense in
+ * depth — a crafted message must not drive filesystem operations with
+ * "", ".", "..", absolute, or native-separator paths).
+ *
+ * Entry paths use "/" separators and are relative. Tolerated shapes:
+ *   - a leading "./" prefix (7z listings may emit it),
+ *   - a single trailing "/" (directory entries in some listings).
+ * Rejected: empty string, absolute paths (leading "/" or drive letter),
+ * backslashes, any ".." segment, "." segments except the leading "./"
+ * prefix, empty segments elsewhere ("a//b"), and overlong paths.
+ */
+export function isValidArchivePath(p: string): boolean {
+  if (typeof p !== "string" || p.length === 0 || p.length > 4096) return false;
+  if (p.startsWith("/") || /^[a-zA-Z]:/.test(p)) return false;
+  if (p.includes("\\")) return false;
+  const segments = p.split("/");
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (seg === "..") return false;
+    if (seg === "") {
+      // Only a trailing empty segment ("dir/") is tolerated.
+      if (i !== segments.length - 1) return false;
+      continue;
+    }
+    if (seg === ".") {
+      // Only the leading "./" prefix is tolerated.
+      if (!(i === 0 && segments.length > 1)) return false;
+      continue;
+    }
+  }
+  return true;
+}
+
+/**
+ * Validate an archive entry NAME (rename / new-folder input), as opposed
+ * to a path: a single segment, no separators, not "." or "..", no Windows
+ * reserved characters, and a sane length. Trailing dots are rejected too
+ * (Windows silently strips them, making "foo." and "foo" collide).
+ */
+export function isValidEntryName(name: string): boolean {
+  if (typeof name !== "string" || name.length === 0 || name.length > 255) return false;
+  if (name === "." || name === "..") return false;
+  if (/[<>:"/\\|?*]/.test(name)) return false;
+  if (name.endsWith(".") || name.endsWith(" ")) return false;
+  return true;
+}

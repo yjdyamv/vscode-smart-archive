@@ -304,3 +304,98 @@ export function secureRmDir(dir: string): void {
     // Best effort — the tree may be gone already.
   }
 }
+
+/**
+ * Rename `src` onto `dst`, overwriting an existing `dst`. POSIX rename
+ * overwrites atomically; Windows can fail with EPERM/EEXIST when the
+ * destination exists, so fall back to remove-then-rename. Only use for
+ * outputs that are safe to regenerate (never for the only copy of data).
+ */
+export function renameOverwrite(src: string, dst: string): void {
+  try {
+    fs.renameSync(src, dst);
+  } catch {
+    try {
+      fs.unlinkSync(dst);
+    } catch {
+      // destination did not exist — the original rename failed for another
+      // reason (e.g. cross-device); let the retry surface the real error.
+    }
+    fs.renameSync(src, dst);
+  }
+}
+
+export interface AtomicOutputOptions {
+  /** Final output path the caller promised to the user. */
+  dstPath: string;
+  /** When set, the engine is expected to produce `out.001, out.002, ...`. */
+  volumeSize?: string;
+  /** Perform the actual write against a temp path in dstPath's directory. */
+  write: (tempOutPath: string) => Promise<void>;
+}
+
+/**
+ * Run a compression-style write against a temp path and only move the
+ * result into place on success.
+ *
+ * Motivation: engines write their output in place, so a failed or
+ * cancelled compression aimed at a live path (e.g. merge-over-self of a
+ * split set, where dstPath === the logical source) destroys the original
+ * archive. With this helper the source is untouched until the output
+ * exists, and a failure/cancel cleans the temp leftovers instead.
+ *
+ * Temp naming: `<dir>/.sa_tmp_<pid>_<rand><ext>` — same directory (rename
+ * stays on one volume), hidden-ish name, unpredictable (no symlink race
+ * with attacker-writable shared tmpdirs).
+ */
+export async function withAtomicOutput({
+  dstPath,
+  volumeSize,
+  write,
+}: AtomicOutputOptions): Promise<void> {
+  const dir = path.dirname(dstPath);
+  const ext = path.extname(dstPath);
+  const tmpBase = path.join(
+    dir,
+    `.sa_tmp_${process.pid}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+  );
+  const tmpOut = tmpBase + ext;
+  const cleanup = (): void => {
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      if (name.startsWith(path.basename(tmpBase))) {
+        try {
+          fs.rmSync(path.join(dir, name), { force: true });
+        } catch {
+          // best effort
+        }
+      }
+    }
+  };
+  try {
+    await write(tmpOut);
+    if (volumeSize) {
+      // Volume set: engine produced tmpOut.001, tmpOut.002, ... Move each
+      // onto dstPath.001, ... A single-file output (engine chose not to
+      // split) is handled as a plain rename.
+      let moved = 0;
+      for (let i = 1; i <= 9999; i++) {
+        const vol = `${tmpOut}.${String(i).padStart(3, "0")}`;
+        if (!fs.existsSync(vol)) break;
+        renameOverwrite(vol, `${dstPath}.${String(i).padStart(3, "0")}`);
+        moved++;
+      }
+      if (moved === 0) renameOverwrite(tmpOut, dstPath);
+    } else {
+      renameOverwrite(tmpOut, dstPath);
+    }
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
+}
