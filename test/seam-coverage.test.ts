@@ -20,11 +20,17 @@ const ROOT = path.join(__dirname, "..");
 
 function listSrcModules(): string[] {
   const out: string[] = [];
+  const rootPrefix = ROOT + path.sep;
   const walk = (dir: string): void => {
     for (const name of fs.readdirSync(dir)) {
       const full = path.join(dir, name);
       if (fs.statSync(full).isDirectory()) walk(full);
-      else if (name.endsWith(".ts")) out.push(full.replace(ROOT + "/", ""));
+      // Normalize to forward slashes — the manifest keys use "/", and
+      // path.join on Windows yields "\" which would never match. The ROOT
+      // prefix must use path.sep too, otherwise the replace is a no-op.
+      else if (name.endsWith(".ts")) {
+        out.push(full.replace(rootPrefix, "").replace(/\\/g, "/"));
+      }
     }
   };
   walk(path.join(ROOT, "src"));
