@@ -98,7 +98,10 @@ async function checkRar5(fetchJson) {
   };
 }
 
-async function checkSnappy(fetchJson, pkgPath = path.join(import.meta.dirname, "..", "node_modules", "snappy", "package.json")) {
+async function checkSnappy(
+  fetchJson,
+  pkgPath = path.join(import.meta.dirname, "..", "node_modules", "snappy", "package.json"),
+) {
   const latestBody = await fetchJson("https://registry.npmjs.org/snappy/latest");
   const latest = String(latestBody.version);
   let current = "unknown";
@@ -109,7 +112,12 @@ async function checkSnappy(fetchJson, pkgPath = path.join(import.meta.dirname, "
     name: "snappy (npm)",
     current,
     latest,
-    status: current === "unknown" ? "unavailable" : current === latest ? "up-to-date" : "update-available",
+    status:
+      current === "unknown"
+        ? "unavailable"
+        : current === latest
+          ? "up-to-date"
+          : "update-available",
     url: "https://www.npmjs.com/package/snappy",
   };
 }
@@ -145,7 +153,9 @@ export async function checkUpdates({ fetchJson = defaultFetchJson, snappyPkgPath
 }
 
 export function hasUpdate(results) {
-  return results.some((r) => r.status === "update-available" || r.status === "mirror-behind-upstream");
+  return results.some(
+    (r) => r.status === "update-available" || r.status === "mirror-behind-upstream",
+  );
 }
 
 function printHuman(results) {
