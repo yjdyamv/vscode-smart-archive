@@ -79,19 +79,29 @@ describe("previewCacheHit", () => {
     expect(previewCacheHit(target)).toBe(false);
   });
 
-  it("refuses a FIFO (would hang the editor read)", async () => {
-    const target = path.join(dir, "hit3.bin");
-    await new Promise<void>((resolve, reject) => {
-      const mk = require("child_process").spawn("mkfifo", [target]);
-      mk.on("exit", (code: number) => (code === 0 ? resolve() : reject(new Error(`mkfifo exited ${code}`))));
-    });
-    expect(previewCacheHit(target)).toBe(false);
-    try {
-      secureUnlink(target);
-    } catch {
-      // Best effort — the dir is cleaned up by tmpDir teardown.
-    }
-  });
+  it.runIf(process.platform !== "win32")(
+    "refuses a FIFO (would hang the editor read)",
+    async () => {
+      const target = path.join(dir, "hit3.bin");
+      await new Promise<void>((resolve, reject) => {
+        const mk = require("child_process").spawn("mkfifo", [target]);
+        // Windows has no mkfifo (spawn fails with ENOENT via "error", and
+        // without this listener the promise would hang until the test
+        // timeout); the test is POSIX-only, but a spawn error must still
+        // fail fast instead of hanging.
+        mk.on("error", (err: Error) => reject(err));
+        mk.on("exit", (code: number) =>
+          code === 0 ? resolve() : reject(new Error(`mkfifo exited ${code}`)),
+        );
+      });
+      expect(previewCacheHit(target)).toBe(false);
+      try {
+        secureUnlink(target);
+      } catch {
+        // Best effort — the dir is cleaned up by tmpDir teardown.
+      }
+    },
+  );
 
   it("refuses an oversized tampered file", async () => {
     const target = path.join(dir, "hit4.bin");

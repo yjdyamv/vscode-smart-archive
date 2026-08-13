@@ -139,6 +139,12 @@ describe("readListingCache / writeListingCache", () => {
     await writeListingCache(cache, src, ENTRIES);
 
     fs.writeFileSync(src, "BBBBBBBBBBBBBBBBBBBBBBBB");
+    // The stat fast-path keys on (size, mtimeMs): a same-size rewrite within
+    // the same millisecond would keep mtimeMs equal and hit the stale cache.
+    // Push mtime forward so the test asserts the CONTENT check (sha256
+    // fallback), not filesystem timestamp luck.
+    const future = new Date(Date.now() + 2000);
+    fs.utimesSync(src, future, future);
     expect(await readListingCache(cache, src)).toBeNull();
   });
 

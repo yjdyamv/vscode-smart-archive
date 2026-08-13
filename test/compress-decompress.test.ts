@@ -649,7 +649,9 @@ describe("tar LongLink (production tar-writer)", () => {
       await run7z(j, ["x", "/long.tar", "-o/o"]);
       const got: Record<string, string> = {};
       copyFS(j, "/o", "", got);
-      const deepRel = path.join("d".repeat(50), "e".repeat(30), "f".repeat(20), "payload.txt");
+      // copyFS keys use "/" separators (VFS convention) — never path.join,
+      // which yields "\" on Windows and would never match.
+      const deepRel = ["d".repeat(50), "e".repeat(30), "f".repeat(20), "payload.txt"].join("/");
       expect(got[deepRel]).toBe("deep content");
       expect(got[longBase]).toBe("cjk content");
     } finally {
