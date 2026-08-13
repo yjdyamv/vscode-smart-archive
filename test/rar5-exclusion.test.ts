@@ -14,18 +14,13 @@ import * as path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compress } from "../src/api/compress";
 import { COMPRESS_EXCLUDE_DEFAULTS } from "../src/constants";
+import { bundled7zPath } from "../src/engines/bundled7z";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
 
-const BUNDLED_7ZZ = path.join(
-  __dirname,
-  "..",
-  "vendor",
-  "7z-bin",
-  process.platform,
-  process.arch,
-  process.platform === "win32" ? "7zz.exe" : "7zz",
-);
+// Same resolution as the bundled7zz gate (never a hand-rolled vendor path);
+// every use is inside it.runIf(gate("bundled7zz")), so non-null there.
+const BUNDLED_7ZZ = bundled7zPath()!;
 
 function listArchive(rarPath: string): string[] {
   const out = childProcess.execFileSync(BUNDLED_7ZZ, ["l", rarPath], { encoding: "utf8" });

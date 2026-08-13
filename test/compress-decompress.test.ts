@@ -665,8 +665,14 @@ describe("tar LongLink (production tar-writer)", () => {
       const nested = path.join(tmp, "nested");
       fs.mkdirSync(nested, { recursive: true });
       fs.writeFileSync(path.join(tmp, "real.txt"), "data");
-      fs.symlinkSync("real.txt", path.join(tmp, "link.txt"));
-      fs.symlinkSync("real.txt", path.join(nested, "inner-link.txt"));
+      try {
+        // Windows needs Developer Mode / admin to create symlinks; without
+        // either this throws EPERM — skip like the sibling symlink test above.
+        fs.symlinkSync("real.txt", path.join(tmp, "link.txt"));
+        fs.symlinkSync("real.txt", path.join(nested, "inner-link.txt"));
+      } catch {
+        return; // filesystem without symlink support
+      }
 
       // Top-level symlink target: the writer follows it (entry = link.txt
       // with the target's content).

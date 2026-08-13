@@ -75,7 +75,14 @@ describe("previewCacheHit", () => {
     const victim = path.join(dir, "victim.txt");
     fs.writeFileSync(victim, "attacker-chosen content");
     const target = path.join(dir, "hit2.bin");
-    fs.symlinkSync(victim, target);
+    try {
+      // Windows needs Developer Mode / admin to create symlinks (EPERM
+      // otherwise) — skip the fixture on such machines like the other
+      // symlink cases below.
+      fs.symlinkSync(victim, target);
+    } catch {
+      return; // symlink creation unsupported (e.g. Windows without Developer Mode)
+    }
     expect(previewCacheHit(target)).toBe(false);
   });
 

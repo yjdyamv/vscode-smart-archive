@@ -39,7 +39,10 @@ function run(bin: string, args: string[]): string {
 }
 
 describe("big archive direct modify (manual)", () => {
-  it.runIf(process.env.SAT_BIG_E2E === "1")(
+  // Linux-only: the work dir is hardcoded to a dev-machine path
+  // (/home/yuan/...) that does not exist on Windows (drive-relative
+  // mkdtempSync would throw ENOENT there).
+  it.runIf(process.env.SAT_BIG_E2E === "1" && process.platform === "linux")(
     "appends and deletes on a 1.2GB RAR without rebuilding",
     async () => {
     // Disk-backed work dir (os.tmpdir may be a small tmpfs) so the 1.2GB
