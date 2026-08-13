@@ -111,6 +111,21 @@ describe("checkUpdates", () => {
     expect(snappy.latest).toBe("7.5.0");
   });
 
+  it("reports a blocked snappy release (7.4.0) as blocked, not an update", async () => {
+    const fetchJson = makeFetchJson({
+      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
+      [githubUpstream]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
+      [githubRar5]: { tag_name: RAR5_VERSION },
+      [npmSnappy]: { version: "7.4.0" },
+    });
+    const results = await checkUpdates({ fetchJson, snappyPkgPath: snappyPkg("7.3.3") });
+    const snappy = results.find((r) => r.key === "snappy")!;
+    expect(snappy.status).toBe("blocked");
+    expect(snappy.latest).toBe("7.4.0");
+    expect(snappy.reason).toMatch(/snappy-wasm32-wasi/);
+    expect(hasUpdate(results)).toBe(false);
+  });
+
   it("degrades to unavailable per-check on network errors, without throwing", async () => {
     const fetchJson = makeFetchJson({
       [github7z]: new Error("network down"),
