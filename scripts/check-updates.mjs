@@ -38,15 +38,19 @@ import {
 
 const UPSTREAM_7Z_REPO = "mcmilk/7-Zip-zstd";
 
-const API_HEADERS = { "User-Agent": "smart-archive-vscode", Accept: "application/vnd.github+json" };
-
 /** "v26.02-v1.5.7-R2" → "26.02-v1.5.7-R2" (and "0.3.2" stays "0.3.2"). */
-function normalizeTag(tag) {
+export function normalizeTag(tag) {
   return String(tag).replace(/^v/, "");
 }
 
-async function defaultFetchJson(url) {
-  const res = await fetch(url, { headers: API_HEADERS });
+export async function defaultFetchJson(url) {
+  // npm registry rejects requests without a User-Agent (406) and does not
+  // accept GitHub's Accept header — only tag GitHub API calls with it.
+  const headers = { "User-Agent": "smart-archive-vscode" };
+  if (url.startsWith("https://api.github.com")) {
+    headers.Accept = "application/vnd.github+json";
+  }
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
   return res.json();
 }

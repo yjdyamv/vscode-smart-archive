@@ -1,0 +1,80 @@
+name: Update engine dependencies
+
+# Weekly automated check of the bundled engine dependencies (7-Zip ZS
+# native+wasm, smart-archive-rar, snappy). When a newer release exists the
+# workflow bumps the in-repo version pins, regenerates the SHA-256 hash
+# pins (SA_HASH_BOOTSTRAP), verifies every installer with fresh downloads,
+# and opens a pull request. The hash diff in the PR IS the supply-chain
+# review — merge it only after eyeballing the changed hashes.
+#
+# Manual run: Actions → "Update engine dependencies" → Run workflow.
+
+on:
+  schedule:
+    # 03:17 UTC every Monday — off the top-of-hour GitHub load peak.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # --ignore-scripts: the root postinstall stages WASM binaries and
+      # installs webview-ui deps — neither is needed to detect or bump.
+      - run: npm ci --ignore-scripts
+
+      - name: Check engine dependency updates
+        id: check
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-updates.mjs --json > "$RUNNER_TEMP/deps.json" 2>&1
+          code=$?
+          set -e
+          if [ "$code" -eq 1 ]; then
+            echo "updates=true" >> "$GITHUB_OUTPUT"
+            echo "Update available:"
+            cat "$RUNNER_TEMP/deps.json"
+          else
+            echo "updates=false" >> "$GITHUB_OUTPUT"
+            echo "All engine dependencies are up to date."
+          fi
+
+      - name: Apply dependency bumps
+        if: steps.check.outputs.updates == 'true'
+        run: node scripts/bump-deps.mjs
+
+      - name: Prepare pull request body
+        if: steps.check.outputs.updates == 'true'
+        shell: bash
+        run: |
+          {
+            echo "Weekly automated check found newer engine releases. This PR bumps the version pins and regenerates the SHA-256 hash pins (SA_HASH_BOOTSTRAP=1)."
+            echo ""
+            echo "**Review the hash diff — it is the supply-chain review.**"
+            echo ""
+            echo "\`\`\`json"
+            cat "$RUNNER_TEMP/deps.json"
+            echo "\`\`\`"
+          } > "$RUNNER_TEMP/pr-body.md"
+
+      - name: Open pull request
+        if: steps.check.outputs.updates == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: deps/engine-update
+          delete-branch: true
+          commit-message: "chore(deps): update bundled engine dependencies"
+          title: "chore(deps): update bundled engine dependencies"
+          body-path: "$RUNNER_TEMP/pr-body.md"
+          labels: dependencies
