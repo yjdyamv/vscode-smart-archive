@@ -24,20 +24,13 @@ import { beforeAll } from "vitest";
 import { itIf } from "./gates";
 import { __setWorkspaceFs } from "./__mocks__/vscode";
 import { tmpDir } from "./tmp";
+import { detectSystem7z } from "../src/engines/system7z";
 
-function find7z(): string | null {
-  for (const c of ["/usr/bin/7z", "/usr/local/bin/7z", "7z", "7zz"]) {
-    try {
-      const r = spawnSync(c, [], { stdio: "pipe", timeout: 5000 });
-      if (r.status === 0) return c;
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
-
-const sz = find7z();
+// Use the SAME detection the system7z gate uses (gates.ts probes
+// detectSystem7z()): a hardcoded POSIX path list would return null on
+// Windows even when the gate lets the test through, crashing with
+// "file must be of type string" on spawnSync(null).
+const sz = detectSystem7z();
 
 // Unencrypted previews now persist in the preview cache (globalStorage in
 // production); point it at a test dir so the cache-hit tests can inspect it.

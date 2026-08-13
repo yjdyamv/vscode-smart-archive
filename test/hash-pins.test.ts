@@ -109,7 +109,11 @@ describe("persistBootstrapHash", () => {
     expect(persistBootstrapHash(script, dest, "a")).toBe(true);
     const text = fs.readFileSync(script, "utf8");
     expect(text).toContain(sha256(Buffer.from("hello world")));
-    expect(fs.statSync(script).mode & 0o777).toBe(0o755);
+    // Windows chmod only tracks the read-only bit — the mode is not
+    // preserved there, so the assertion is POSIX-only.
+    if (process.platform !== "win32") {
+      expect(fs.statSync(script).mode & 0o777).toBe(0o755);
+    }
     expect(warn.mock.calls[0][0]).toContain("pinned hash updated");
     fs.rmSync(dir, { recursive: true, force: true });
   });

@@ -92,12 +92,17 @@ function findHostSevenZip(platform, stagedRoot) {
     }
     return null;
   }
-  // Windows: check common install paths + PATH, then staged binary
+  // Windows: check common install paths + PATH, then the staged binary
+  // matching THIS host's arch (a staged exe of another arch cannot run —
+  // spawning it fails with UNKNOWN instead of a clean "not found").
   if (platform === "win32") {
     for (const p of [
       path.join(process.env.LOCALAPPDATA || "", "Programs", "7-Zip", "7z.exe"),
       "C:\\Program Files\\7-Zip\\7z.exe",
       "C:\\Program Files (x86)\\7-Zip\\7z.exe",
+      // 7-Zip ZS (mcmilk fork) installs here by default.
+      "C:\\Program Files\\7-Zip-Zstandard\\7z.exe",
+      "C:\\Program Files\\7-Zip-Zstandard\\7zz.exe",
     ]) {
       if (fs.existsSync(p)) return p;
     }
@@ -113,13 +118,10 @@ function findHostSevenZip(platform, stagedRoot) {
     } catch {
       /* not on PATH */
     }
-    // Fall back to just-staged win32 binary (7zz.exe; 7z.exe covers stale
-    // vendor dirs from older staging runs)
-    for (const a of ["x64", "arm64", "ia32"]) {
-      for (const bin of ["7zz.exe", "7z.exe"]) {
-        const p = path.join(stagedRoot, "win32", a, bin);
-        if (fs.existsSync(p)) return p;
-      }
+    // Fall back to a just-staged win32 binary of the current arch only.
+    for (const bin of ["7zz.exe", "7z.exe"]) {
+      const p = path.join(stagedRoot, "win32", process.arch, bin);
+      if (fs.existsSync(p)) return p;
     }
     return null;
   }
@@ -129,6 +131,9 @@ function findHostSevenZip(platform, stagedRoot) {
 /**
  * Extract an archive into destDir. kind "tgz" uses the system tar; kind "zip"
  * uses a host 7z/7zz binary (staged binaries included) to unpack Windows SFX.
+ * On Windows hosts without any 7-Zip, the built-in PowerShell Expand-Archive
+ * is used — the win32 7zz.exe we stage lives inside the very zip we need to
+ * unpack, so requiring a system 7-Zip there would break fresh staging.
  */
 function extractArchive(
   kind,
@@ -144,6 +149,24 @@ function extractArchive(
   if (kind !== "zip") throw new Error(`unsupported archive kind: ${kind}`);
   const sz = findHostSevenZip(platform, stagedRoot);
   if (!sz) {
+    if (platform === "win32") {
+      // No system 7-Zip and no staged win32 binary yet (chicken-and-egg:
+      // the staged 7zz.exe is inside the zip being unpacked). PowerShell's
+      // Expand-Archive handles the GitHub-release zips reliably (the CI
+      // workflow already relies on it).
+      const ps = (p) => String(p).replace(/'/g, "''");
+      execFileSync(
+        "powershell",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `Expand-Archive -Force -LiteralPath '${ps(archivePath)}' -DestinationPath '${ps(destDir)}'`,
+        ],
+        { stdio: "inherit" },
+      );
+      return;
+    }
     throw new Error(
       `Cannot extract Windows SFX on ${platform}-${process.arch}: no 7z/7zz found. ` +
         "On Linux/macOS install p7zip; on Windows install 7-Zip from https://www.7-zip.org/.",

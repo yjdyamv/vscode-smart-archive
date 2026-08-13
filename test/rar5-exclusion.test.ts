@@ -32,6 +32,9 @@ function listArchive(rarPath: string): string[] {
   return out
     .split("\n")
     .map((l) => l.trim())
+    // Windows 7zz lists entries with backslashes; the tests assert on
+    // forward-slash paths.
+    .map((l) => l.replace(/\\/g, "/"))
     .filter(
       (l) =>
         l &&
