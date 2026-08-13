@@ -15,6 +15,8 @@ import {
   FILES,
   REPO as REPOWASM,
   TAG as TAGWASM,
+  VER as VERWASM,
+  getWasmPackageVersion,
 } from "../scripts/install-7zz-wasm.mjs";
 import {
   EXPECTED_HASHES as HSN,
@@ -25,7 +27,13 @@ import {
   SEVEN_ZIP_ZSTD_REPO,
   SEVEN_ZIP_ZSTD_TAG,
   SEVEN_ZIP_ZSTD_WASM_REPO,
+  RAR5_REPO,
+  RAR5_VERSION,
 } from "../scripts/lib/releases.mjs";
+import {
+  REPO as REPO_RAR5,
+  resolveVersion,
+} from "../scripts/install-rar5-platforms.mjs";
 
 const HASH_RE = /^[0-9a-f]{64}$/;
 const PLATFORMS = ["linux", "darwin", "win32"];
@@ -77,6 +85,15 @@ describe("7zz-wasm installer config", () => {
       expect(hash, `hash for ${file}`).toMatch(HASH_RE);
     }
   });
+
+  it("vendor package version is derived from the release tag", () => {
+    // Never hardcode the version again: it must be semver and start with
+    // the tag's own version prefix, so a tag bump cannot leave the staged
+    // package.json stale.
+    const v = getWasmPackageVersion();
+    expect(v).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(v.startsWith(VERWASM)).toBe(true);
+  });
 });
 
 describe("snappy installer config", () => {
@@ -97,5 +114,26 @@ describe("shared release constants", () => {
     expect(TAGWASM).toBe(SEVEN_ZIP_ZSTD_TAG);
     expect(REPO7Z).toBe(SEVEN_ZIP_ZSTD_REPO);
     expect(REPOWASM).toBe(SEVEN_ZIP_ZSTD_WASM_REPO);
+  });
+
+  it("rar5 installer uses the pinned repo and version from releases.mjs", async () => {
+    expect(REPO_RAR5).toBe(RAR5_REPO);
+    const saved = process.env.SA_RAR5_VERSION;
+    try {
+      delete process.env.SA_RAR5_VERSION;
+      expect(await resolveVersion()).toBe(RAR5_VERSION);
+    } finally {
+      if (saved !== undefined) process.env.SA_RAR5_VERSION = saved;
+    }
+  });
+
+  it("SA_RAR5_VERSION overrides the pinned rar5 version", async () => {
+    const saved = process.env.SA_RAR5_VERSION;
+    try {
+      process.env.SA_RAR5_VERSION = "v9.9.9";
+      expect(await resolveVersion()).toBe("9.9.9");
+    } finally {
+      if (saved !== undefined) process.env.SA_RAR5_VERSION = saved;
+    }
   });
 });
