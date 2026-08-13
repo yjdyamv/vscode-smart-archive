@@ -11,7 +11,7 @@ import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
 import { createFolderInArchive } from "../../archive";
-import { sanitizeTargetDir } from "../../../utils/security";
+import { isValidEntryName, sanitizeTargetDir } from "../../../utils/security";
 import { setupWebview } from "../setup";
 import { isReadOnlyExt } from "../helpers";
 import { startOperation, endOperation } from "../state";
@@ -35,13 +35,9 @@ export const handleNewFolder: MessageHandler = async (ctx) => {
     validateInput: (v) =>
       !v.trim()
         ? t("validation.nameEmpty")
-        : v.includes("\0")
-          ? t("validation.nameInvalidChar")
-          : /[<>:"/\\|?*]/.test(v)
-            ? t("validation.nameInvalidChars")
-            : v.length > 255
-              ? t("validation.nameTooLong")
-              : null,
+        : !isValidEntryName(v.trim())
+          ? t("validation.nameInvalidChars")
+          : null,
   });
   if (!folderName || !folderName.trim()) {
     logger.info({ event: "webview.newFolder.cancelled" });
@@ -49,6 +45,14 @@ export const handleNewFolder: MessageHandler = async (ctx) => {
     return;
   }
   const name = folderName.trim();
+  // Defense in depth: showInputBox validation is UI-only; a crafted message
+  // flow must not create "." / ".." / separator-named folders (a ".." name
+  // would otherwise escape the extraction root during a RAR rebuild).
+  if (!isValidEntryName(name)) {
+    logger.warn({ event: "webview.newFolder.invalidName", dir: targetDir, name });
+    webview.postMessage({ c: "loading", t: false });
+    return;
+  }
   logger.info({ event: "webview.newFolder", dir: targetDir, name });
   const token = startOperation(s);
   try {

@@ -27,9 +27,16 @@ import { isMusl } from "../utils/platform";
 import { parseSize } from "../utils/security";
 import { logger } from "../utils/logger-core";
 
-/** The rar5 library supports compression levels 0..=5; 7z uses 0..=9. */
-function mapLevel(level: number): number {
-  return Math.max(0, Math.min(5, Math.round(((level || 5) * 5) / 9)));
+/**
+ * Map the 7z-style level (0..=9, 0 = store) onto the rar5 library's range
+ * (0..=5, 0 = store). Level 0 must stay 0 — the old `level || 5` fallback
+ * silently turned "store only" into rar5 level 3 compression. Undefined
+ * (unset) still means "default" (5).
+ */
+export function mapLevel(level: number | undefined): number {
+  const l = level ?? 5;
+  if (l <= 0) return 0;
+  return Math.max(0, Math.min(5, Math.round((l * 5) / 9)));
 }
 
 /** napi-rs triple naming, e.g. linux-x64-gnu / win32-arm64-msvc. */

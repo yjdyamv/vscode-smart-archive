@@ -37,7 +37,11 @@
  * 3. ONEXIT — the 7zz build does not invoke Module.onExit (its callMain
  *    returns the exit code synchronously). `callMain` is wrapped to fire
  *    onExit(code) with the returned code, keeping the Promise-based
- *    run7z/list flows working unchanged.
+ *    run7z/list flows working unchanged. A synchronous callMain throw
+ *    (engine crash, memory guard) does NOT fire onExit: exit code 1 is the
+ *    recoverable "warning" contract, and a crash must never masquerade as
+ *    one — the exception propagates so callers fail loudly instead of
+ *    accepting a partial result.
  *
  * 4. DESTROY — no native cleanup exists on this build (same as js7z-tools);
  *    disposeJS7z is therefore a no-op. The shared instance is intentional:
@@ -226,13 +230,14 @@ export const JS7z: JS7zFactory = async (options) => {
         Object.defineProperty(inst, "callMain", {
           configurable: true,
           value: (args: string[]) => {
-            let code: number;
-            try {
-              code = origCallMain(args);
-            } catch (err) {
-              if (eng.exitCb) eng.exitCb(1);
-              throw err;
-            }
+            // A synchronous throw means the engine crashed mid-operation
+            // (e.g. the worker memory guard OOMs during a print tick). Do NOT
+            // fire onExit(1) here: callers treat exit code 1 as a recoverable
+            // 7-Zip warning and would silently accept a partial result. The
+            // exception propagates to the caller's own try/catch (run7z
+            // rejects; direct callMain callers reject via the Promise
+            // executor) — the only correct outcome for a crash.
+            const code = origCallMain(args);
             if (eng.exitCb) eng.exitCb(code);
             return code;
           },

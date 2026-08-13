@@ -17,10 +17,16 @@ import * as os from "os";
 import { compressWith7z } from "../engines/js7z-compress";
 import { decompressWith7z } from "../engines/js7z-decompress";
 import { COMPRESS_FORMATS, DEFAULT_COMPRESSION_LEVEL } from "../constants";
+import { withAtomicOutput } from "../utils/fs";
 import { logger } from "../utils/logger";
 
 /**
  * Convert an archive format (decompress + recompress).
+ *
+ * The output is written atomically (temp file in the destination directory,
+ * renamed into place only on success): a failed or cancelled conversion can
+ * never leave a corrupt partial archive at dstPath — important for merge
+ * over a split-volume set, where dstPath is the logical source path.
  *
  * @param srcPath - Source archive
  * @param dstFormat - Target format label (e.g. "7z", "zip")
@@ -48,30 +54,34 @@ export async function convertArchive(
       token,
     );
     if (token?.isCancellationRequested) throw new vscode.CancellationError();
-    if (volumeSize) {
-      fs.mkdirSync(path.dirname(dstPath), { recursive: true });
-    }
     const entries = fs.readdirSync(tmp).map((e) => ({ fsPath: path.join(tmp, e) }));
     const fmtInfo = COMPRESS_FORMATS.find((f) => f.label === dstFormat);
-    await compressWith7z(
-      {
-        targets: entries.length ? entries : [{ fsPath: tmp }],
-        format: fmtInfo ?? {
-          label: dstFormat,
-          description: "",
-          canCreate: true,
-          supportsEncryption: false,
-        },
-        outputPath: dstPath,
-        password: outputPassword ?? password,
-        level: vscode.workspace
-          .getConfiguration("smart-archive")
-          .get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL),
-        volumeSize,
+    fs.mkdirSync(path.dirname(dstPath), { recursive: true });
+    await withAtomicOutput({
+      dstPath,
+      volumeSize,
+      write: async (outPath) => {
+        await compressWith7z(
+          {
+            targets: entries.length ? entries : [{ fsPath: tmp }],
+            format: fmtInfo ?? {
+              label: dstFormat,
+              description: "",
+              canCreate: true,
+              supportsEncryption: false,
+            },
+            outputPath: outPath,
+            password: outputPassword ?? password,
+            level: vscode.workspace
+              .getConfiguration("smart-archive")
+              .get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL),
+            volumeSize,
+          },
+          { report: () => {} },
+          token,
+        );
       },
-      { report: () => {} },
-      token,
-    );
+    });
   } finally {
     try {
       fs.rmSync(tmp, { recursive: true, force: true });

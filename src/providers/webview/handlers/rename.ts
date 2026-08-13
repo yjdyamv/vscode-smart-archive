@@ -12,6 +12,7 @@ import { logger } from "../../../utils/logger";
 import { t } from "../../../i18n";
 import { getFullExt } from "../../../constants";
 import { renameInArchive } from "../../archive";
+import { isValidEntryName } from "../../../utils/security";
 import { setupWebview } from "../setup";
 import { isReadOnlyExt, showErrorWithCopy } from "../helpers";
 import { startOperation, endOperation } from "../state";
@@ -31,18 +32,20 @@ export const handleRename: MessageHandler = async (ctx) => {
     validateInput: (v) =>
       !v.trim()
         ? t("validation.nameEmpty")
-        : v.includes("\0")
-          ? t("validation.nameInvalidChar")
-          : /[<>:"/\\|?*]/.test(v)
-            ? t("validation.nameInvalidChars")
-            : v.trim() === oldName
-              ? t("validation.nameSameName")
-              : v.length > 255
-                ? t("validation.nameTooLong")
-                : null,
+        : !isValidEntryName(v.trim())
+          ? t("validation.nameInvalidChars")
+          : v.trim() === oldName
+            ? t("validation.nameSameName")
+            : null,
   });
   if (!newName || !newName.trim() || newName.trim() === oldName) {
     logger.info({ event: "webview.rename.cancelled", oldPath });
+    return;
+  }
+  // Defense in depth: showInputBox validation is UI-only; a crafted message
+  // flow must not rename to "." / ".." / separators.
+  if (!isValidEntryName(newName.trim())) {
+    logger.warn({ event: "webview.rename.invalidName", oldPath, newName });
     return;
   }
   const parentDir = oldPath.includes("/") ? oldPath.slice(0, oldPath.lastIndexOf("/") + 1) : "";
