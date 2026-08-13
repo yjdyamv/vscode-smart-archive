@@ -98,6 +98,23 @@ async function checkRar5(fetchJson) {
   };
 }
 
+/**
+ * snappy releases that must NOT be offered as updates. snappy 7.4.0's
+ * generated index.js unconditionally `import * as s from
+ * "@napi-rs/snappy-wasm32-wasi"` while dropping that package from
+ * optionalDependencies, so `require("snappy")` throws ERR_MODULE_NOT_FOUND
+ * on every native host — and even with the package installed manually, the
+ * 7.4.0 entry chain no longer loads the staged native bindings at all.
+ * See https://github.com/Brooooooklyn/snappy/issues/352.
+ * Remove the entry (and re-bump) once upstream ships a fix.
+ */
+export const SNAPPY_BLOCKED_VERSIONS = new Map([
+  [
+    "7.4.0",
+    "index.js unconditionally imports the undeclared @napi-rs/snappy-wasm32-wasi; native loader removed (Brooooooklyn/snappy#352)",
+  ],
+]);
+
 async function checkSnappy(
   fetchJson,
   pkgPath = path.join(import.meta.dirname, "..", "node_modules", "snappy", "package.json"),
@@ -108,6 +125,7 @@ async function checkSnappy(
   if (fs.existsSync(pkgPath)) {
     current = String(JSON.parse(fs.readFileSync(pkgPath, "utf8")).version);
   }
+  const blockedReason = SNAPPY_BLOCKED_VERSIONS.get(latest);
   return {
     name: "snappy (npm)",
     current,
@@ -115,9 +133,12 @@ async function checkSnappy(
     status:
       current === "unknown"
         ? "unavailable"
-        : current === latest
-          ? "up-to-date"
-          : "update-available",
+        : blockedReason
+          ? "blocked"
+          : current === latest
+            ? "up-to-date"
+            : "update-available",
+    ...(blockedReason ? { reason: blockedReason } : {}),
     url: "https://www.npmjs.com/package/snappy",
   };
 }
@@ -167,6 +188,9 @@ function printHuman(results) {
       console.log(`     ${r.url}`);
     } else if (r.status === "unavailable") {
       console.warn(`  ?  ${line} (${r.error ?? "check failed"})`);
+    } else if (r.status === "blocked") {
+      console.warn(`  ⛔  ${line}`);
+      console.warn(`     ${r.reason}`);
     } else {
       console.log(`  ✔  ${line}`);
     }

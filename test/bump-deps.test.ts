@@ -95,6 +95,16 @@ describe("planUpdates", () => {
     expect(snappy.latest).toBe("7.5.0");
   });
 
+  it("does not plan a snappy bump for a blocked release (7.4.0, upstream #352)", async () => {
+    const fetchJson = makeFetchJson({
+      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
+      [githubRar5]: { tag_name: RAR5_VERSION },
+      [npmSnappy]: { version: "7.4.0" },
+    });
+    const updates = await planUpdates({ fetchJson, snappyRootPkg: rootPkg("^7.3.3") });
+    expect(updates.find((u) => u.key === "snappy")).toBeUndefined();
+  });
+
   it("ignores snappy when the declared version already matches", async () => {
     const fetchJson = makeFetchJson({
       [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },

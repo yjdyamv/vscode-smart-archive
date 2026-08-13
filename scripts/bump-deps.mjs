@@ -29,7 +29,7 @@ import fs from "fs";
 import path from "path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { normalizeTag, defaultFetchJson } from "./check-updates.mjs";
+import { normalizeTag, defaultFetchJson, SNAPPY_BLOCKED_VERSIONS } from "./check-updates.mjs";
 import {
   SEVEN_ZIP_ZSTD_REPO,
   SEVEN_ZIP_ZSTD_TAG,
@@ -138,7 +138,13 @@ export async function planUpdates({
       JSON.parse(fs.readFileSync(snappyRootPkg, "utf8")).dependencies?.snappy ?? "unknown",
     );
   }
-  if (declared !== "unknown" && stripCaret(declared) !== snappyLatest) {
+  const snappyBlockedReason = SNAPPY_BLOCKED_VERSIONS.get(snappyLatest);
+  if (snappyBlockedReason) {
+    // Known-broken release (see SNAPPY_BLOCKED_VERSIONS): do NOT plan a bump.
+    console.warn(
+      `[bump-deps] snappy ${snappyLatest} is blocked from bumping: ${snappyBlockedReason}`,
+    );
+  } else if (declared !== "unknown" && stripCaret(declared) !== snappyLatest) {
     updates.push({
       key: "snappy",
       name: "snappy (npm)",
