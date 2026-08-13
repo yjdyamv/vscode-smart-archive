@@ -617,6 +617,15 @@ function getSystem7zOrNull(): string | null {
 const _rarSupportCache = new Map<string, boolean>();
 
 /**
+ * Does a `7z i` output mention RAR (RAR4/RAR5) format support? Extracted
+ * from hasRarSupport so the parsing is unit-testable without spawning a
+ * binary (Windows cannot execute POSIX shell-script fakes).
+ */
+export function outputHasRarSupport(out: string): boolean {
+  return /\bRar5\b/i.test(out) || /\bRar\b/i.test(out);
+}
+
+/**
  * Does this 7-Zip binary include RAR (RAR4/RAR5) read support? Some distro
  * builds strip RAR for licensing reasons (e.g. Fedora's 7zip package), in
  * which case they cannot open RAR archives at all.
@@ -629,7 +638,7 @@ export function hasRarSupport(binary: string): boolean {
     const r = spawnSync(binary, ["i"], { stdio: "pipe", timeout: BINARY_DETECT_TIMEOUT });
     if (r.status === 0) {
       const out = `${r.stdout.toString("utf8")}\n${r.stderr.toString("utf8")}`;
-      supported = /\bRar5\b/i.test(out) || /\bRar\b/i.test(out);
+      supported = outputHasRarSupport(out);
     }
   } catch {
     supported = false;

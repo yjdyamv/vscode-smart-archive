@@ -9,11 +9,30 @@
 import * as fs from "fs";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { hasRarSupport, system7zForExt } from "../src/engines/system7z";
+import { hasRarSupport, outputHasRarSupport, system7zForExt } from "../src/engines/system7z";
 import { bundled7zPath } from "../src/engines/bundled7z";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
 
+// The `7z i` output parser is platform-independent — this is the coverage
+// that runs everywhere (including Windows, where the shell-script fakes
+// below cannot execute).
+describe("outputHasRarSupport", () => {
+  it("accepts output listing Rar5/Rar formats", () => {
+    expect(outputHasRarSupport("Formats:\n  Rar5\n  Rar\n  Zip\n  7z\n  Xz")).toBe(true);
+    expect(outputHasRarSupport("  Rar5")).toBe(true);
+    expect(outputHasRarSupport("  Rar")).toBe(true);
+  });
+
+  it("rejects output without RAR formats", () => {
+    expect(outputHasRarSupport("Formats:\n  Zip\n  7z\n  Xz")).toBe(false);
+    expect(outputHasRarSupport("")).toBe(false);
+  });
+});
+
+// The spawn integration path needs an executable fake; POSIX shell scripts
+// cannot run on Windows, so the fakes are POSIX-only (the parser above
+// still covers the logic everywhere).
 function fake7z(dir: string, name: string, rar: boolean): string {
   const p = path.join(dir, name);
   const formats = rar
@@ -24,22 +43,28 @@ function fake7z(dir: string, name: string, rar: boolean): string {
   return p;
 }
 
-describe("hasRarSupport", () => {
+describe("hasRarSupport (POSIX spawn integration)", () => {
   let dir: string;
   beforeEach(() => {
     dir = tmpDir("sat_rar7z-");
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it("accepts a 7-Zip build that lists Rar5/Rar formats", () => {
-    const p = fake7z(dir, "full7z", true);
-    expect(hasRarSupport(p)).toBe(true);
-  });
+  it.runIf(process.platform !== "win32")(
+    "accepts a 7-Zip build that lists Rar5/Rar formats",
+    () => {
+      const p = fake7z(dir, "full7z", true);
+      expect(hasRarSupport(p)).toBe(true);
+    },
+  );
 
-  it("rejects a license-stripped build without RAR formats", () => {
-    const p = fake7z(dir, "stripped7z", false);
-    expect(hasRarSupport(p)).toBe(false);
-  });
+  it.runIf(process.platform !== "win32")(
+    "rejects a license-stripped build without RAR formats",
+    () => {
+      const p = fake7z(dir, "stripped7z", false);
+      expect(hasRarSupport(p)).toBe(false);
+    },
+  );
 });
 
 describe("system7zForExt (RAR)", () => {
