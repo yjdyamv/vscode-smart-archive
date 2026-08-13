@@ -52,6 +52,17 @@ const cacheDir = path.join(import.meta.dirname, "..", ".cache", "7zz-wasm");
 
 const FILES = ["7zz.js", "7zz.wasm", "LICENSE"];
 
+/**
+ * Derive the vendor package version from the release tag so the staged
+ * vendor/7zz-wasm/package.json can never drift from the real engine
+ * version. "v26.02-v1.5.7-R2" → "26.02.0"; "v26.03.1-..." → "26.03.1".
+ */
+export function getWasmPackageVersion() {
+  const parts = VER.split(".");
+  while (parts.length < 3) parts.push("0");
+  return parts.slice(0, 3).join(".");
+}
+
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
   for (const name of FILES) {
@@ -90,7 +101,7 @@ async function main() {
         JSON.stringify(
           {
             name: "7zz-wasm",
-            version: "26.02.0",
+            version: getWasmPackageVersion(),
             private: true,
             description: `7-Zip ZS ${VER} WebAssembly engine (multi-threaded)`,
             main: "7zz.js",

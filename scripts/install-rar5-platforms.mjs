@@ -2,7 +2,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { fetchReleaseAsset, resolveLatestReleaseTag } from "./lib/github.mjs";
+import { fetchReleaseAsset } from "./lib/github.mjs";
 import { downloadWithCache, countStatuses } from "./lib/download.mjs";
 import { writeFileAtomic } from "./lib/fs.mjs";
 import { persistBootstrapHash } from "./lib/hash-pins.mjs";
@@ -28,27 +28,25 @@ import { pathToFileURL } from "node:url";
  *
  * The loader (src/engines/rar5-engine.ts) resolves
  * vendor/rar5-bin/<platform>/<arch>/smart-archive-rar.<triple>.node
+ *
+ * Version policy: the release version is PINNED in-repo
+ * (scripts/lib/releases.mjs — RAR5_VERSION), because the pinned hashes below
+ * are bound to one specific release. Resolving "latest release" at install
+ * time would make every new upstream release break fresh installs and CI
+ * builds (fail-closed hash mismatch) until the pins are regenerated. To
+ * update the binding: bump RAR5_VERSION, then run
+ *   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
+ * SA_RAR5_VERSION still overrides the pinned version for one-off experiments.
  */
 
 // Binding repo, overridable (e.g. a fork):
 //   SA_RAR5_REPO=me/smart-archive-rar
-const REPO = process.env.SA_RAR5_REPO || "yjdyamv/smart-archive-rar";
-
-// Fallback version used only when the GitHub API is unreachable. Prefer
-// SA_RAR5_VERSION (explicit) — otherwise the latest release tag is resolved
-// automatically (cached for 1 h under .cache/rar5-platforms/).
-const PKG_VERSION_FALLBACK = "0.3.2";
-
-const VERSION_CACHE_TTL_MS = 60 * 60 * 1000;
+import { RAR5_REPO, RAR5_VERSION } from "./lib/releases.mjs";
+const REPO = process.env.SA_RAR5_REPO || RAR5_REPO;
 
 async function resolveVersion() {
   if (process.env.SA_RAR5_VERSION) return process.env.SA_RAR5_VERSION.replace(/^v/, "");
-  return resolveLatestReleaseTag(REPO, {
-    cacheDir,
-    ttlMs: VERSION_CACHE_TTL_MS,
-    fallback: PKG_VERSION_FALLBACK,
-    pinHint: "set SA_RAR5_VERSION to pin",
-  });
+  return RAR5_VERSION;
 }
 
 // SHA-256 of each platform .node release asset plus the WASI fallback bundle
@@ -312,8 +310,8 @@ async function main() {
     return;
   }
 
-  // Version resolution: SA_RAR5_VERSION > cached latest-release > GitHub API
-  // (with a documented fallback only when the API is unreachable).
+  // Version resolution: SA_RAR5_VERSION (one-off override) > in-repo pin
+  // (scripts/lib/releases.mjs RAR5_VERSION — the single source of truth).
   const version = await resolveVersion();
   resolvedVersion = version;
   releaseBase =
@@ -356,7 +354,6 @@ const getReleaseBase = () => releaseBase;
 
 export {
   REPO,
-  PKG_VERSION_FALLBACK,
   resolveVersion,
   getReleaseBase,
   TRIPLES,
