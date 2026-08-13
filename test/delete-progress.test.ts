@@ -11,19 +11,14 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "child_process";
 import { deleteFromArchiveSystem7z } from "../src/engines/system7z";
+import { bundled7zPath } from "../src/engines/bundled7z";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
 
 const td = tmpDir("sadp_");
-const BUNDLED_7Z = path.join(
-  __dirname,
-  "..",
-  "vendor",
-  "7z-bin",
-  process.platform,
-  process.arch,
-  process.platform === "win32" ? "7zz.exe" : "7zz",
-);
+// Same resolution as the bundled7zz gate (never a hand-rolled vendor path);
+// every use is inside describe.runIf(gate("bundled7zz")), so non-null there.
+const BUNDLED_7Z = bundled7zPath()!;
 
 function makeArchive(name: string, sizeMb = 64): string {
   const archive = path.join(td, name);

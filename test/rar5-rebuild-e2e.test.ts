@@ -12,6 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
+import { bundled7zPath } from "../src/engines/bundled7z";
 import {
   rebuildRarArchive,
   hasEncryptedHeaders,
@@ -28,15 +29,10 @@ const RAR5_FORMAT = {
   supportsEncryption: true,
 };
 
-const BUNDLED_7ZZ = path.join(
-  __dirname,
-  "..",
-  "vendor",
-  "7z-bin",
-  "linux",
-  "x64",
-  "7zz",
-);
+// Same resolution the bundled7zz gate uses (src/engines/bundled7z) — never
+// a hardcoded platform/arch layout. Every use is inside it.runIf(haveBinaries()),
+// which requires gate("bundled7zz"), so this is non-null there.
+const BUNDLED_7ZZ = bundled7zPath()!;
 const RAR_CLI = rar5CliBinaries().rar;
 const UNRAR_CLI = rar5CliBinaries().unrar;
 

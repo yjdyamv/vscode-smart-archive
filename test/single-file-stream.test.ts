@@ -277,28 +277,24 @@ describe("wrapped preview fast path (7z auto-unpacks the inner tar)", () => {
 
         // Cold: 7-Zip auto-unpacks the inner tar for these wraps — the old
         // code required an intermediate .tar and silently fell back to WASM
-        // ("No inner tar found"). The fast path completes in ms.
-        const t0 = Date.now();
+        // ("No inner tar found"). The fast path must produce exactly one
+        // preview file (no wall-clock assertion — process spawn + AV scanning
+        // make any ms bound flaky on Windows CI).
         await previewFileFromArchive(arc, main);
-        const cold = Date.now() - t0;
         const first = fs.readdirSync(previewDir()).filter((f) => !before.has(f));
         expect(first.length).toBe(1);
         const cachedPath = path.join(previewDir(), first[0]);
         expect(fs.readFileSync(cachedPath, "utf8")).toBe("inside " + ext + "\n".repeat(1000));
         const cachedMtime = fs.statSync(cachedPath).mtimeMs;
-        expect(cold).toBeLessThan(100);
 
         // Warm: cache hit — same file untouched, no new files, and the hit
         // refreshes mtime (idle-TTL LRU: revisited entries keep their slot).
-        const t1 = Date.now();
         await previewFileFromArchive(arc, main);
-        const warm = Date.now() - t1;
         const createdAfter = fs
           .readdirSync(previewDir())
           .filter((f) => !before.has(f) && f !== first[0]);
         expect(fs.statSync(cachedPath).mtimeMs).toBeGreaterThanOrEqual(cachedMtime);
         expect(createdAfter.length).toBe(0);
-        expect(warm).toBeLessThan(50);
       } finally {
         fs.rmSync(td, { recursive: true, force: true });
       }

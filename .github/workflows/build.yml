@@ -54,12 +54,14 @@ jobs:
       - run: npm run check
       - run: npm test
 
-  # Run the listing-cache tests on real Windows — the only platform-sensitive
-  # pure-fs module (rename-over-existing semantics, O_EXCL writes, path
-  # handling). The main check job covers Linux; macOS is POSIX-equivalent so
-  # the ubuntu run covers it. Informational on PRs, like `check`.
-  test-listing-cache-windows:
-    name: Test listing cache (Windows)
+  # Run the platform-sensitive pure-fs tests on real Windows — the same
+  # rename-over-existing / O_EXCL / hardlink (nlink, ino) / path semantics
+  # that listing-cache exercises are also asserted by preview-cache and
+  # atomic-output. The main check job covers Linux; macOS is
+  # POSIX-equivalent so the ubuntu run covers it. Informational on PRs,
+  # like `check`.
+  test-windows-fs:
+    name: Test pure-fs modules (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -67,7 +69,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      - run: npx vitest run test/listing-cache.test.ts
+      - run: npx vitest run test/listing-cache.test.ts test/preview-cache.test.ts test/atomic-output.test.ts
 
   # Exercise the RAR5 WASI fallback (wasm32-wasip1-threads): stages only the
   # wasm bundle from the smart-archive-rar release and forces the extension's

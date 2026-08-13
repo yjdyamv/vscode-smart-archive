@@ -33,7 +33,12 @@ export type TierName =
   | "outBuild";
 
 const ROOT = path.join(__dirname, "..");
-const REPORT_FILE = path.join(ROOT, "test-results", "gates.json");
+const REPORT_DIR = path.join(ROOT, "test-results");
+/** Merged report consumed by CI / teardown (stable path). */
+const REPORT_FILE = path.join(REPORT_DIR, "gates.json");
+/** Per-process shard — vitest forks write concurrently; a shared
+ *  read-modify-write JSON would race and lose probe counts. */
+const PID_REPORT_FILE = path.join(REPORT_DIR, `gates.${process.pid}.json`);
 
 // ── Tier probes ─────────────────────────────────────────────────────
 
@@ -144,18 +149,19 @@ function record(tier: TierName, available: boolean): void {
   if (available) rec.available++;
   registry.set(tier, rec);
   try {
-    // Test files run in separate processes (vitest forks pool); merge with
-    // the on-disk report so the aggregated view survives across files.
+    // Test files run in separate processes (vitest forks pool). Each process
+    // owns a pid-sharded file (PID_REPORT_FILE), so concurrent read-modify-
+    // write cannot lose counts; gateReportPath() merges the shards.
     let disk: Partial<Record<TierName, GateRecord>> = {};
     try {
-      disk = JSON.parse(fs.readFileSync(REPORT_FILE, "utf8"));
+      disk = JSON.parse(fs.readFileSync(PID_REPORT_FILE, "utf8"));
     } catch {
-      // First write of the run.
+      // First write of this process.
     }
     const prev = disk[tier] ?? { checked: 0, available: 0 };
     disk[tier] = { checked: prev.checked + 1, available: prev.available + (available ? 1 : 0) };
-    fs.mkdirSync(path.dirname(REPORT_FILE), { recursive: true });
-    fs.writeFileSync(REPORT_FILE, JSON.stringify(disk, null, 2));
+    fs.mkdirSync(REPORT_DIR, { recursive: true });
+    fs.writeFileSync(PID_REPORT_FILE, JSON.stringify(disk, null, 2));
   } catch {
     // Report writing is best effort — never fail a test for it.
   }
@@ -197,8 +203,52 @@ export function getGateReport(): Record<TierName, GateRecord> {
   return out;
 }
 
+/**
+ * Merge every per-process shard into gates.json (the stable path CI and
+ * teardown read) and return that path. Idempotent; best effort.
+ */
 export function gateReportPath(): string {
+  try {
+    fs.mkdirSync(REPORT_DIR, { recursive: true });
+    const merged: Partial<Record<TierName, GateRecord>> = {};
+    for (const name of fs.readdirSync(REPORT_DIR)) {
+      if (!name.startsWith("gates.") || !name.endsWith(".json")) continue;
+      try {
+        const shard = JSON.parse(
+          fs.readFileSync(path.join(REPORT_DIR, name), "utf8"),
+        ) as Partial<Record<TierName, GateRecord>>;
+        for (const [tier, r] of Object.entries(shard)) {
+          const t = tier as TierName;
+          const prev = merged[t] ?? { checked: 0, available: 0 };
+          prev.checked += r!.checked;
+          prev.available += r!.available;
+          merged[t] = prev;
+        }
+      } catch {
+        // Unreadable shard (torn write) — ignore.
+      }
+    }
+    fs.writeFileSync(REPORT_FILE, JSON.stringify(merged, null, 2));
+  } catch {
+    // Report writing is best effort — never fail a test for it.
+  }
   return REPORT_FILE;
+}
+
+/** Remove the per-process shards after the merged report has been read. */
+export function cleanupGateReportShards(): void {
+  try {
+    for (const name of fs.readdirSync(REPORT_DIR)) {
+      if (!name.startsWith("gates.") || !name.endsWith(".json")) continue;
+      try {
+        fs.unlinkSync(path.join(REPORT_DIR, name));
+      } catch {
+        // Best effort.
+      }
+    }
+  } catch {
+    // Best effort.
+  }
 }
 
 /** Format a one-line human summary of the merged report. */

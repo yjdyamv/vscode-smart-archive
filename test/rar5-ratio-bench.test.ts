@@ -32,7 +32,11 @@ function makeFile(p: string, mb: number): void {
 describe("1 GiB + 20% recovery record (manual)", () => {
   // 1 GiB benchmark — opt-in like test/rar5-big-modify.test.ts:
   //   SAT_BIG_E2E=1 npx vitest run test/rar5-ratio-bench.test.ts
-  it.runIf(process.env.SAT_BIG_E2E === "1")("measures payload walk, append and delete", async () => {
+  // Linux-only: the work dir is hardcoded to a dev-machine path
+  // (/home/yuan/...) that does not exist on Windows.
+  it.runIf(process.env.SAT_BIG_E2E === "1" && process.platform === "linux")(
+    "measures payload walk, append and delete",
+    async () => {
     const dir = fs.mkdtempSync(path.join("/home/yuan/.sat-rr1g-"));
     try {
       const big = path.join(dir, "big.bin");
