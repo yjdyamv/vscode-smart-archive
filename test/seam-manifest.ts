@@ -176,6 +176,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "preview.test.ts",
     "shared-setup.ts"
   ],
+  "src/services/archiveService.ts": [
+    "setup-split-rar.test.ts"
+  ],
   "src/providers/webview/handlers/decrypt.ts": [
     "webview-encrypt-decrypt.test.ts"
   ],
@@ -184,6 +187,10 @@ export const SEAM_COVERED: Record<string, string[]> = {
   ],
   "src/providers/webview/handlers/shared.ts": [
     "rar5-rebuild-e2e.test.ts"
+  ],
+  "src/providers/webview/setup.ts": [
+    "setup-encrypted.test.ts",
+    "setup-split-rar.test.ts"
   ],
   "src/providers/webview/helpers.ts": [
     "workspace.test.ts"
@@ -276,10 +283,8 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/providers/webview/handlers/split.ts": "webview handler — untested",
   "src/providers/webview/handlers/test.ts": "webview handler — untested",
   "src/providers/webview/handlers/types.ts": "type-only",
-  "src/providers/webview/setup.ts": "webview boot — untested",
   "src/providers/webview/state.ts": "webview state — untested",
   "src/providers/webviewHandler.ts": "webview message routing — untested",
-  "src/services/archiveService.ts": "webview service layer — untested",
   "src/types/index.ts": "type-only",
   "src/ui/prompts.ts": "password/save dialogs — exercised via wizard + commands flows",
   "src/ui/stage-progress.ts": "progress staging — untested",
