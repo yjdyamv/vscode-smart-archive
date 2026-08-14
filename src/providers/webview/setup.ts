@@ -195,7 +195,7 @@ export async function setupWebview(
       const flags: string[] = [];
       if (isSplitVolume(originalFilePath)) {
         flags.push("window._xIsSplit=true");
-      } else if ([".7z", ".zip"].includes(resolvedExt)) {
+      } else if ([".7z", ".zip", ".rar"].includes(resolvedExt)) {
         flags.push("window._xCanSplit=true");
       }
       flags.push("window._xIsEncrypted=true");
@@ -289,7 +289,7 @@ export async function setupWebview(
   else {
     if (isReadOnlyExt(resolvedExt))
       extra.push(`<script type="application/json" id="_xReadOnly">true</script>`);
-    if ([".7z", ".zip"].includes(resolvedExt))
+    if ([".7z", ".zip", ".rar"].includes(resolvedExt))
       extra.push(`<script type="application/json" id="_xCanSplit">true</script>`);
   }
   if (isEnc) extra.push(`<script type="application/json" id="_xIsEncrypted">true</script>`);
