@@ -279,6 +279,12 @@
         "title": "Smart Archive: Repair Archive",
         "shortTitle": "Repair Archive",
         "icon": "$(wrench)"
+      },
+      {
+        "command": "yjdyamv.smart-archive.rebuildVolumes",
+        "title": "Smart Archive: Rebuild Missing Volumes",
+        "shortTitle": "Rebuild Volumes",
+        "icon": "$(debug-restart)"
       }
     ],
     "menus": {
@@ -306,6 +312,10 @@
         {
           "command": "yjdyamv.smart-archive.repair",
           "when": "false"
+        },
+        {
+          "command": "yjdyamv.smart-archive.rebuildVolumes",
+          "when": "false"
         }
       ],
       "explorer/context": [
@@ -326,6 +336,11 @@
         {
           "command": "yjdyamv.smart-archive.repair",
           "when": "resourceExtname == .rar",
+          "group": "7_modification"
+        },
+        {
+          "command": "yjdyamv.smart-archive.rebuildVolumes",
+          "when": "resourceFilename =~ /\\.part1\\.rar$/i",
           "group": "7_modification"
         }
       ]

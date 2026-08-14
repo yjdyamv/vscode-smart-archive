@@ -33,6 +33,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/commands/repair.ts": [
     "commands-e2e.test.ts"
   ],
+  "src/commands/rebuildVolumes.ts": [
+    "rebuild-volumes.test.ts"
+  ],
   "src/constants.ts": [
     "defaults-consistency.test.ts",
     "preview.test.ts",
@@ -188,6 +191,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/providers/webview/handlers/shared.ts": [
     "rar5-rebuild-e2e.test.ts"
   ],
+  "src/providers/webview/handlers/split.ts": [
+    "webview-split.test.ts"
+  ],
   "src/providers/webview/setup.ts": [
     "setup-encrypted.test.ts",
     "setup-split-rar.test.ts"
@@ -280,7 +286,6 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/providers/webview/handlers/password.ts": "webview handler — untested",
   "src/providers/webview/handlers/preview.ts": "webview handler — untested",
   "src/providers/webview/handlers/rename.ts": "webview handler — untested",
-  "src/providers/webview/handlers/split.ts": "webview handler — untested",
   "src/providers/webview/handlers/test.ts": "webview handler — untested",
   "src/providers/webview/handlers/types.ts": "type-only",
   "src/providers/webview/state.ts": "webview state — untested",

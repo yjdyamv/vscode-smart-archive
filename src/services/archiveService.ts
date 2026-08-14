@@ -44,6 +44,7 @@ export async function convertArchive(
   volumeSize?: string,
   outputPassword?: string,
   token?: vscode.CancellationToken,
+  recoveryVolumeCount?: number,
 ): Promise<void> {
   logger.info({ event: "service.convert.start", srcPath, dstFormat, dstPath });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sa_cvt_"));
@@ -81,6 +82,10 @@ export async function convertArchive(
               .getConfiguration("smart-archive")
               .get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL),
             volumeSize,
+            // RAR5 recovery volumes (.rev, WinRAR -rv): only meaningful for
+            // split RAR output.
+            recoveryVolumeCount:
+              dstFormat === "rar" && volumeSize ? recoveryVolumeCount : undefined,
           },
           { report: () => {} },
           token,

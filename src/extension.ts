@@ -12,6 +12,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { compressCommand } from "./commands/compress";
 import { repairCommand } from "./commands/repair";
+import { rebuildVolumesCommand } from "./commands/rebuildVolumes";
 import { decompressCommand, browseCommand } from "./commands/decompress";
 import { registerArchiveEditor, pasteCopiedFromArchive } from "./providers/archiveProvider";
 import { runAddToArchive } from "./providers/archive";
@@ -172,6 +173,12 @@ export function activate(context: vscode.ExtensionContext): void {
     (uri: vscode.Uri) => repairCommand(uri),
   );
 
+  // Register rebuild-volumes command (RAR5 .rev recovery volumes)
+  const rebuildVolumesDisposable = vscode.commands.registerCommand(
+    "yjdyamv.smart-archive.rebuildVolumes",
+    (uri: vscode.Uri) => rebuildVolumesCommand(uri),
+  );
+
   // Register add-to-archive command (triggered via command URI from webview)
   const addToArchiveDisposable = vscode.commands.registerCommand(
     "yjdyamv.smart-archive.addToArchive",
@@ -186,6 +193,7 @@ export function activate(context: vscode.ExtensionContext): void {
     pasteDisposable,
     addToArchiveDisposable,
     repairDisposable,
+    rebuildVolumesDisposable,
   );
 }
 

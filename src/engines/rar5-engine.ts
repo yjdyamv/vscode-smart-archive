@@ -102,6 +102,7 @@ interface Rar5Binding {
   deleteEntries(archivePath: string, names: string[], password?: string): number;
   listEntries(archivePath: string, password?: string): string[];
   repairArchive(inputPath: string, outputPath: string): void;
+  rebuildMissingVolumes(firstVolume: string): string[];
 }
 
 export type Rar5Backend = "auto" | "native" | "wasm";
@@ -329,6 +330,16 @@ function totalBytes(entries: CollectedEntry[]): number {
 export function repairWithRar5(inputPath: string, outputPath: string): void {
   const mod = loadBinding();
   mod.repairArchive(inputPath, outputPath);
+}
+
+/**
+ * Rebuild missing volumes of a multi-volume RAR5 set from its `.rev`
+ * recovery volumes (WinRAR `rc` equivalent). `firstVolume` is the path
+ * of `name.part1.rar`; returns the paths of all volumes produced.
+ */
+export function rebuildMissingVolumesWithRar5(firstVolume: string): string[] {
+  const mod = loadBinding();
+  return mod.rebuildMissingVolumes(firstVolume);
 }
 
 export async function compressWithRar5(
