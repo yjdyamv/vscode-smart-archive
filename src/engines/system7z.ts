@@ -30,6 +30,7 @@ import {
   mapLizardLevel,
   normalizeSevenZipMethod,
   SEVEN_ZIP_METHOD_CODECS,
+  xzMethodParam,
 } from "../utils/sevenZipMethod";
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
@@ -725,6 +726,13 @@ export async function compressWithSystem7z(
         "--",
         tarPath,
       ];
+      // XZ wraps honour the fast-LZMA2 method (HC4 match finder, ~4x faster,
+      // ~2% larger, still standard LZMA2) — the XZ container rejects all
+      // other 7z methods with "parameter error", so only flzma2 maps here.
+      if (typeFlag === "xz" && options.level > 0) {
+        const xzParam = xzMethodParam(normalizeSevenZipMethod(options.sevenZipMethod));
+        if (xzParam) compressArgs.splice(2, 0, `-m0=${xzParam}`);
+      }
       if (options.password) {
         validatePassword(options.password);
         // Empty -p switch makes 7-Zip prompt for the password; the value is

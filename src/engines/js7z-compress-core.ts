@@ -44,6 +44,7 @@ import {
   mapLizardLevel,
   normalizeSevenZipMethod,
   SEVEN_ZIP_METHOD_CODECS,
+  xzMethodParam,
 } from "../utils/sevenZipMethod";
 
 function buildCompressArgs(
@@ -68,6 +69,11 @@ function buildCompressArgs(
     } else {
       args.push(`-m0=${SEVEN_ZIP_METHOD_CODECS[method!]}`);
     }
+  } else if (format.label === "xz" && level > 0) {
+    // XZ only accepts the LZMA2 filter; the flzma2 setting maps to the HC4
+    // match finder (~4x faster, ~2% larger, still standard LZMA2).
+    const xzParam = xzMethodParam(normalizeSevenZipMethod(sevenZipMethod));
+    if (xzParam) args.push(`-m0=${xzParam}`);
   }
 
   if (password) {
@@ -229,14 +235,13 @@ export async function compressWith7z(
           try {
             js7z2.FS.mkdir(OUTPUT_DIR);
             streamToVFS(js7z2, tarDiskPath, `/${innerName}`);
-            await run7z(
-              js7z2,
-              ["a", archiveFsPath, `/${innerName}`, "-mmt=on"],
-              compressProgress,
-              undefined,
-              undefined,
-              printBridge,
-            );
+            const wrappedArgs = ["a", archiveFsPath, `/${innerName}`, "-mmt=on"];
+            // XZ wraps (tar.xz) honour the fast-LZMA2 method like plain xz.
+            if (wrapExt === "xz" && options.level > 0) {
+              const xzParam = xzMethodParam(normalizeSevenZipMethod(options.sevenZipMethod));
+              if (xzParam) wrappedArgs.push(`-m0=${xzParam}`);
+            }
+            await run7z(js7z2, wrappedArgs, compressProgress, undefined, undefined, printBridge);
             compressedData = new Uint8Array(
               js7z2.FS.readFile(archiveFsPath, { encoding: "binary" }),
             );
