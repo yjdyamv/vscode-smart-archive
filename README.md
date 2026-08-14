@@ -122,7 +122,8 @@ npm run lint             # oxlint static analysis
 npm run typecheck        # TypeScript type checking
 npm run format           # oxfmt code formatting
 npm run check            # format + lint + typecheck
-npm run test             # vitest (extension + webview)
+npm run test             # vitest (extension tests)
+npm --prefix webview-ui test   # vitest (webview UI tests)
 npm run package:cross    # create .vsix (clean install + staged natives)
 npm run release          # check + package:cross (pre-release validation)
 ```
