@@ -48,6 +48,11 @@ export interface DecompressParams {
   onProgress?: (message: string) => void;
   /** Optional AbortSignal to cancel a long-running operation. */
   signal?: AbortSignal;
+  /**
+   * Smart extract: collapse a lone top-level wrapper directory into the
+   * output dir. Defaults to the smart-archive.smartExtract setting (true).
+   */
+  smartExtract?: boolean;
 }
 
 /**
@@ -202,6 +207,7 @@ export async function decompress(params: DecompressParams): Promise<string> {
     inputPath: effectiveInput,
     outputDir,
     password: params.password ?? "",
+    smartExtract: params.smartExtract,
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

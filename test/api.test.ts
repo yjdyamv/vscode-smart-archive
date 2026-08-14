@@ -37,6 +37,17 @@ import { tmpDir } from "./tmp";
 const RAR5_BIN = path.join(__dirname, "..", "vendor", "rar5-bin");
 const RAR5_WASM = path.join(__dirname, "..", "vendor", "rar5-wasm");
 
+/**
+ * Round-trip decompress helper: the API tests assert the archive's own
+ * layout, so smart extract (wrapper collapse) is disabled — that behavior
+ * is covered by test/smart-extract.test.ts.
+ */
+function decompressPlain(
+  params: Omit<Parameters<typeof decompress>[0], "smartExtract">,
+): ReturnType<typeof decompress> {
+  return decompress({ ...params, smartExtract: false });
+}
+
 function rar5Staged(): boolean {
   if (fs.existsSync(RAR5_WASM)) return true;
   if (!fs.existsSync(RAR5_BIN)) return false;
@@ -341,7 +352,7 @@ describe("API compress round-trips", () => {
     expect(fs.existsSync(archivePath)).toBe(true);
     expect(archivePath.endsWith(".7z")).toBe(true);
 
-    const outDir = await decompress({ inputPath: archivePath, password: "" });
+    const outDir = await decompressPlain({ inputPath: archivePath, password: "" });
     const content = fs.readFileSync(path.join(outDir, "hello.txt"), "utf-8");
     expect(content).toBe("Hello World!");
   });
@@ -355,7 +366,7 @@ describe("API compress round-trips", () => {
     const targets = writeFiles(files);
     const archivePath = await compress({ targets, format: "7z" });
 
-    const outDir = await decompress({ inputPath: archivePath, password: "" });
+    const outDir = await decompressPlain({ inputPath: archivePath, password: "" });
     expect(fs.readFileSync(path.join(outDir, "proj", "src", "main.js"), "utf-8")).toBe(
       "console.log('hi')",
     );
@@ -374,10 +385,10 @@ describe("API compress round-trips", () => {
     });
 
     // Wrong password should fail
-    await expect(decompress({ inputPath: archivePath, password: "wrong" })).rejects.toThrow();
+    await expect(decompressPlain({ inputPath: archivePath, password: "wrong" })).rejects.toThrow();
 
     // Correct password should work
-    const outDir = await decompress({ inputPath: archivePath, password: "s3cret!" });
+    const outDir = await decompressPlain({ inputPath: archivePath, password: "s3cret!" });
     expect(fs.readFileSync(path.join(outDir, "secret.txt"), "utf-8")).toBe("classified");
   });
 
@@ -385,7 +396,7 @@ describe("API compress round-trips", () => {
     const targets = writeFiles({ "data.bin": "zipped" });
     const archivePath = await compress({ targets, format: "zip" });
 
-    const outDir = await decompress({ inputPath: archivePath, ext: "zip", password: "" });
+    const outDir = await decompressPlain({ inputPath: archivePath, ext: "zip", password: "" });
     expect(fs.readFileSync(path.join(outDir, "data.bin"), "utf-8")).toBe("zipped");
   });
 
@@ -398,10 +409,10 @@ describe("API compress round-trips", () => {
     });
 
     await expect(
-      decompress({ inputPath: archivePath, password: "wrong", ext: "zip" }),
+      decompressPlain({ inputPath: archivePath, password: "wrong", ext: "zip" }),
     ).rejects.toThrow();
 
-    const outDir = await decompress({ inputPath: archivePath, password: "zip123", ext: "zip" });
+    const outDir = await decompressPlain({ inputPath: archivePath, password: "zip123", ext: "zip" });
     expect(fs.readFileSync(path.join(outDir, "private.txt"), "utf-8")).toBe("top secret");
   });
 
@@ -409,7 +420,7 @@ describe("API compress round-trips", () => {
     const targets = writeFiles({ "notes.txt": "tar test" });
     const archivePath = await compress({ targets, format: "tar" });
 
-    const outDir = await decompress({ inputPath: archivePath, ext: "tar", password: "" });
+    const outDir = await decompressPlain({ inputPath: archivePath, ext: "tar", password: "" });
     expect(fs.readFileSync(path.join(outDir, "notes.txt"), "utf-8")).toBe("tar test");
   });
 
@@ -417,7 +428,7 @@ describe("API compress round-trips", () => {
     const targets = writeFiles({ "boot/setup.ini": "[setup]" });
     const archivePath = await compress({ targets, format: "wim" });
 
-    const outDir = await decompress({ inputPath: archivePath, ext: "wim", password: "" });
+    const outDir = await decompressPlain({ inputPath: archivePath, ext: "wim", password: "" });
     expect(fs.readFileSync(path.join(outDir, "boot", "setup.ini"), "utf-8")).toBe("[setup]");
   });
 
@@ -433,7 +444,7 @@ describe("API compress round-trips", () => {
       excludePatterns: ["node_modules"],
     });
 
-    const outDir = await decompress({ inputPath: archivePath, password: "" });
+    const outDir = await decompressPlain({ inputPath: archivePath, password: "" });
     expect(fs.readFileSync(path.join(outDir, "app", "src", "index.js"), "utf-8")).toBe("main");
     // node_modules should be excluded
     expect(() =>
@@ -767,7 +778,7 @@ describe("API wrapped format round-trips", () => {
       const out = await compress({ targets, format: "tar.br", outputPath: archivePath });
       expect(fs.existsSync(out)).toBe(true);
 
-      const outDir = await decompress({ inputPath: out });
+      const outDir = await decompressPlain({ inputPath: out });
       const extracted = readDirRecursive(outDir);
       expect(extracted["pkg/src/index.ts"]).toBe("main()");
       expect(extracted["pkg/src/lib/helper.ts"]).toBe("export 1");
@@ -783,7 +794,7 @@ describe("API wrapped format round-trips", () => {
       await compress({ targets: [projDir], format: "tar.br", outputPath: archivePath });
       expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
-      const outDir = await decompress({ inputPath: archivePath });
+      const outDir = await decompressPlain({ inputPath: archivePath });
       expect(fs.readFileSync(path.join(outDir, "app", "main.ts"), "utf-8")).toBe("const x = 1;");
     });
 
@@ -795,7 +806,7 @@ describe("API wrapped format round-trips", () => {
       const archivePath = path.join(tdir, "mod.tbr");
       await compress({ targets: [projDir], format: "tar.br", outputPath: archivePath });
 
-      const outDir = await decompress({ inputPath: archivePath });
+      const outDir = await decompressPlain({ inputPath: archivePath });
       expect(fs.readFileSync(path.join(outDir, "mod", "data.bin"), "utf-8")).toBe("alias-test");
     });
   });
@@ -813,7 +824,7 @@ describe("API wrapped format round-trips", () => {
       const out = await compress({ targets, format: "tar.lz4", outputPath: archivePath });
       expect(fs.existsSync(out)).toBe(true);
 
-      const outDir = await decompress({ inputPath: out });
+      const outDir = await decompressPlain({ inputPath: out });
       const extracted = readDirRecursive(outDir);
       expect(extracted["lib/src/core.ts"]).toBe("export default class Core {}");
       expect(extracted["lib/src/util/fs.ts"]).toBe("export const read = (p: string) => {}");
@@ -828,7 +839,7 @@ describe("API wrapped format round-trips", () => {
       const archivePath = path.join(tdir, "data.tar.lz4");
       await compress({ targets: [projDir], format: "tar.lz4", outputPath: archivePath });
 
-      const outDir = await decompress({ inputPath: archivePath });
+      const outDir = await decompressPlain({ inputPath: archivePath });
       expect(fs.readFileSync(path.join(outDir, "data", "log.txt"), "utf-8")).toBe("lz4-test-content");
     });
 
@@ -840,7 +851,7 @@ describe("API wrapped format round-trips", () => {
       const archivePath = path.join(tdir, "pkg.tlz4");
       await compress({ targets: [projDir], format: "tar.lz4", outputPath: archivePath });
 
-      const outDir = await decompress({ inputPath: archivePath });
+      const outDir = await decompressPlain({ inputPath: archivePath });
       expect(fs.readFileSync(path.join(outDir, "pkg", "info.json"), "utf-8")).toBe('{"v":1}');
     });
   });
@@ -860,7 +871,7 @@ describe("API wrapped format round-trips", () => {
       const out = await compress({ targets, format: "tar.sz", outputPath: archivePath });
       expect(fs.existsSync(out)).toBe(true);
 
-      const outDir = await decompress({ inputPath: out });
+      const outDir = await decompressPlain({ inputPath: out });
       const extracted = readDirRecursive(outDir);
       expect(extracted["lib/src/core.ts"]).toBe("export default class Core {}");
       expect(extracted["lib/src/util/fs.ts"]).toBe("export const read = (p: string) => {}");
@@ -876,7 +887,7 @@ describe("API wrapped format round-trips", () => {
       await compress({ targets: [projDir], format: "tar.sz", outputPath: archivePath });
       expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
-      const outDir = await decompress({ inputPath: archivePath });
+      const outDir = await decompressPlain({ inputPath: archivePath });
       expect(fs.readFileSync(path.join(outDir, "data", "log.txt"), "utf-8")).toBe("snappy-test-content");
     });
 
@@ -888,7 +899,7 @@ describe("API wrapped format round-trips", () => {
       const archivePath = path.join(tdir, "pkg.tsz");
       await compress({ targets: [projDir], format: "tar.sz", outputPath: archivePath });
 
-      const outDir = await decompress({ inputPath: archivePath });
+      const outDir = await decompressPlain({ inputPath: archivePath });
       expect(fs.readFileSync(path.join(outDir, "pkg", "info.json"), "utf-8")).toBe('{"v":1}');
     });
   });
@@ -915,7 +926,7 @@ describe("API wrapped format round-trips", () => {
         expect(fs.existsSync(archivePath)).toBe(true);
         expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
-        const outDir = await decompress({ inputPath: archivePath });
+        const outDir = await decompressPlain({ inputPath: archivePath });
         expect(fs.readFileSync(path.join(outDir, "data.txt"), "utf-8")).toBe("wrapped round-trip test");
       });
 
@@ -934,7 +945,7 @@ describe("API wrapped format round-trips", () => {
           excludePatterns: [], // no default exclusions for this test
         });
 
-        const outDir = await decompress({ inputPath: archivePath });
+        const outDir = await decompressPlain({ inputPath: archivePath });
         expect(fs.existsSync(outDir)).toBe(true);
         expect(fs.readFileSync(path.join(outDir, "proj", "readme.md"), "utf-8")).toBe("hello");
         expect(fs.readFileSync(path.join(outDir, "proj", "src", "app.ts"), "utf-8")).toBe("type X = 1;");
@@ -970,7 +981,7 @@ describe("API decompress flows", () => {
       outputPath: archivePath,
     });
 
-    const result = await decompress({ inputPath: outPath });
+    const result = await decompressPlain({ inputPath: outPath });
     expect(result).toBe(path.join(tdir, "test.extracted"));
     expect(fs.existsSync(result)).toBe(true);
   });
@@ -983,7 +994,7 @@ describe("API decompress flows", () => {
     await compress({ targets: [srcFile], format: "7z", outputPath: archivePath });
 
     const customOut = path.join(tdir, "my_output");
-    const result = await decompress({ inputPath: archivePath, outputDir: customOut });
+    const result = await decompressPlain({ inputPath: archivePath, outputDir: customOut });
     expect(result).toBe(customOut);
     expect(fs.existsSync(path.join(customOut, "note.txt"))).toBe(true);
   });

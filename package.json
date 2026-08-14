@@ -696,6 +696,11 @@
           "default": 100,
           "minimum": 1,
           "description": "%config.cache.maxFiles.description%"
+        },
+        "smart-archive.smartExtract": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.smartExtract.description%"
         }
       }
     }

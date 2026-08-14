@@ -17,7 +17,8 @@ import { selectEngine } from "./select-engine";
 import { isCancellationError } from "../utils/cancellation";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 import { logger } from "../utils/logger";
-import { getFullExt } from "../constants";
+import { getFullExt, DEFAULT_SMART_EXTRACT } from "../constants";
+import { promoteSingleTopDirectory } from "../utils/smart-extract";
 
 export async function decompressWith7z(
   options: DecompressOptions,
@@ -50,19 +51,37 @@ export async function decompressWith7z(
       progress as ProgressLike | undefined,
       token as TokenLike | undefined,
     );
-    return;
+  } else {
+    try {
+      await runArchiveOp(
+        "decompress",
+        { options },
+        progress as ProgressLike | undefined,
+        token as TokenLike | undefined,
+      );
+    } catch (err) {
+      // Preserve vscode.CancellationError semantics for existing callers.
+      if (isCancellationError(err)) throw new vscode.CancellationError();
+      throw err;
+    }
   }
 
-  try {
-    await runArchiveOp(
-      "decompress",
-      { options },
-      progress as ProgressLike | undefined,
-      token as TokenLike | undefined,
-    );
-  } catch (err) {
-    // Preserve vscode.CancellationError semantics for existing callers.
-    if (isCancellationError(err)) throw new vscode.CancellationError();
-    throw err;
+  // Smart extract: collapse a lone wrapper directory (App-1.0/…) so the
+  // user gets the contents directly. Enabled by default; the setting can
+  // restore the old "keep the wrapper" behavior.
+  const smartExtract =
+    options.smartExtract ??
+    vscode.workspace
+      .getConfiguration("smart-archive")
+      .get<boolean>("smartExtract", DEFAULT_SMART_EXTRACT);
+  if (smartExtract) {
+    try {
+      promoteSingleTopDirectory(options.outputDir);
+    } catch (err) {
+      logger.warn(
+        { event: "decompress.smartExtract.failed", err },
+        "Smart extract post-processing failed; leaving output as extracted",
+      );
+    }
   }
 }

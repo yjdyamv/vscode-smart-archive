@@ -79,6 +79,11 @@ export interface DecompressOptions {
   password: string;
   /** Host already confirmed that the archive exceeds maxArchiveSize. */
   allowOversize?: boolean;
+  /**
+   * Smart extract: collapse a lone top-level wrapper directory into the
+   * output dir. Defaults to the smart-archive.smartExtract setting (true).
+   */
+  smartExtract?: boolean;
 }
 
 /**
