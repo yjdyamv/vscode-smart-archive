@@ -380,15 +380,28 @@ export async function withAtomicOutput({
   try {
     await write(tmpOut);
     if (volumeSize) {
-      // Volume set: engine produced tmpOut.001, tmpOut.002, ... Move each
-      // onto dstPath.001, ... A single-file output (engine chose not to
-      // split) is handled as a plain rename.
+      // Volume set: engines produce either `tmpOut.001, .002, ...`
+      // (7z/zip convention) or `tmpOut.part1.rar, .part2.rar, ...`
+      // (RAR5 convention — the rar5 engine replaces the extension, so
+      // tmpOut itself is never written; recovery `.rev` files may join
+      // the set). Move every volume onto the final names; a single-file
+      // output (engine chose not to split) is handled as a plain rename.
       let moved = 0;
       for (let i = 1; i <= 9999; i++) {
         const vol = `${tmpOut}.${String(i).padStart(3, "0")}`;
         if (!fs.existsSync(vol)) break;
         renameOverwrite(vol, `${dstPath}.${String(i).padStart(3, "0")}`);
         moved++;
+      }
+      const tmpBaseName = path.basename(tmpBase);
+      const dstBase = dstPath.slice(0, -path.extname(dstPath).length) || dstPath;
+      for (const name of fs.readdirSync(dir)) {
+        if (!name.startsWith(tmpBaseName)) continue;
+        const rest = name.slice(tmpBaseName.length);
+        if (/^\.part\d+\.rar$/i.test(rest) || /^\.rev\d+\.(?:rev|rar)$/i.test(rest)) {
+          renameOverwrite(path.join(dir, name), `${dstBase}${rest}`);
+          moved++;
+        }
       }
       if (moved === 0) renameOverwrite(tmpOut, dstPath);
     } else {

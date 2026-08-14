@@ -72,6 +72,11 @@ export async function convertArchive(
             },
             outputPath: outPath,
             password: outputPassword ?? password,
+            // RAR5 parity with the compress wizard: a password-protected
+            // RAR output must encrypt headers too, otherwise member names
+            // leak from an "encrypted" archive.
+            encryptHeaders:
+              dstFormat === "rar" && Boolean(outputPassword ?? password) ? true : undefined,
             level: vscode.workspace
               .getConfiguration("smart-archive")
               .get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL),

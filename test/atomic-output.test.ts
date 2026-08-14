@@ -111,6 +111,45 @@ describe("withAtomicOutput (volume set)", () => {
     });
     expect(fs.readFileSync(dst, "utf8")).toBe("tiny-output");
   });
+
+  it("moves RAR5-style tmpOut.partN.rar volumes onto dstPath.partN.rar", async () => {
+    const dir = tmpDir("saao-");
+    const dst = path.join(dir, "out.rar");
+    await withAtomicOutput({
+      dstPath: dst,
+      volumeSize: "1m",
+      write: async (outPath) => {
+        // The rar5 engine replaces the .rar extension with .partN.rar —
+        // the bare outPath is never written.
+        const base = outPath.replace(/\.rar$/i, "");
+        fs.writeFileSync(base + ".part1.rar", "vol1");
+        fs.writeFileSync(base + ".part2.rar", "vol2");
+      },
+    });
+    expect(fs.readFileSync(dst.replace(/\.rar$/, "") + ".part1.rar", "utf8")).toBe("vol1");
+    expect(fs.readFileSync(dst.replace(/\.rar$/, "") + ".part2.rar", "utf8")).toBe("vol2");
+    expect(fs.existsSync(dst)).toBe(false);
+    const leftovers = fs.readdirSync(dir).filter((f) => f.startsWith(".sa_tmp_"));
+    expect(leftovers).toEqual([]);
+  });
+
+  it("moves RAR5 recovery volumes (.rev) alongside the part files", async () => {
+    const dir = tmpDir("saao-");
+    const dst = path.join(dir, "out.rar");
+    await withAtomicOutput({
+      dstPath: dst,
+      volumeSize: "1m",
+      write: async (outPath) => {
+        const base = outPath.replace(/\.rar$/i, "");
+        fs.writeFileSync(base + ".part1.rar", "vol1");
+        fs.writeFileSync(base + ".rev1.rev", "rev1");
+      },
+    });
+    expect(fs.existsSync(dst.replace(/\.rar$/, "") + ".part1.rar")).toBe(true);
+    expect(fs.readFileSync(dst.replace(/\.rar$/, "") + ".rev1.rev", "utf8")).toBe("rev1");
+    const leftovers = fs.readdirSync(dir).filter((f) => f.startsWith(".sa_tmp_"));
+    expect(leftovers).toEqual([]);
+  });
 });
 
 describe("renameOverwrite", () => {
