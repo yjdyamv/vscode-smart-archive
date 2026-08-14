@@ -81,7 +81,6 @@ const av = useArchiveView({
   readOnly,
   isSplit,
   canSplit,
-  isEncrypted,
   canEncrypt,
   pwError,
   descCounts,

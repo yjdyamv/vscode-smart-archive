@@ -74,9 +74,12 @@ export function pwInputBox(
       }
     });
     ib.onDidHide(() => {
-      if (!accepted) {
-        logger.debug({ event: "shared.pwInputBox.cancelled" });
-      }
+      // Only cancel when the box closed without an accept. The accept path
+      // already resolved with the value (hide() may fire this event before
+      // the rest of the accept handler runs — resolving here would silently
+      // turn every confirmed password into undefined).
+      if (accepted) return;
+      logger.debug({ event: "shared.pwInputBox.cancelled" });
       resolve(undefined);
     });
     ib.show();

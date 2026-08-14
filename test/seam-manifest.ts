@@ -176,6 +176,12 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "preview.test.ts",
     "shared-setup.ts"
   ],
+  "src/providers/webview/handlers/decrypt.ts": [
+    "webview-encrypt-decrypt.test.ts"
+  ],
+  "src/providers/webview/handlers/encrypt.ts": [
+    "webview-encrypt-decrypt.test.ts"
+  ],
   "src/providers/webview/handlers/shared.ts": [
     "rar5-rebuild-e2e.test.ts"
   ],
@@ -258,9 +264,7 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/providers/webview/handlers/addFiles.ts": "webview handler — untested",
   "src/providers/webview/handlers/convert.ts": "webview handler — untested",
   "src/providers/webview/handlers/copy.ts": "webview handler — untested",
-  "src/providers/webview/handlers/decrypt.ts": "webview handler — untested",
   "src/providers/webview/handlers/deleteEntries.ts": "webview handler — untested",
-  "src/providers/webview/handlers/encrypt.ts": "webview handler — untested",
   "src/providers/webview/handlers/extractAll.ts": "webview handler — untested",
   "src/providers/webview/handlers/extractSelected.ts": "webview handler — untested",
   "src/providers/webview/handlers/index.ts": "re-export barrel",

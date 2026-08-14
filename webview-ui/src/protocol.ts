@@ -36,5 +36,4 @@ export type HostToWebview =
   | { c: "err"; t: string }
   | { c: "pwerr"; t: string }
   | { c: "loading"; t: string | boolean }
-  | { c: "dirChildren"; path: string; children: TreeNodeData[] }
-  | { c: "encState"; v: boolean };
+  | { c: "dirChildren"; path: string; children: TreeNodeData[] };

@@ -56,9 +56,12 @@ export const handleEncrypt: MessageHandler = async (ctx) => {
     }
     webview.postMessage({ c: "loading", t: t("archive.encrypting") });
     await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, newPw, token);
+    // Note: encrypt writes a NEW archive (…_encrypted.ext) and the webview
+    // keeps displaying the original file, whose encryption state is unchanged
+    // — so no encState message is sent (the status-bar button must keep
+    // reflecting the archive currently on screen).
     logger.info({ event: "webview.encrypt.ok", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${dst}` });
-    webview.postMessage({ c: "encState", v: true });
   } catch (err) {
     if (isCancellationError(err)) return;
     logger.error({ event: "webview.encrypt.failed", err }, (err as Error).message);

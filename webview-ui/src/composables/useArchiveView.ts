@@ -27,7 +27,6 @@ export interface ArchiveViewContext {
   readOnly: Ref<boolean>;
   isSplit: Ref<boolean>;
   canSplit: Ref<boolean>;
-  isEncrypted: Ref<boolean>;
   canEncrypt: Ref<boolean>;
   pwError: Ref<boolean>;
   descCounts: Ref<Record<string, DescCount>>;
@@ -158,7 +157,6 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     viewState,
     loadingMsg,
     pwError: ctx.pwError,
-    isEncrypted: ctx.isEncrypted,
     loadExpandedPaths,
     selectAllPending,
   });
