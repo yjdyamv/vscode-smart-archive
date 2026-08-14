@@ -5,12 +5,10 @@ test/out/
 *.vsix
 .vscode/settings.json
 media/vue/
-vendor/7zz-wasm/7zz.js
-vendor/7zz-wasm/7zz.wasm
-vendor/7zz-wasm/LICENSE
-vendor/7z-bin/
-vendor/rar5-bin/
-vendor/rar5-wasm/
+# vendored native/WASM engines — all staged by the install scripts
+# (install-7zz-wasm.mjs / install-7z-platforms.mjs / install-rar5-platforms.mjs
+# / install-snappy-platforms.mjs), including vendor/7zz-wasm/package.json
+vendor/
 **/*.tsbuildinfo
 .cache/
 
