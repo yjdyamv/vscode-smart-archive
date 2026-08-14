@@ -12,7 +12,6 @@
  *   { c: "pwerr",     t: string }                     wrong-password feedback
  *   { c: "loading",   t: string | false }             loading overlay
  *   { c: "dirChildren", path: string, children }      lazy directory expansion
- *   { c: "encState",  v: boolean }                    encryption state change
  *
  * Webview → Extension (`c` field):
  *   pw            { c: "pw",            pw: string }

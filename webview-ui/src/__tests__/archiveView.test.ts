@@ -50,7 +50,6 @@ function makeFixture() {
   const viewState = ref("content");
   const loadingMsg = ref("");
   const pwError = ref(false);
-  const isEncrypted = ref(false);
   const selectAllPending = ref(false);
   const scrollToPath = vi.fn();
   const containerEl = ref<HTMLElement | null>(null);
@@ -65,7 +64,6 @@ function makeFixture() {
     viewState,
     loadingMsg,
     pwError,
-    isEncrypted,
     selectAllPending,
     scrollToPath,
     containerEl,
@@ -273,13 +271,6 @@ describe("createMessageDispatcher", () => {
     const d = createMessageDispatcher({ ...f, loadExpandedPaths: vi.fn() });
     d.handleMessage({ c: "pwerr", t: "Wrong password" });
     expect(f.pwError.value).toBe(true);
-  });
-
-  it("encState updates encryption state", () => {
-    const f = makeFixture();
-    const d = createMessageDispatcher({ ...f, loadExpandedPaths: vi.fn() });
-    d.handleMessage({ c: "encState", v: true });
-    expect(f.isEncrypted.value).toBe(true);
   });
 
   it("dirChildren inserts children and extends selection when parent selected", () => {
@@ -495,7 +486,6 @@ describe("useArchiveView row interactions", () => {
       readOnly: ref(false),
       isSplit: ref(false),
       canSplit: ref(false),
-      isEncrypted: f.isEncrypted,
       canEncrypt: ref(false),
       pwError: f.pwError,
       descCounts: ref({}),

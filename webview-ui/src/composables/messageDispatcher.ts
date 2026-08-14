@@ -11,7 +11,6 @@ export interface MessageDispatcherContext {
   viewState: Ref<string>;
   loadingMsg: Ref<string>;
   pwError: Ref<boolean>;
-  isEncrypted: Ref<boolean>;
   loadExpandedPaths: () => void;
   /**
    * Set while a Ctrl+A select-all is draining its lazy loads: every
@@ -46,9 +45,6 @@ export function createMessageDispatcher(ctx: MessageDispatcherContext) {
         break;
       case "pwerr":
         ctx.pwError.value = true;
-        break;
-      case "encState":
-        ctx.isEncrypted.value = !!msg.v;
         break;
       case "dirChildren": {
         const parentPath = msg.path;
