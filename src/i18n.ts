@@ -303,6 +303,51 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "修复失败：",
     "zh-tw": "修復失敗：",
   },
+  "rebuildVolumes.title": {
+    en: "Rebuild missing volumes",
+    "zh-cn": "重建缺失分卷",
+    "zh-tw": "重建缺失分卷",
+  },
+  "rebuildVolumes.pick": {
+    en: "Select the first volume (.part1.rar) of the set to rebuild",
+    "zh-cn": "选择要重建的分卷集第一个卷（.part1.rar）",
+    "zh-tw": "選擇要重建的分卷集第一個卷（.part1.rar）",
+  },
+  "rebuildVolumes.needPart1": {
+    en: "Please select the first volume (name.part1.rar) of the set.",
+    "zh-cn": "请选择分卷集的第一个卷（name.part1.rar）。",
+    "zh-tw": "請選擇分卷集的第一個卷（name.part1.rar）。",
+  },
+  "rebuildVolumes.nothingMissing": {
+    en: "No missing volumes detected in this set.",
+    "zh-cn": "未检测到缺失的分卷。",
+    "zh-tw": "未偵測到缺失的分卷。",
+  },
+  "rebuildVolumes.noRecovery": {
+    en: "No .rev recovery volumes found — the missing volumes cannot be rebuilt.",
+    "zh-cn": "未找到 .rev 恢复卷，无法重建缺失分卷。",
+    "zh-tw": "未找到 .rev 復原磁碟區，無法重建缺失分卷。",
+  },
+  "rebuildVolumes.confirm": {
+    en: "Rebuild {0}?",
+    "zh-cn": "重建 {0}？",
+    "zh-tw": "重建 {0}？",
+  },
+  "rebuildVolumes.rebuild": {
+    en: "Rebuild",
+    "zh-cn": "重建",
+    "zh-tw": "重建",
+  },
+  "rebuildVolumes.done": {
+    en: "Rebuilt {0} volume(s).",
+    "zh-cn": "已重建 {0} 个分卷。",
+    "zh-tw": "已重建 {0} 個分卷。",
+  },
+  "rebuildVolumes.failed": {
+    en: "Rebuild failed: ",
+    "zh-cn": "重建失败：",
+    "zh-tw": "重建失敗：",
+  },
 
   // ---- Decompress flow ----
   "decompress.noFile": {
@@ -784,6 +829,31 @@ const messages: Record<string, Record<Locale, string>> = {
     en: "Splitting...",
     "zh-cn": "正在分割分卷...",
     "zh-tw": "正在分割分卷...",
+  },
+  "split.recoveryPrompt": {
+    en: "Recovery volumes (.rev) to create (0 = none)",
+    "zh-cn": "要创建的恢复卷 (.rev) 数量（0 = 不创建）",
+    "zh-tw": "要建立的復原磁碟區 (.rev) 數量（0 = 不建立）",
+  },
+  "split.recoveryNone": {
+    en: "No recovery volumes",
+    "zh-cn": "不创建恢复卷",
+    "zh-tw": "不建立復原磁碟區",
+  },
+  "split.recoveryOne": {
+    en: "1 recovery volume (minimal redundancy)",
+    "zh-cn": "1 个恢复卷（最小冗余）",
+    "zh-tw": "1 個復原磁碟區（最小冗餘）",
+  },
+  "split.recoveryFew": {
+    en: "recovery volumes (moderate redundancy)",
+    "zh-cn": "个恢复卷（中等冗余）",
+    "zh-tw": "個復原磁碟區（中等冗餘）",
+  },
+  "split.recoveryMany": {
+    en: "recovery volumes (high redundancy)",
+    "zh-cn": "个恢复卷（高冗余）",
+    "zh-tw": "個復原磁碟區（高冗餘）",
   },
   "archive.encrypting": {
     en: "Encrypting...",

@@ -26,9 +26,30 @@ export const handleSplit: MessageHandler = async (ctx) => {
       endOperation(s);
       return;
     }
-    if (token.isCancellationRequested) throw new vscode.CancellationError();
     const ext = getFullExt(s.filePath);
     const fmt = ext.slice(1);
+    // RAR5 split sets can carry .rev recovery volumes (WinRAR -rv):
+    // offer a count, defaulting to none (0).
+    let recoveryVolumeCount: number | undefined;
+    if (fmt === "rar") {
+      const picked = await vscode.window.showQuickPick(
+        [
+          { label: "0", description: t("split.recoveryNone"), value: 0 },
+          { label: "1", description: t("split.recoveryOne"), value: 1 },
+          { label: "2", description: t("split.recoveryFew"), value: 2 },
+          { label: "3", description: t("split.recoveryFew"), value: 3 },
+          { label: "5", description: t("split.recoveryFew"), value: 5 },
+          { label: "10", description: t("split.recoveryMany"), value: 10 },
+        ],
+        { placeHolder: t("split.recoveryPrompt"), ignoreFocusOut: true },
+      );
+      if (!picked) {
+        endOperation(s);
+        return;
+      }
+      if (picked.value > 0) recoveryVolumeCount = picked.value;
+    }
+    if (token.isCancellationRequested) throw new vscode.CancellationError();
     const dir = path.dirname(s.filePath);
     const base = path.basename(s.filePath);
     const folderName = base.replace(/\.[^.]+$/, "");
@@ -40,7 +61,16 @@ export const handleSplit: MessageHandler = async (ctx) => {
     }
     const dst = path.join(folderPath, base);
     webview.postMessage({ c: "loading", t: t("archive.splitting") });
-    await convertArchive(s.filePath, fmt, dst, s.password ?? "", volSize, undefined, token);
+    await convertArchive(
+      s.filePath,
+      fmt,
+      dst,
+      s.password ?? "",
+      volSize,
+      undefined,
+      token,
+      recoveryVolumeCount,
+    );
     logger.info({ event: "webview.split.ok", dst });
     webview.postMessage({ c: "ok", t: `${t("compress.done")}${folderPath}` });
   } catch (err) {

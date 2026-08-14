@@ -220,6 +220,11 @@ export const window = {
     state.dialogs.push({ kind: "information", message, items });
     return Promise.resolve(undefined);
   },
+  showQuickPick: <T extends { label: string }>(items: readonly T[], _options?: unknown): Promise<T | undefined> => {
+    // Recorded like dialogs; tests spy on it to script the selection.
+    state.quickPicks.push({ items, accepted: undefined } as never);
+    return Promise.resolve(undefined);
+  },
   showSaveDialog: async () => state.showSaveDialogResult,
   showOpenDialog: async () => state.showOpenDialogResult,
   createOutputChannel: (name: string) => {

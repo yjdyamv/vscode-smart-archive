@@ -18,7 +18,6 @@ import { verifyArchivePassword } from "../src/providers/webview/handlers/shared"
 import { convertArchive } from "../src/services/archiveService";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
-
 const RAR5_FORMAT = {
   label: "rar",
   description: "RAR5",
@@ -130,6 +129,41 @@ describe("webview split flags for RAR", () => {
       // password while accepting the right one.
       expect(await verifyArchivePassword(out1, "wrong")).toBe(false);
       expect(await verifyArchivePassword(out1, "newpw")).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(haveGates())("header-encrypted split sets (-hp) round-trip through 7-Zip with exact volume sizes", async () => {
+    // WinRAR -hp equivalent: every volume starts with the plaintext
+    // encryption header and all blocks are encrypted. 7-Zip must list and
+    // test the set with the password (and reject the wrong one), and every
+    // volume must stay within the requested size (like WinRAR's exact
+    // volumes).
+    const td = tmpDir("sat_rarsp4_");
+    try {
+      const proj = path.join(td, "proj");
+      fs.mkdirSync(proj, { recursive: true });
+      fs.writeFileSync(path.join(proj, "big.bin"), require("crypto").randomBytes(150000));
+      const first = path.join(td, "hp.part1.rar");
+      await compressWithRar5({
+        format: RAR5_FORMAT,
+        outputPath: first,
+        targets: [{ fsPath: proj }],
+        password: "newpw",
+        encryptHeaders: true,
+        level: 3,
+        volumeSize: "64k",
+      });
+
+      const vols = fs.readdirSync(td).filter((n) => n.endsWith(".rar")).sort();
+      expect(vols.length).toBeGreaterThanOrEqual(2);
+      for (const v of vols) {
+        expect(fs.statSync(path.join(td, v)).size).toBeLessThanOrEqual(65536);
+      }
+
+      expect(await verifyArchivePassword(first, "wrong")).toBe(false);
+      expect(await verifyArchivePassword(first, "newpw")).toBe(true);
     } finally {
       fs.rmSync(td, { recursive: true, force: true });
     }
