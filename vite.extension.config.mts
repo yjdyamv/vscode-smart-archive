@@ -19,8 +19,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Stable filenames for shared chunks (no content hash): the worker
-        // entry requires them by relative path, and obfuscate.js walks out/
-        // recursively — deterministic names keep both predictable.
+        // entry requires them by relative path — deterministic names keep
+        // the require predictable.
         chunkFileNames: (chunkInfo) =>
           chunkInfo.name === "rolldown-runtime" ? "rolldown-runtime.js" : "shared-core.js",
       },
