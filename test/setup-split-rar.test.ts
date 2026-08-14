@@ -2,9 +2,10 @@
  * Webview RAR split support — Smart Archive VSCode Extension
  *
  * Pins the split/merge flag contract for RAR in the archive webview and
- * the production split-RAR conversion path. Gated on the rar5 binding
- * (to create real RAR5 archives) and the bundled 7zz (setupWebview
- * lists archives through it).
+ * the production split-RAR conversion path (including WinRAR/7-Zip
+ * interoperability of the produced volume sets). Gated on the rar5
+ * binding (to create real RAR5 archives) and the bundled 7zz
+ * (setupWebview lists archives through it).
  */
 
 import { describe, expect, it } from "vitest";
@@ -13,6 +14,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
 import { setupWebview } from "../src/providers/webview/setup";
+import { verifyArchivePassword } from "../src/providers/webview/handlers/shared";
 import { convertArchive } from "../src/services/archiveService";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
@@ -38,13 +40,7 @@ function haveGates(): boolean {
 }
 
 describe("webview split flags for RAR", () => {
-  it.runIf(haveGates())("a single .rar does NOT offer Split until the rar5 binding's volume output is 7-Zip-readable", async () => {
-    // Pinned limitation: the smart-archive-rar binding appends trailing
-    // bytes after each volume's ENDARC marker, which 7-Zip rejects
-    // ("data after the end of archive"), so sets created here cannot be
-    // read back by this extension. Once the binding is fixed, flip this
-    // test to expect _xCanSplit=true and add ".rar" to the canSplit
-    // lists in src/providers/webview/setup.ts.
+  it.runIf(haveGates())("a single .rar offers Split (_xCanSplit) and no merge flag", async () => {
     const td = tmpDir("sat_rarsp_");
     try {
       const proj = path.join(td, "proj");
@@ -62,7 +58,7 @@ describe("webview split flags for RAR", () => {
       const webview = fakeWebview();
       await setupWebview(webview, vscode.Uri.file(archive));
 
-      expect(webview.html).not.toContain('id="_xCanSplit">true');
+      expect(webview.html).toContain('id="_xCanSplit">true');
       expect(webview.html).not.toContain('id="_xIsSplit">true');
     } finally {
       fs.rmSync(td, { recursive: true, force: true });
@@ -97,25 +93,24 @@ describe("webview split flags for RAR", () => {
     }
   });
 
-  it.runIf(haveGates())("convertArchive writes RAR5 volumes under their final names", async () => {
-    // The webview split flow (single archive → RAR5 volume set): the rar5
-    // engine replaces the output extension with .partN.rar, and
-    // withAtomicOutput must move every volume onto the final names.
-    // NOTE: round-trip verification is intentionally omitted — 7-Zip
-    // cannot read binding-produced volume sets yet ("data after the end
-    // of archive"), see the first test's comment.
+  it.runIf(haveGates())("convertArchive re-splits a RAR set with header encryption (7-Zip + password readable)", async () => {
+    // The full webview split/encrypt path: split RAR set → convertArchive
+    // with a volume size and a new password. The produced volumes must
+    // land on final names, be 7-Zip-readable, and carry header
+    // encryption (member names hidden without the password).
     const td = tmpDir("sat_rarsp3_");
     try {
       const proj = path.join(td, "proj");
       fs.mkdirSync(proj, { recursive: true });
       fs.writeFileSync(path.join(proj, "big.bin"), require("crypto").randomBytes(150000));
-      const src = path.join(td, "src.rar");
+      const src = path.join(td, "src.part1.rar");
       await compressWithRar5({
         format: RAR5_FORMAT,
         outputPath: src,
         targets: [{ fsPath: proj }],
         password: "",
         level: 3,
+        volumeSize: "64k",
       });
 
       const dst = path.join(td, "out.rar");
@@ -129,6 +124,12 @@ describe("webview split flags for RAR", () => {
       expect(fs.existsSync(out2)).toBe(true);
       expect(fs.existsSync(dst)).toBe(false);
       expect(fs.readdirSync(td).filter((n) => n.startsWith(".sa_tmp_"))).toEqual([]);
+
+      // 7-Zip must read the set (7zz t is the read-back path the
+      // extension uses), and header encryption must reject the wrong
+      // password while accepting the right one.
+      expect(await verifyArchivePassword(out1, "wrong")).toBe(false);
+      expect(await verifyArchivePassword(out1, "newpw")).toBe(true);
     } finally {
       fs.rmSync(td, { recursive: true, force: true });
     }
