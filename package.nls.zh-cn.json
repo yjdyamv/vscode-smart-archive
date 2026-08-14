@@ -50,6 +50,7 @@
   "config.sevenZipMethod.deflate": "Deflate — ZIP 同款算法，兼容性广。",
   "config.sevenZipMethod.bzip2": "BZip2 — 经典块压缩，较慢，压缩率好。",
   "config.sevenZipMethod.lizard": "Lizard — 解压极快；0–9 级会映射到 LizardMT 的 10–49 级。",
+  "config.smartExtract.description": "智能解压：当压缩包内只有一个顶层文件夹时，自动去掉这层包装，让内容直接落在输出目录（不再双层嵌套）。",
   "config.workerMemoryMb.description": "归档 worker 线程（运行 WASM 7-Zip）的内存上限（MiB）。设为 0 可禁用护栏。降低可减少扩展内存占用；若大压缩包报内存超限错误请调高。",
   "config.workerPoolSize.description": "归档 worker 线程数。1 表示所有操作串行（内存占用最低）；2 允许小压缩包批量操作并行执行。每个 worker 独立持有 WASM 7-Zip 堆内存。修改后需重载窗口生效。",
   "config.logLevel.description": "Smart Archive 输出面板日志的详细程度。",

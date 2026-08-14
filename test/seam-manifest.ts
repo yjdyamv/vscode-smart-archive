@@ -286,5 +286,6 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/utils/progress-scale.ts": "progress scaling — untested",
   "src/utils/promptOversize.ts": "oversize dialog — exercised via decompress command flow",
   "src/utils/sevenZipMethod.ts": "7z method strings — untested",
+  "src/utils/smart-extract.ts": "smart extract wrapper collapse — smart-extract tests",
   "src/utils/volume-sizes-core.ts": "volume size lists — split-volume tests use router path"
 };
