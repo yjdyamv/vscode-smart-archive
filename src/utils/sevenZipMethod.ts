@@ -20,6 +20,21 @@ export const SEVEN_ZIP_METHOD_CODECS: Record<SevenZipMethod, string> = {
   lizard: "LIZARD",
 };
 
+/**
+ * `-m0=` parameter for the XZ container, or undefined to keep the default.
+ *
+ * The XZ format only defines the LZMA2 filter — FLZMA2/ZSTD/BROTLI/LZ4/
+ * LIZARD are rejected by both bundled engines with E_INVALIDARG ("parameter
+ * error"), so the 7z method cannot be forwarded as-is. The `flzma2` setting
+ * (the default) maps to LZMA2 with the HC4 hash-chain match finder: the
+ * same "fast LZMA2" idea, ~4x faster than BT4 with ~2% larger output, and
+ * still a standard LZMA2 stream every xz decoder accepts. Any other method
+ * leaves the encoder default (LZMA2/BT4) untouched.
+ */
+export function xzMethodParam(method: SevenZipMethod | undefined): string | undefined {
+  return method === "flzma2" ? "LZMA2:mf=hc4" : undefined;
+}
+
 /** Coerce a raw setting value into a known method; anything unknown → flzma2. */
 export function normalizeSevenZipMethod(raw: unknown): SevenZipMethod {
   return raw === "lzma2" ||

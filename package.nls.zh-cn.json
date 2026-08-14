@@ -33,7 +33,7 @@
   "config.zstdBackend.native": "始终使用系统 zstd。如果未安装则显示错误。",
   "config.zstdBackend.bundled": "使用内置的 7zz 二进制，忽略系统 zstd。不可用时回退 WASM。",
   "config.zstdBackend.wasm": "始终使用 WASM 引擎，即使系统 zstd 或内置二进制可用。",
-  "config.sevenZipMethod.description": "新建 .7z 压缩包时使用的压缩算法。FLZMA2（默认）与标准 LZMA2 兼容且压缩快 20–100%。bundled 的 7-Zip ZS 还支持 ZSTD/Brotli/LZ4/Lizard；原版 7-Zip 只能读 LZMA2/Deflate/BZip2 等，追求最大兼容性请选 LZMA2。",
+  "config.sevenZipMethod.description": "新建 .7z 压缩包时使用的压缩算法。FLZMA2（默认）与标准 LZMA2 兼容且压缩快 20–100%。bundled 的 7-Zip ZS 还支持 ZSTD/Brotli/LZ4/Lizard；原版 7-Zip 只能读 LZMA2/Deflate/BZip2 等，追求最大兼容性请选 LZMA2。对 .xz/.tar.xz：FLZMA2 映射为 HC4 快速 LZMA2（快约 4 倍、体积略增），LZMA2 保持标准编码器。",
   "config.brotliBackend.auto": "使用最佳可用原生实现（Node.js zlib）。",
   "config.brotliBackend.native": "Node.js 内置 zlib — 原生，不占 WASM 堆。",
   "config.brotliBackend.bundled": "内置原生 7-Zip 二进制（标准 brotli 流）。不可用时回退 Node zlib。",

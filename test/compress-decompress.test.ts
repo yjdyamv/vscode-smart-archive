@@ -21,6 +21,7 @@ import {
   disposeJS7z,
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
+import { compressWith7z as compressWasmCore } from "../src/engines/js7z-compress-core";
 import { copyDirToFS } from "../src/utils/fs";
 import { createTarFile } from "../src/engines/tar-writer";
 import { tmpDir } from "./tmp";
@@ -366,6 +367,65 @@ describe("wrapped format round-trips", () => {
       }
     });
   }
+});
+
+describe("xz method mapping (flzma2 → HC4 fast LZMA2)", () => {
+  const format = { label: "tar.xz", description: "", canCreate: true, supportsEncryption: false };
+
+  it("WASM wrapped tar.xz: flzma2 and lzma2 both round-trip and differ", async () => {
+    const work = tmpDir("sat_xzm_");
+    try {
+      const srcDir = path.join(work, "src");
+      fs.mkdirSync(srcDir, { recursive: true });
+      // Deterministic, repetitive corpus so the HC4 vs BT4 encoders diverge.
+      for (let i = 0; i < 8; i++) {
+        fs.writeFileSync(path.join(srcDir, `f${i}.txt`), `content ${i} `.repeat(4000));
+      }
+      const compress = async (method: "flzma2" | "lzma2"): Promise<Buffer> => {
+        const out = path.join(work, `out-${method}.tar.xz`);
+        await compressWasmCore({
+          targets: [{ fsPath: srcDir }],
+          format,
+          outputPath: out,
+          password: "",
+          level: 5,
+          sevenZipMethod: method,
+        });
+        return fs.readFileSync(out);
+      };
+
+      const fast = await compress("flzma2");
+      const std = await compress("lzma2");
+      expect(fast.length).toBeGreaterThan(0);
+      expect(std.length).toBeGreaterThan(0);
+      // flzma2 → -m0=LZMA2:mf=hc4, lzma2 → default BT4: streams must differ.
+      expect(fast.equals(std)).toBe(false);
+
+      for (const buf of [fast, std]) {
+        const j = await trackedJS7z();
+        try {
+          j.FS.writeFile("/w.tar.xz", new Uint8Array(buf));
+          j.FS.mkdir("/o1");
+          await run7z(j, ["x", "/w.tar.xz", "-o/o1", "-y"]);
+          const top = j.FS.readdir("/o1").filter((e: string) => e !== "." && e !== "..");
+          expect(top.length).toBeGreaterThan(0);
+          const innerTar = top[0];
+          const inner = j.FS.readFile("/o1/" + innerTar, { encoding: "binary" });
+          j.FS.writeFile("/_t.tar", new Uint8Array(inner));
+          j.FS.mkdir("/o2");
+          await run7z(j, ["x", "/_t.tar", "-o/o2", "-y"]);
+          const result: Record<string, string> = {};
+          copyFS(j, "/o2", "", result);
+          expect(Object.keys(result).length).toBe(8);
+          expect(result["src/f0.txt"]).toBe("content 0 ".repeat(4000));
+        } finally {
+          disposeJS7z(j);
+        }
+      }
+    } finally {
+      fs.rmSync(work, { recursive: true, force: true });
+    }
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════

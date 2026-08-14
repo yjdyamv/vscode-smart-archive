@@ -247,7 +247,8 @@ describe("system 7-Zip", () => {
     fs.rmSync(tdir, { recursive: true, force: true });
   });
 
-  itIf("system7z", "honors the compression level for wrapped formats (tar.xz)", async () => {    let tdir = tmpDir("sat_sz_wraplvl_");
+  itIf("system7z", "honors the compression level for wrapped formats (tar.xz)", async () => {
+    let tdir = tmpDir("sat_sz_wraplvl_");
     const srcDir = path.join(tdir, "src");
     fs.mkdirSync(srcDir, { recursive: true });
     // Deterministic corpus (seeded xorshift32): 4 identical 20×200KB text
@@ -313,6 +314,91 @@ describe("system 7-Zip", () => {
     const sizeL9 = fs.statSync(outL9).size;
     expect(sizeL9).toBeLessThan(sizeL1);
     expect(sizeL9).toBeLessThan(sizeL1 * 0.5);
+
+    fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("system7z", "maps the flzma2 method to the HC4 fast-LZMA2 encoder for tar.xz", async () => {
+    let tdir = tmpDir("sat_sz_xzmeth_");
+    const srcDir = path.join(tdir, "src");
+    fs.mkdirSync(srcDir, { recursive: true });
+    // Deterministic mixed corpus: repeated text so HC4 vs BT4 output differs.
+    const words = [
+      "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf",
+      "hotel", "india", "juliet", "kilo", "lima", "mike", "november",
+      "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform",
+    ];
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-.,";
+    let s = 123456789;
+    const rnd = () => {
+      s ^= s << 13;
+      s >>>= 0;
+      s ^= s >>> 17;
+      s ^= s << 5;
+      s >>>= 0;
+      return s;
+    };
+    for (let i = 0; i < 24; i++) {
+      let out = "";
+      while (out.length < 100_000) {
+        out += rnd() % 4 === 0 ? words[rnd() % words.length] + " " : chars[rnd() % chars.length];
+      }
+      fs.writeFileSync(path.join(srcDir, `f${i}.txt`), out);
+    }
+
+    const format = { label: "tar.xz", description: "", canCreate: true, supportsEncryption: false };
+    const outFast = path.join(tdir, "fast.tar.xz"); // flzma2 → LZMA2:mf=hc4
+    const outStd = path.join(tdir, "std.tar.xz"); // lzma2 → default BT4
+    await compressWithSystem7z({
+      targets: [{ fsPath: srcDir }],
+      format,
+      outputPath: outFast,
+      password: "",
+      level: 5,
+      sevenZipMethod: "flzma2",
+    });
+    await compressWithSystem7z({
+      targets: [{ fsPath: srcDir }],
+      format,
+      outputPath: outStd,
+      password: "",
+      level: 5,
+      sevenZipMethod: "lzma2",
+    });
+
+    expect(fs.existsSync(outFast)).toBe(true);
+    expect(fs.existsSync(outStd)).toBe(true);
+    // HC4 and BT4 encoders must produce different streams for the same input.
+    const fastBytes = fs.readFileSync(outFast);
+    const stdBytes = fs.readFileSync(outStd);
+    expect(fastBytes.equals(stdBytes)).toBe(false);
+
+    // Both outputs must be valid xz that extracts to the full tree.
+    // NOTE: system 7z unwraps only ONE layer (xz → inner .tar), so the
+    // inner tar must be extracted a second time to reach the files.
+    for (const [archive, label] of [
+      [outFast, "flzma2/HC4"],
+      [outStd, "lzma2/BT4"],
+    ] as const) {
+      const outDir = path.join(tdir, `out-${label.split("/")[0]}`);
+      const r = spawnSync(sz!, ["x", `-o${outDir}`, "-y", archive], {
+        stdio: "pipe",
+        timeout: 60_000,
+      });
+      expect(r.status).toBe(0, `${label} extraction failed: ${r.stderr}`);
+      const innerTar = fs.readdirSync(outDir).find((f) => (f as string).endsWith(".tar"));
+      expect(innerTar, `${label} produced no inner tar`).toBeTruthy();
+      const r2 = spawnSync(
+        sz!,
+        ["x", `-o${outDir}`, "-y", path.join(outDir, innerTar as string)],
+        { stdio: "pipe", timeout: 60_000 },
+      );
+      expect(r2.status).toBe(0, `${label} inner tar extraction failed: ${r2.stderr}`);
+      const extracted = fs
+        .readdirSync(outDir, { recursive: true })
+        .filter((f) => (f as string).endsWith(".txt"));
+      expect(extracted.length).toBe(24);
+    }
 
     fs.rmSync(tdir, { recursive: true, force: true });
   });
