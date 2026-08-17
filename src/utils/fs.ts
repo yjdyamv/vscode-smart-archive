@@ -158,14 +158,17 @@ export const MAX_DIR_DEPTH = 100;
  * @param js7z - JS7z instance
  * @param fsDir - Source directory in the virtual FS (Unix-style)
  * @param localDir - Target local directory (native OS format)
+ * @param enforceTotalSize - Apply the extract-total size cap per file.
+ *   Host sets false after the user confirmed an oversized extraction.
  */
 export function copyDirFromFS(
   js7z: JS7zInstance,
   fsDir: string,
   localDir: string,
   token?: TokenLike,
+  enforceTotalSize = true,
 ): number {
-  return _copyDirFromFS(js7z, fsDir, localDir, 0, 0, token);
+  return _copyDirFromFS(js7z, fsDir, localDir, 0, 0, token, enforceTotalSize);
 }
 
 function _copyDirFromFS(
@@ -175,6 +178,7 @@ function _copyDirFromFS(
   totalSize: number,
   depth: number,
   token?: TokenLike,
+  enforceTotalSize = true,
 ): number {
   if (depth > MAX_DIR_DEPTH) {
     logger.warn(
@@ -220,12 +224,20 @@ function _copyDirFromFS(
 
     if (stat && js7z.FS.isDir(stat.mode)) {
       fs.mkdirSync(localEntry, { recursive: true });
-      totalSize = _copyDirFromFS(js7z, fsEntry, localEntry, totalSize, depth + 1, token);
+      totalSize = _copyDirFromFS(
+        js7z,
+        fsEntry,
+        localEntry,
+        totalSize,
+        depth + 1,
+        token,
+        enforceTotalSize,
+      );
     } else {
       // Read the file data from VFS
       checkWorkerMemory();
       const data = js7z.FS.readFile(fsEntry, { encoding: "binary" });
-      totalSize = checkTotalSize(totalSize, data.byteLength);
+      if (enforceTotalSize) totalSize = checkTotalSize(totalSize, data.byteLength);
       // Write errors propagate to caller — silent data loss is worse
       // than a reported failure
       fs.writeFileSync(localEntry, Buffer.from(data));

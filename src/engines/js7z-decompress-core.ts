@@ -71,7 +71,7 @@ async function decompressCodecWrapper(
       prog.report({ message: t("decompress.inProgress") });
       await run7z(js7z, ["x", tarFsPath, `-o${OUTPUT_DIR}`], progress);
       if (token?.isCancellationRequested) throw new CancelledError();
-      copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+      copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token, !options.allowOversize);
     } finally {
       disposeJS7z(js7z);
     }
@@ -83,7 +83,7 @@ async function decompressCodecWrapper(
       logger.warn({ event: "decompress.cleanup.failed" }, "Failed to clean up temp directory");
     }
   }
-  await unwrapInnerTar(options.outputDir, progress);
+  await unwrapInnerTar(options.outputDir, progress, token, !options.allowOversize);
 }
 
 export async function decompressWith7z(
@@ -165,9 +165,9 @@ export async function decompressWith7z(
 
     await run7z(js7z, extractArgs, progress);
     if (token?.isCancellationRequested) throw new CancelledError();
-    copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token);
+    copyDirFromFS(js7z, OUTPUT_DIR, options.outputDir, token, !options.allowOversize);
 
-    await unwrapInnerTar(options.outputDir, progress);
+    await unwrapInnerTar(options.outputDir, progress, token, !options.allowOversize);
     logger.info({ event: "decompress.ok", outputDir: options.outputDir });
   } finally {
     disposeJS7z(js7z);
@@ -178,6 +178,7 @@ export async function unwrapInnerTar(
   outputDir: string,
   progress?: ProgressLike,
   token?: TokenLike,
+  enforceTotalSize = true,
 ): Promise<void> {
   const prog = progress ?? { report: () => {} };
   let entries = fs.readdirSync(outputDir).filter((e) => e !== "." && e !== "..");
@@ -230,7 +231,14 @@ export async function unwrapInnerTar(
         js7z.FS.mkdir(outPath);
 
         await run7z(js7z, ["x", innerFsPath, `-o${outPath}`], progress);
-        totalSize = checkTotalSize(totalSize, copyDirFromFS(js7z, outPath, outputDir, token));
+        if (enforceTotalSize) {
+          totalSize = checkTotalSize(
+            totalSize,
+            copyDirFromFS(js7z, outPath, outputDir, token, enforceTotalSize),
+          );
+        } else {
+          copyDirFromFS(js7z, outPath, outputDir, token, false);
+        }
 
         try {
           fs.unlinkSync(tarPath);
