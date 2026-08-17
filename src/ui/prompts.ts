@@ -1,5 +1,5 @@
 /**
- * VSCode UI prompts — Smart Archive VSCode Extension
+ * VSCode UI prompts — Smart Archiver VSCode Extension
  *
  * Shared dialog helpers:
  * - Password input (masked)

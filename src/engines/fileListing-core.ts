@@ -1,5 +1,5 @@
 /**
- * File listing core — Smart Archive VSCode Extension
+ * File listing core — Smart Archiver VSCode Extension
  *
  * Vscode-free file listing for archives, runs inside the worker thread.
  * Wrapped formats (tar.gz etc.) require full extraction to list.

@@ -1,5 +1,5 @@
 /**
- * Copy/paste — Smart Archive VSCode Extension
+ * Copy/paste — Smart Archiver VSCode Extension
  *
  * Per-webview clipboard state for copy-from-archive / paste-to-filesystem.
  *

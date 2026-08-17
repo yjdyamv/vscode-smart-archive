@@ -1,5 +1,5 @@
 /**
- * HTML Renderer — Smart Archive VSCode Extension
+ * HTML Renderer — Smart Archiver VSCode Extension
  *
  * Vue 3 + TanStack Virtual webview renderer.
  * Generates HTML pages that load the Vue app with archive data injected.

@@ -1,5 +1,5 @@
 /**
- * Full-pipeline progress tests — Smart Archive VSCode Extension
+ * Full-pipeline progress tests — Smart Archiver VSCode Extension
  *
  * Verifies that multi-phase compression pipelines report continuous,
  * monotonically increasing, phase-scaled progress (tar packing → codec),

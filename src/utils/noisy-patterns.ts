@@ -1,5 +1,5 @@
 /**
- * Noisy directory pattern matching — Smart Archive VSCode Extension
+ * Noisy directory pattern matching — Smart Archiver VSCode Extension
  *
  * Marks directory tree nodes as collapsed when they match user-configured
  * "noisy" patterns (node_modules, .git, etc.). Extracted to a pure module

@@ -1,5 +1,5 @@
 /**
- * Formatting utilities — Smart Archive VSCode Extension
+ * Formatting utilities — Smart Archiver VSCode Extension
  *
  * Pure formatting functions with no locale dependency.
  *

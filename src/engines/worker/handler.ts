@@ -1,5 +1,5 @@
 /**
- * Archive worker handler — Smart Archive VSCode Extension
+ * Archive worker handler — Smart Archiver VSCode Extension
  *
  * Message-loop logic for the archive worker, extracted from the entry
  * (worker.ts) so it can be unit-tested with a fake port. The entry passes

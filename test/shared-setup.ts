@@ -1,5 +1,5 @@
 /**
- * Shared test setup — Smart Archive VSCode Extension
+ * Shared test setup — Smart Archiver VSCode Extension
  *
  * Code shared across test files that test against the bundled 7zz WASM engine.
  * Imports: vitest globals, path/fs/os, fixture oracle (./helpers), codec

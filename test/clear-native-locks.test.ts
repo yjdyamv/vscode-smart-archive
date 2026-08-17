@@ -1,5 +1,5 @@
 /**
- * clear-native-locks POSIX matcher tests — Smart Archive VSCode Extension
+ * clear-native-locks POSIX matcher tests — Smart Archiver VSCode Extension
  *
  * The POSIX branch of scripts/clear-native-locks.mjs runs `ps` and reads
  * /proc/<pid>/cwd (or lsof on macOS), which cannot run on a Windows dev

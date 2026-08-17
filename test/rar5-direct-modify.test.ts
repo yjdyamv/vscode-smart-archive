@@ -1,5 +1,5 @@
 /**
- * RAR5 direct modify (append/delete without rebuild) — Smart Archive
+ * RAR5 direct modify (append/delete without rebuild) — Smart Archiver
  *
  * The rar5 binding (>= 0.3.1) appends members and deletes members
  * surgically: existing members keep their exact bytes, only the trailing

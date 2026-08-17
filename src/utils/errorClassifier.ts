@@ -1,5 +1,5 @@
 /**
- * Error classification helpers — Smart Archive VSCode Extension
+ * Error classification helpers — Smart Archiver VSCode Extension
  *
  * Centralizes string-based error classification for 7z engine outputs.
  * String matching is unavoidable here because 7z CLI outputs vary by locale

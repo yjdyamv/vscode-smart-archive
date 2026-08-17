@@ -1,5 +1,5 @@
 /**
- * js7z-factory contract tests — Smart Archive VSCode Extension
+ * js7z-factory contract tests — Smart Archiver VSCode Extension
  *
  * Locks the compatibility shim over the bundled 7-Zip ZS WASM engine:
  * shared instance, per-call FS reset, post-construction print/printErr

@@ -1,5 +1,5 @@
 /**
- * Temp file lifecycle — Smart Archive VSCode Extension
+ * Temp file lifecycle — Smart Archiver VSCode Extension
  *
  * Manages preview temp files created when previewing individual archive
  * entries. Uses per-session unpredictable temp directories to prevent

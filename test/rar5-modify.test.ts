@@ -1,5 +1,5 @@
 /**
- * Rebuild-based RAR modification tests — Smart Archive
+ * Rebuild-based RAR modification tests — Smart Archiver
  *
  * Covers the rar5-modify core: archive guards (RAR5 vs RAR4 vs
  * multi-volume), path-escape protection, and the extract → mutate →

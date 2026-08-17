@@ -1,5 +1,5 @@
 /**
- * Oversize-file prompt — Smart Archive VSCode Extension
+ * Oversize-file prompt — Smart Archiver VSCode Extension
  *
  * Host-side confirmation dialog for extracting oversized files.
  * Kept out of utils/security (which is vscode-free for worker threads).
@@ -21,7 +21,7 @@ function fmtSize(bytes: number): string {
 
 function readMaxArchiveSize(): number {
   const raw = vscode.workspace
-    .getConfiguration("smart-archive")
+    .getConfiguration("smart-archiver")
     .get<string | number>("maxArchiveSize");
   return parseSize(raw, 1024 * 1024 * 1024);
 }

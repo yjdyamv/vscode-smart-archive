@@ -1,5 +1,5 @@
 /**
- * 7zz-wasm codec tests — Smart Archive VSCode Extension
+ * 7zz-wasm codec tests — Smart Archiver VSCode Extension
  *
  * Verifies the WASM codec engine for the single-file stream codecs
  * (zstd / brotli / lz4): parallel zstd output, standard brotli/lz4

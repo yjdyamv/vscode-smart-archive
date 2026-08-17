@@ -1,5 +1,5 @@
 /**
- * Constants — Smart Archive VSCode Extension
+ * Constants — Smart Archiver VSCode Extension
  *
  * Single source of truth for all archive format metadata.
  * Every supported format is defined as one row in FORMAT_TABLE;
@@ -640,9 +640,9 @@ export const PREVIEW_CACHE_DIR = "preview-cache";
 /** How often the caches are swept in a long-lived session */
 export const DAILY_CACHE_SWEEP_MS = 24 * 60 * 60 * 1000;
 /** Command palette ID for cache clearing (package.json contributes) */
-export const CLEAR_CACHES_COMMAND = "yjdyamv.smart-archive.clearCaches";
+export const CLEAR_CACHES_COMMAND = "yjdyamv.smart-archiver.clearCaches";
 /** Settings section + keys for the preview-cache disk budget */
-export const CONFIG_SECTION = "smart-archive";
+export const CONFIG_SECTION = "smart-archiver";
 export const CONFIG_MAX_PREVIEW_MB = "cache.maxPreviewMB";
 export const CONFIG_TTL_DAYS = "cache.ttlDays";
 export const CONFIG_MAX_MB = "cache.maxMB";

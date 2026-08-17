@@ -1,5 +1,5 @@
 /**
- * Archive add operations — Smart Archive VSCode Extension
+ * Archive add operations — Smart Archiver VSCode Extension
  *
  * Host-side entry points: the webview/picker flow (initAddToArchive /
  * runAddToArchive) and the addToArchive dispatcher. The WASM mutation
@@ -169,7 +169,7 @@ export async function addToArchive(
   const ext = getFullExt(archivePath);
 
   const patterns =
-    vscode.workspace.getConfiguration("smart-archive").get<string[]>("compressExcludePatterns") ??
+    vscode.workspace.getConfiguration("smart-archiver").get<string[]>("compressExcludePatterns") ??
     COMPRESS_EXCLUDE_DEFAULTS;
 
   const { engine } = selectEngine({ op: "add", ext, password });

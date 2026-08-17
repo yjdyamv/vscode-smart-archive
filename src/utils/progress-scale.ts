@@ -1,5 +1,5 @@
 /**
- * Phase-scoped progress scaling — Smart Archive VSCode Extension
+ * Phase-scoped progress scaling — Smart Archiver VSCode Extension
  *
  * Compression pipelines run several phases back to back (e.g. tar
  * packing → codec). Each phase reports its own 0–100% progress; feeding

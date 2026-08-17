@@ -1,5 +1,5 @@
 /**
- * Decompress API — Smart Archive VSCode Extension
+ * Decompress API — Smart Archiver VSCode Extension
  *
  * Pure business-logic functions for decompression operations.
  * These functions have zero VSCode UI dependency and can be

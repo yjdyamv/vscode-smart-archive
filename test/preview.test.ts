@@ -1,5 +1,5 @@
 /**
- * Preview tests — Smart Archive VSCode Extension
+ * Preview tests — Smart Archiver VSCode Extension
  *
  * Tests for: selective extraction (all formats), parse7zListing,
  * markNoisyDirs, two-step wrapped format extraction, zstd round-trip.

@@ -1,5 +1,5 @@
 /**
- * Public API — Smart Archive VSCode Extension
+ * Public API — Smart Archiver VSCode Extension
  *
  * Programmatic entry point for compression and decompression operations.
  * These functions are VSCode-agnostic and can be called from:

@@ -1,5 +1,5 @@
 /**
- * System 7-Zip tests — Smart Archive VSCode Extension
+ * System 7-Zip tests — Smart Archiver VSCode Extension
  *
  * Tests for: 7z detection, compress, decompress, list.
  * These tests require a system 7-Zip installation and are skipped otherwise.

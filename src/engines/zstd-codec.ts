@@ -1,5 +1,5 @@
 /**
- * Zstd codec wrapper — Smart Archive VSCode Extension
+ * Zstd codec wrapper — Smart Archiver VSCode Extension
  *
  * Prioritises the system zstd CLI (when enabled/found), otherwise uses the
  * bundled 7zz native binary and then the WASM engine (7-Zip ZS, zstd
@@ -151,7 +151,7 @@ function zstdWasmForced(): boolean {
 
 /**
  * Clear the cached system-zstd detection result so a change to
- * `smart-archive.zstdBackend` takes effect without a window reload.
+ * `smart-archiver.zstdBackend` takes effect without a window reload.
  * Without this, the first resolveSystemZstd() latches sysZstdPath (including
  * the `false` sentinel written on the "wasm"/"bundled" branches) for the
  * whole session.

@@ -1,5 +1,5 @@
 /**
- * Compress/Decompress engine tests — Smart Archive VSCode Extension
+ * Compress/Decompress engine tests — Smart Archiver VSCode Extension
  *
  * Tests for: js7z compress/decompress (all formats), production pipeline
  * round-trips, wrapped format round-trips, stream-to-VFS large files,

@@ -1,5 +1,5 @@
 /**
- * Rebuild-volumes command — Smart Archive VSCode Extension
+ * Rebuild-volumes command — Smart Archiver VSCode Extension
  *
  * Rebuilds missing volumes of a multi-volume RAR5 set from its `.rev`
  * recovery volumes (WinRAR's `rar rc` equivalent, backed by the rar5
@@ -116,7 +116,7 @@ export async function rebuildVolumesCommand(uri?: vscode.Uri): Promise<void> {
     );
     if (open) {
       await vscode.commands.executeCommand(
-        "yjdyamv.smart-archive.browse",
+        "yjdyamv.smart-archiver.browse",
         vscode.Uri.file(firstVolume),
       );
     }

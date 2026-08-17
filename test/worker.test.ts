@@ -1,5 +1,5 @@
 /**
- * Worker handler tests — Smart Archive VSCode Extension
+ * Worker handler tests — Smart Archiver VSCode Extension
  *
  * createArchiveWorkerHandler protocol tests with an in-memory port:
  * init/ready, compress round-trip, decompress round-trip, progress,

@@ -1,5 +1,5 @@
 /**
- * Workspace compress, parse7z, and naming tests — Smart Archive VSCode Extension
+ * Workspace compress, parse7z, and naming tests — Smart Archiver VSCode Extension
  */
 
 import { describe, it, expect } from "vitest";

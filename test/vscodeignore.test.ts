@@ -1,5 +1,5 @@
 /**
- * VSIX packaging whitelist tests — Smart Archive VSCode Extension
+ * VSIX packaging whitelist tests — Smart Archiver VSCode Extension
  *
  * .vscodeignore excludes the whole node_modules tree and re-includes only
  * the packages the external runtime require chain needs. Regression: tslib

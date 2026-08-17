@@ -1,5 +1,5 @@
 /**
- * rar5 level mapping tests — Smart Archive VSCode Extension
+ * rar5 level mapping tests — Smart Archiver VSCode Extension
  *
  * Locks the "store" fix: 7z level 0 (store only) must map to rar5 level 0,
  * not to the old `level || 5` fallback that silently produced level 3

@@ -1,5 +1,5 @@
 /**
- * Archive modify core — Smart Archive VSCode Extension
+ * Archive modify core — Smart Archiver VSCode Extension
  *
  * Vscode-free WASM mutations of existing archives (add / delete / rename /
  * createFolder / preview / test), runs inside the worker thread.

@@ -1,5 +1,5 @@
 /**
- * Webview RAR split support — Smart Archive VSCode Extension
+ * Webview RAR split support — Smart Archiver VSCode Extension
  *
  * Pins the split/merge flag contract for RAR in the archive webview and
  * the production split-RAR conversion path (including WinRAR/7-Zip

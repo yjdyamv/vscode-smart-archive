@@ -1,5 +1,5 @@
 /**
- * Preview cache — Smart Archive VSCode Extension
+ * Preview cache — Smart Archiver VSCode Extension
  *
  * Persistent cache for single-file previews of UNENCRYPTED archives: the
  * extracted file is keyed by sha256(archivePath | mtimeMs | size |

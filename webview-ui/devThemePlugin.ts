@@ -1,5 +1,5 @@
 /**
- * VS Code theme dev plugin — Smart Archive webview
+ * VS Code theme dev plugin — Smart Archiver webview
  *
  * Serves the VS Code theme the developer currently has active as
  * `/__sa-theme.json` on the vite dev server, so the browser preview
@@ -108,7 +108,7 @@ function currentThemeId(): string {
 
 export function devThemePlugin(): Plugin {
   return {
-    name: "smart-archive-dev-theme",
+    name: "smart-archiver-dev-theme",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = (req.url ?? "").split("?")[0];

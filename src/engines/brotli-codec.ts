@@ -1,7 +1,7 @@
 /**
- * Brotli codec wrapper — Smart Archive VSCode Extension
+ * Brotli codec wrapper — Smart Archiver VSCode Extension
  *
- * Backend is configurable via `smart-archive.brotliBackend`:
+ * Backend is configurable via `smart-archiver.brotliBackend`:
  * - auto (default): best native implementation (Node.js zlib)
  * - native: Node.js built-in zlib
  * - bundled: bundled native 7-Zip binary, falling back to node:zlib when

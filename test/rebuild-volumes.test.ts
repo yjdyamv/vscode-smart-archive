@@ -1,5 +1,5 @@
 /**
- * Rebuild-volumes command tests — Smart Archive VSCode Extension
+ * Rebuild-volumes command tests — Smart Archiver VSCode Extension
  *
  * Pins the .rev recovery-volume rebuild flow (WinRAR `rar rc`
  * equivalent): a missing volume of a split RAR5 set is reconstructed

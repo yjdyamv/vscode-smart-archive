@@ -1,5 +1,5 @@
 /**
- * Security utilities — Smart Archive VSCode Extension
+ * Security utilities — Smart Archiver VSCode Extension
  *
  * Protects against common archive-based attacks:
  *   - Zip Slip (path traversal via ../ in entry names)

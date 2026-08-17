@@ -1,6 +1,6 @@
 {
-  "name": "smart-archive",
-  "displayName": "Smart Archive",
+  "name": "smart-archiver",
+  "displayName": "Smart Archiver",
   "version": "1.30.1",
   "private": true,
   "description": "Compress and decompress files with a bundled native 7-Zip (WASM fallback) + zstd/brotli/lz4 with WASM fallback. Supports 7z, ZIP, RAR, TAR, GZip, BZip2, XZ, Zstd, WIM with AES-256 encryption.",
@@ -247,42 +247,42 @@
     ],
     "commands": [
       {
-        "command": "yjdyamv.smart-archive.compress",
-        "title": "Smart Archive: Compress",
+        "command": "yjdyamv.smart-archiver.compress",
+        "title": "Smart Archiver: Compress",
         "shortTitle": "Compress",
         "icon": "$(archive)"
       },
       {
-        "command": "yjdyamv.smart-archive.decompress",
-        "title": "Smart Archive: Decompress",
+        "command": "yjdyamv.smart-archiver.decompress",
+        "title": "Smart Archiver: Decompress",
         "shortTitle": "Decompress",
         "icon": "$(folder-opened)"
       },
       {
-        "command": "yjdyamv.smart-archive.browse",
-        "title": "Smart Archive: Browse Contents",
+        "command": "yjdyamv.smart-archiver.browse",
+        "title": "Smart Archiver: Browse Contents",
         "shortTitle": "Browse Contents",
         "icon": "$(list-tree)"
       },
       {
-        "command": "yjdyamv.smart-archive.paste",
-        "title": "Smart Archive: Paste Copied Files",
+        "command": "yjdyamv.smart-archiver.paste",
+        "title": "Smart Archiver: Paste Copied Files",
         "shortTitle": "Paste Files"
       },
       {
-        "command": "yjdyamv.smart-archive.addToArchive",
-        "title": "Smart Archive: Add to Archive",
+        "command": "yjdyamv.smart-archiver.addToArchive",
+        "title": "Smart Archiver: Add to Archive",
         "shortTitle": "Add to Archive"
       },
       {
-        "command": "yjdyamv.smart-archive.repair",
-        "title": "Smart Archive: Repair Archive",
+        "command": "yjdyamv.smart-archiver.repair",
+        "title": "Smart Archiver: Repair Archive",
         "shortTitle": "Repair Archive",
         "icon": "$(wrench)"
       },
       {
-        "command": "yjdyamv.smart-archive.rebuildVolumes",
-        "title": "Smart Archive: Rebuild Missing Volumes",
+        "command": "yjdyamv.smart-archiver.rebuildVolumes",
+        "title": "Smart Archiver: Rebuild Missing Volumes",
         "shortTitle": "Rebuild Volumes",
         "icon": "$(debug-restart)"
       }
@@ -290,65 +290,65 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "yjdyamv.smart-archive.compress",
+          "command": "yjdyamv.smart-archiver.compress",
           "when": "false"
         },
         {
-          "command": "yjdyamv.smart-archive.decompress",
+          "command": "yjdyamv.smart-archiver.decompress",
           "when": "false"
         },
         {
-          "command": "yjdyamv.smart-archive.browse",
+          "command": "yjdyamv.smart-archiver.browse",
           "when": "false"
         },
         {
-          "command": "yjdyamv.smart-archive.paste",
+          "command": "yjdyamv.smart-archiver.paste",
           "when": "false"
         },
         {
-          "command": "yjdyamv.smart-archive.addToArchive",
+          "command": "yjdyamv.smart-archiver.addToArchive",
           "when": "false"
         },
         {
-          "command": "yjdyamv.smart-archive.repair",
+          "command": "yjdyamv.smart-archiver.repair",
           "when": "false"
         },
         {
-          "command": "yjdyamv.smart-archive.rebuildVolumes",
+          "command": "yjdyamv.smart-archiver.rebuildVolumes",
           "when": "false"
         }
       ],
       "explorer/context": [
         {
-          "command": "yjdyamv.smart-archive.compress",
+          "command": "yjdyamv.smart-archiver.compress",
           "group": "7_modification"
         },
         {
-          "command": "yjdyamv.smart-archive.decompress",
+          "command": "yjdyamv.smart-archiver.decompress",
           "group": "7_modification",
           "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|tbr|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|tar\\.br|tar\\.sz|tsz|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
         },
         {
-          "command": "yjdyamv.smart-archive.browse",
+          "command": "yjdyamv.smart-archiver.browse",
           "group": "7_modification",
           "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|tbr|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|tar\\.br|tar\\.sz|tsz|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
         },
         {
-          "command": "yjdyamv.smart-archive.repair",
+          "command": "yjdyamv.smart-archiver.repair",
           "when": "resourceExtname == .rar",
           "group": "7_modification"
         },
         {
-          "command": "yjdyamv.smart-archive.rebuildVolumes",
+          "command": "yjdyamv.smart-archiver.rebuildVolumes",
           "when": "resourceFilename =~ /\\.part1\\.rar$/i",
           "group": "7_modification"
         }
       ]
     },
     "configuration": {
-      "title": "Smart Archive",
+      "title": "Smart Archiver",
       "properties": {
-        "smart-archive.defaultFormat": {
+        "smart-archiver.defaultFormat": {
           "type": "string",
           "default": "7z",
           "enum": [
@@ -379,7 +379,7 @@
           ],
           "description": "%config.defaultFormat.description%"
         },
-        "smart-archive.defaultCompressionLevel": {
+        "smart-archiver.defaultCompressionLevel": {
           "type": "integer",
           "default": 5,
           "minimum": 0,
@@ -402,7 +402,7 @@
           ],
           "description": "%config.defaultCompressionLevel.description%"
         },
-        "smart-archive.maxArchiveSize": {
+        "smart-archiver.maxArchiveSize": {
           "type": [
             "integer",
             "string"
@@ -411,7 +411,7 @@
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
           "description": "%config.maxArchiveSize.description%"
         },
-        "smart-archive.maxExtractTotalSize": {
+        "smart-archiver.maxExtractTotalSize": {
           "type": [
             "integer",
             "string"
@@ -420,7 +420,7 @@
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
           "description": "%config.maxExtractTotalSize.description%"
         },
-        "smart-archive.collapsedDirPatterns": {
+        "smart-archiver.collapsedDirPatterns": {
           "type": "array",
           "items": {
             "type": "string"
@@ -463,7 +463,7 @@
           ],
           "description": "%config.collapsedDirPatterns.description%"
         },
-        "smart-archive.compressExcludePatterns": {
+        "smart-archiver.compressExcludePatterns": {
           "type": "array",
           "items": {
             "type": "string"
@@ -506,7 +506,7 @@
           ],
           "description": "%config.compressExcludePatterns.description%"
         },
-        "smart-archive.volumeSizes": {
+        "smart-archiver.volumeSizes": {
           "type": "object",
           "default": {
             "1.44M": "1440k",
@@ -527,7 +527,7 @@
           },
           "markdownDescription": "%config.volumeSizes.description%"
         },
-        "smart-archive.sevenZBackend": {
+        "smart-archiver.sevenZBackend": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -544,7 +544,7 @@
           ],
           "description": "%config.sevenZBackend.description%"
         },
-        "smart-archive.zstdBackend": {
+        "smart-archiver.zstdBackend": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -561,7 +561,7 @@
           ],
           "description": "%config.zstdBackend.description%"
         },
-        "smart-archive.brotliBackend": {
+        "smart-archiver.brotliBackend": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -578,7 +578,7 @@
           ],
           "description": "%config.brotliBackend.description%"
         },
-        "smart-archive.lz4Backend": {
+        "smart-archiver.lz4Backend": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -593,7 +593,7 @@
           ],
           "description": "%config.lz4Backend.description%"
         },
-        "smart-archive.rar5Backend": {
+        "smart-archiver.rar5Backend": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -608,7 +608,7 @@
           ],
           "description": "%config.rar5Backend.description%"
         },
-        "smart-archive.snappyBackend": {
+        "smart-archiver.snappyBackend": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -623,7 +623,7 @@
           ],
           "description": "%config.snappyBackend.description%"
         },
-        "smart-archive.sevenZipMethod": {
+        "smart-archiver.sevenZipMethod": {
           "type": "string",
           "default": "flzma2",
           "enum": [
@@ -648,20 +648,20 @@
           ],
           "description": "%config.sevenZipMethod.description%"
         },
-        "smart-archive.workerMemoryMb": {
+        "smart-archiver.workerMemoryMb": {
           "type": "integer",
           "default": 8192,
           "minimum": 0,
           "description": "%config.workerMemoryMb.description%"
         },
-        "smart-archive.workerPoolSize": {
+        "smart-archiver.workerPoolSize": {
           "type": "integer",
           "default": 1,
           "minimum": 1,
           "maximum": 2,
           "description": "%config.workerPoolSize.description%"
         },
-        "smart-archive.logLevel": {
+        "smart-archiver.logLevel": {
           "type": "string",
           "default": "info",
           "enum": [
@@ -678,33 +678,33 @@
           ],
           "description": "%config.logLevel.description%"
         },
-        "smart-archive.logHistoryBytes": {
+        "smart-archiver.logHistoryBytes": {
           "type": "integer",
           "default": 1048576,
           "minimum": 65536,
           "maximum": 16777216,
           "description": "%config.logHistoryBytes.description%"
         },
-        "smart-archive.cache.maxPreviewMB": {
+        "smart-archiver.cache.maxPreviewMB": {
           "type": "integer",
           "default": 10,
           "minimum": 0,
           "description": "%config.cache.maxPreviewMB.description%"
         },
-        "smart-archive.cache.ttlDays": {
+        "smart-archiver.cache.ttlDays": {
           "type": "integer",
           "default": 30,
           "minimum": 1,
           "maximum": 365,
           "description": "%config.cache.ttlDays.description%"
         },
-        "smart-archive.cache.maxMB": {
+        "smart-archiver.cache.maxMB": {
           "type": "integer",
           "default": 1024,
           "minimum": 1,
           "description": "%config.cache.maxMB.description%"
         },
-        "smart-archive.cache.maxFiles": {
+        "smart-archiver.cache.maxFiles": {
           "type": "integer",
           "default": 100,
           "minimum": 1,

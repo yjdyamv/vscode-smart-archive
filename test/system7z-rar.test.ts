@@ -1,5 +1,5 @@
 /**
- * RAR-capability detection for system 7-Zip — Smart Archive
+ * RAR-capability detection for system 7-Zip — Smart Archiver
  *
  * Some distro builds of 7-Zip ship without RAR support (e.g. Fedora's
  * 7zip package), which made every RAR operation fail with "Cannot open

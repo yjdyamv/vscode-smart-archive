@@ -1,5 +1,5 @@
 /**
- * Preview cache unit tests — Smart Archive VSCode Extension
+ * Preview cache unit tests — Smart Archiver VSCode Extension
  *
  * Persistent single-file preview cache: deterministic keying on
  * archive path + mtime + size + entry, atomic O_EXCL stores, and the

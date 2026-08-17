@@ -1,5 +1,5 @@
 /**
- * js7z list & inspect dispatcher — Smart Archive VSCode Extension
+ * js7z list & inspect dispatcher — Smart Archiver VSCode Extension
  *
  * Host-side entry point for archive listing / encryption detection.
  * Keeps the original isEncrypted signature; the WASM work runs in the

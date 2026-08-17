@@ -1,5 +1,5 @@
 /**
- * i18n unit tests — Smart Archive VSCode Extension
+ * i18n unit tests — Smart Archiver VSCode Extension
  *
  * Tests for t() placeholder substitution, compressLevels(), and
  * format utility re-exports. Locale detection relies on the

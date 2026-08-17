@@ -1,5 +1,5 @@
 /**
- * js7z factory — Smart Archive VSCode Extension
+ * js7z factory — Smart Archiver VSCode Extension
  *
  * Provides the `JS7z` factory over the bundled 7-Zip ZS 26.02 WebAssembly
  * engine (vendor/7zz-wasm, see scripts/install-7zz-wasm.js), replacing the

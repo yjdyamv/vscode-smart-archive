@@ -1,5 +1,5 @@
 /**
- * Host config bridge — Smart Archive VSCode Extension
+ * Host config bridge — Smart Archiver VSCode Extension
  *
  * Reads vscode workspace configuration and applies it to the vscode-free
  * engine layer via engines/engine-config (applyEngineConfig). The worker
@@ -30,7 +30,7 @@ import {
  * (worker init/reconfigure) so the values never drift apart.
  */
 export function readEngineConfig(): EngineConfig {
-  const config = vscode.workspace.getConfiguration("smart-archive");
+  const config = vscode.workspace.getConfiguration("smart-archiver");
   const memMb = config.get<number>("workerMemoryMb", DEFAULT_ENGINE_CONFIG.workerMemoryMb);
   return {
     locale: vscode.env.language,
@@ -104,7 +104,7 @@ export function applyHostConfig(): void {
   // the underlying pino level; the host wrapper additionally rebuilds the
   // panel buffer from history).
   logger.setLevel(config.logLevel ?? DEFAULT_ENGINE_CONFIG.logLevel);
-  setHistoryBudget(readLogHistoryBudget(vscode.workspace.getConfiguration("smart-archive")));
+  setHistoryBudget(readLogHistoryBudget(vscode.workspace.getConfiguration("smart-archiver")));
 }
 
 /** Read and clamp the logHistoryBytes setting into its documented bounds. */

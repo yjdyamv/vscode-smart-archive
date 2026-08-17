@@ -1,5 +1,5 @@
 /**
- * Worker protocol types — Smart Archive VSCode Extension
+ * Worker protocol types — Smart Archiver VSCode Extension
  *
  * Structured messages exchanged between the extension host and the
  * worker_threads archive worker (src/engines/worker/worker.ts).
@@ -35,7 +35,7 @@ export interface EngineConfig {
   workerMemoryMb?: number;
   /** Default compression level (0-9) for wrapped-format mutations */
   compressionLevel?: number;
-  /** Output-channel verbosity (matches smart-archive.logLevel) */
+  /** Output-channel verbosity (matches smart-archiver.logLevel) */
   logLevel?: LogLevel;
 }
 

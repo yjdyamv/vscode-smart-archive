@@ -1,5 +1,5 @@
 /**
- * Compress-wizard state machine tests — Smart Archive
+ * Compress-wizard state machine tests — Smart Archiver
  *
  * Drives the real wizard code with the scriptable vscode test double to
  * verify the RAR flow: forced header encryption, split-volume recovery

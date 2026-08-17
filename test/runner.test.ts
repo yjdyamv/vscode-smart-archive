@@ -1,5 +1,5 @@
 /**
- * Runner tests — Smart Archive VSCode Extension
+ * Runner tests — Smart Archiver VSCode Extension
  *
  * WorkerThreadRunner protocol tests with a fake Worker: spawn/init,
  * request flow, progress forwarding, cancellation, error mapping, queueing,

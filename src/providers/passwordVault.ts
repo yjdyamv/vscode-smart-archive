@@ -1,5 +1,5 @@
 /**
- * Password vault — Smart Archive VSCode Extension
+ * Password vault — Smart Archiver VSCode Extension
  *
  * Session-scoped storage of archive passwords in VS Code's SecretStorage
  * (OS keychain: Keychain on macOS, Credential Manager on Windows, libsecret

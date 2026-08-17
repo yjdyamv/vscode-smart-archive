@@ -1,4 +1,4 @@
-# Smart Archive — Roadmap
+# Smart Archiver — Roadmap
 
 > Planning document for the maintainer. Current baseline: **v1.30.0** — a mature
 > VS Code archive extension (~25k LOC, 790+ tests, clean lint/typecheck, 3-language UI,

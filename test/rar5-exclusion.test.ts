@@ -1,5 +1,5 @@
 /**
- * rar5 exclusion & structure verification — Smart Archive
+ * rar5 exclusion & structure verification — Smart Archiver
  *
  * Proves the exclusion pipeline end-to-end for RAR5 creation:
  * default noisy-dir patterns (COMPRESS_EXCLUDE_DEFAULTS) and custom

@@ -1,5 +1,5 @@
 /**
- * Security & Exclusion tests — Smart Archive VSCode Extension
+ * Security & Exclusion tests — Smart Archiver VSCode Extension
  *
  * Tests for: security (safeJoinPath, parseSize, sanitizeCliPath, sanitizeTargetDir),
  * encryption detection, exclusion integration, exclusion logic,

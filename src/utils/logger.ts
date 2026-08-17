@@ -1,8 +1,8 @@
 /**
- * Logger — Smart Archive VSCode Extension
+ * Logger — Smart Archiver VSCode Extension
  *
  * Host-side logger built on logger-core, routing structured pino records
- * to the "Smart Archive" output panel and stderr.
+ * to the "Smart Archiver" output panel and stderr.
  *
  * Rendering model: a plain OutputChannel with appendLine for every record,
  * formatted with a level tag and timestamp. This is deliberate — VS Code's
@@ -10,7 +10,7 @@
  * time and its clear() is a no-op in the extension host, so its content
  * can never be rebuilt or pruned. With a plain channel we own the whole
  * buffer: every record is appended unfiltered, and a log-level change
- * (the smart-archive.logLevel setting) clears the panel and re-renders it
+ * (the smart-archiver.logLevel setting) clears the panel and re-renders it
  * from the history buffer in sequence order. Lowering the level removes
  * the now-excluded lines; raising it brings buffered records back.
  *
@@ -33,7 +33,7 @@ let channel: vscode.OutputChannel | null = null;
 
 function getChannel(): vscode.OutputChannel {
   if (!channel) {
-    channel = vscode.window.createOutputChannel("Smart Archive");
+    channel = vscode.window.createOutputChannel("Smart Archiver");
   }
   return channel;
 }

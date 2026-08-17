@@ -1,5 +1,5 @@
 /**
- * Tree, Format & CJK utility tests — Smart Archive VSCode Extension
+ * Tree, Format & CJK utility tests — Smart Archiver VSCode Extension
  *
  * Tests for: tree builder, format utilities, CJK encoding, RAR utilities.
  */

@@ -1,5 +1,5 @@
 /**
- * 7zz-wasm full-pipeline tests — Smart Archive VSCode Extension
+ * 7zz-wasm full-pipeline tests — Smart Archiver VSCode Extension
  *
  * Forces the codec engines onto the bundled 7zz WASM engine and runs the
  * complete wrapped-format workflow for tar.zst / tar.lz4 / tar.br:

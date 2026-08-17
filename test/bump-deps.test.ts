@@ -1,5 +1,5 @@
 /**
- * bump-deps.mjs unit tests — Smart Archive
+ * bump-deps.mjs unit tests — Smart Archiver
  *
  * Locks the planning/constant-rewriting logic without network: injectable
  * fetchJson covers the comparison decisions, and updateVersionConstant is

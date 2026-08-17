@@ -1,5 +1,5 @@
 /**
- * Persistent expanded state — Smart Archive VSCode Extension
+ * Persistent expanded state — Smart Archiver VSCode Extension
  *
  * Dual-storage strategy:
  * - Non-encrypted archives: in-memory Map, destroyed on VS Code close.

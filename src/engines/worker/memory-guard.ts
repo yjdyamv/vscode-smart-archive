@@ -1,5 +1,5 @@
 /**
- * Worker memory guard — Smart Archive VSCode Extension
+ * Worker memory guard — Smart Archiver VSCode Extension
  *
  * RSS-based safety net for the archive worker. The WASM memory (VFS) is a
  * WebAssembly.Memory and is invisible to V8 heap caps, so instead of

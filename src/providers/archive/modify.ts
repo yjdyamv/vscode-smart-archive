@@ -1,5 +1,5 @@
 /**
- * Archive modify/preview/test operations — Smart Archive VSCode Extension
+ * Archive modify/preview/test operations — Smart Archiver VSCode Extension
  *
  * Host-side dispatchers: the WASM mutations run in the worker thread
  * (engines/modify-core). Preview keeps its system-7z fast path (child

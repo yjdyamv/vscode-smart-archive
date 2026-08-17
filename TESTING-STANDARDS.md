@@ -1,4 +1,4 @@
-# Testing Standards — Smart Archive
+# Testing Standards — Smart Archiver
 
 本文件是 test/ 套件的标准。标准从本项目利益出发设计：**测试必须能暴露生产缺陷，覆盖必须可验证**。每条标准都配有自动化检查，不是口头约定。
 

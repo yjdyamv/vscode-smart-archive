@@ -1,5 +1,5 @@
 /**
- * js7z decompress dispatcher — Smart Archive VSCode Extension
+ * js7z decompress dispatcher — Smart Archiver VSCode Extension
  *
  * Host-side entry point for decompression. Keeps the original
  * decompressWith7z signature; the heavy WASM pipeline now runs in a

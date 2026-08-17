@@ -1,5 +1,5 @@
 /**
- * JS7z WASM lifecycle — Smart Archive VSCode Extension
+ * JS7z WASM lifecycle — Smart Archiver VSCode Extension
  *
  * The ONLY JS7z cleanup function. With the shared 7zz instance the
  * destroy/_cleanup hooks are no-ops (see engines/js7z-factory); keeping the

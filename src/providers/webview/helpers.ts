@@ -1,5 +1,5 @@
 /**
- * Webview helpers — Smart Archive VSCode Extension
+ * Webview helpers — Smart Archiver VSCode Extension
  *
  * Shared utility functions used by both webview setup and message routing.
  *
@@ -15,7 +15,7 @@ import { t } from "../../i18n";
 
 export function getNoisyPatterns(): string[] {
   return (
-    vscode.workspace.getConfiguration("smart-archive").get<string[]>("collapsedDirPatterns") ??
+    vscode.workspace.getConfiguration("smart-archiver").get<string[]>("collapsedDirPatterns") ??
     NOISY_DIR_PATTERNS
   );
 }

@@ -4,7 +4,7 @@ import { httpGet, httpGetRetry, httpGetMirrored } from "./http.mjs";
 import { sha256 } from "./hash-pins.mjs";
 
 const API_HEADERS = {
-  "User-Agent": "smart-archive-vscode",
+  "User-Agent": "smart-archiver-vscode",
   Accept: "application/vnd.github+json",
 };
 

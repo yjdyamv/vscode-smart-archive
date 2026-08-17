@@ -1,5 +1,5 @@
 /**
- * Dynamic VS Code theme loader for the browser dev preview — Smart Archive
+ * Dynamic VS Code theme loader for the browser dev preview — Smart Archiver
  * webview
  *
  * `npm run dev:webview` renders the UI in a plain browser, where VS Code's

@@ -1,5 +1,5 @@
 /**
- * Volume size unit tests — Smart Archive VSCode Extension
+ * Volume size unit tests — Smart Archiver VSCode Extension
  *
  * Tests for toBinaryVolumeSize (decimal-to-binary unit conversion)
  * and VOLUME_SIZES presets.

@@ -1,5 +1,5 @@
 /**
- * Logger tests — Smart Archive VSCode Extension
+ * Logger tests — Smart Archiver VSCode Extension
  *
  * The host renders every record to a plain OutputChannel via appendLine
  * (unfiltered), and a log-level change clears the panel and re-renders it

@@ -1,5 +1,5 @@
 /**
- * Encrypted-archive webview setup tests — Smart Archive VSCode Extension
+ * Encrypted-archive webview setup tests — Smart Archiver VSCode Extension
  *
  * Pins the vault-unlock flow in setupWebview: an encrypted archive whose
  * password is in the session vault opens directly (no password view) and

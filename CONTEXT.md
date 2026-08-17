@@ -1,4 +1,4 @@
-# Context — Smart Archive 领域词汇表
+# Context — Smart Archiver 领域词汇表
 
 本文件记录项目的领域语言与架构语言。架构术语（module / interface / depth / seam / adapter / leverage / locality）由 codebase-design 定义，这里只记录领域名词与测试套件专用名词。架构评审、测试标准、新代码应使用这些词，不另造同义词。
 

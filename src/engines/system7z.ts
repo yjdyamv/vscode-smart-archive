@@ -1,5 +1,5 @@
 /**
- * System 7-Zip engine — Smart Archive VSCode Extension
+ * System 7-Zip engine — Smart Archiver VSCode Extension
  *
  * Detects a local 7-Zip installation and uses it for
  * compress/decompress/list operations with better performance
@@ -78,7 +78,7 @@ export function detectSystem7z(): string | null {
   if (_cachedPath !== undefined) return _cachedPath;
 
   const setting = vscode.workspace
-    .getConfiguration("smart-archive")
+    .getConfiguration("smart-archiver")
     .get<string>("sevenZBackend", "auto");
 
   // "wasm": disable the native engine entirely (→ WASM).
@@ -185,7 +185,7 @@ function findSystem7z(): string | null {
 }
 
 export function hasSystem7z(): boolean {
-  const config = vscode.workspace.getConfiguration("smart-archive");
+  const config = vscode.workspace.getConfiguration("smart-archiver");
   const setting = config.get<string>("sevenZBackend", "auto");
 
   if (setting === "wasm") {
@@ -233,7 +233,7 @@ const METHOD_FALLBACK: Record<SevenZipMethod, SevenZipMethod> = {
 const _probeCache = new Map<string, SevenZipCapabilities | null>();
 
 /**
- * Reset the cached engine detection so a changed `smart-archive.sevenZBackend`
+ * Reset the cached engine detection so a changed `smart-archiver.sevenZBackend`
  * setting takes effect without a window reload. Wired to onDidChangeConfiguration
  * in extension.ts.
  */
@@ -422,7 +422,7 @@ const SNAPPY_EXTS = new Set([".tar.sz", ".tsz"]);
  * outer type: gzip/bzip2/xz).
  */
 export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): boolean {
-  const config = vscode.workspace.getConfiguration("smart-archive");
+  const config = vscode.workspace.getConfiguration("smart-archiver");
   const setting = config.get<string>("sevenZBackend", "auto");
   if (setting === "wasm") {
     logger.debug({ event: "system7z.disabledBySetting" });
@@ -1825,7 +1825,7 @@ function run7z(
 // ── Helpers ──────────────────────────────────────────────────────────
 
 /**
- * Maps Smart Archive format labels to 7-Zip `-t` type flags.
+ * Maps Smart Archiver format labels to 7-Zip `-t` type flags.
  *
  * This map is intentionally limited — it only lists formats that system
  * 7-Zip handles directly. Codec-based wrapped formats (tar.zst, tar.lz4,

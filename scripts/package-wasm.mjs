@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Package a pure-WASM build of the extension — Smart Archive
+ * Package a pure-WASM build of the extension — Smart Archiver
  *
- * Produces smart-archive-<version>-wasm.vsix containing only the WASM
+ * Produces smart-archiver-<version>-wasm.vsix containing only the WASM
  * engines (js7z 7-Zip, rar5 WASI, snappy/zstd/brotli/lz4 WASI codecs):
  * no native .node binaries, no 7zz executables. The extension already
  * falls back to these engines when the native binaries are absent, so
@@ -48,7 +48,7 @@ function buildWasmIgnore(original) {
 fs.copyFileSync(ignorePath, backupPath);
 try {
   fs.writeFileSync(ignorePath, buildWasmIgnore(fs.readFileSync(ignorePath, "utf8")));
-  const out = path.join(root, `smart-archive-${pkg.version}-wasm.vsix`);
+  const out = path.join(root, `smart-archiver-${pkg.version}-wasm.vsix`);
   execFileSync("npx", ["vsce", "package", "-o", out], { cwd: root, stdio: "inherit" });
   console.log(`pure-WASM package: ${out}`);
 } finally {

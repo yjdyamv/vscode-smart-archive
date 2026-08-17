@@ -1,5 +1,5 @@
 /**
- * Environment gates — Smart Archive VSCode Extension
+ * Environment gates — Smart Archiver VSCode Extension
  *
  * One module owns "what is available in this test run". Every environment
  * decision in the suite (system 7z, bundled 7zz, staged rar5 binding, …)

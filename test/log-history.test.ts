@@ -1,5 +1,5 @@
 /**
- * LogHistory unit tests — Smart Archive VSCode Extension
+ * LogHistory unit tests — Smart Archiver VSCode Extension
  *
  * Covers the byte-budgeted ring buffer: budget eviction, level-filtered
  * re-render (replayAll), budget resize, and reset.

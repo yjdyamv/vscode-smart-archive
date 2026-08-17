@@ -60,7 +60,7 @@ function buildCompressArgs(
   const method = format.label === "7z" ? normalizeSevenZipMethod(sevenZipMethod) : undefined;
 
   // The bundled 7zz-wasm build ships FLZMA2/ZSTD/BROTLI/LZ4/LIZARD etc.
-  // Default to FLZMA2; the user picks via smart-archive.sevenZipMethod.
+  // Default to FLZMA2; the user picks via smart-archiver.sevenZipMethod.
   // Level 0 means store — force Copy because the fork maps -mx0 of its new
   // codecs to "fastest" (still compressing).
   if (format.label === "7z") {

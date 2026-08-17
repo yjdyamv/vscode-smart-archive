@@ -1,5 +1,5 @@
 /**
- * API tests — Smart Archive VSCode Extension
+ * API tests — Smart Archiver VSCode Extension
  *
  * Tests for the public API layer (src/api/). These tests exercise
  * the same code paths that extension commands use, but without

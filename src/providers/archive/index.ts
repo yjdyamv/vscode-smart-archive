@@ -1,5 +1,5 @@
 /**
- * Archive operations barrel — Smart Archive VSCode Extension
+ * Archive operations barrel — Smart Archiver VSCode Extension
  *
  * @module providers/archive/index
  */

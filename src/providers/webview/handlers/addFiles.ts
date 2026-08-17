@@ -29,5 +29,5 @@ export const handleAddFiles: MessageHandler = async (ctx) => {
   }
   logger.info({ event: "webview.addFiles", dir: targetAddDir });
   initAddToArchive(s.filePath, targetAddDir, s.password, webview, s.archiveUri, setupWebview);
-  vscode.commands.executeCommand("yjdyamv.smart-archive.addToArchive");
+  vscode.commands.executeCommand("yjdyamv.smart-archiver.addToArchive");
 };

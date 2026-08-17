@@ -1,5 +1,5 @@
 /**
- * js7z helpers — Smart Archive VSCode Extension
+ * js7z helpers — Smart Archiver VSCode Extension
  *
  * Shared infrastructure for the bundled 7zz WASM engine: cleanup, virtual-FS I/O,
  * and the generic 7z command runner with progress reporting.
