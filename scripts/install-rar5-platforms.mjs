@@ -56,22 +56,22 @@ async function resolveVersion() {
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "6bf53686f9d9bdb3a6e6bd440c570a6df463f48c630cddfb2b56dbec2c2b3587",
-  "linux-x64-musl": "b973cf4c4a3474c10529ec8aa4b5b5c160b5752f3802b89569bccbeb40d962d8",
-  "linux-arm64-gnu": "f47ce2f3e5f11b30e458b44fd2d065122404f934f486cccfcfa00854bf979555",
-  "linux-arm64-musl": "652b7685b04a08773106793174370331685e56908935726a42eb2f009597a85d",
-  "linux-arm-gnueabihf": "459fe607b03fa451173cc789faffc3f576de702c00f0b1c87ae01484e0c7286e",
-  "darwin-arm64": "4f59827a7cfb0b60d356736f6f18bda12df0391c9f65fb5b79170e1c1daa1654",
-  "win32-x64-msvc": "eaebecb3842433332b24aaee530f011c123cfcf784699bfcaff4c0360f47bf6d",
-  "win32-ia32-msvc": "03d539634bcd42497f5f467a0f5b4bdfcb96ca46e19829e7732b24cbfde71c27",
-  "win32-arm64-msvc": "be5daaa2a9eb0923fbe54122d3f3d254ab274c16121345f855673198c906dbf1",
+  "linux-x64-gnu": "ee0b59f85b951bbf2c8b009742dd30542b31846c843909ab6f2ff6401c2ed473",
+  "linux-x64-musl": "a6031fc572a107933de6c17b40769174ca8b99dcd781a26f1dd1a0ccf2f52751",
+  "linux-arm64-gnu": "3792e21b0d67035304524696d0bbf052b5a1840adcb064daf3de7e01dcfd7f21",
+  "linux-arm64-musl": "c70a8bbf5e1deaae43bfe3ca734966dd99ec274db75436a9746a15af7a7ad5ca",
+  "linux-arm-gnueabihf": "cecbd237caa112748c28355f73d7e1d65e5882da8838861cd0d2cc5246aa5d14",
+  "darwin-arm64": "34fc9188335ae99c6b04f76450c70581556a4242f1265033731be3af96978a4d",
+  "win32-x64-msvc": "4dd778aa58e73246066ed96663f6ab0f1a24e3478239f10b43a7b130d558cf5c",
+  "win32-ia32-msvc": "831967c3b83be30926a42ebfc5b6acfd6ab32eb048734d793c238456a3bee729",
+  "win32-arm64-msvc": "d8f390166c75f079da6570d5839d66f96c3f6cf8e44d22fc3d96bc79da1b90b8",
   // WASI fallback bundle (smart-archive-rar >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "smart-archive-rar.wasm32-wasi.wasm":
-    "3b427abbd854d26c2a4eeead093674c17fc83ff6d97b5135459fd0e4896bbfd8",
-  "smart-archive-rar.wasi.cjs": "0e71c3b9eab238c5a8018cd36a14acaf2a6ff6fd658d9db6a047cdf1164fd0bb",
-  "wasi-path-map.cjs": "ca428d68155e0f2f2dc051d5ee32ac700b7644c02005ccfcffdf2b89f20f56be",
+    "b860ca171cee1009e54223144692a9e841fbcd77ae01eaf3bbe7316e36d44806",
+  "smart-archive-rar.wasi.cjs": "fcf01d50f302795572302ad8024bf8dc057138a4d5dec36536f8fbcb1f9ef3cd",
+  "wasi-path-map.cjs": "c6847fd35b642bc3c202f902ad6891faf7b1f158ae6071b41ab0b1b5f84276d4",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
 };
 
