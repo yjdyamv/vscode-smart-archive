@@ -63,7 +63,6 @@ const EXPECTED_HASHES = {
   "linux-arm-gnueabihf": "cecbd237caa112748c28355f73d7e1d65e5882da8838861cd0d2cc5246aa5d14",
   "darwin-arm64": "34fc9188335ae99c6b04f76450c70581556a4242f1265033731be3af96978a4d",
   "win32-x64-msvc": "4dd778aa58e73246066ed96663f6ab0f1a24e3478239f10b43a7b130d558cf5c",
-  "win32-ia32-msvc": "831967c3b83be30926a42ebfc5b6acfd6ab32eb048734d793c238456a3bee729",
   "win32-arm64-msvc": "d8f390166c75f079da6570d5839d66f96c3f6cf8e44d22fc3d96bc79da1b90b8",
   // WASI fallback bundle (smart-archive-rar >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
@@ -82,7 +81,6 @@ const TRIPLES = {
   "linux/arm": ["linux-arm-gnueabihf"],
   "darwin/arm64": ["darwin-arm64"],
   "win32/x64": ["win32-x64-msvc"],
-  "win32/ia32": ["win32-ia32-msvc"],
   "win32/arm64": ["win32-arm64-msvc"],
 };
 

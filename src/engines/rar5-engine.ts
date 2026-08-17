@@ -55,7 +55,6 @@ export function resolveRarTriple(): string {
       );
     case "win32":
       if (arch === "x64") return "win32-x64-msvc";
-      if (arch === "ia32") return "win32-ia32-msvc";
       if (arch === "arm64") return "win32-arm64-msvc";
       throw new Error(`unsupported win32 arch: ${arch}`);
     default:

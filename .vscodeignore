@@ -31,20 +31,20 @@ node_modules/
 !node_modules/snappy/index.js
 !node_modules/snappy/index.d.ts
 !node_modules/snappy/snappy.*.node
+# ia32 (32 位 x86 Windows) 已无 VS Code 支持（1.77 起停止发布）
+node_modules/snappy/snappy.win32-ia32-msvc.node
 !node_modules/snappy/snappy.wasi.cjs
 !node_modules/snappy/snappy.wasm32-wasi.wasm
 !node_modules/snappy/wasi-worker.mjs
 !node_modules/snappy/package.json
 !node_modules/snappy/LICENSE
 # napi-rs wasm runtime: 只保留 CommonJS require 链（runtime.cjs →
-# dist/emnapi-plugins.cjs + dist/fs-proxy.cjs → @emnapi/core/@emnapi/runtime）
-!node_modules/@napi-rs/wasm-runtime/runtime.js
+# dist/emnapi-plugins.cjs + dist/fs-proxy.cjs → @emnapi/core/@emnapi/runtime）。
+# ESM 变体（runtime.js / dist/fs.js / dist/emnapi-plugins.js / fs-proxy.js）
+# 只被 "import" 条件触发，而 wasi-loader 全走 createRequire → CJS 链，是死重。
 !node_modules/@napi-rs/wasm-runtime/runtime.cjs
 !node_modules/@napi-rs/wasm-runtime/package.json
-!node_modules/@napi-rs/wasm-runtime/fs-proxy.js
-!node_modules/@napi-rs/wasm-runtime/dist/fs.js
 !node_modules/@napi-rs/wasm-runtime/dist/fs-proxy.cjs
-!node_modules/@napi-rs/wasm-runtime/dist/emnapi-plugins.js
 !node_modules/@napi-rs/wasm-runtime/dist/emnapi-plugins.cjs
 # @emnapi core/runtime: index.js 只 require 两个 CJS dist 变体
 !node_modules/@emnapi/core/index.js
