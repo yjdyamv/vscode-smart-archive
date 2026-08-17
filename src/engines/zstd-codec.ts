@@ -151,7 +151,7 @@ function zstdWasmForced(): boolean {
 
 /**
  * Clear the cached system-zstd detection result so a change to
- * `smart-archiver.zstdBackend` takes effect without a window reload.
+ * `smart-archiver.backend.zstd` takes effect without a window reload.
  * Without this, the first resolveSystemZstd() latches sysZstdPath (including
  * the `false` sentinel written on the "wasm"/"bundled" branches) for the
  * whole session.

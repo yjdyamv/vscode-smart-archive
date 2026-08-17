@@ -63,27 +63,27 @@ describe("package.json defaults match code defaults", () => {
     expect(settingDefault("logHistoryBytes")).toBe(DEFAULT_LOG_HISTORY_BYTES);
   });
 
-  it("sevenZBackend", () => {
-    expect(settingDefault("sevenZBackend")).toBe(DEFAULT_ENGINE_CONFIG.sevenZBackend);
+  it("backend.7z", () => {
+    expect(settingDefault("backend.7z")).toBe(DEFAULT_ENGINE_CONFIG.sevenZBackend);
   });
 
-  it("zstdBackend", () => {
-    expect(settingDefault("zstdBackend")).toBe(DEFAULT_ENGINE_CONFIG.zstdBackend);
+  it("backend.zstd", () => {
+    expect(settingDefault("backend.zstd")).toBe(DEFAULT_ENGINE_CONFIG.zstdBackend);
   });
 
-  it("brotliBackend", () => {
-    expect(settingDefault("brotliBackend")).toBe(DEFAULT_ENGINE_CONFIG.brotliBackend);
+  it("backend.brotli", () => {
+    expect(settingDefault("backend.brotli")).toBe(DEFAULT_ENGINE_CONFIG.brotliBackend);
   });
 
-  it("lz4Backend", () => {
-    expect(settingDefault("lz4Backend")).toBe(DEFAULT_ENGINE_CONFIG.lz4Backend);
+  it("backend.lz4", () => {
+    expect(settingDefault("backend.lz4")).toBe(DEFAULT_ENGINE_CONFIG.lz4Backend);
   });
 
-  it("rar5Backend", () => {
-    expect(settingDefault("rar5Backend")).toBe(DEFAULT_ENGINE_CONFIG.rar5Backend);
+  it("backend.rar", () => {
+    expect(settingDefault("backend.rar")).toBe(DEFAULT_ENGINE_CONFIG.rar5Backend);
   });
 
-  it("snappyBackend", () => {
-    expect(settingDefault("snappyBackend")).toBe(DEFAULT_ENGINE_CONFIG.snappyBackend);
+  it("backend.snappy", () => {
+    expect(settingDefault("backend.snappy")).toBe(DEFAULT_ENGINE_CONFIG.snappyBackend);
   });
 });

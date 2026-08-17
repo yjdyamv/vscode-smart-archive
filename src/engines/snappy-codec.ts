@@ -22,7 +22,7 @@ let snappyConfig: { backend?: SnappyBackend } = {};
 
 /**
  * Inject the snappyBackend setting. The host/worker wire it from
- * `smart-archiver.snappyBackend`; tests inject it directly.
+ * `smart-archiver.backend.snappy`; tests inject it directly.
  */
 export function setSnappyConfig(config: { backend?: SnappyBackend }): void {
   snappyConfig = config;

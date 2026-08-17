@@ -140,7 +140,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // Push the new values into a live worker too — without this, the
       // worker keeps stale limits/zstd settings until it is restarted.
       reconfigureArchiveWorker();
-      if (e.affectsConfiguration("smart-archiver.sevenZBackend")) resetDetectionCache();
+      if (e.affectsConfiguration("smart-archiver.backend.7z")) resetDetectionCache();
     }),
   );
 

@@ -1,7 +1,7 @@
 /**
  * LZ4 codec wrapper — Smart Archiver VSCode Extension
  *
- * Backend is configurable via `smart-archiver.lz4Backend`:
+ * Backend is configurable via `smart-archiver.backend.lz4`:
  * - auto (default): bundled native 7zz (standard LZ4 frame format,
  *   single-threaded) first, then the bundled 7zz WASM engine
  * - bundled: always use the bundled native 7zz, WASM fallback
