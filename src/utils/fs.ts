@@ -35,6 +35,18 @@ import type { TokenLike } from "./cancellation";
  *   // → '/data/archive.extracted' (if available)
  *   // → '/data/archive_1.extracted' (if collision)
  */
+/**
+ * Create `dir` (and any missing parents) only when it does not already
+ * exist. Unlike a bare `fs.mkdirSync(dir, { recursive: true })`, this never
+ * mkdirs a path that already exists — on some drives (e.g. external USB
+ * disks) mkdir on the drive root returns EPERM instead of EEXIST, so the
+ * recursive form fails there even though the directory is present.
+ */
+export function ensureDirSync(dir: string): void {
+  if (fs.existsSync(dir)) return;
+  fs.mkdirSync(dir, { recursive: true });
+}
+
 export function getOutputPath(inputPath: string, extension: string): string {
   const dir = path.dirname(inputPath);
   const fullExt = getFullExt(inputPath);

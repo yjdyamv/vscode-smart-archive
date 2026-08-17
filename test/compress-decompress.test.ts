@@ -22,7 +22,7 @@ import {
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
 import { compressWith7z as compressWasmCore } from "../src/engines/js7z-compress-core";
-import { copyDirToFS } from "../src/utils/fs";
+import { copyDirToFS, ensureDirSync } from "../src/utils/fs";
 import { createTarFile } from "../src/engines/tar-writer";
 import { tmpDir } from "./tmp";
 
@@ -756,6 +756,31 @@ describe("tar LongLink (production tar-writer)", () => {
       expect(Object.keys(gotNested).length).toBe(0);
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("utils/fs", () => {
+  it("ensureDirSync never mkdirs an existing path (drive-root EPERM regression)", () => {
+    // Some drives (e.g. external USB disks) answer mkdir on the drive root
+    // with EPERM instead of EEXIST, so a bare recursive mkdirSync fails on a
+    // directory that already exists. ensureDirSync must short-circuit via
+    // existsSync and never call mkdir for a present path.
+    const base = tmpDir("sa_ensure_");
+    try {
+      const file = path.join(base, "existing");
+      fs.writeFileSync(file, "x");
+      // Prove a bare recursive mkdirSync throws on an existing path
+      // (EEXIST here; EPERM on some drives' roots) — ensureDirSync must not.
+      expect(() => fs.mkdirSync(file, { recursive: true })).toThrow();
+      ensureDirSync(file);
+      expect(fs.readFileSync(file, "utf8")).toBe("x");
+
+      const deep = path.join(base, "a", "b");
+      ensureDirSync(deep);
+      expect(fs.existsSync(deep)).toBe(true);
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true });
     }
   });
 });

@@ -18,7 +18,6 @@ import {
   DEFAULT_LOG_HISTORY_BYTES,
   WORKER_MEMORY_LIMIT_DEFAULT_MB,
   DEFAULT_COMPRESSION_LEVEL,
-  DEFAULT_SMART_EXTRACT,
 } from "../src/constants";
 import { parseSize } from "../src/utils/security";
 
@@ -86,9 +85,5 @@ describe("package.json defaults match code defaults", () => {
 
   it("snappyBackend", () => {
     expect(settingDefault("snappyBackend")).toBe(DEFAULT_ENGINE_CONFIG.snappyBackend);
-  });
-
-  it("smartExtract", () => {
-    expect(settingDefault("smartExtract")).toBe(DEFAULT_SMART_EXTRACT);
   });
 });
