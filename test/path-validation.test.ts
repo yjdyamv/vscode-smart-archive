@@ -1,5 +1,5 @@
 /**
- * Path/name validation tests — Smart Archive VSCode Extension
+ * Path/name validation tests — Smart Archiver VSCode Extension
  *
  * Locks the webview defense-in-depth whitelist: entry paths and entry names
  * that reach filesystem operations must never be "", ".", "..", absolute,

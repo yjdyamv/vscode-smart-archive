@@ -1,5 +1,5 @@
 /**
- * vscode test double — Smart Archive VSCode Extension
+ * vscode test double — Smart Archiver VSCode Extension
  *
  * A deep adapter at the vscode seam. Small test-visible interface:
  * keyed configuration, recorded dialogs, scriptable pickers/inputs, and
@@ -368,7 +368,7 @@ export const CancellationError = class extends Error {};
 
 export const extensions = {
   getExtension: (_id: string) => ({
-    id: "yjdyamv.smart-archive",
+    id: "yjdyamv.smart-archiver",
     extensionUri: new Uri("file", "/ext", "/ext"),
   }),
 };

@@ -1,5 +1,5 @@
 /**
- * Encrypt/decrypt webview handler tests — Smart Archive VSCode Extension
+ * Encrypt/decrypt webview handler tests — Smart Archiver VSCode Extension
  *
  * Pins the status-bar button semantics: encrypt/decrypt write a NEW archive
  * (…_encrypted.ext / …_decrypted.ext) while the webview keeps displaying the

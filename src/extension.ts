@@ -1,5 +1,5 @@
 /**
- * Extension entry point — Smart Archive VSCode Extension
+ * Extension entry point — Smart Archiver VSCode Extension
  *
  * Registers three commands (compress, decompress, browse) and the
  * custom archive viewer editor. All heavy lifting is delegated to
@@ -140,48 +140,48 @@ export function activate(context: vscode.ExtensionContext): void {
       // Push the new values into a live worker too — without this, the
       // worker keeps stale limits/zstd settings until it is restarted.
       reconfigureArchiveWorker();
-      if (e.affectsConfiguration("smart-archive.sevenZBackend")) resetDetectionCache();
+      if (e.affectsConfiguration("smart-archiver.sevenZBackend")) resetDetectionCache();
     }),
   );
 
   // Register compress command
   const compressDisposable = vscode.commands.registerCommand(
-    "yjdyamv.smart-archive.compress",
+    "yjdyamv.smart-archiver.compress",
     (uri: vscode.Uri, selectedUris: readonly vscode.Uri[]) => compressCommand(uri, selectedUris),
   );
 
   // Register decompress command
   const decompressDisposable = vscode.commands.registerCommand(
-    "yjdyamv.smart-archive.decompress",
+    "yjdyamv.smart-archiver.decompress",
     (uri: vscode.Uri, selectedUris: readonly vscode.Uri[]) => decompressCommand(uri, selectedUris),
   );
 
   // Register browse command
   const browseDisposable = vscode.commands.registerCommand(
-    "yjdyamv.smart-archive.browse",
+    "yjdyamv.smart-archiver.browse",
     (uri: vscode.Uri) => browseCommand(uri),
   );
 
   // Register paste-from-archive command
-  const pasteDisposable = vscode.commands.registerCommand("yjdyamv.smart-archive.paste", () =>
+  const pasteDisposable = vscode.commands.registerCommand("yjdyamv.smart-archiver.paste", () =>
     pasteCopiedFromArchive(),
   );
 
   // Register repair command
   const repairDisposable = vscode.commands.registerCommand(
-    "yjdyamv.smart-archive.repair",
+    "yjdyamv.smart-archiver.repair",
     (uri: vscode.Uri) => repairCommand(uri),
   );
 
   // Register rebuild-volumes command (RAR5 .rev recovery volumes)
   const rebuildVolumesDisposable = vscode.commands.registerCommand(
-    "yjdyamv.smart-archive.rebuildVolumes",
+    "yjdyamv.smart-archiver.rebuildVolumes",
     (uri: vscode.Uri) => rebuildVolumesCommand(uri),
   );
 
   // Register add-to-archive command (triggered via command URI from webview)
   const addToArchiveDisposable = vscode.commands.registerCommand(
-    "yjdyamv.smart-archive.addToArchive",
+    "yjdyamv.smart-archiver.addToArchive",
     () => runAddToArchive(),
   );
 

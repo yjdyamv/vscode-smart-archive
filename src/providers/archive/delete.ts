@@ -1,5 +1,5 @@
 /**
- * Archive delete operations — Smart Archive VSCode Extension
+ * Archive delete operations — Smart Archiver VSCode Extension
  *
  * Host-side dispatcher: the WASM mutation runs in the worker thread
  * (engines/modify-core); the system-7z fast path (child process) stays

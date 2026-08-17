@@ -1,5 +1,5 @@
 /**
- * rar5 install integrity tests — Smart Archive
+ * rar5 install integrity tests — Smart Archiver
  *
  * Three layers of protection around scripts/install-rar5-platforms.js:
  *   1. config sanity: every staged triple has a pinned SHA-256, in valid form;
@@ -94,7 +94,7 @@ describe("rar5 release digest verification", () => {
     const version = await resolveVersion();
     const url = `https://api.github.com/repos/${REPO}/releases/tags/v${version}`;
     const res = await fetch(url, {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "smart-archive" },
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "smart-archiver" },
     });
     expect(res.ok, `GitHub API ${res.status} — run with SA_VERIFY_RAR5_HASHES=1 manually`).toBe(
       true,

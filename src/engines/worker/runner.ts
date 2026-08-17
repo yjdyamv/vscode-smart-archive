@@ -1,5 +1,5 @@
 /**
- * Worker runner — Smart Archive VSCode Extension
+ * Worker runner — Smart Archiver VSCode Extension
  *
  * Host-side gateway to the archive worker_threads worker. Owns a single
  * long-lived Worker (out/worker/worker.js), a FIFO request queue, progress
@@ -53,7 +53,7 @@ let nextId = 1;
 let _active: ArchiveRunner | null = null;
 
 function readPoolSize(): number {
-  const raw = vscode.workspace.getConfiguration("smart-archive").get<number>("workerPoolSize");
+  const raw = vscode.workspace.getConfiguration("smart-archiver").get<number>("workerPoolSize");
   if (typeof raw !== "number" || !Number.isFinite(raw)) return WORKER_POOL_SIZE_DEFAULT;
   return Math.max(WORKER_POOL_SIZE_DEFAULT, Math.min(WORKER_POOL_SIZE_MAX, Math.floor(raw)));
 }

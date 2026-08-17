@@ -1,4 +1,4 @@
-/** Shared UI constants — Smart Archive webview */
+/** Shared UI constants — Smart Archiver webview */
 
 /** JS fallback for --sa-row-multiplier (defined in tailwind.css) when CSS is unavailable */
 export const ROW_HEIGHT_FALLBACK = 1.85;

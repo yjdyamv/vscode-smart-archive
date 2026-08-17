@@ -1,5 +1,5 @@
 /**
- * Engine selection matrix — Smart Archive VSCode Extension
+ * Engine selection matrix — Smart Archiver VSCode Extension
  *
  * selectEngine is the single place that decides which engine runs an
  * operation (system 7z / worker / rar5 / rar rebuild). The system-7z

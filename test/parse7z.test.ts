@@ -1,5 +1,5 @@
 /**
- * parse7zListing edge-case tests — Smart Archive VSCode Extension
+ * parse7zListing edge-case tests — Smart Archiver VSCode Extension
  *
  * Tests the production parse7zListing from src/utils/parse7z.ts with
  * focus on the archivePath self-reference filter.

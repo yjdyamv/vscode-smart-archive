@@ -1,5 +1,5 @@
 /**
- * Snappy WASI (wasm32-wasip1-threads) fallback — Smart Archive
+ * Snappy WASI (wasm32-wasip1-threads) fallback — Smart Archiver
  *
  * snappy >= 7.3.1 ships an official WASI bundle (@napi-rs/snappy-wasm32-wasi);
  * scripts/install-snappy-platforms.js stages its loader + wasm next to the

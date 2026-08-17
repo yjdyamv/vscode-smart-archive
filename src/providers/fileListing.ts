@@ -1,5 +1,5 @@
 /**
- * File listing dispatcher — Smart Archive VSCode Extension
+ * File listing dispatcher — Smart Archiver VSCode Extension
  *
  * Host-side entry point for archive listing. Keeps the original
  * fetchFileList signature; the WASM work runs in the worker thread

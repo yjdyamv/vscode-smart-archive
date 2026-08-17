@@ -53,7 +53,7 @@
   "config.sevenZipMethod.lizard": "Lizard — very fast decompression; levels 0–9 are mapped onto LizardMT's 10–49 scale.",
   "config.workerMemoryMb.description": "Memory ceiling (MiB) for the archive worker thread, which runs WASM 7-Zip. 0 disables the guard. Lower it to reduce the extension's memory footprint; raise it if large archives fail with a memory-limit error.",
   "config.workerPoolSize.description": "Number of archive worker threads. 1 serializes all operations (lowest memory); 2 allows batch operations on small archives to run in parallel. Each worker holds its own WASM 7-Zip heap. Requires a window reload to take effect.",
-  "config.logLevel.description": "Verbosity of the Smart Archive output channel logs.",
+  "config.logLevel.description": "Verbosity of the Smart Archiver output channel logs.",
   "config.logLevel.error": "Errors only",
   "config.logLevel.warn": "Errors and warnings",
   "config.logLevel.info": "Errors, warnings and info (default)",

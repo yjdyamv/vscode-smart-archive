@@ -1,5 +1,5 @@
 /**
- * Log event naming — Smart Archive VSCode Extension
+ * Log event naming — Smart Archiver VSCode Extension
  *
  * Guards the event naming convention documented in utils/logger-core.ts:
  *

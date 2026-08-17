@@ -1,5 +1,5 @@
 /**
- * Log history — Smart Archive VSCode Extension
+ * Log history — Smart Archiver VSCode Extension
  *
  * Byte-budgeted ring buffer of structured log records. The host owns the
  * output panel's rendering (appendLine on a plain OutputChannel), so a

@@ -1,5 +1,5 @@
 /**
- * run7z crash-vs-warning contract tests — Smart Archive VSCode Extension
+ * run7z crash-vs-warning contract tests — Smart Archiver VSCode Extension
  *
  * Locks the fix for "WASM crash reported as success": a synchronous
  * callMain throw (engine crash / memory-guard OOM) must reject the run,

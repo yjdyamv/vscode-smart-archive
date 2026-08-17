@@ -1,5 +1,5 @@
 /**
- * Error classification — Smart Archive VSCode Extension
+ * Error classification — Smart Archiver VSCode Extension
  *
  * Message-pattern fallback for recognizing "cannot open" failures when the
  * engine does not provide structured error info (system 7z spawn errors,

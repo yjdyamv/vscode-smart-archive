@@ -1,5 +1,5 @@
 /**
- * Composable pure-logic tests — Smart Archive VSCode Extension (webview UI)
+ * Composable pure-logic tests — Smart Archiver VSCode Extension (webview UI)
  *
  * Tests for pure utility functions extracted from Vue composables:
  * - fuzzyMatch / isRedosSafe / collectMatches (useSearch)

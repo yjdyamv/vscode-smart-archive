@@ -1,5 +1,5 @@
 /**
- * Latest rar5 binding API — Smart Archive
+ * Latest rar5 binding API — Smart Archiver
  *
  * Exercises the newest smart-archive-rar surface through rar5-engine:
  * dictionary size / solid / BLAKE2 compression options, detailed member

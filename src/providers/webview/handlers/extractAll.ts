@@ -20,7 +20,7 @@ export const handleExtractAll: MessageHandler = async (ctx) => {
     if (s.password) {
       await decompressWithKnownPassword(s.archiveUri, s.password);
     } else {
-      await vscode.commands.executeCommand("yjdyamv.smart-archive.decompress", s.archiveUri);
+      await vscode.commands.executeCommand("yjdyamv.smart-archiver.decompress", s.archiveUri);
     }
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     logger.info({ event: "webview.extAll.ok", archiveName: s.archiveName });

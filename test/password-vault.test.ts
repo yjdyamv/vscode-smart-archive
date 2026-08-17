@@ -1,5 +1,5 @@
 /**
- * Password vault unit tests — Smart Archive VSCode Extension
+ * Password vault unit tests — Smart Archiver VSCode Extension
  *
  * Session-scoped SecretStorage password store: save after successful
  * unlock, read for same-session re-opens, delete everything on

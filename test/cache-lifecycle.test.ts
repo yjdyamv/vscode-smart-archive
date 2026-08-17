@@ -1,5 +1,5 @@
 /**
- * Cache lifecycle policy tests — Smart Archive VSCode Extension
+ * Cache lifecycle policy tests — Smart Archiver VSCode Extension
  *
  * The caches must not outlive the extension: update, disable, and
  * uninstall should clear them, while a plain window close must keep them

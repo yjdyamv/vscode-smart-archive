@@ -1,8 +1,8 @@
 /**
- * rar5 / snappy backend selection — Smart Archive
+ * rar5 / snappy backend selection — Smart Archiver
  *
  * Both codecs can run on the native Node binding or the WASM engine.
- * `smart-archive.rar5Backend` / `smart-archive.snappyBackend` (auto /
+ * `smart-archiver.rar5Backend` / `smart-archiver.snappyBackend` (auto /
  * native / wasm) are injected via applyEngineConfig (the single config
  * interface shared by host and worker); the legacy env overrides
  * (SA_RAR5_FORCE_WASM / NAPI_RS_FORCE_WASI) still win.

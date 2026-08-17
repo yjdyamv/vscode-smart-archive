@@ -1,5 +1,5 @@
 /**
- * Decompress command handler — Smart Archive VSCode Extension
+ * Decompress command handler — Smart Archiver VSCode Extension
  *
  * Password flow:
  *   - .7z / .zip / .rar → detect encryption first, skip prompt if not encrypted

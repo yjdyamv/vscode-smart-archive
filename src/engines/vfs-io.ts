@@ -1,5 +1,5 @@
 /**
- * Virtual FS I/O primitives — Smart Archive VSCode Extension
+ * Virtual FS I/O primitives — Smart Archiver VSCode Extension
  *
  * Low-level read/write operations between the local filesystem and the
  * JS7z Emscripten virtual filesystem. Extracted to break the circular

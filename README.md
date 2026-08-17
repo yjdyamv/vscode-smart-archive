@@ -1,15 +1,22 @@
-# Smart Archive
+# Smart Archiver
 
 [![Build](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml)
 
 VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4/brotli** codecs (brotli via Node.js zlib), with the WASM engine as the final fallback. Works out of the box with no local 7-Zip install, at near-desktop speed.
+
+> **Renamed from `smart-archive` to `smart-archiver`:** the previous marketplace
+> listing (`yjdyamv.smart-archive`) was deleted and its name can no longer be
+> republished, so this extension ships under the new ID `yjdyamv.smart-archiver`.
+> If you are upgrading, re-apply your settings (the section is now
+> `smart-archiver.*` instead of `smart-archive.*`) and re-bind any keybindings
+> that referenced the old command IDs (e.g. `yjdyamv.smart-archive.compress`).
 
 ## Features
 
 - **Compress** to 7z, ZIP, RAR5, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst, tar.lz4, tar.br, tar.sz
 - **Decompress** from 40+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
 - **AES-256 encryption** — password-protect 7z, ZIP, and RAR5 archives (7z with header encryption, RAR5 with inline recovery records and recovery volumes)
-- **Native 7-Zip engine** — the bundled 7-Zip binary covers Windows, Linux (x64/arm64) and macOS (arm64), no install needed; platforms without a native build (macOS x64, Linux arm, Windows ia32) fall back to the WASM engine. In `auto` mode the bundled binary is preferred; a system 7-Zip is used only when it is at least as capable (newer than the bundled fork with the same codecs). Choose explicitly via `smart-archive.sevenZBackend` (`auto`/`native`/`bundled`/`wasm`)
+- **Native 7-Zip engine** — the bundled 7-Zip binary covers Windows, Linux (x64/arm64) and macOS (arm64), no install needed; platforms without a native build (macOS x64, Linux arm, Windows ia32) fall back to the WASM engine. In `auto` mode the bundled binary is preferred; a system 7-Zip is used only when it is at least as capable (newer than the bundled fork with the same codecs). Choose explicitly via `smart-archiver.sevenZBackend` (`auto`/`native`/`bundled`/`wasm`)
 - **Archive browser** — opens as the default editor for archives: virtual-scrolled tree, search with regex or fuzzy match, sort by name/size, multi-select for partial extract, add/delete/rename files right inside the view
 - **Keyboard navigation** — Arrow keys, PageUp/PageDown (scroll viewport), Home/End, Space to toggle selection, Enter to extract, Delete to remove, Ctrl+A to select all
 - **File preview** — double-click any file to open it in VS Code
@@ -43,9 +50,9 @@ Press `F5` in VS Code to launch the Extension Development Host.
 
 | Action | How |
 |--------|-----|
-| Compress | Right-click file(s)/folder(s) → `Smart Archive: Compress` → pick format → optional password → save |
-| Decompress | Right-click archive → `Smart Archive: Decompress` → optional password → extracts to `<name>.extracted/` |
-| Browse | Right-click archive → `Smart Archive: Browse Contents`, or double-click the archive file |
+| Compress | Right-click file(s)/folder(s) → `Smart Archiver: Compress` → pick format → optional password → save |
+| Decompress | Right-click archive → `Smart Archiver: Decompress` → optional password → extracts to `<name>.extracted/` |
+| Browse | Right-click archive → `Smart Archiver: Browse Contents`, or double-click the archive file |
 
 ### Archive Browser Shortcuts
 
@@ -89,19 +96,19 @@ All formats supported by 7-Zip (including CAB, ARJ, LZH, CHM, MSI, ISO, VHD, VMD
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `smart-archive.defaultFormat` | `7z` | Default archive format |
-| `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
-| `smart-archive.maxArchiveSize` | `"1g"` | Max size of the compressed archive file itself; warning threshold when the WASM fallback loads the whole archive into memory. Extraction and single-file preview can continue after confirmation |
-| `smart-archive.maxExtractTotalSize` | `"10g"` | Max total size of all files after one extraction |
-| `smart-archive.sevenZBackend` | `"auto"` | 7-Zip engine: `auto` (bundled native→system, only if at least as capable→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
-| `smart-archive.zstdBackend` | `"auto"` | Zstd engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
-| `smart-archive.brotliBackend` | `"auto"` | Brotli engine: `auto`/`native` (Node.js zlib), `bundled` (bundled native 7-Zip), `wasm` (WASM only) |
-| `smart-archive.lz4Backend` | `"auto"` | LZ4 engine: `auto` (bundled native→WASM), `bundled` (bundled native only), `wasm` (WASM only) |
-| `smart-archive.rar5Backend` | `"auto"` | RAR5 engine: `auto` (native binding→WASM), `native` (Node binding only), `wasm` (WASM only) |
-| `smart-archive.snappyBackend` | `"auto"` | Snappy (tar.sz): `auto` (native addon→WASM), `native` (Node addon only), `wasm` (WASM only) |
-| `smart-archive.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
-| `smart-archive.compressExcludePatterns` | `[30+ patterns]` | Patterns excluded when compressing |
-| `smart-archive.volumeSizes` | `[built-in presets]` | Custom split volume size presets (empty `{}` falls back to the built-in presets) |
+| `smart-archiver.defaultFormat` | `7z` | Default archive format |
+| `smart-archiver.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
+| `smart-archiver.maxArchiveSize` | `"1g"` | Max size of the compressed archive file itself; warning threshold when the WASM fallback loads the whole archive into memory. Extraction and single-file preview can continue after confirmation |
+| `smart-archiver.maxExtractTotalSize` | `"10g"` | Max total size of all files after one extraction |
+| `smart-archiver.sevenZBackend` | `"auto"` | 7-Zip engine: `auto` (bundled native→system, only if at least as capable→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
+| `smart-archiver.zstdBackend` | `"auto"` | Zstd engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
+| `smart-archiver.brotliBackend` | `"auto"` | Brotli engine: `auto`/`native` (Node.js zlib), `bundled` (bundled native 7-Zip), `wasm` (WASM only) |
+| `smart-archiver.lz4Backend` | `"auto"` | LZ4 engine: `auto` (bundled native→WASM), `bundled` (bundled native only), `wasm` (WASM only) |
+| `smart-archiver.rar5Backend` | `"auto"` | RAR5 engine: `auto` (native binding→WASM), `native` (Node binding only), `wasm` (WASM only) |
+| `smart-archiver.snappyBackend` | `"auto"` | Snappy (tar.sz): `auto` (native addon→WASM), `native` (Node addon only), `wasm` (WASM only) |
+| `smart-archiver.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
+| `smart-archiver.compressExcludePatterns` | `[30+ patterns]` | Patterns excluded when compressing |
+| `smart-archiver.volumeSizes` | `[built-in presets]` | Custom split volume size presets (empty `{}` falls back to the built-in presets) |
 
 ## Requirements
 
@@ -158,7 +165,7 @@ npm run release          # check + package:cross (pre-release validation)
 ## Security
 
 - **Untrusted archives** — whenever a native 7-Zip is used (the bundled binary by default, or a system install), extraction refuses archives containing symbolic-link entries and enforces the configured size limits *before* writing, guarding against path-traversal writes and decompression bombs. The archive browser renders attacker-controlled entry names under a strict Content-Security-Policy.
-- **Native vs sandboxed parsing** — by default (`auto`) archives are parsed by a native 7-Zip process, which is fast but runs C/C++ format handlers on untrusted input. To parse untrusted archives inside the WebAssembly sandbox instead, set `smart-archive.sevenZBackend` to `wasm`.
+- **Native vs sandboxed parsing** — by default (`auto`) archives are parsed by a native 7-Zip process, which is fast but runs C/C++ format handlers on untrusted input. To parse untrusted archives inside the WebAssembly sandbox instead, set `smart-archiver.sevenZBackend` to `wasm`.
 - **Passwords on shared machines** — passwords are piped to native 7-Zip through stdin (`Enter password:` prompt), never passed as a command-line argument, so they do not appear in the process list. The WASM engine similarly keeps passwords inside the extension process.
 
 ## License

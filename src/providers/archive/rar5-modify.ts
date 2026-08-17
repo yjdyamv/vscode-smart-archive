@@ -1,5 +1,5 @@
 /**
- * Rebuild-based RAR archive modification — Smart Archive VSCode Extension
+ * Rebuild-based RAR archive modification — Smart Archiver VSCode Extension
  *
  * 7-Zip (and the WASM fallback) can read/extract RAR archives but cannot
  * modify them (`E_NOTIMPL`). RAR modification is therefore implemented as

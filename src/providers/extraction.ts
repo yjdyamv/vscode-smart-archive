@@ -1,5 +1,5 @@
 /**
- * Extraction dispatcher — Smart Archive VSCode Extension
+ * Extraction dispatcher — Smart Archiver VSCode Extension
  *
  * Host-side entry point for selective extraction. Resolves the output
  * directory, runs the WASM extraction in the worker thread

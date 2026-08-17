@@ -1,5 +1,5 @@
 /**
- * Defaults consistency — Smart Archive VSCode Extension
+ * Defaults consistency — Smart Archiver VSCode Extension
  *
  * Guards the two places a user-visible default lives: the package.json
  * "configuration" block (settings UI) and the code constants that engine
@@ -28,8 +28,8 @@ const pkg = JSON.parse(
 };
 
 function settingDefault(name: string): unknown {
-  const prop = pkg.contributes.configuration.properties[`smart-archive.${name}`];
-  if (!prop) throw new Error(`Missing setting smart-archive.${name} in package.json`);
+  const prop = pkg.contributes.configuration.properties[`smart-archiver.${name}`];
+  if (!prop) throw new Error(`Missing setting smart-archiver.${name} in package.json`);
   return prop.default;
 }
 

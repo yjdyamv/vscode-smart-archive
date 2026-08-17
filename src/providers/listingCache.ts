@@ -1,5 +1,5 @@
 /**
- * Listing cache — Smart Archive VSCode Extension
+ * Listing cache — Smart Archiver VSCode Extension
  *
  * Disk cache for wrapped-format listings (tar.gz etc.). Wrapped listing is
  * the most expensive op in the extension — the whole archive is read into

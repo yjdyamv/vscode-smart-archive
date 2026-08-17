@@ -1,5 +1,5 @@
 /**
- * Listing cache unit tests — Smart Archive VSCode Extension
+ * Listing cache unit tests — Smart Archiver VSCode Extension
  *
  * Disk cache for wrapped-format listings: stat fast check, sha256
  * fallback on stat change, atomic snapshot writes, cleanup sweep

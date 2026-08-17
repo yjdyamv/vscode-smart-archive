@@ -1,5 +1,5 @@
 /**
- * Repair command — Smart Archive VSCode Extension
+ * Repair command — Smart Archiver VSCode Extension
  *
  * Repairs a damaged RAR5 archive using its inline recovery record
  * (WinRAR's `rar r` equivalent, backed by the rar5 native binding).
@@ -68,7 +68,7 @@ export async function repairCommand(uri?: vscode.Uri): Promise<void> {
     const open = await vscode.window.showInformationMessage(t("repair.done") + outputPath, "Open");
     if (open) {
       await vscode.commands.executeCommand(
-        "yjdyamv.smart-archive.browse",
+        "yjdyamv.smart-archiver.browse",
         vscode.Uri.file(outputPath),
       );
     }

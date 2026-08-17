@@ -1,5 +1,5 @@
 /**
- * 7zz-wasm codec helpers — Smart Archive VSCode Extension
+ * 7zz-wasm codec helpers — Smart Archiver VSCode Extension
  *
  * Single-file stream codecs (zstd / brotli / lz4) backed by the bundled
  * 7-Zip ZS WASM engine. The engine creates and extracts these formats

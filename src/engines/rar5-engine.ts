@@ -1,5 +1,5 @@
 /**
- * RAR5 creation engine — Smart Archive VSCode Extension
+ * RAR5 creation engine — Smart Archiver VSCode Extension
  *
  * Native napi-rs binding (`smart-archive-rar`) wrapping the pure-Rust
  * `rar5` library (codeberg.org/yjdyamv/rar-rs fork), with a WASI
@@ -169,7 +169,7 @@ let rar5Config: { backend?: Rar5Backend } = {};
 
 /**
  * Inject the rar5Backend setting. The host wires it from
- * `smart-archive.rar5Backend`; tests inject it directly. `auto` keeps the
+ * `smart-archiver.rar5Backend`; tests inject it directly. `auto` keeps the
  * native-first / WASI-fallback behaviour.
  */
 export function setRar5Config(config: { backend?: Rar5Backend }): void {

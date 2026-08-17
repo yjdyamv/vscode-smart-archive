@@ -1,5 +1,5 @@
 /**
- * Seam manifest — Smart Archive VSCode Extension
+ * Seam manifest — Smart Archiver VSCode Extension
  *
  * One machine-checked record of which production module each test file
  * reaches. Every module under src/ is registered here — either with the

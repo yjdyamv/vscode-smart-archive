@@ -1,5 +1,5 @@
 /**
- * Volume size core — Smart Archive VSCode Extension
+ * Volume size core — Smart Archiver VSCode Extension
  *
  * Pure volume-size helpers (no vscode dependency) so worker threads and
  * the engine layer can use them. The config-dependent getVolumeSizes

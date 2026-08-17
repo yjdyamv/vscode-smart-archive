@@ -1,5 +1,5 @@
 /**
- * Oversized preview tests — Smart Archive VSCode Extension
+ * Oversized preview tests — Smart Archiver VSCode Extension
  *
  * Entries larger than MAX_PREVIEW_FILE_SIZE must reject with the
  * PreviewTooLargeError sentinel — the host preview path uses it to skip

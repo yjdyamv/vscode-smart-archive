@@ -1,5 +1,5 @@
 /**
- * End-to-end RAR5 rebuild — Smart Archive
+ * End-to-end RAR5 rebuild — Smart Archiver
  *
  * Reproduces the webview "delete folder inside a RAR archive" flow with
  * the REAL bundled 7zz + REAL rar5 binding + REAL rar-rs CLI:

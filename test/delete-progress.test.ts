@@ -1,5 +1,5 @@
 /**
- * Delete-progress tests — Smart Archive VSCode Extension
+ * Delete-progress tests — Smart Archiver VSCode Extension
  *
  * Verifies that the system-7z delete path reports real progress
  * (percentage from the 7z stderr parser) and that deleting rebuilds the

@@ -1,5 +1,5 @@
 /**
- * Seam coverage guard — Smart Archive VSCode Extension
+ * Seam coverage guard — Smart Archiver VSCode Extension
  *
  * Makes "comprehensive coverage" a machine-checked property instead of a
  * human audit. Scans src/ for modules, scans test/ for imports, and

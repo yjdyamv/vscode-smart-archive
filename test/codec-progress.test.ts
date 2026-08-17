@@ -1,5 +1,5 @@
 /**
- * Codec progress tests — Smart Archive VSCode Extension
+ * Codec progress tests — Smart Archiver VSCode Extension
  *
  * Verifies that the wrapped-format codecs (zstd/lz4/brotli/snappy) report
  * determinate progress (message + increment) while compressing, so the

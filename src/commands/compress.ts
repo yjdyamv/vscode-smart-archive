@@ -1,5 +1,5 @@
 /**
- * Compress command handler — Smart Archive VSCode Extension
+ * Compress command handler — Smart Archiver VSCode Extension
  *
  * Orchestrates the compression workflow:
  *   format → level → volume → encrypt → password → save → execute
@@ -168,7 +168,7 @@ function promptInputBox(opts: {
 const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
 
 async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
-  const config = vscode.workspace.getConfiguration("smart-archive");
+  const config = vscode.workspace.getConfiguration("smart-archiver");
   const defaultFormat = config.get<string>("defaultFormat", "7z");
   const items = COMPRESS_FORMATS.map((f) => ({ label: f.label, description: f.description }));
   const defaultIdx = items.findIndex((i) => i.label === defaultFormat);
@@ -189,7 +189,7 @@ async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
 }
 
 async function promptLevelWizard(): Promise<StepResult<number>> {
-  const config = vscode.workspace.getConfiguration("smart-archive");
+  const config = vscode.workspace.getConfiguration("smart-archiver");
   const defaultLevel = config.get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL);
   const labels = compressLevels();
   const defaultIdx = LEVEL_VALUES.indexOf(defaultLevel);
@@ -610,14 +610,14 @@ export async function compressCommand(
           recoveryVolumeCount,
           sevenZipMethod: normalizeSevenZipMethod(
             vscode.workspace
-              .getConfiguration("smart-archive")
+              .getConfiguration("smart-archiver")
               .get<string>("sevenZipMethod", "flzma2"),
           ),
         };
 
         const excludePatterns: string[] =
           vscode.workspace
-            .getConfiguration("smart-archive")
+            .getConfiguration("smart-archiver")
             .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
         const startTime = Date.now();
         const stages = new StageProgress();

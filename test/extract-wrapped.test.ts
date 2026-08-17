@@ -1,5 +1,5 @@
 /**
- * Selective-extraction unit tests — Smart Archive VSCode Extension
+ * Selective-extraction unit tests — Smart Archiver VSCode Extension
  *
  * extractSelectedCore, both branches:
  *   - wrapped (tar.gz / tar.zst / tar.lz4 / tar.br / tar.sz): outer layer →

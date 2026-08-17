@@ -1,5 +1,5 @@
 /**
- * Tree builder — Smart Archive VSCode Extension
+ * Tree builder — Smart Archiver VSCode Extension
  *
  * Converts a flat archive entry list into a hierarchical TreeNode[] tree.
  * Supports both full-tree builds and lazy (root-only + on-demand children).

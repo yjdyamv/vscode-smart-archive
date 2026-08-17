@@ -1,5 +1,5 @@
 /**
- * Per-stage progress notifications — Smart Archive VSCode Extension
+ * Per-stage progress notifications — Smart Archiver VSCode Extension
  *
  * Compression pipelines run copy → pack → compress stages. Each stage gets
  * its own progress notification (own bar, own elapsed timer), but only one

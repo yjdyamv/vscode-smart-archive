@@ -1,5 +1,5 @@
 /**
- * Test fixture oracle — Smart Archive VSCode Extension
+ * Test fixture oracle — Smart Archiver VSCode Extension
  *
  * The ONLY test-side implementations in this suite. Everything here is an
  * independent oracle that produces archive bytes through the raw 7zz WASM

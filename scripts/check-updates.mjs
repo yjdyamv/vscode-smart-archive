@@ -46,7 +46,7 @@ export function normalizeTag(tag) {
 export async function defaultFetchJson(url) {
   // npm registry rejects requests without a User-Agent (406) and does not
   // accept GitHub's Accept header — only tag GitHub API calls with it.
-  const headers = { "User-Agent": "smart-archive-vscode" };
+  const headers = { "User-Agent": "smart-archiver-vscode" };
   if (url.startsWith("https://api.github.com")) {
     headers.Accept = "application/vnd.github+json";
   }
@@ -180,7 +180,7 @@ export function hasUpdate(results) {
 }
 
 function printHuman(results) {
-  console.log("=== Smart Archive dependency update check ===");
+  console.log("=== Smart Archiver dependency update check ===");
   for (const r of results) {
     const line = `[${r.name}] current ${r.current} / latest ${r.latest} — ${r.status}`;
     if (r.status === "update-available" || r.status === "mirror-behind-upstream") {

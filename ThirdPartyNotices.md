@@ -1,6 +1,6 @@
 # Third Party Notices
 
-Smart Archive uses the following third-party libraries, each under its own license.
+Smart Archiver uses the following third-party libraries, each under its own license.
 
 ## Native Modules (distributed as separate binaries)
 

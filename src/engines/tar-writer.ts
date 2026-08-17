@@ -1,5 +1,5 @@
 /**
- * TAR writer — Smart Archive VSCode Extension
+ * TAR writer — Smart Archiver VSCode Extension
  *
  * Pure Node.js streaming TAR creator. Writes a TAR archive directly
  * to disk without loading files into memory, bypassing WASM limits.

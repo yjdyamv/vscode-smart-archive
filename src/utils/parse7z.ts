@@ -1,5 +1,5 @@
 /**
- * 7z listing parser — Smart Archive VSCode Extension
+ * 7z listing parser — Smart Archiver VSCode Extension
  *
  * Parses stdout from `7z l -slt` into a flat entry list.
  * Shared between js7z-list.ts and fileListing.ts to avoid

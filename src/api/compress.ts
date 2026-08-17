@@ -1,5 +1,5 @@
 /**
- * Compress API — Smart Archive VSCode Extension
+ * Compress API — Smart Archiver VSCode Extension
  *
  * Pure business-logic functions for compression operations.
  * These functions have zero VSCode UI dependency and can be

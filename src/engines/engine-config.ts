@@ -1,5 +1,5 @@
 /**
- * Engine configuration — Smart Archive VSCode Extension
+ * Engine configuration — Smart Archiver VSCode Extension
  *
  * Single entry point for pushing workspace configuration into the
  * vscode-free engine layer. Both the extension host (at activation and on

@@ -1,5 +1,5 @@
 /**
- * js7z list & inspect core — Smart Archive VSCode Extension
+ * js7z list & inspect core — Smart Archiver VSCode Extension
  *
  * WASM listing/encryption-detection via the bundled 7zz engine, vscode-free (runs in
  * the worker thread). Host dispatcher: engines/js7z-list.ts.

@@ -1,5 +1,5 @@
 /**
- * Operation dispatch — Smart Archive VSCode Extension
+ * Operation dispatch — Smart Archiver VSCode Extension
  *
  * Single op → core mapping for the archive pipeline. Both execution
  * contexts cross the same seam: the worker handler (messages from the

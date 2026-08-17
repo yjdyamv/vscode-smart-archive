@@ -1,5 +1,5 @@
 /**
- * Archive worker — Smart Archive VSCode Extension
+ * Archive worker — Smart Archiver VSCode Extension
  *
  * worker_threads entry that runs the WASM 7-Zip compress/decompress
  * pipelines off the extension host. Vscode-free by construction —

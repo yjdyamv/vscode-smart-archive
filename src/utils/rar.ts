@@ -1,5 +1,5 @@
 /**
- * RAR archive utilities — Smart Archive VSCode Extension
+ * RAR archive utilities — Smart Archiver VSCode Extension
  *
  * RAR detection and multi-volume resolution.
  * This module centralizes all RAR-specific detection, validation, and

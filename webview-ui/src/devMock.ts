@@ -1,5 +1,5 @@
 /**
- * Browser dev sandbox for the webview UI — Smart Archive webview
+ * Browser dev sandbox for the webview UI — Smart Archiver webview
  *
  * `npm run dev:webview` serves the UI in a plain browser (vite dev server,
  * HMR) instead of a VS Code panel. There is no extension host there, so

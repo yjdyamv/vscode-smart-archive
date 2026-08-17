@@ -1,5 +1,5 @@
 /**
- * Production-path test helpers — Smart Archive VSCode Extension
+ * Production-path test helpers — Smart Archiver VSCode Extension
  *
  * High-level compress/decompress helpers that delegate to the public
  * API layer (src/api/). Tests using these helpers exercise the FULL

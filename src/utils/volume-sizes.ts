@@ -1,5 +1,5 @@
 /**
- * Volume size utilities — Smart Archive VSCode Extension
+ * Volume size utilities — Smart Archiver VSCode Extension
  *
  * Config-dependent volume-size helpers (host-side UI only).
  * Pure helpers live in utils/volume-sizes-core.
@@ -22,7 +22,7 @@ export type { VolumeSizeItem };
  * avoiding unwanted merging with the package.json default.
  */
 export function getVolumeSizes(): VolumeSizeItem[] {
-  const config = vscode.workspace.getConfiguration("smart-archive");
+  const config = vscode.workspace.getConfiguration("smart-archiver");
   const inspected = config.inspect<Record<string, string>>("volumeSizes");
   const userValue =
     inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;

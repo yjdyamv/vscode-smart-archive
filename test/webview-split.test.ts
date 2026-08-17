@@ -1,5 +1,5 @@
 /**
- * Webview split handler tests — Smart Archive VSCode Extension
+ * Webview split handler tests — Smart Archiver VSCode Extension
  *
  * Pins the split flow: volume-size + RAR5 recovery-volume prompts are
  * driven through the real handler, and the produced split set carries

@@ -1,5 +1,5 @@
 /**
- * Webview UI strings — Smart Archive webview
+ * Webview UI strings — Smart Archiver webview
  *
  * The host injects every user-visible string as the `_xStrings` JSON blob
  * (localized in src/i18n.ts — the single source). Components read through

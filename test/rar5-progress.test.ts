@@ -1,5 +1,5 @@
 /**
- * RAR5 compression progress regression tests — Smart Archive
+ * RAR5 compression progress regression tests — Smart Archiver
  *
  * Reproduces the two progress-accounting bugs fixed in rar-rs 23733cc+ and
  * smart-archive-rar 0.2.10:

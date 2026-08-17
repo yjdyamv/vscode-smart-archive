@@ -1,5 +1,5 @@
 /**
- * Command end-to-end tests — Smart Archive
+ * Command end-to-end tests — Smart Archiver
  *
  * Drives the real command layer (compress / decompress / repair) through
  * the full seam: wizard UI on the scriptable vscode test double → real

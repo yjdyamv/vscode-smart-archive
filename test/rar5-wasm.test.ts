@@ -1,5 +1,5 @@
 /**
- * RAR5 WASI (wasm32-wasip1-threads) fallback — Smart Archive
+ * RAR5 WASI (wasm32-wasip1-threads) fallback — Smart Archiver
  *
  * Forces the WASM loader in src/engines/rar5-engine.ts (native .node path is
  * skipped via SA_RAR5_FORCE_WASM=1) and exercises compressWithRar5 against

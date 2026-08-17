@@ -16,5 +16,5 @@ export const handleCopy: MessageHandler = async (ctx) => {
   setCopiedPaths(msg.paths, s.filePath, s.password, msg.flat);
   logger.info({ event: "webview.copy", count: msg.paths.length, flat: msg.flat });
   vscode.window.showInformationMessage(t("archive.copied", String(msg.paths.length)));
-  vscode.commands.executeCommand("yjdyamv.smart-archive.paste");
+  vscode.commands.executeCommand("yjdyamv.smart-archiver.paste");
 };

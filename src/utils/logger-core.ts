@@ -1,5 +1,5 @@
 /**
- * Logger core — Smart Archive VSCode Extension
+ * Logger core — Smart Archiver VSCode Extension
  *
  * Vscode-free pino logger for worker threads. The host-side logger
  * (utils/logger) re-points the sink to the VSCode LogOutputChannel via

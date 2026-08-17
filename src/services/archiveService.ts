@@ -1,5 +1,5 @@
 /**
- * Archive conversion — Smart Archive VSCode Extension
+ * Archive conversion — Smart Archiver VSCode Extension
  *
  * Convert an archive between formats (decompress to a temp dir, then
  * recompress). Used by the webview convert / encrypt / decrypt / merge /
@@ -79,7 +79,7 @@ export async function convertArchive(
             encryptHeaders:
               dstFormat === "rar" && Boolean(outputPassword ?? password) ? true : undefined,
             level: vscode.workspace
-              .getConfiguration("smart-archive")
+              .getConfiguration("smart-archiver")
               .get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL),
             volumeSize,
             // RAR5 recovery volumes (.rev, WinRAR -rv): only meaningful for

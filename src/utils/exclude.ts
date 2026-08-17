@@ -1,5 +1,5 @@
 /**
- * Exclusion helpers — Smart Archive VSCode Extension
+ * Exclusion helpers — Smart Archiver VSCode Extension
  *
  * Shared exclusion logic used by both the tar-writer (wrapped formats)
  * and the 7z compression path (non-wrapped formats).  Splits user-supplied

@@ -1,5 +1,5 @@
 /**
- * Webview setup — Smart Archive VSCode Extension
+ * Webview setup — Smart Archiver VSCode Extension
  *
  * Initializes an archive webview: resolves RAR volumes, detects encryption,
  * fetches file listing, builds the tree, and renders the content HTML.

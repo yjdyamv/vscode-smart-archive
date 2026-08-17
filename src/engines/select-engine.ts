@@ -1,5 +1,5 @@
 /**
- * Engine selection — Smart Archive VSCode Extension
+ * Engine selection — Smart Archiver VSCode Extension
  *
  * Host-side decision module: which engine runs a given operation. All the
  * gating that used to be re-implemented at every call site (password leaks

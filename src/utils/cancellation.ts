@@ -1,5 +1,5 @@
 /**
- * Cancellation & progress abstractions — Smart Archive VSCode Extension
+ * Cancellation & progress abstractions — Smart Archiver VSCode Extension
  *
  * Vscode-free equivalents of vscode.CancellationToken / vscode.Progress /
  * vscode.CancellationError. Structurally compatible with the real vscode

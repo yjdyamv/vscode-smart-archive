@@ -1,5 +1,5 @@
 /**
- * Selective extraction core — Smart Archive VSCode Extension
+ * Selective extraction core — Smart Archiver VSCode Extension
  *
  * Vscode-free WASM selective extraction, runs inside the worker thread.
  * Host dispatcher: providers/extraction.ts (output-dir resolution and

@@ -1,5 +1,5 @@
 /**
- * Recovery-record aware compression ratio — Smart Archive
+ * Recovery-record aware compression ratio — Smart Archiver
  *
  * The RAR5 recovery record appends parity data that inflates the on-disk
  * archive size; getRarPayloadSize must return the protected payload so

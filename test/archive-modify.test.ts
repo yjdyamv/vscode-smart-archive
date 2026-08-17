@@ -1,5 +1,5 @@
 /**
- * Archive modification tests — Smart Archive VSCode Extension
+ * Archive modification tests — Smart Archiver VSCode Extension
  *
  * Tests for: add-to-archive, rename, delete, format conversion,
  * merge/split operations, encrypt/decrypt workflows.

@@ -1,5 +1,5 @@
 /**
- * Webview state — Smart Archive VSCode Extension
+ * Webview state — Smart Archiver VSCode Extension
  *
  * Shared types and state containers for archive webview instances.
  *
@@ -9,7 +9,7 @@
 import * as vscode from "vscode";
 import type { FlatEntry, EntryIndex } from "../treeBuilder";
 
-export const EXT_ID = "yjdyamv.smart-archive";
+export const EXT_ID = "yjdyamv.smart-archiver";
 
 export interface HandlerState {
   archiveUri: vscode.Uri;

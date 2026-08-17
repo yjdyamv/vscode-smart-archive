@@ -1,5 +1,5 @@
 /**
- * check-updates.mjs unit tests — Smart Archive
+ * check-updates.mjs unit tests — Smart Archiver
  *
  * Exercises the comparison/status logic with an injected fetchJson, so no
  * network is touched: a registry/API outage must never make these tests
