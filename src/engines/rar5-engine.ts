@@ -80,6 +80,16 @@ interface Rar5Binding {
       recoveryVolumeCount?: number;
       volumeSize?: number;
       maxTotalBytes?: number;
+      dictSize?: string;
+      solid?: boolean;
+      quickOpen?: boolean;
+      blake2?: boolean;
+      threads?: number;
+      saveCtime?: boolean;
+      saveAtime?: boolean;
+      timePrecisionSeconds?: boolean;
+      saveOwner?: boolean;
+      saveStreams?: boolean;
     },
     onProgress?: (err: Error | null, p: { done: number; total: number }) => void,
     signal?: AbortSignal,
@@ -95,14 +105,62 @@ interface Rar5Binding {
       }>;
       level?: number;
       password?: string;
+      dictSize?: string;
     },
     onProgress?: (err: Error | null, p: { done: number; total: number }) => void,
     signal?: AbortSignal,
   ): Promise<{ files: string[] }>;
   deleteEntries(archivePath: string, names: string[], password?: string): number;
   listEntries(archivePath: string, password?: string): string[];
+  listEntriesDetailed(
+    archivePath: string,
+    password?: string,
+  ): Array<{
+    name: string;
+    size: number;
+    packedSize: number;
+    method: number;
+    isDir: boolean;
+    mtime: number;
+  }>;
+  extractArchive(
+    archivePath: string,
+    opts: {
+      destPath: string;
+      password?: string;
+      flat?: boolean;
+      maxDictSize?: number;
+    },
+    signal?: AbortSignal,
+  ): Promise<void>;
   repairArchive(inputPath: string, outputPath: string): void;
   rebuildMissingVolumes(firstVolume: string): string[];
+}
+
+/** One member's details from [`listRar5EntriesDetailed`]. */
+export interface Rar5EntryInfo {
+  name: string;
+  /** Uncompressed size in bytes. */
+  size: number;
+  /** On-disk (packed) size in bytes. */
+  packedSize: number;
+  /** Compression method: 0 = store, 1..=5. */
+  method: number;
+  isDir: boolean;
+  /** Modification time as Unix seconds (0 when unknown). */
+  mtime: number;
+}
+
+/** Options for [`extractWithRar5`]. */
+export interface ExtractRar5Options {
+  /** Extract members flat (basename only, no directory tree). */
+  flat?: boolean;
+  /**
+   * Maximum dictionary size in bytes accepted when decoding a member
+   * (WinRAR-compatible default: 4 GiB; RAR7 v70 members with larger
+   * dictionaries are refused). Pass 0 for no limit.
+   */
+  maxDictSize?: number;
 }
 
 export type Rar5Backend = "auto" | "native" | "wasm";
@@ -414,6 +472,16 @@ export async function compressWithRar5(
         recoveryPercent: options.recoveryPercent ?? 0,
         recoveryVolumeCount: options.recoveryVolumeCount ?? 0,
         volumeSize: volumeSize && volumeSize > 0 ? volumeSize : undefined,
+        dictSize: options.dictSize || undefined,
+        solid: options.solid ?? undefined,
+        quickOpen: options.quickOpen ?? undefined,
+        blake2: options.blake2 ?? undefined,
+        threads: options.threads ?? undefined,
+        saveCtime: options.saveCtime ?? undefined,
+        saveAtime: options.saveAtime ?? undefined,
+        timePrecisionSeconds: options.timePrecisionSeconds ?? undefined,
+        saveOwner: options.saveOwner ?? undefined,
+        saveStreams: options.saveStreams ?? undefined,
       },
       (err, p) => {
         if (err) return;
@@ -464,6 +532,50 @@ function cleanupPartialOutput(outputPath: string): void {
 export function listRar5Entries(archivePath: string, password?: string): string[] {
   const mod = loadBinding();
   return mod.listEntries(archivePath, password || undefined);
+}
+
+/** List the members of a RAR5 archive with sizes and methods. */
+export function listRar5EntriesDetailed(
+  archivePath: string,
+  password?: string,
+): Rar5EntryInfo[] {
+  const mod = loadBinding();
+  return mod.listEntriesDetailed(archivePath, password || undefined);
+}
+
+/**
+ * Extract a RAR5 archive into a directory using the rar5 binding (fully
+ * streaming, so arbitrarily large members work; RAR7 v70 members are
+ * accepted with `maxDictSize: 0`).
+ */
+export async function extractWithRar5(
+  archivePath: string,
+  destPath: string,
+  password: string,
+  opts: ExtractRar5Options = {},
+  token?: TokenLike,
+): Promise<void> {
+  const mod = loadBinding();
+  const controller = new AbortController();
+  let disposable: { dispose(): void } | undefined;
+  if (token) {
+    disposable = token.onCancellationRequested?.(() => controller.abort());
+    if (token.isCancellationRequested) controller.abort();
+  }
+  try {
+    await mod.extractArchive(
+      archivePath,
+      {
+        destPath,
+        password: password || undefined,
+        flat: opts.flat ?? undefined,
+        maxDictSize: opts.maxDictSize ?? undefined,
+      },
+      controller.signal,
+    );
+  } finally {
+    disposable?.dispose();
+  }
 }
 
 /**
@@ -549,6 +661,7 @@ export async function appendWithRar5(
         entries: bindingEntries,
         level: 3,
         password: password || undefined,
+        dictSize: undefined,
       },
       (err, p) => {
         if (err) return;
