@@ -348,7 +348,7 @@
     "configuration": {
       "title": "Smart Archiver",
       "properties": {
-        "smart-archiver.defaultFormat": {
+        "smart-archiver.default.format": {
           "type": "string",
           "default": "7z",
           "enum": [
@@ -365,21 +365,21 @@
             "wim"
           ],
           "enumDescriptions": [
-            "%config.defaultFormat.7z%",
-            "%config.defaultFormat.zip%",
-            "%config.defaultFormat.tar%",
-            "%config.defaultFormat.tar.gz%",
-            "%config.defaultFormat.tar.bz2%",
-            "%config.defaultFormat.tar.xz%",
-            "%config.defaultFormat.tar.zst%",
-            "%config.defaultFormat.tar.lz4%",
-            "%config.defaultFormat.tar.br%",
-            "%config.defaultFormat.tar.sz%",
-            "%config.defaultFormat.wim%"
+            "%config.default.format.7z%",
+            "%config.default.format.zip%",
+            "%config.default.format.tar%",
+            "%config.default.format.tar.gz%",
+            "%config.default.format.tar.bz2%",
+            "%config.default.format.tar.xz%",
+            "%config.default.format.tar.zst%",
+            "%config.default.format.tar.lz4%",
+            "%config.default.format.tar.br%",
+            "%config.default.format.tar.sz%",
+            "%config.default.format.wim%"
           ],
-          "description": "%config.defaultFormat.description%"
+          "description": "%config.default.format.description%"
         },
-        "smart-archiver.defaultCompressionLevel": {
+        "smart-archiver.default.compressionLevel": {
           "type": "integer",
           "default": 5,
           "minimum": 0,
@@ -393,34 +393,34 @@
             9
           ],
           "enumDescriptions": [
-            "%config.defaultCompressionLevel.0%",
-            "%config.defaultCompressionLevel.1%",
-            "%config.defaultCompressionLevel.3%",
-            "%config.defaultCompressionLevel.5%",
-            "%config.defaultCompressionLevel.7%",
-            "%config.defaultCompressionLevel.9%"
+            "%config.default.compressionLevel.0%",
+            "%config.default.compressionLevel.1%",
+            "%config.default.compressionLevel.3%",
+            "%config.default.compressionLevel.5%",
+            "%config.default.compressionLevel.7%",
+            "%config.default.compressionLevel.9%"
           ],
-          "description": "%config.defaultCompressionLevel.description%"
+          "description": "%config.default.compressionLevel.description%"
         },
-        "smart-archiver.maxArchiveSize": {
+        "smart-archiver.limits.maxArchiveSize": {
           "type": [
             "integer",
             "string"
           ],
           "default": "1g",
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
-          "description": "%config.maxArchiveSize.description%"
+          "description": "%config.limits.maxArchiveSize.description%"
         },
-        "smart-archiver.maxExtractTotalSize": {
+        "smart-archiver.limits.maxExtractTotalSize": {
           "type": [
             "integer",
             "string"
           ],
           "default": "10g",
           "pattern": "^(\\d+(\\.\\d+)?)\\s*(k|m|g)$",
-          "description": "%config.maxExtractTotalSize.description%"
+          "description": "%config.limits.maxExtractTotalSize.description%"
         },
-        "smart-archiver.collapsedDirPatterns": {
+        "smart-archiver.patterns.collapsedDirs": {
           "type": "array",
           "items": {
             "type": "string"
@@ -461,9 +461,9 @@
             "bower_components",
             ".terraform"
           ],
-          "description": "%config.collapsedDirPatterns.description%"
+          "description": "%config.patterns.collapsedDirs.description%"
         },
-        "smart-archiver.compressExcludePatterns": {
+        "smart-archiver.patterns.compressExclude": {
           "type": "array",
           "items": {
             "type": "string"
@@ -504,9 +504,9 @@
             "bower_components",
             ".terraform"
           ],
-          "description": "%config.compressExcludePatterns.description%"
+          "description": "%config.patterns.compressExclude.description%"
         },
-        "smart-archiver.volumeSizes": {
+        "smart-archiver.volumes.sizes": {
           "type": "object",
           "default": {
             "1.44M": "1440k",
@@ -525,7 +525,7 @@
             "type": "string",
             "pattern": "^\\d+[kmg]$"
           },
-          "markdownDescription": "%config.volumeSizes.description%"
+          "markdownDescription": "%config.volumes.sizes.description%"
         },
         "smart-archiver.backend.7z": {
           "type": "string",
@@ -623,7 +623,7 @@
           ],
           "description": "%config.backend.snappy.description%"
         },
-        "smart-archiver.sevenZipMethod": {
+        "smart-archiver.compression.method": {
           "type": "string",
           "default": "flzma2",
           "enum": [
@@ -637,31 +637,31 @@
             "lizard"
           ],
           "enumDescriptions": [
-            "%config.sevenZipMethod.flzma2%",
-            "%config.sevenZipMethod.lzma2%",
-            "%config.sevenZipMethod.zstd%",
-            "%config.sevenZipMethod.brotli%",
-            "%config.sevenZipMethod.lz4%",
-            "%config.sevenZipMethod.deflate%",
-            "%config.sevenZipMethod.bzip2%",
-            "%config.sevenZipMethod.lizard%"
+            "%config.compression.method.flzma2%",
+            "%config.compression.method.lzma2%",
+            "%config.compression.method.zstd%",
+            "%config.compression.method.brotli%",
+            "%config.compression.method.lz4%",
+            "%config.compression.method.deflate%",
+            "%config.compression.method.bzip2%",
+            "%config.compression.method.lizard%"
           ],
-          "description": "%config.sevenZipMethod.description%"
+          "description": "%config.compression.method.description%"
         },
-        "smart-archiver.workerMemoryMb": {
+        "smart-archiver.worker.memoryMb": {
           "type": "integer",
           "default": 8192,
           "minimum": 0,
-          "description": "%config.workerMemoryMb.description%"
+          "description": "%config.worker.memoryMb.description%"
         },
-        "smart-archiver.workerPoolSize": {
+        "smart-archiver.worker.poolSize": {
           "type": "integer",
           "default": 1,
           "minimum": 1,
           "maximum": 2,
-          "description": "%config.workerPoolSize.description%"
+          "description": "%config.worker.poolSize.description%"
         },
-        "smart-archiver.logLevel": {
+        "smart-archiver.log.level": {
           "type": "string",
           "default": "info",
           "enum": [
@@ -671,19 +671,19 @@
             "debug"
           ],
           "enumDescriptions": [
-            "%config.logLevel.error%",
-            "%config.logLevel.warn%",
-            "%config.logLevel.info%",
-            "%config.logLevel.debug%"
+            "%config.log.level.error%",
+            "%config.log.level.warn%",
+            "%config.log.level.info%",
+            "%config.log.level.debug%"
           ],
-          "description": "%config.logLevel.description%"
+          "description": "%config.log.level.description%"
         },
-        "smart-archiver.logHistoryBytes": {
+        "smart-archiver.log.historyBytes": {
           "type": "integer",
           "default": 1048576,
           "minimum": 65536,
           "maximum": 16777216,
-          "description": "%config.logHistoryBytes.description%"
+          "description": "%config.log.historyBytes.description%"
         },
         "smart-archiver.cache.maxPreviewMB": {
           "type": "integer",

@@ -22,7 +22,7 @@ function fmtSize(bytes: number): string {
 function readMaxArchiveSize(): number {
   const raw = vscode.workspace
     .getConfiguration("smart-archiver")
-    .get<string | number>("maxArchiveSize");
+    .get<string | number>("limits.maxArchiveSize");
   return parseSize(raw, 1024 * 1024 * 1024);
 }
 

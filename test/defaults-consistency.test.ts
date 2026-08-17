@@ -34,19 +34,19 @@ function settingDefault(name: string): unknown {
 }
 
 describe("package.json defaults match code defaults", () => {
-  it("defaultCompressionLevel", () => {
-    expect(settingDefault("defaultCompressionLevel")).toBe(DEFAULT_COMPRESSION_LEVEL);
+  it("default.compressionLevel", () => {
+    expect(settingDefault("default.compressionLevel")).toBe(DEFAULT_COMPRESSION_LEVEL);
     expect(DEFAULT_ENGINE_CONFIG.compressionLevel).toBe(DEFAULT_COMPRESSION_LEVEL);
   });
 
-  it("workerMemoryMb", () => {
-    expect(settingDefault("workerMemoryMb")).toBe(WORKER_MEMORY_LIMIT_DEFAULT_MB);
+  it("worker.memoryMb", () => {
+    expect(settingDefault("worker.memoryMb")).toBe(WORKER_MEMORY_LIMIT_DEFAULT_MB);
     expect(DEFAULT_ENGINE_CONFIG.workerMemoryMb).toBe(WORKER_MEMORY_LIMIT_DEFAULT_MB);
   });
 
-  it("maxArchiveSize / maxExtractTotalSize", () => {
-    expect(parseSize(String(settingDefault("maxArchiveSize")), -1)).toBe(DEFAULT_MAX_ARCHIVE_SIZE);
-    expect(parseSize(String(settingDefault("maxExtractTotalSize")), -1)).toBe(
+  it("limits.maxArchiveSize / maxExtractTotalSize", () => {
+    expect(parseSize(String(settingDefault("limits.maxArchiveSize")), -1)).toBe(DEFAULT_MAX_ARCHIVE_SIZE);
+    expect(parseSize(String(settingDefault("limits.maxExtractTotalSize")), -1)).toBe(
       DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
     );
     expect(DEFAULT_ENGINE_CONFIG.limits.maxArchiveSize).toBe(DEFAULT_MAX_ARCHIVE_SIZE);
@@ -55,12 +55,12 @@ describe("package.json defaults match code defaults", () => {
     );
   });
 
-  it("logLevel", () => {
-    expect(settingDefault("logLevel")).toBe(DEFAULT_ENGINE_CONFIG.logLevel);
+  it("log.level", () => {
+    expect(settingDefault("log.level")).toBe(DEFAULT_ENGINE_CONFIG.logLevel);
   });
 
-  it("logHistoryBytes", () => {
-    expect(settingDefault("logHistoryBytes")).toBe(DEFAULT_LOG_HISTORY_BYTES);
+  it("log.historyBytes", () => {
+    expect(settingDefault("log.historyBytes")).toBe(DEFAULT_LOG_HISTORY_BYTES);
   });
 
   it("backend.7z", () => {

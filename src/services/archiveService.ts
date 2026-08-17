@@ -80,7 +80,7 @@ export async function convertArchive(
               dstFormat === "rar" && Boolean(outputPassword ?? password) ? true : undefined,
             level: vscode.workspace
               .getConfiguration("smart-archiver")
-              .get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL),
+              .get<number>("default.compressionLevel", DEFAULT_COMPRESSION_LEVEL),
             volumeSize,
             // RAR5 recovery volumes (.rev, WinRAR -rv): only meaningful for
             // split RAR output.

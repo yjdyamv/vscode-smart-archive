@@ -53,7 +53,7 @@ let nextId = 1;
 let _active: ArchiveRunner | null = null;
 
 function readPoolSize(): number {
-  const raw = vscode.workspace.getConfiguration("smart-archiver").get<number>("workerPoolSize");
+  const raw = vscode.workspace.getConfiguration("smart-archiver").get<number>("worker.poolSize");
   if (typeof raw !== "number" || !Number.isFinite(raw)) return WORKER_POOL_SIZE_DEFAULT;
   return Math.max(WORKER_POOL_SIZE_DEFAULT, Math.min(WORKER_POOL_SIZE_MAX, Math.floor(raw)));
 }

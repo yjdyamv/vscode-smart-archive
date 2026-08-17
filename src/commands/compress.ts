@@ -169,7 +169,7 @@ const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
 
 async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
   const config = vscode.workspace.getConfiguration("smart-archiver");
-  const defaultFormat = config.get<string>("defaultFormat", "7z");
+  const defaultFormat = config.get<string>("default.format", "7z");
   const items = COMPRESS_FORMATS.map((f) => ({ label: f.label, description: f.description }));
   const defaultIdx = items.findIndex((i) => i.label === defaultFormat);
   if (defaultIdx > 0) {
@@ -190,7 +190,7 @@ async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
 
 async function promptLevelWizard(): Promise<StepResult<number>> {
   const config = vscode.workspace.getConfiguration("smart-archiver");
-  const defaultLevel = config.get<number>("defaultCompressionLevel", DEFAULT_COMPRESSION_LEVEL);
+  const defaultLevel = config.get<number>("default.compressionLevel", DEFAULT_COMPRESSION_LEVEL);
   const labels = compressLevels();
   const defaultIdx = LEVEL_VALUES.indexOf(defaultLevel);
   const order = LEVEL_VALUES.map((_, i) => i);
@@ -611,14 +611,14 @@ export async function compressCommand(
           sevenZipMethod: normalizeSevenZipMethod(
             vscode.workspace
               .getConfiguration("smart-archiver")
-              .get<string>("sevenZipMethod", "flzma2"),
+              .get<string>("compression.method", "flzma2"),
           ),
         };
 
         const excludePatterns: string[] =
           vscode.workspace
             .getConfiguration("smart-archiver")
-            .get<string[]>("compressExcludePatterns") ?? COMPRESS_EXCLUDE_DEFAULTS;
+            .get<string[]>("patterns.compressExclude") ?? COMPRESS_EXCLUDE_DEFAULTS;
         const startTime = Date.now();
         const stages = new StageProgress();
         let error: unknown;
