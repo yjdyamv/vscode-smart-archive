@@ -24,7 +24,7 @@
 - 禁止自定义 `itOrSkip` / `fs.existsSync(机器路径)` / `os.homedir()/桌面/...`。机器路径只允许作为 env 覆盖（`SA_RAR_CLI` / `SA_UNRAR_CLI` / `SA_RAR5_DEV_PROJECT`）的兜底。
 - 每次运行的跳过情况写入 `test-results/gates.json`，teardown 打印 GATE REPORT；CI 应把"某 tier 被检查但 0 可用"视为告警。
 
-**检查**：`grep -rn "itOrSkip\|os.homedir" test/` 应为空（`install-rar5-platforms` 的兜底除外）；gates.json 人工/CI 巡检。
+**检查**：`grep -rn "itOrSkip\|os.homedir" test/` 只允许命中以下已登记的 env 兜底（`SA_RAR_CLI` / `SA_UNRAR_CLI` / `SA_RAR5_DEV_PROJECT` / `SA_OFFICIAL_UNRAR`）：`test/gates.ts` 的 `rar5CliPaths()`、`test/install-rar5-platforms.test.ts`、`test/rar5-wasm.test.ts`；其余命中即违规。gates.json 人工/CI 巡检。
 
 ## 标准 3 — 断言必须验证可观察结果
 
@@ -67,8 +67,8 @@
 
 ---
 
-## 现状（2026-08-07，本套标准落地后）
+## 现状（2026-08-17 更新；首次落地为 2026-08-07：42 文件 / 565 通过 / 2 跳过）
 
-- 42 个测试文件 / 565 通过 / 2 跳过；lint + src typecheck 干净。
-- `npm run check` 不含 `tsc -p test/tsconfig.json`（test 侧类型检查在 HEAD 上有 48 个既有错误，多为隐式 any 与 mock 类型缺位）——建议作为后续补齐项纳入 check。
+- 71 个测试文件 / 794 通过 / 21 跳过（GATE REPORT：system7z 3/3、bundled7zz 9/9、rar5Binding 8/8、rar5Wasm 2/2、snappyWasm 2/2 可用；systemZstd、rar5Cli、outBuild 在 CI/本机不可用会告警）；lint + src typecheck 干净。
+- `npm run check` 不含 `tsc -p test/tsconfig.json`（test 侧类型检查在 HEAD 上有 98 个既有错误，多于 2026-08-07 时的 48 个，多为隐式 any 与 mock 类型缺位）——建议作为后续补齐项纳入 check。
 - 已知剩余缺口（seam manifest 的 SEAM_GAPS 有完整清单，主要集中 webview 自定义编辑器层与若干 utils）。
