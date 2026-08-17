@@ -23,7 +23,7 @@ export type { VolumeSizeItem };
  */
 export function getVolumeSizes(): VolumeSizeItem[] {
   const config = vscode.workspace.getConfiguration("smart-archiver");
-  const inspected = config.inspect<Record<string, string>>("volumeSizes");
+  const inspected = config.inspect<Record<string, string>>("volumes.sizes");
   const userValue =
     inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
   if (userValue && Object.keys(userValue).length > 0) {

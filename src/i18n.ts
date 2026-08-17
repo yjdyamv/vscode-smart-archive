@@ -703,21 +703,21 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "密碼包含換行符",
   },
   "security.archiveSizeExceeded": {
-    en: "Archive file size {0} exceeds the archive limit {1} (smart-archiver.maxArchiveSize)",
-    "zh-cn": "压缩包大小 {0} 超过压缩包限制 {1}（smart-archiver.maxArchiveSize）",
-    "zh-tw": "壓縮檔大小 {0} 超過壓縮檔限制 {1}（smart-archiver.maxArchiveSize）",
+    en: "Archive file size {0} exceeds the archive limit {1} (smart-archiver.limits.maxArchiveSize)",
+    "zh-cn": "压缩包大小 {0} 超过压缩包限制 {1}（smart-archiver.limits.maxArchiveSize）",
+    "zh-tw": "壓縮檔大小 {0} 超過壓縮檔限制 {1}（smart-archiver.limits.maxArchiveSize）",
   },
   "webview.isEncryptedOversizeArchive": {
-    en: "This archive is {0}, larger than the Smart Archiver archive-size limit of {1} (smart-archiver.maxArchiveSize). Encryption detection needs to load the whole archive into memory, so its contents cannot be listed here. Increase smart-archiver.maxArchiveSize in settings and reopen it.",
+    en: "This archive is {0}, larger than the Smart Archiver archive-size limit of {1} (smart-archiver.limits.maxArchiveSize). Encryption detection needs to load the whole archive into memory, so its contents cannot be listed here. Increase smart-archiver.limits.maxArchiveSize in settings and reopen it.",
     "zh-cn":
-      "该压缩包大小为 {0}，超过 Smart Archiver 的压缩包限制 {1}（smart-archiver.maxArchiveSize）。加密检测需要把整个压缩包读入内存，因此无法列出内容。请在设置中调大 smart-archiver.maxArchiveSize 后重新打开。",
+      "该压缩包大小为 {0}，超过 Smart Archiver 的压缩包限制 {1}（smart-archiver.limits.maxArchiveSize）。加密检测需要把整个压缩包读入内存，因此无法列出内容。请在设置中调大 smart-archiver.limits.maxArchiveSize 后重新打开。",
     "zh-tw":
-      "此壓縮檔大小為 {0}，超過 Smart Archiver 的壓縮檔限制 {1}（smart-archiver.maxArchiveSize）。加密偵測需要把整個壓縮檔讀入記憶體，因此無法列出內容。請在設定中調大 smart-archiver.maxArchiveSize 後重新開啟。",
+      "此壓縮檔大小為 {0}，超過 Smart Archiver 的壓縮檔限制 {1}（smart-archiver.limits.maxArchiveSize）。加密偵測需要把整個壓縮檔讀入記憶體，因此無法列出內容。請在設定中調大 smart-archiver.limits.maxArchiveSize 後重新開啟。",
   },
   "security.totalSizeExceeded": {
-    en: "Extracted total size {0} exceeds the limit {1} (smart-archiver.maxExtractTotalSize)",
-    "zh-cn": "解压后总大小 {0} 超过限制 {1}（smart-archiver.maxExtractTotalSize）",
-    "zh-tw": "解壓後總大小 {0} 超過限制 {1}（smart-archiver.maxExtractTotalSize）",
+    en: "Extracted total size {0} exceeds the limit {1} (smart-archiver.limits.maxExtractTotalSize)",
+    "zh-cn": "解压后总大小 {0} 超过限制 {1}（smart-archiver.limits.maxExtractTotalSize）",
+    "zh-tw": "解壓後總大小 {0} 超過限制 {1}（smart-archiver.limits.maxExtractTotalSize）",
   },
   "security.decompressionBomb": {
     en: "Decompression bomb: reported {0}B but decompressed to {1}B",
@@ -1089,11 +1089,11 @@ const messages: Record<string, Record<Locale, string>> = {
 
   // ---- Security dialogs ----
   "security.oversizeWarning": {
-    en: "{0} is a {1} archive, exceeding the archive-size limit of {2} (smart-archiver.maxArchiveSize).\n\nThe system 7-Zip engine can still extract it without loading the whole archive into memory. Increase smart-archiver.maxArchiveSize to suppress this warning.",
+    en: "{0} is a {1} archive, exceeding the archive-size limit of {2} (smart-archiver.limits.maxArchiveSize).\n\nThe system 7-Zip engine can still extract it without loading the whole archive into memory. Increase smart-archiver.limits.maxArchiveSize to suppress this warning.",
     "zh-cn":
-      "{0} 是一个大小为 {1} 的压缩包，超过压缩包限制 {2}（smart-archiver.maxArchiveSize）。\n\n系统 7-Zip 引擎可以不把整个压缩包读入内存继续解压。调大 smart-archiver.maxArchiveSize 可关闭此提示。",
+      "{0} 是一个大小为 {1} 的压缩包，超过压缩包限制 {2}（smart-archiver.limits.maxArchiveSize）。\n\n系统 7-Zip 引擎可以不把整个压缩包读入内存继续解压。调大 smart-archiver.limits.maxArchiveSize 可关闭此提示。",
     "zh-tw":
-      "{0} 是一個大小為 {1} 的壓縮檔，超過壓縮檔限制 {2}（smart-archiver.maxArchiveSize）。\n\n系統 7-Zip 引擎可以不把整個壓縮檔讀入記憶體繼續解壓。調大 smart-archiver.maxArchiveSize 可關閉此提示。",
+      "{0} 是一個大小為 {1} 的壓縮檔，超過壓縮檔限制 {2}（smart-archiver.limits.maxArchiveSize）。\n\n系統 7-Zip 引擎可以不把整個壓縮檔讀入記憶體繼續解壓。調大 smart-archiver.limits.maxArchiveSize 可關閉此提示。",
   },
 
   // ---- System 7-Zip ----
@@ -1132,11 +1132,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": '攔截到路徑逃逸："{0}" 位於暫存目錄 "{1}" 之外',
   },
   "worker.memoryLimit": {
-    en: "Operation requires more memory than the worker limit ({0} MB). Close other archives or increase smart-archiver.workerMemoryMb.",
+    en: "Operation requires more memory than the worker limit ({0} MB). Close other archives or increase smart-archiver.worker.memoryMb.",
     "zh-cn":
-      "操作所需内存超过 worker 上限（{0} MB）。请关闭其他压缩包或增大 smart-archiver.workerMemoryMb。",
+      "操作所需内存超过 worker 上限（{0} MB）。请关闭其他压缩包或增大 smart-archiver.worker.memoryMb。",
     "zh-tw":
-      "操作所需記憶體超過 worker 上限（{0} MB）。請關閉其他壓縮檔或增大 smart-archiver.workerMemoryMb。",
+      "操作所需記憶體超過 worker 上限（{0} MB）。請關閉其他壓縮檔或增大 smart-archiver.worker.memoryMb。",
   },
 };
 

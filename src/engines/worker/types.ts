@@ -35,7 +35,7 @@ export interface EngineConfig {
   workerMemoryMb?: number;
   /** Default compression level (0-9) for wrapped-format mutations */
   compressionLevel?: number;
-  /** Output-channel verbosity (matches smart-archiver.logLevel) */
+  /** Output-channel verbosity (matches smart-archiver.log.level) */
   logLevel?: LogLevel;
 }
 

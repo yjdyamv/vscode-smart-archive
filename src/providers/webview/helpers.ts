@@ -15,7 +15,7 @@ import { t } from "../../i18n";
 
 export function getNoisyPatterns(): string[] {
   return (
-    vscode.workspace.getConfiguration("smart-archiver").get<string[]>("collapsedDirPatterns") ??
+    vscode.workspace.getConfiguration("smart-archiver").get<string[]>("patterns.collapsedDirs") ??
     NOISY_DIR_PATTERNS
   );
 }

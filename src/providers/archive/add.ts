@@ -169,7 +169,7 @@ export async function addToArchive(
   const ext = getFullExt(archivePath);
 
   const patterns =
-    vscode.workspace.getConfiguration("smart-archiver").get<string[]>("compressExcludePatterns") ??
+    vscode.workspace.getConfiguration("smart-archiver").get<string[]>("patterns.compressExclude") ??
     COMPRESS_EXCLUDE_DEFAULTS;
 
   const { engine } = selectEngine({ op: "add", ext, password });

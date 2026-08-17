@@ -31,16 +31,16 @@ import {
  */
 export function readEngineConfig(): EngineConfig {
   const config = vscode.workspace.getConfiguration("smart-archiver");
-  const memMb = config.get<number>("workerMemoryMb", DEFAULT_ENGINE_CONFIG.workerMemoryMb);
+  const memMb = config.get<number>("worker.memoryMb", DEFAULT_ENGINE_CONFIG.workerMemoryMb);
   return {
     locale: vscode.env.language,
     limits: {
       maxArchiveSize: parseSize(
-        config.get<string | number>("maxArchiveSize"),
+        config.get<string | number>("limits.maxArchiveSize"),
         DEFAULT_MAX_ARCHIVE_SIZE,
       ),
       maxExtractTotalSize: parseSize(
-        config.get<string | number>("maxExtractTotalSize"),
+        config.get<string | number>("limits.maxExtractTotalSize"),
         DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
       ),
     },
@@ -63,12 +63,15 @@ export function readEngineConfig(): EngineConfig {
     ]),
     rar5Backend: validBackend(config.get("backend.rar", DEFAULT_ENGINE_CONFIG.rar5Backend)),
     snappyBackend: validBackend(config.get("backend.snappy", DEFAULT_ENGINE_CONFIG.snappyBackend)),
-    compressionLevel: config.get("defaultCompressionLevel", DEFAULT_ENGINE_CONFIG.compressionLevel),
+    compressionLevel: config.get(
+      "default.compressionLevel",
+      DEFAULT_ENGINE_CONFIG.compressionLevel,
+    ),
     workerMemoryMb:
       typeof memMb === "number" && Number.isFinite(memMb)
         ? Math.max(0, Math.floor(memMb))
         : DEFAULT_ENGINE_CONFIG.workerMemoryMb,
-    logLevel: validLogLevel(config.get("logLevel", DEFAULT_ENGINE_CONFIG.logLevel)),
+    logLevel: validLogLevel(config.get("log.level", DEFAULT_ENGINE_CONFIG.logLevel)),
   };
 }
 
@@ -109,7 +112,7 @@ export function applyHostConfig(): void {
 
 /** Read and clamp the logHistoryBytes setting into its documented bounds. */
 function readLogHistoryBudget(config: vscode.WorkspaceConfiguration): number {
-  const raw = config.get<number>("logHistoryBytes", DEFAULT_LOG_HISTORY_BYTES);
+  const raw = config.get<number>("log.historyBytes", DEFAULT_LOG_HISTORY_BYTES);
   if (!Number.isFinite(raw)) return DEFAULT_LOG_HISTORY_BYTES;
   return Math.min(MAX_LOG_HISTORY_BYTES, Math.max(MIN_LOG_HISTORY_BYTES, Math.floor(raw)));
 }

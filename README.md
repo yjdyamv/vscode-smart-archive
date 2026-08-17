@@ -96,19 +96,19 @@ All formats supported by 7-Zip (including CAB, ARJ, LZH, CHM, MSI, ISO, VHD, VMD
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `smart-archiver.defaultFormat` | `7z` | Default archive format |
-| `smart-archiver.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
-| `smart-archiver.maxArchiveSize` | `"1g"` | Max size of the compressed archive file itself; warning threshold when the WASM fallback loads the whole archive into memory. Extraction and single-file preview can continue after confirmation |
-| `smart-archiver.maxExtractTotalSize` | `"10g"` | Max total size of all files after one extraction |
+| `smart-archiver.default.format` | `7z` | Default archive format |
+| `smart-archiver.default.compressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
+| `smart-archiver.limits.maxArchiveSize` | `"1g"` | Max size of the compressed archive file itself; warning threshold when the WASM fallback loads the whole archive into memory. Extraction and single-file preview can continue after confirmation |
+| `smart-archiver.limits.maxExtractTotalSize` | `"10g"` | Max total size of all files after one extraction |
 | `smart-archiver.backend.7z` | `"auto"` | 7-Zip engine: `auto` (bundled native→system, only if at least as capable→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archiver.backend.zstd` | `"auto"` | Zstd engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archiver.backend.brotli` | `"auto"` | Brotli engine: `auto`/`native` (Node.js zlib), `bundled` (bundled native 7-Zip), `wasm` (WASM only) |
 | `smart-archiver.backend.lz4` | `"auto"` | LZ4 engine: `auto` (bundled native→WASM), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archiver.backend.rar` | `"auto"` | RAR5 engine: `auto` (native binding→WASM), `native` (Node binding only), `wasm` (WASM only) |
 | `smart-archiver.backend.snappy` | `"auto"` | Snappy (tar.sz): `auto` (native addon→WASM), `native` (Node addon only), `wasm` (WASM only) |
-| `smart-archiver.collapsedDirPatterns` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
-| `smart-archiver.compressExcludePatterns` | `[30+ patterns]` | Patterns excluded when compressing |
-| `smart-archiver.volumeSizes` | `[built-in presets]` | Custom split volume size presets (empty `{}` falls back to the built-in presets) |
+| `smart-archiver.patterns.collapsedDirs` | `[30+ patterns]` | Directory patterns kept collapsed in preview |
+| `smart-archiver.patterns.compressExclude` | `[30+ patterns]` | Patterns excluded when compressing |
+| `smart-archiver.volumes.sizes` | `[built-in presets]` | Custom split volume size presets (empty `{}` falls back to the built-in presets) |
 
 ## Requirements
 

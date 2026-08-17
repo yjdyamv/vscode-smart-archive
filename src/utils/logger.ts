@@ -10,7 +10,7 @@
  * time and its clear() is a no-op in the extension host, so its content
  * can never be rebuilt or pruned. With a plain channel we own the whole
  * buffer: every record is appended unfiltered, and a log-level change
- * (the smart-archiver.logLevel setting) clears the panel and re-renders it
+ * (the smart-archiver.log.level setting) clears the panel and re-renders it
  * from the history buffer in sequence order. Lowering the level removes
  * the now-excluded lines; raising it brings buffered records back.
  *
