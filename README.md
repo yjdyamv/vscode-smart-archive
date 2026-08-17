@@ -8,18 +8,18 @@ VSCode extension for creating, extracting, and browsing archives — powered by 
 
 - **Compress** to 7z, ZIP, RAR5, TAR, WIM, tar.gz, tar.bz2, tar.xz, tar.zst, tar.lz4, tar.br, tar.sz
 - **Decompress** from 40+ formats: 7z, ZIP, RAR (v4/v5), TAR, GZ, BZ2, XZ, CAB, ISO, VHD, DEB, RPM, ...
-- **AES-256 encryption** — password-protect 7z, ZIP, and RAR5 archives
-- **Native 7-Zip engine** — a full 7-Zip binary is bundled for all platforms (no install needed); a newer system 7-Zip is used automatically if present; the WASM engine is the final fallback. Choose explicitly via `smart-archive.sevenZBackend` (`auto`/`native`/`bundled`/`wasm`)
+- **AES-256 encryption** — password-protect 7z, ZIP, and RAR5 archives (7z with header encryption, RAR5 with inline recovery records and recovery volumes)
+- **Native 7-Zip engine** — the bundled 7-Zip binary covers Windows, Linux (x64/arm64) and macOS (arm64), no install needed; platforms without a native build (macOS x64, Linux arm, Windows ia32) fall back to the WASM engine. In `auto` mode the bundled binary is preferred; a system 7-Zip is used only when it is at least as capable (newer than the bundled fork with the same codecs). Choose explicitly via `smart-archive.sevenZBackend` (`auto`/`native`/`bundled`/`wasm`)
 - **Archive browser** — opens as the default editor for archives: virtual-scrolled tree, search with regex or fuzzy match, sort by name/size, multi-select for partial extract, add/delete/rename files right inside the view
 - **Keyboard navigation** — Arrow keys, PageUp/PageDown (scroll viewport), Home/End, Space to toggle selection, Enter to extract, Delete to remove, Ctrl+A to select all
 - **File preview** — double-click any file to open it in VS Code
 - **Copy/paste** — select files in the archive browser, paste them to any local folder
-- **Multi-volume support** — auto-resolves RAR `.r00`–`.r99` and split 7z/zip `.001`–`.N` volumes
+- **Multi-volume support** — auto-resolves RAR `.r00`–`.r99` / `.partN.rar` and split 7z/zip `.001`–`.N` volumes
 - **Bilingual UI** — English / Simplified Chinese / Traditional Chinese (auto-detected from VS Code locale)
-- **Large file handling** — archives and files beyond 2 GiB via chunked I/O and NODEFS mount
+- **Large file handling** — archives and files beyond 2 GiB via chunked I/O (2 GiB file boundary split into 100 MB chunks)
 - **Security** — Zip Slip protection, configurable size limits (k/m/g units), path traversal blocking, decompression bomb detection
 - **Smart exclude** — automatically skips `node_modules`, `.git`, `dist`, `.venv`, and 30+ other noisy directories when compressing; customizable via settings
-- **CJK filename recovery** — fixes GBK / Shift-JIS / EUC-KR encoded filenames in old archives
+- **CJK filename recovery** — fixes GBK-encoded filenames in old archives (Shift-JIS / EUC-KR are byte-indistinguishable from GBK and not recoverable)
 - **Context menu integration** — right-click files to compress, right-click archives to decompress or browse
 
 ## Quick Start
@@ -69,7 +69,7 @@ Press `F5` in VS Code to launch the Extension Development Host.
 | Format | Encryption | Notes |
 |--------|------------|-------|
 | 7z | AES-256 | Best ratio, solid archive, header encryption |
-| zip | AES-256 | Universal compatibility |
+| zip | AES-256 (7-Zip default) | Universal compatibility |
 | rar | AES-256 | RAR5 creation, header encryption, multi-volume, recovery records |
 | tar | — | No compression, archive only |
 | tar.gz | — | TAR + GZip |
@@ -83,7 +83,7 @@ Press `F5` in VS Code to launch the Extension Development Host.
 
 ### Decompression (extract)
 
-All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, AR, DMG, FAT, NTFS, SquashFS, ...) — 40+ in total.
+All formats supported by 7-Zip (including CAB, ARJ, LZH, CHM, MSI, ISO, VHD, VMDK, DEB, RPM, CPIO, UHA, XAR, DMG, FAT, NTFS, SquashFS, ...) — 40+ in total.
 
 ## Configuration
 
@@ -93,7 +93,7 @@ All formats supported by 7-Zip (including CAB, ISO, VHD, VMDK, DEB, RPM, CPIO, A
 | `smart-archive.defaultCompressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
 | `smart-archive.maxArchiveSize` | `"1g"` | Max size of the compressed archive file itself; warning threshold when the WASM fallback loads the whole archive into memory. Extraction and single-file preview can continue after confirmation |
 | `smart-archive.maxExtractTotalSize` | `"10g"` | Max total size of all files after one extraction |
-| `smart-archive.sevenZBackend` | `"auto"` | 7-Zip engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
+| `smart-archive.sevenZBackend` | `"auto"` | 7-Zip engine: `auto` (bundled native→system, only if at least as capable→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archive.zstdBackend` | `"auto"` | Zstd engine: `auto` (system→bundled native→WASM), `native` (system only), `bundled` (bundled native only), `wasm` (WASM only) |
 | `smart-archive.brotliBackend` | `"auto"` | Brotli engine: `auto`/`native` (Node.js zlib), `bundled` (bundled native 7-Zip), `wasm` (WASM only) |
 | `smart-archive.lz4Backend` | `"auto"` | LZ4 engine: `auto` (bundled native→WASM), `bundled` (bundled native only), `wasm` (WASM only) |

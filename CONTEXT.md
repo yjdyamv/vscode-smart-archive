@@ -20,7 +20,7 @@
 
 ## 架构语言（codebase-design 词表）
 
-- **module** — 有 interface 与 implementation 的任何东西；本仓库的深模块：js7z-factory（单导出）、system7z（12 导出守 1765 行）、modify-core、runner；浅模块：select-engine、engine-config、dispatch（薄映射，深在其被 N 处调用）。
+- **module** — 有 interface 与 implementation 的任何东西；本仓库的深模块：js7z-factory（单导出）、system7z（20 导出守 1993 行）、modify-core、runner；浅模块：select-engine、engine-config、dispatch（薄映射，深在其被 N 处调用）。
 - **seam** — 可注入行为的位置；本仓库的真实 seam：`runArchiveOp`/`ArchiveRunner`、`WorkerPort`（handler ↔ worker）、`dispatchOp`、`setArchiveRunner`、vscode 替身（两个 adapter：真实 vscode + 测试替身）。
 - **adapter** — 满足 seam 接口的具体物；vscode 测试替身是"一个 seam、两个 adapter"的正例。
 - **locality / leverage** — 深模块给维护者/调用者的收益；镜像层曾破坏 locality（一个行为两个实现），标准 1 禁止。

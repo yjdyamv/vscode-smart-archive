@@ -1,9 +1,9 @@
 # Smart Archive — Roadmap
 
-> Planning document for the maintainer. Current baseline: **v1.20.0** — a mature
-> VS Code archive extension (~15k LOC, 310+ tests, clean lint/typecheck, 3-language UI,
+> Planning document for the maintainer. Current baseline: **v1.30.0** — a mature
+> VS Code archive extension (~25k LOC, 790+ tests, clean lint/typecheck, 3-language UI,
 > custom-editor archive browser with in-place add/delete/rename/convert/split/merge,
-> AES-256, multi-volume, progress + cancellation, WASM 7-Zip with system-tool fast path).
+> AES-256, multi-volume, progress + cancellation, worker_threads offload, WASM 7-Zip with system-tool fast path).
 >
 > The core feature set is essentially complete. The work below is about **shipping it to
 > users, hardening it under load, and closing the few real functional gaps** — not a rewrite.
@@ -21,7 +21,7 @@ until users can install it.**
 
 | # | Item | Pri | Effort | Notes |
 |---|------|-----|--------|-------|
-| 1.1 | **Automated Marketplace + Open VSX publish** in CI on `v*` tags | 🔴 | S | `publish` / `publish:ovsx` scripts already exist — wire them into `build.yml` behind a tag trigger, using `VSCE_PAT` / `OVSX_PAT` repo secrets. Keep the existing artifact + GH Release steps. |
+| 1.1 | **Automated Marketplace + Open VSX publish** in CI on `v*` tags | 🔴 | S | Wire `vsce publish` / `ovsx publish` into `build.yml` behind a tag trigger, using `VSCE_PAT` / `OVSX_PAT` repo secrets. Keep the existing artifact + GH Release steps. |
 | 1.2 | **`CHANGELOG.md`** (Keep-a-Changelog format) | 🔴 | S | The Marketplace renders CHANGELOG on the extension page; today there is none. Backfill from git history (`generate_release_notes` is already on for GH Releases — reuse that content). |
 | 1.3 | **Release checklist / version-bump script** | 🟡 | S | Single command that bumps `package.json`, updates CHANGELOG heading, tags, and pushes. Removes the manual drift between `version`, tag, and changelog. |
 | 1.4 | **README polish for Marketplace**: hero GIF, screenshots of the browser, badges (installs, version, rating) | 🟡 | M | The archive browser is the standout feature and it is currently text-only in the README. One good animated GIF of browse → multi-select → extract sells the extension. |
@@ -59,7 +59,7 @@ Grounded, high-value additions the current architecture supports. Ordered by use
 | # | Item | Pri | Effort | Notes |
 |---|------|-----|--------|-------|
 | 3.1 | **Edit-in-place / save-back**: open a file from the archive, edit it, save → write the changes back into the archive | 🔴 | L | Today `preview.ts` opens files read-only. Save-back is the most-requested capability for archive tools and the `archive/modify.ts` + temp-file plumbing already exists to build on. Guard behind a "reopen from archive" dirty-tracking model. |
-| 3.2 | **Drag files from OS / Explorer into the browser** to add them | 🟡 | M | `dropFiles` handler exists — extend it to native drops and VS Code Explorer drags, not just internal moves. Complements the existing add/paste flows. |
+| 3.2 | **Drag files from OS / Explorer into the browser** to add them | 🟡 | M | No drop handler exists yet — add native drops and VS Code Explorer drags. Complements the existing add/paste flows. |
 | 3.3 | **Explorer quick actions**: "Extract Here" and "Extract to <name>/" as distinct context-menu items | 🟡 | S | Current single "Decompress" always extracts to `<name>.extracted/`. Two explicit choices match every desktop archive tool and are a small `package.json` + command change. |
 | 3.4 | **Archive compare / diff** — pick two archives (or an archive vs. a folder) and show added/removed/changed entries | 🟢 | L | Natural extension of the tree-builder; useful for verifying backups and releases. |
 | 3.5 | **Nested archive browse** — open an archive-within-an-archive without manual extract | 🟢 | M | The custom editor already keys off virtual entries; nesting reuses the extraction-to-temp path. |
@@ -76,7 +76,7 @@ Keeps the project maintainable and contributor-friendly as it grows.
 
 | # | Item | Pri | Effort | Notes |
 |---|------|-----|--------|-------|
-| 4.1 | **Real VS Code integration/E2E tests** with `@vscode/test-electron` | 🔴 | L | The 310 unit tests mock the `vscode` module (`test/__mocks__/vscode.ts`). Nothing exercises the actual custom-editor lifecycle, command registration, or webview messaging in a running VS Code. Add a thin E2E layer for the critical paths (open archive → browse → extract → compress round-trip). |
+| 4.1 | **Real VS Code integration/E2E tests** with `@vscode/test-electron` | 🔴 | L | The ~790 unit tests mock the `vscode` module (`test/__mocks__/vscode.ts`). Nothing exercises the actual custom-editor lifecycle, command registration, or webview messaging in a running VS Code. Add a thin E2E layer for the critical paths (open archive → browse → extract → compress round-trip). |
 | 4.2 | **`CONTRIBUTING.md` + architecture note** | 🟡 | S | Document the `engines → services → providers → webview` layering (it is clean but undocumented) so future changes respect the seams that Phase 2/3 depend on. |
 | 4.3 | **CI matrix on Windows + macOS** for the native codecs (`zstd-napi`, `lz4-napi`) and system-7z detection | 🟡 | M | `package:cross` handles multi-platform binaries, but tests only run on `ubuntu-latest`. The system-tool detection and path logic are exactly the code most likely to break per-OS. |
 | 4.4 | **Coverage reporting** in CI (Vitest `--coverage`) with a non-blocking threshold badge | 🟢 | S | Visibility, not a gate. |
@@ -99,5 +99,5 @@ Keeps the project maintainable and contributor-friendly as it grows.
 
 - Rewriting engines or swapping the WASM 7-Zip core — it works and is fast with the system fast-path.
 - Cloud/remote archive sources (S3, etc.) — large surface, unclear demand; revisit if requested.
-- Additional _creation_ formats beyond the current 10 — decompression already covers 40+, and
+- Additional _creation_ formats beyond the current 12 — decompression already covers 40+, and
   new create-formats add test/maintenance cost for little gain.
