@@ -20,6 +20,7 @@ import {
   unwrapInnerTarsWithSystem7z,
 } from "../src/engines/system7z";
 import { createTarFile } from "../src/engines/tar-writer";
+import { setSecurityLimits } from "../src/utils/security";
 import { itIf } from "./gates";
 import { tmpDir } from "./tmp";
 
@@ -537,6 +538,40 @@ describe("system 7-Zip", () => {
     ).rejects.toThrow();
 
     fs.rmSync(tdir, { recursive: true, force: true });
+  });
+
+  itIf("system7z", "allowOversize waives the extracted-total limit after user confirmation", async () => {
+    const tdir = tmpDir("sat_sz_ovs_");
+    const src = path.join(tdir, "big.bin");
+    fs.writeFileSync(src, "x".repeat(512));
+    const archive = path.join(tdir, "big.7z");
+
+    const r = spawnSync(sz!, ["a", "-t7z", archive, src], { stdio: "pipe", timeout: 30_000 });
+    expect(r.status).toBe(0);
+
+    setSecurityLimits({ maxExtractTotalSize: 128 });
+    try {
+      // No confirmation: the preflight total-size guard still aborts.
+      await expect(
+        decompressWithSystem7z({
+          inputPath: archive,
+          outputDir: path.join(tdir, "blocked"),
+          password: "",
+        }),
+      ).rejects.toThrow(/exceed/i);
+
+      // allowOversize (the host's "Extract anyway" answer) waives the cap.
+      await decompressWithSystem7z({
+        inputPath: archive,
+        outputDir: path.join(tdir, "allowed"),
+        password: "",
+        allowOversize: true,
+      });
+      expect(fs.readFileSync(path.join(tdir, "allowed", "big.bin")).length).toBe(512);
+    } finally {
+      setSecurityLimits({});
+      fs.rmSync(tdir, { recursive: true, force: true });
+    }
   });
 
   itIf("system7z", "selective extraction extracts only selected entries", async () => {

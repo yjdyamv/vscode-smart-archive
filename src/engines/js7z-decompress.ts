@@ -49,6 +49,7 @@ export async function decompressWith7z(
       options.outputDir,
       progress as ProgressLike | undefined,
       token as TokenLike | undefined,
+      !!options.allowOversize,
     );
   } else {
     try {

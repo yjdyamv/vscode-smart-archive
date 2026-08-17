@@ -1049,7 +1049,9 @@ export async function decompressWithSystem7z(
   const sz = system7zForExt(getFullExt(options.inputPath));
   if (!sz) throw new Error("System 7-Zip not available");
 
-  await preflightSystem7z(sz, options.inputPath, options.password ?? "");
+  // allowOversize = the host already asked and the user confirmed this
+  // extraction (promptOversizeFile), so the extracted-total cap is waived too.
+  await preflightSystem7z(sz, options.inputPath, options.password ?? "", !options.allowOversize);
 
   // Stage on the SAME filesystem as the output dir so the post-extraction move
   // is an atomic same-device rename. Using os.tmpdir() breaks whenever /tmp is a
@@ -1189,6 +1191,7 @@ export async function unwrapInnerTarsWithSystem7z(
   outputDir: string,
   progress?: ProgressLike,
   token?: TokenLike,
+  allowOversize = false,
 ): Promise<void> {
   const sz = system7zForExt(".tar");
   if (!sz) throw new Error("System 7-Zip not available");
@@ -1228,7 +1231,7 @@ export async function unwrapInnerTarsWithSystem7z(
         for (const item of walkDir(stagingDir)) {
           if (!item.symlink) tarTotal += fs.statSync(item.path).size;
         }
-        totalSize = checkTotalSize(totalSize, tarTotal);
+        if (!allowOversize) totalSize = checkTotalSize(totalSize, tarTotal);
         moveMerge(stagingDir, outputDir);
       } finally {
         try {
