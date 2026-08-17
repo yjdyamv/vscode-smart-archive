@@ -37,7 +37,7 @@ import {
 
 const HASH_RE = /^[0-9a-f]{64}$/;
 const PLATFORMS = ["linux", "darwin", "win32"];
-const ARCHES = ["x64", "arm64", "ia32", "arm"];
+const ARCHES = ["x64", "arm64", "arm"];
 
 describe("7z native installer config", () => {
   it("pins exactly the staged assets", () => {

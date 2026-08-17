@@ -46,7 +46,6 @@ const PACKAGES = [
   "darwin-x64",
   "darwin-arm64",
   "win32-x64-msvc",
-  "win32-ia32-msvc",
   "win32-arm64-msvc",
 ];
 
@@ -68,7 +67,6 @@ const EXPECTED_HASHES = {
   "darwin-x64": "ac63599dc7036c83ebe616092f853b5b62945364c9023542f04a9807b6a6d9ff",
   "darwin-arm64": "d85eca57cc0d5005351a85e039e5c57feb5634acdcf61a0dd5b6876f827e36d9",
   "win32-x64-msvc": "325df83f5db9fc0bb39c2c0c96d396ed14e179cad3264ed823500cc930b4ae46",
-  "win32-ia32-msvc": "bf33003c948b8aefbbe37f4d5d3ae17e01802ba5b44b1507317a60ac94c520d7",
   "win32-arm64-msvc": "bfb2bb77cee88f017f1d13477f684f829e38ec72d895f84bd5a733c4c8e864a6",
   // WASI fallback bundle (snappy >= 7.3.1). Placeholder pins are regenerated
   // with SA_HASH_BOOTSTRAP=1 after the dependency bump.
