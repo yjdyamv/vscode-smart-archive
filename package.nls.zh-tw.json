@@ -50,7 +50,6 @@
   "config.sevenZipMethod.deflate": "Deflate — ZIP 同款演算法，相容性廣。",
   "config.sevenZipMethod.bzip2": "BZip2 — 經典區塊壓縮，較慢，壓縮率好。",
   "config.sevenZipMethod.lizard": "Lizard — 解壓極快；0–9 級會映射到 LizardMT 的 10–49 級。",
-  "config.smartExtract.description": "智慧解壓：當壓縮檔內只有一個頂層資料夾時，自動去掉這層包裝，讓內容直接落在輸出目錄（不再雙層巢狀）。",
   "config.workerMemoryMb.description": "封存 worker 執行緒（執行 WASM 7-Zip）的記憶體上限（MiB）。設為 0 可停用護欄。調低可減少擴充功能記憶體佔用；若大型壓縮檔報記憶體超限錯誤請調高。",
   "config.workerPoolSize.description": "封存 worker 執行緒數。1 表示所有操作序列化（記憶體佔用最低）；2 允許小壓縮檔批次操作並行執行。每個 worker 各自持有 WASM 7-Zip 堆記憶體。修改後需重載視窗生效。",
   "config.logLevel.description": "Smart Archive 輸出面板記錄檔的詳細程度。",

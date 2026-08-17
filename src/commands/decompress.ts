@@ -18,7 +18,7 @@ import { decompressWith7z } from "../engines/js7z-decompress";
 import { isEncrypted } from "../engines/js7z-list";
 import { resolveEffectiveInput } from "../utils/path";
 import { promptPassword } from "../ui/prompts";
-import { getOutputPath } from "../utils/fs";
+import { getOutputPath, ensureDirSync } from "../utils/fs";
 import {
   DECOMPRESS_EXTENSIONS,
   getFullExt,
@@ -133,7 +133,7 @@ async function decompressSingleFile(
     async (progress, token) => {
       const startTime = Date.now();
       try {
-        fs.mkdirSync(outputDir, { recursive: true });
+        ensureDirSync(outputDir);
         progress.report({ message: t("archive.extracting") });
         await decompressWith7z(
           { inputPath, outputDir, password, allowOversize: true },

@@ -33,12 +33,6 @@ export interface TestCompressOptions {
 export interface TestDecompressOptions {
   password?: string;
   ext?: string;
-  /**
-   * Smart extract (default false in tests): round-trip helpers verify the
-   * archive's own structure, so the wrapper-collapse behavior is disabled
-   * unless a test opts in. Covered by test/smart-extract.test.ts.
-   */
-  smartExtract?: boolean;
 }
 
 // ── Compress ───────────────────────────────────────────────────────
@@ -104,9 +98,6 @@ export async function testDecompress(
       inputPath: archivePath,
       outputDir,
       password: options.password ?? "",
-      // Round-trip helpers assert the archive's own layout; keep the
-      // wrapper unless the test explicitly opts into smart extract.
-      smartExtract: options.smartExtract ?? false,
     });
 
     // Walk output dir and collect files

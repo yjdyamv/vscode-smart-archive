@@ -56,6 +56,7 @@ import { calcSplitVolumeTotalSize } from "./vfs-io";
 import { checkTotalSize } from "../utils/security";
 import { createTarFile } from "./tar-writer";
 import { isRarExt } from "../utils/rar";
+import { ensureDirSync } from "../utils/fs";
 import {
   bundled7zPath,
   testBinary,
@@ -1053,11 +1054,19 @@ export async function decompressWithSystem7z(
   // Stage on the SAME filesystem as the output dir so the post-extraction move
   // is an atomic same-device rename. Using os.tmpdir() breaks whenever /tmp is a
   // separate mount/tmpfs (common on Linux): renameSync then fails with EXDEV.
+  // ensureDirSync (not bare recursive mkdir): when outputDir sits at a drive
+  // root's child the parent may be the root itself, and some drives (external
+  // USB disks) answer mkdir on the root with EPERM instead of EEXIST.
   const stagingParent = path.dirname(path.resolve(options.outputDir));
-  fs.mkdirSync(stagingParent, { recursive: true });
+  ensureDirSync(stagingParent);
   const stagingDir = fs.mkdtempSync(path.join(stagingParent, ".sa7z_"));
 
   const args: string[] = ["x", `-o${stagingDir}`, "-mmt=on"];
+  // 7-Zip only prints live percentages when the output is a console; with
+  // piped stdio (as here) it stays silent, so the progress bar would sit on
+  // the initial message until the end. -bsp1 forces progress onto stdout
+  // where run7z parses it (same as the compress path).
+  if (progress) args.push("-bsp1");
 
   args.push("--", options.inputPath);
 
@@ -1120,12 +1129,15 @@ export async function extractSelectedWithSystem7z(
   // Stage on the SAME filesystem as the output dir so the post-extraction move
   // is an atomic same-device rename.
   const stagingParent = path.dirname(path.resolve(outputDir));
-  fs.mkdirSync(stagingParent, { recursive: true });
+  ensureDirSync(stagingParent);
   const stagingDir = fs.mkdtempSync(path.join(stagingParent, ".sa7zs_"));
 
   const args: string[] = [flat ? "e" : "x", archivePath, `-o${stagingDir}`];
   if (flat) args.push("-aou");
   else args.push("-y");
+  // Live percentages are suppressed when stdout is piped; -bsp1 forces them
+  // onto stdout so run7z can drive a determinate progress bar.
+  if (progress) args.push("-bsp1");
   for (const ex of excludes ?? []) {
     args.push("-xr!" + ex.replace(/\\/g, "/"));
   }

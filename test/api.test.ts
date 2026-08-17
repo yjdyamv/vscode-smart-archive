@@ -39,13 +39,12 @@ const RAR5_WASM = path.join(__dirname, "..", "vendor", "rar5-wasm");
 
 /**
  * Round-trip decompress helper: the API tests assert the archive's own
- * layout, so smart extract (wrapper collapse) is disabled — that behavior
- * is covered by test/smart-extract.test.ts.
+ * layout.
  */
 function decompressPlain(
-  params: Omit<Parameters<typeof decompress>[0], "smartExtract">,
+  params: Parameters<typeof decompress>[0],
 ): ReturnType<typeof decompress> {
-  return decompress({ ...params, smartExtract: false });
+  return decompress(params);
 }
 
 function rar5Staged(): boolean {

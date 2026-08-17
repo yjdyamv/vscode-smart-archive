@@ -616,9 +616,6 @@ export const WORKER_MEMORY_LIMIT_DEFAULT_MB = 8192;
 /** Default compression level (0-9) — matches defaultCompressionLevel.
  *  Single source for EngineConfig and all engine-side fallbacks. */
 export const DEFAULT_COMPRESSION_LEVEL = 5;
-/** Default smart-extract behavior — matches the smartExtract setting.
- *  Collapses a lone top-level wrapper directory after extraction. */
-export const DEFAULT_SMART_EXTRACT = true;
 /** Default log-history byte budget (1 MiB ≈ thousands of records) — matches
  *  the logHistoryBytes setting. Bounds replay memory while keeping enough
  *  history to rebuild the output panel after a level change. */
