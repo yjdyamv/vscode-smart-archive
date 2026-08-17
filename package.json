@@ -527,7 +527,7 @@
           },
           "markdownDescription": "%config.volumeSizes.description%"
         },
-        "smart-archiver.sevenZBackend": {
+        "smart-archiver.backend.7z": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -537,14 +537,14 @@
             "wasm"
           ],
           "enumDescriptions": [
-            "%config.sevenZBackend.auto%",
-            "%config.sevenZBackend.native%",
-            "%config.sevenZBackend.bundled%",
-            "%config.sevenZBackend.wasm%"
+            "%config.backend.7z.auto%",
+            "%config.backend.7z.native%",
+            "%config.backend.7z.bundled%",
+            "%config.backend.7z.wasm%"
           ],
-          "description": "%config.sevenZBackend.description%"
+          "description": "%config.backend.7z.description%"
         },
-        "smart-archiver.zstdBackend": {
+        "smart-archiver.backend.zstd": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -554,14 +554,14 @@
             "wasm"
           ],
           "enumDescriptions": [
-            "%config.zstdBackend.auto%",
-            "%config.zstdBackend.native%",
-            "%config.zstdBackend.bundled%",
-            "%config.zstdBackend.wasm%"
+            "%config.backend.zstd.auto%",
+            "%config.backend.zstd.native%",
+            "%config.backend.zstd.bundled%",
+            "%config.backend.zstd.wasm%"
           ],
-          "description": "%config.zstdBackend.description%"
+          "description": "%config.backend.zstd.description%"
         },
-        "smart-archiver.brotliBackend": {
+        "smart-archiver.backend.brotli": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -571,14 +571,14 @@
             "wasm"
           ],
           "enumDescriptions": [
-            "%config.brotliBackend.auto%",
-            "%config.brotliBackend.native%",
-            "%config.brotliBackend.bundled%",
-            "%config.brotliBackend.wasm%"
+            "%config.backend.brotli.auto%",
+            "%config.backend.brotli.native%",
+            "%config.backend.brotli.bundled%",
+            "%config.backend.brotli.wasm%"
           ],
-          "description": "%config.brotliBackend.description%"
+          "description": "%config.backend.brotli.description%"
         },
-        "smart-archiver.lz4Backend": {
+        "smart-archiver.backend.lz4": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -587,13 +587,13 @@
             "wasm"
           ],
           "enumDescriptions": [
-            "%config.lz4Backend.auto%",
-            "%config.lz4Backend.bundled%",
-            "%config.lz4Backend.wasm%"
+            "%config.backend.lz4.auto%",
+            "%config.backend.lz4.bundled%",
+            "%config.backend.lz4.wasm%"
           ],
-          "description": "%config.lz4Backend.description%"
+          "description": "%config.backend.lz4.description%"
         },
-        "smart-archiver.rar5Backend": {
+        "smart-archiver.backend.rar": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -602,13 +602,13 @@
             "wasm"
           ],
           "enumDescriptions": [
-            "%config.rar5Backend.auto%",
-            "%config.rar5Backend.native%",
-            "%config.rar5Backend.wasm%"
+            "%config.backend.rar.auto%",
+            "%config.backend.rar.native%",
+            "%config.backend.rar.wasm%"
           ],
-          "description": "%config.rar5Backend.description%"
+          "description": "%config.backend.rar.description%"
         },
-        "smart-archiver.snappyBackend": {
+        "smart-archiver.backend.snappy": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -617,11 +617,11 @@
             "wasm"
           ],
           "enumDescriptions": [
-            "%config.snappyBackend.auto%",
-            "%config.snappyBackend.native%",
-            "%config.snappyBackend.wasm%"
+            "%config.backend.snappy.auto%",
+            "%config.backend.snappy.native%",
+            "%config.backend.snappy.wasm%"
           ],
-          "description": "%config.snappyBackend.description%"
+          "description": "%config.backend.snappy.description%"
         },
         "smart-archiver.sevenZipMethod": {
           "type": "string",

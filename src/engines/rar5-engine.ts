@@ -169,7 +169,7 @@ let rar5Config: { backend?: Rar5Backend } = {};
 
 /**
  * Inject the rar5Backend setting. The host wires it from
- * `smart-archiver.rar5Backend`; tests inject it directly. `auto` keeps the
+ * `smart-archiver.backend.rar`; tests inject it directly. `auto` keeps the
  * native-first / WASI-fallback behaviour.
  */
 export function setRar5Config(config: { backend?: Rar5Backend }): void {

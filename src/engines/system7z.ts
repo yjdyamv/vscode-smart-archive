@@ -79,7 +79,7 @@ export function detectSystem7z(): string | null {
 
   const setting = vscode.workspace
     .getConfiguration("smart-archiver")
-    .get<string>("sevenZBackend", "auto");
+    .get<string>("backend.7z", "auto");
 
   // "wasm": disable the native engine entirely (→ WASM).
   if (setting === "wasm") {
@@ -186,7 +186,7 @@ function findSystem7z(): string | null {
 
 export function hasSystem7z(): boolean {
   const config = vscode.workspace.getConfiguration("smart-archiver");
-  const setting = config.get<string>("sevenZBackend", "auto");
+  const setting = config.get<string>("backend.7z", "auto");
 
   if (setting === "wasm") {
     logger.debug({ event: "system7z.disabledBySetting" });
@@ -233,7 +233,7 @@ const METHOD_FALLBACK: Record<SevenZipMethod, SevenZipMethod> = {
 const _probeCache = new Map<string, SevenZipCapabilities | null>();
 
 /**
- * Reset the cached engine detection so a changed `smart-archiver.sevenZBackend`
+ * Reset the cached engine detection so a changed `smart-archiver.backend.7z`
  * setting takes effect without a window reload. Wired to onDidChangeConfiguration
  * in extension.ts.
  */
@@ -423,7 +423,7 @@ const SNAPPY_EXTS = new Set([".tar.sz", ".tsz"]);
  */
 export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): boolean {
   const config = vscode.workspace.getConfiguration("smart-archiver");
-  const setting = config.get<string>("sevenZBackend", "auto");
+  const setting = config.get<string>("backend.7z", "auto");
   if (setting === "wasm") {
     logger.debug({ event: "system7z.disabledBySetting" });
     return false;

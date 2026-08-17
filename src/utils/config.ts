@@ -45,24 +45,24 @@ export function readEngineConfig(): EngineConfig {
       ),
     },
     sevenZBackend: validEngineBackend(
-      config.get("sevenZBackend", DEFAULT_ENGINE_CONFIG.sevenZBackend),
+      config.get("backend.7z", DEFAULT_ENGINE_CONFIG.sevenZBackend),
       ["native", "bundled", "wasm"],
     ),
-    zstdBackend: validEngineBackend(config.get("zstdBackend", DEFAULT_ENGINE_CONFIG.zstdBackend), [
+    zstdBackend: validEngineBackend(config.get("backend.zstd", DEFAULT_ENGINE_CONFIG.zstdBackend), [
       "native",
       "bundled",
       "wasm",
     ]),
     brotliBackend: validEngineBackend(
-      config.get("brotliBackend", DEFAULT_ENGINE_CONFIG.brotliBackend),
+      config.get("backend.brotli", DEFAULT_ENGINE_CONFIG.brotliBackend),
       ["native", "bundled", "wasm"],
     ),
-    lz4Backend: validEngineBackend(config.get("lz4Backend", DEFAULT_ENGINE_CONFIG.lz4Backend), [
+    lz4Backend: validEngineBackend(config.get("backend.lz4", DEFAULT_ENGINE_CONFIG.lz4Backend), [
       "bundled",
       "wasm",
     ]),
-    rar5Backend: validBackend(config.get("rar5Backend", DEFAULT_ENGINE_CONFIG.rar5Backend)),
-    snappyBackend: validBackend(config.get("snappyBackend", DEFAULT_ENGINE_CONFIG.snappyBackend)),
+    rar5Backend: validBackend(config.get("backend.rar", DEFAULT_ENGINE_CONFIG.rar5Backend)),
+    snappyBackend: validBackend(config.get("backend.snappy", DEFAULT_ENGINE_CONFIG.snappyBackend)),
     compressionLevel: config.get("defaultCompressionLevel", DEFAULT_ENGINE_CONFIG.compressionLevel),
     workerMemoryMb:
       typeof memMb === "number" && Number.isFinite(memMb)
