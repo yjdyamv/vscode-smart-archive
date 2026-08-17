@@ -535,10 +535,7 @@ export function listRar5Entries(archivePath: string, password?: string): string[
 }
 
 /** List the members of a RAR5 archive with sizes and methods. */
-export function listRar5EntriesDetailed(
-  archivePath: string,
-  password?: string,
-): Rar5EntryInfo[] {
+export function listRar5EntriesDetailed(archivePath: string, password?: string): Rar5EntryInfo[] {
   const mod = loadBinding();
   return mod.listEntriesDetailed(archivePath, password || undefined);
 }
