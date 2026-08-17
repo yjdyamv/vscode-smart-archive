@@ -54,6 +54,30 @@ export interface CompressOptions {
   recoveryPercent?: number;
   /** RAR5 recovery volumes (.rev) count (WinRAR -rv); auto-capped at the data volume count. */
   recoveryVolumeCount?: number;
+  /**
+   * RAR5 dictionary size (WinRAR -md, e.g. "64m", "1g"). Values up to
+   * 4 GiB must be powers of two; values above 4 GiB produce RAR7 (v70)
+   * archives.
+   */
+  dictSize?: string;
+  /** RAR5 solid archive (better ratio, slower random access). */
+  solid?: boolean;
+  /** RAR5 quick-open record for fast member listing. */
+  quickOpen?: boolean;
+  /** RAR5 BLAKE2sp hash records (WinRAR -htb). */
+  blake2?: boolean;
+  /** RAR5 compression threads (1..=64). */
+  threads?: number;
+  /** RAR5: save creation time (Windows) / ctime (Unix) in the extra record. */
+  saveCtime?: boolean;
+  /** RAR5: save the last access time in the extra record. */
+  saveAtime?: boolean;
+  /** RAR5: store timestamps at 1-second precision. */
+  timePrecisionSeconds?: boolean;
+  /** RAR5: save owner/group on Unix (WinRAR -ow). */
+  saveOwner?: boolean;
+  /** RAR5: save NTFS alternate data streams (Windows, WinRAR -os). */
+  saveStreams?: boolean;
   /** 7z compression method (lzma2 | flzma2 | zstd); default flzma2. */
   sevenZipMethod?: SevenZipMethod;
 }
