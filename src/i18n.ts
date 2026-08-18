@@ -656,6 +656,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "已删除 {0} 项",
     "zh-tw": "已刪除 {0} 項",
   },
+  "archive.deletedAllErased": {
+    en: "All entries deleted — the archive file was removed along with them (matches the official `rar d` behavior).",
+    "zh-cn": "已删除全部条目，归档文件随之一并移除（与官方 `rar d` 行为一致）。",
+    "zh-tw": "已刪除全部條目，壓縮檔隨之一併移除（與官方 `rar d` 行為一致）。",
+  },
   "archive.toastRenamed": {
     en: "Renamed",
     "zh-cn": "已重命名",

@@ -148,6 +148,29 @@ describe("rar5 direct delete (no rebuild)", () => {
     },
   );
 
+  it.runIf(haveBinaries())(
+    "deleting every member erases the archive (official `rar d` behavior)",
+    async () => {
+      dir = tmpDir("sat_rar5erase-");
+      const proj = path.join(dir, "proj");
+      fs.mkdirSync(proj, { recursive: true });
+      fs.writeFileSync(path.join(proj, "a.txt"), "a");
+      fs.writeFileSync(path.join(proj, "b.txt"), "b");
+      const archive = path.join(dir, "out.rar");
+      await compressWithRar5(
+        { format: RAR5_FORMAT, outputPath: archive, targets: [{ fsPath: proj }], level: 3 },
+        undefined,
+        undefined,
+        [],
+      );
+      expect(fs.existsSync(archive)).toBe(true);
+
+      const deleted = deleteWithRar5(archive, ["proj/a.txt", "proj/b.txt"], "");
+      expect(deleted).toBe(2);
+      expect(fs.existsSync(archive)).toBe(false);
+    },
+  );
+
   it("expands directory selections to exact member names", () => {
     const all = ["d/", "d/a.txt", "d/sub/b.txt", "f.txt"];
     expect(expandRarSelection(all, ["d"]).sort()).toEqual([

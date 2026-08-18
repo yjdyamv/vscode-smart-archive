@@ -5,6 +5,7 @@
  */
 
 import * as vscode from "vscode";
+import * as fs from "fs";
 import type { MessageHandler } from "./types";
 import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
@@ -12,7 +13,8 @@ import { t } from "../../../i18n";
 import { getFullExt, isWrappedFormat } from "../../../constants";
 import { deleteFromArchive } from "../../archive";
 import { setupWebview } from "../setup";
-import { isReadOnlyExt } from "../helpers";
+import { isReadOnlyExt, getWebviewUris } from "../helpers";
+import { emptyHtml } from "../../htmlRenderer";
 import { startOperation, endOperation } from "../state";
 
 export const handleDelete: MessageHandler = async (ctx) => {
@@ -65,6 +67,17 @@ export const handleDelete: MessageHandler = async (ctx) => {
     await deleteFromArchive(s.filePath, pathsToDelete, s.password);
     if (token.isCancellationRequested) throw new vscode.CancellationError();
     logger.info({ event: "webview.delSel.ok", count: msg.paths.length });
+
+    // RAR never keeps an empty archive: deleting every member erases the
+    // archive file itself (official `rar d` behavior). Refreshing would
+    // fail on the missing file — render a clear end state instead.
+    if (!fs.existsSync(s.filePath)) {
+      logger.info({ event: "webview.delSel.erasedArchive", filePath: s.filePath });
+      const { cssUri, jsUri, codiconCssUri } = getWebviewUris(webview);
+      webview.html = emptyHtml(t("archive.deletedAllErased"), cssUri, jsUri, codiconCssUri);
+      return;
+    }
+
     try {
       await setupWebview(
         webview,
