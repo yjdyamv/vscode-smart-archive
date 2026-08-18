@@ -256,8 +256,8 @@
     display: flex;
     align-items: center;
     cursor: default;
-    user-select: none;
     -webkit-user-select: none;
+    user-select: none;
     padding-right: 8px;
     transition: var(--transition-sa-hover);
   }
@@ -402,10 +402,6 @@ mark {
   padding: 0 1px;
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4)) transparent;
-}
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
