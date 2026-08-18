@@ -4,7 +4,7 @@
   >
     <div class="flex flex-wrap items-center gap-1.5">
       <button v-if="isSplit" class="btn" :title="ui('ui.mergeTitle')" @click="$emit('merge')">
-        <span class="codicon codicon-merge"></span> {{ ui("ui.merge") }}
+        <span class="codicon codicon-merge"></span><span class="btn-lbl">{{ ui("ui.merge") }}</span>
       </button>
       <button
         v-if="canSplit && !isSplit"
@@ -12,7 +12,8 @@
         :title="ui('ui.splitTitle')"
         @click="$emit('split')"
       >
-        <span class="codicon codicon-split-horizontal"></span> {{ ui("ui.split") }}
+        <span class="codicon codicon-split-horizontal"></span
+        ><span class="btn-lbl">{{ ui("ui.split") }}</span>
       </button>
       <template v-if="canEncrypt">
         <button
@@ -21,7 +22,8 @@
           :title="ui('ui.decryptTitle')"
           @click="$emit('decrypt')"
         >
-          <span class="codicon codicon-unlock"></span> {{ ui("ui.decrypt") }}
+          <span class="codicon codicon-unlock"></span
+          ><span class="btn-lbl">{{ ui("ui.decrypt") }}</span>
         </button>
         <button
           v-if="!isEncrypted"
@@ -29,7 +31,8 @@
           :title="ui('ui.encryptTitle')"
           @click="$emit('encrypt')"
         >
-          <span class="codicon codicon-lock"></span> {{ ui("ui.encrypt") }}
+          <span class="codicon codicon-lock"></span
+          ><span class="btn-lbl">{{ ui("ui.encrypt") }}</span>
         </button>
       </template>
       <button class="btn-ico" :title="ui('ui.testTitle')" @click="$emit('test')">

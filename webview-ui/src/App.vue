@@ -188,7 +188,7 @@ const emptyState = computed(() => {
 
 <template>
   <div
-    class="flex flex-col h-screen bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] font-[var(--vscode-font-family)]"
+    class="flex flex-col h-screen bg-[var(--vscode-sideBar-background)] text-[var(--vscode-foreground)] font-[var(--vscode-font-family)] @container"
     style="font-size: var(--vscode-font-size)"
   >
     <LoadingSpinner v-if="viewState === 'loading'" :msg="loadingMsg" />

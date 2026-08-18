@@ -70,7 +70,7 @@ function onRowContextMenu(e: MouseEvent, fn: FlatNode) {
 <template>
   <div
     ref="containerRef"
-    class="flex-1 overflow-y-auto overflow-x-hidden relative pb-[50vh]"
+    class="flex-1 overflow-y-auto overflow-x-hidden relative pb-[50vh] @container"
     role="tree"
   >
     <div class="relative w-full" :style="{ height: virtualizer.getTotalSize() + 'px' }">
