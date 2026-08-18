@@ -1,17 +1,19 @@
 <template>
   <div
-    class="flex items-center gap-x-3 gap-y-1 px-2 py-1.5 border-b border-[var(--vscode-sideBarSectionHeader-border)] bg-[var(--vscode-sideBarSectionHeader-background)] sticky top-0 z-10 flex-shrink-0"
+    class="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1.5 border-b border-[var(--vscode-sideBarSectionHeader-border)] bg-[var(--vscode-sideBarSectionHeader-background)] sticky top-0 z-10 flex-shrink-0"
   >
     <div class="flex flex-wrap items-center gap-1">
       <button class="btn" :disabled="selectedCount === 0" @click="$emit('extract-selected')">
-        <span class="codicon codicon-arrow-down"></span> {{ ui("ui.extract") }}
+        <span class="codicon codicon-arrow-down"></span
+        ><span class="btn-lbl">{{ ui("ui.extract") }}</span>
       </button>
       <button
         class="btn"
         :disabled="readOnly || selectedCount === 0"
         @click="$emit('delete-selected')"
       >
-        <span class="codicon codicon-trash"></span> {{ ui("ui.delete") }}
+        <span class="codicon codicon-trash"></span
+        ><span class="btn-lbl">{{ ui("ui.delete") }}</span>
       </button>
       <button
         class="btn"
@@ -19,14 +21,17 @@
         @click="$emit('add-files')"
         :title="ui('ui.addTo') + (lastAddDir || ui('ui.archiveRoot'))"
       >
-        <span class="codicon codicon-add"></span> {{ ui("ui.addFiles") }}
+        <span class="codicon codicon-add"></span
+        ><span class="btn-lbl">{{ ui("ui.addFiles") }}</span>
       </button>
       <span class="sep"></span>
       <button class="btn" @click="$emit('extract-all')">
-        <span class="codicon codicon-desktop-download"></span> {{ ui("ui.extractAll") }}
+        <span class="codicon codicon-desktop-download"></span
+        ><span class="btn-lbl">{{ ui("ui.extractAll") }}</span>
       </button>
       <button class="btn" @click="$emit('convert')">
-        <span class="codicon codicon-arrow-swap"></span> {{ ui("ui.convert") }}
+        <span class="codicon codicon-arrow-swap"></span
+        ><span class="btn-lbl">{{ ui("ui.convert") }}</span>
       </button>
       <span class="sep"></span>
       <button class="btn-ico" :title="ui('ui.expandAll')" @click="$emit('expand-all')">

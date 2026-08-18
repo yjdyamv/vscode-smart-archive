@@ -282,6 +282,25 @@
     color: var(--vscode-foreground);
   }
 
+  /* Narrow list — hide the trailing size/count columns so names keep the
+   * full row width instead of being squeezed into ellipses (see FileTree
+   * scroll container's @container). */
+  @container (max-width: 28em) {
+    .desc-count,
+    .size {
+      display: none;
+    }
+  }
+
+  /* Narrow panel — drop button text labels (icons + tooltips remain) so the
+   * wrapped rows stay compact. The app column root carries the @container,
+   * so both the toolbar and the status bar collapse to icons together. */
+  @container (max-width: 40em) {
+    .btn .btn-lbl {
+      display: none;
+    }
+  }
+
   .guide {
     position: absolute;
     top: 0;
