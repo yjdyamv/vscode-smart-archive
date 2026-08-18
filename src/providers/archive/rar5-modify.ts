@@ -447,11 +447,23 @@ export async function rebuildRarArchive(options: RebuildRarOptions): Promise<voi
     prog.report({ message: t("rar5.modifyRebuilding") });
     await mutate(extractRoot);
 
+    // Official `rar d` erases the archive when every member is deleted —
+    // repacking an empty archive would instead fail on missing targets.
+    const remaining = fs
+      .readdirSync(extractRoot)
+      .filter((n) => n !== "." && n !== "..")
+      .sort();
+    if (remaining.length === 0) {
+      logger.info({ event: "rar5.rebuild.erased", archivePath });
+      fs.rmSync(archivePath, { force: true });
+      return;
+    }
+
     await compressWithRar5(
       {
         format: RAR5_FORMAT,
         outputPath: rebuiltPath,
-        targets: topLevel.map((n) => ({ fsPath: path.join(extractRoot, n) })),
+        targets: remaining.map((n) => ({ fsPath: path.join(extractRoot, n) })),
         password,
         // Preserve header encryption (hidden file names) when the source
         // archive had it — the rebuilt archive must not lose it.

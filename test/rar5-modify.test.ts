@@ -191,6 +191,19 @@ describe("rebuildRarArchive", () => {
     expect(vi.mocked(compressWithRar5).mock.calls[0][0].format.label).toBe("rar");
   });
 
+  it("erases the archive when every member is deleted (official `rar d`)", async () => {
+    await rebuildRarArchive({
+      archivePath,
+      mutate: (root) => {
+        for (const n of fs.readdirSync(root)) {
+          fs.rmSync(path.join(root, n), { recursive: true, force: true });
+        }
+      },
+    });
+    expect(fs.existsSync(archivePath)).toBe(false);
+    expect(compressWithRar5).not.toHaveBeenCalled();
+  });
+
   it("rejects an empty extraction", async () => {
     vi.mocked(decompressWithSystem7z).mockImplementation(async (opts) => {
       fs.mkdirSync(opts.outputDir, { recursive: true });
