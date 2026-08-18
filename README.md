@@ -4,6 +4,8 @@
 
 VSCode extension for creating, extracting, and browsing archives — powered by a **bundled native 7-Zip** (with a **7-Zip WebAssembly** fallback) and native **zstd/lz4/brotli** codecs (brotli via Node.js zlib), with the WASM engine as the final fallback. Works out of the box with no local 7-Zip install, at near-desktop speed.
 
+> **Trademark notice:** RAR and WinRAR are registered trademarks of RARLAB. This extension is an independent third-party tool and is **not affiliated with or endorsed by** RARLAB.
+
 > **Renamed from `smart-archive` to `smart-archiver`:** the previous marketplace
 > listing (`yjdyamv.smart-archive`) was deleted and its name can no longer be
 > republished, so this extension ships under the new ID `yjdyamv.smart-archiver`.
