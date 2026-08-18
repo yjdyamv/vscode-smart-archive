@@ -51,6 +51,7 @@
   "config.compression.method.deflate": "Deflate — the ZIP-family method; wide compatibility.",
   "config.compression.method.bzip2": "BZip2 — classic block compressor; slower, good ratio.",
   "config.compression.method.lizard": "Lizard — very fast decompression; levels 0–9 are mapped onto LizardMT's 10–49 scale.",
+  "config.compression.solid.description": "Store new .7z and RAR5 archives as one solid block (the default of 7-Zip and WinRAR). Solid packs many small files tighter — typically a few percent smaller — but extracting a single file, or deleting/adding files, has to recompress the whole block (7z) or chain (RAR5). Off (default) stores files separately: a bit larger, but deleting and adding stay instant and single-file extraction is fast.",
   "config.worker.memoryMb.description": "Memory ceiling (MiB) for the archive worker thread, which runs WASM 7-Zip. 0 disables the guard. Lower it to reduce the extension's memory footprint; raise it if large archives fail with a memory-limit error.",
   "config.worker.poolSize.description": "Number of archive worker threads. 1 serializes all operations (lowest memory); 2 allows batch operations on small archives to run in parallel. Each worker holds its own WASM 7-Zip heap. Requires a window reload to take effect.",
   "config.log.level.description": "Verbosity of the Smart Archiver output channel logs.",

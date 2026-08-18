@@ -800,6 +800,10 @@ export async function compressWithSystem7z(
       }
       args.push(`-m0=${SEVEN_ZIP_METHOD_CODECS[method]}`);
     }
+    // Non-solid by default (smart-archiver.compression.solid): solid archives
+    // need the whole block recompressed for any delete/update. Each-file
+    // blocks cost a few percent of ratio but make modification instant.
+    if (options.solid === false) args.push("-ms=off");
   }
   // LizardMT speaks levels 10–49; map the UI's 0–9 scale onto it.
   const mxLevel =
@@ -1950,6 +1954,41 @@ function spawnCaptureInCwd(
   return spawnCapture(binary, args, { cwd, timeoutMs, password });
 }
 
+/**
+ * The stored LZMA2 dictionary exponent when `7z d` on this archive would
+ * recompress a solid LZMA2 block at a slow preset, otherwise null. 7-Zip
+ * cannot delete in place: the whole solid block holding the removed entries
+ * is rewritten with the settings stored in the archive, so a big-dictionary
+ * LZMA2 block means a full (slow) re-compression pass. Reads `l -slt` —
+ * cheap, uncached. Returns null on any failure so the delete falls back to
+ * the archive's stored settings.
+ */
+async function slowSolidLzma2DictExp(
+  sz: string,
+  archivePath: string,
+  password?: string,
+): Promise<number | null> {
+  try {
+    const res = await spawnCaptureInCwd(
+      sz,
+      ["l", "-slt", archivePath],
+      path.dirname(archivePath),
+      SPAWN_CAPTURE_TIMEOUT,
+      password,
+    );
+    if (res.code !== 0) return null;
+    if (!/^\s*Solid\s*=\s*\+/m.test(res.stdout)) return null;
+    const method = res.stdout.match(/^\s*Method\s*=\s*LZMA2:([0-9a-f]+)/im);
+    if (!method) return null;
+    const exp = parseInt(method[1], 16);
+    // LZMA2:2N — the dictionary size is 2^N bytes; N >= 23 means 8 MiB+,
+    // i.e. -mx5 and above (stock mapping: -mx3 = 4 MiB = LZMA2:22).
+    return exp >= 23 ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteFromArchiveSystem7z(
   archivePath: string,
   selectedPaths: string[],
@@ -1962,6 +2001,16 @@ export async function deleteFromArchiveSystem7z(
 
   const dArgs = ["d", archivePath, "-y"];
   dArgs.push(...selectedPaths.map((p) => sanitizeCliPath(p.replace(/\\/g, "/"))));
+
+  // 7-Zip recompresses the solid block with the archive's stored settings;
+  // for high-dictionary LZMA2 that is a full re-compression pass (tens of
+  // seconds on large archives). Recompress fast instead, at the fast ceiling
+  // of the stored level scale (-mx3 = 4 MiB dict; stored -mx5+ maps here —
+  // measured ~40x faster, ~30% larger block).
+  if ((await slowSolidLzma2DictExp(sz, archivePath, password)) !== null) {
+    logger.info({ event: "system7z.delete.fastRecompress", archivePath });
+    dArgs.push("-m0=LZMA2", "-mx3", "-mmt=on");
+  }
 
   logger.info({
     event: "system7z.delete.start",
