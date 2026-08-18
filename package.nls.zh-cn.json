@@ -50,6 +50,7 @@
   "config.compression.method.deflate": "Deflate — ZIP 同款算法，兼容性广。",
   "config.compression.method.bzip2": "BZip2 — 经典块压缩，较慢，压缩率好。",
   "config.compression.method.lizard": "Lizard — 解压极快；0–9 级会映射到 LizardMT 的 10–49 级。",
+  "config.compression.solid.description": "新建 .7z / RAR5 压缩包时是否打包为单个 solid（实心）块，这是 7-Zip 与 WinRAR 的默认行为。solid 把多个文件合成一条数据流一起压缩，小文件多时通常小几个百分点，但提取单个文件、删除或添加文件时都要重压整块（RAR5 为整条 solid 链）。关闭（默认）时每个文件独立压缩：体积略大，但删除、添加即时完成，单文件提取也快。",
   "config.worker.memoryMb.description": "归档 worker 线程（运行 WASM 7-Zip）的内存上限（MiB）。设为 0 可禁用护栏。降低可减少扩展内存占用；若大压缩包报内存超限错误请调高。",
   "config.worker.poolSize.description": "归档 worker 线程数。1 表示所有操作串行（内存占用最低）；2 允许小压缩包批量操作并行执行。每个 worker 独立持有 WASM 7-Zip 堆内存。修改后需重载窗口生效。",
   "config.log.level.description": "Smart Archiver 输出面板日志的详细程度。",

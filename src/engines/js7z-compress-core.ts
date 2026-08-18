@@ -55,6 +55,7 @@ function buildCompressArgs(
   level: number,
   volumeSize?: string,
   sevenZipMethod?: SevenZipMethod,
+  solid?: boolean,
 ): string[] {
   const args: string[] = ["a", outputFile];
   const method = format.label === "7z" ? normalizeSevenZipMethod(sevenZipMethod) : undefined;
@@ -75,6 +76,11 @@ function buildCompressArgs(
     const xzParam = xzMethodParam(normalizeSevenZipMethod(sevenZipMethod));
     if (xzParam) args.push(`-m0=${xzParam}`);
   }
+
+  // Non-solid by default (smart-archiver.compression.solid): solid archives
+  // need the whole block recompressed for any delete/update. Each-file
+  // blocks cost a few percent of ratio but make modification instant.
+  if (format.label === "7z" && solid === false) args.push("-ms=off");
 
   if (password) {
     validatePassword(password);
@@ -311,6 +317,7 @@ export async function compressWith7z(
       options.level,
       options.volumeSize,
       options.sevenZipMethod,
+      options.solid,
     );
     await run7z(
       js7z,

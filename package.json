@@ -648,6 +648,11 @@
           ],
           "description": "%config.compression.method.description%"
         },
+        "smart-archiver.compression.solid": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.compression.solid.description%"
+        },
         "smart-archiver.worker.memoryMb": {
           "type": "integer",
           "default": 8192,

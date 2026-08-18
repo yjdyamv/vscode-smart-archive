@@ -60,7 +60,7 @@ export interface CompressOptions {
    * archives.
    */
   dictSize?: string;
-  /** RAR5 solid archive (better ratio, slower random access). */
+  /** Solid archive — better ratio, slower random access and modification. RAR5: solid chain; 7z: single solid block (off = `-ms=off`). */
   solid?: boolean;
   /** RAR5 quick-open record for fast member listing. */
   quickOpen?: boolean;

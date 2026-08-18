@@ -613,6 +613,14 @@ export async function compressCommand(
               .getConfiguration("smart-archiver")
               .get<string>("compression.method", "flzma2"),
           ),
+          // 7z and RAR5 honor the solid toggle; the other formats have no
+          // solid mode (zip/tar compress per file, tar-family is one file).
+          solid:
+            format!.label === "7z" || format!.label === "rar"
+              ? vscode.workspace
+                  .getConfiguration("smart-archiver")
+                  .get<boolean>("compression.solid", false)
+              : undefined,
         };
 
         const excludePatterns: string[] =
