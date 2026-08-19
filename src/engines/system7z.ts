@@ -54,7 +54,7 @@ import { prepareExclusions, isTargetExcluded, isPathExcluded } from "../utils/ex
 import type { ExclusionSet } from "../utils/exclude";
 import { calcSplitVolumeTotalSize } from "./vfs-io";
 import { checkTotalSize } from "../utils/security";
-import { createTarFile } from "./tar-writer";
+import { collectTarPaths } from "./tar-writer";
 import { isRarExt } from "../utils/rar";
 import { ensureDirSync } from "../utils/fs";
 import {
@@ -704,17 +704,59 @@ export async function compressWithSystem7z(
     if (!innerName.endsWith(".tar")) innerName += ".tar";
     const tarPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sat_")), innerName);
     try {
-      // Step 1: create tar using createTarFile (avoids GNU extensions
-      // unsupported by WASM 7z during listing/decompression).
+      // Step 1: create the tar with native 7z itself — the system7z engine
+      // uses its own tar backend instead of the JS writer. 7z recurses any
+      // directory it receives (a circular junction would then fail at the
+      // Windows path limit), so pre-walk each target into an explicit entry
+      // list (cycle-safe, exclusion-aware, symlinks dereferenced) and feed
+      // it via a @listfile. Non-empty directories are omitted — 7z would
+      // recurse them too — only files and empty directories are listed.
       const packProgress = progress ? withStage(progress, "pack") : undefined;
       packProgress?.report({ message: t("compress.creatingTar") });
-      await createTarFile(
-        tarPath,
-        options.targets.map((tg) => tg.fsPath),
-        token,
-        excludePatterns ?? [],
-        packProgress,
-      );
+
+      const singleTarget = options.targets.length === 1;
+      const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
+      const filteredPatterns = singleTarget
+        ? (excludePatterns ?? []).filter((p) => {
+            const stripped = p.replace(/^(\*\*\/)+/, "");
+            return !targetNames.has(stripped);
+          })
+        : (excludePatterns ?? []);
+      const exclusions = prepareExclusions(filteredPatterns);
+      let wrapTargets = options.targets;
+      if (options.targets.length > 1 && excludePatterns?.length) {
+        wrapTargets = options.targets.filter((tg) => !isTargetExcluded(tg.fsPath, exclusions));
+      }
+
+      const rootDir = path.dirname(wrapTargets[0].fsPath);
+      const toRel = (p: string) => path.relative(rootDir, p).replace(/\\/g, "/");
+      const files: string[] = [];
+      const emptyDirs: string[] = [];
+      for (const tg of wrapTargets) {
+        const st = fs.statSync(tg.fsPath);
+        if (!st.isDirectory()) {
+          files.push(tg.fsPath);
+          continue;
+        }
+        const walk = collectTarPaths(tg.fsPath, exclusions, token);
+        files.push(...walk.files);
+        emptyDirs.push(...walk.emptyDirs);
+      }
+      const list = [...emptyDirs.map(toRel), ...files.map(toRel)];
+      if (list.length === 0) {
+        throw new Error("No files to add to TAR archive");
+      }
+      const listFile = path.join(path.dirname(tarPath), "files.list");
+      fs.writeFileSync(listFile, list.join("\r\n"));
+      const tarArgs = ["a", "-ttar", tarPath, "@" + listFile];
+      if (progress) tarArgs.splice(1, 0, "-bsp1");
+      logger.info({
+        event: "system7z.compress.wrap.tar",
+        output: tarPath,
+        entries: list.length,
+        argsPreview: tarArgs.join(" "),
+      });
+      await run7z(sz, tarArgs, packProgress, token, rootDir);
 
       // Step 2: compress the tar. Honor the UI level (xz: -mx0…-mx9 maps to
       // the LZMA2 dictionary preset); without -mx the handler always uses

@@ -30,8 +30,8 @@ function stagePcts(reports: Report[], stage: Report["stage"]): number[] {
     .map((r) => parseInt(r.message!, 10));
 }
 
-function expectStageProgress(pcts: number[]): void {
-  expect(pcts.length).toBeGreaterThan(2);
+function expectStageProgress(pcts: number[], minReports = 3): void {
+  expect(pcts.length).toBeGreaterThanOrEqual(minReports);
   for (let i = 1; i < pcts.length; i++) {
     expect(pcts[i]).toBeGreaterThanOrEqual(pcts[i - 1]);
   }
@@ -130,7 +130,10 @@ describe("full-pipeline compress progress", () => {
     );
 
     expect(fs.existsSync(out)).toBe(true);
-    expectStageProgress(stagePcts(reports, "pack"));
+    // The native tar backend emits 7z's own -bsp1 percents: a fast tar
+    // step reports a single 100% (the old JS writer chunked its own
+    // progress), large packs emit the usual 2%-stepped line.
+    expectStageProgress(stagePcts(reports, "pack"), 1);
     expectStageProgress(stagePcts(reports, "compress"));
     fs.rmSync(td, { recursive: true, force: true });
   });

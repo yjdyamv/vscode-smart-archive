@@ -682,17 +682,17 @@ describe("split volumes", () => {
 // ════════════════════════════════════════════════════════════════════
 
 
-describe("tar LongLink (production tar-writer)", () => {
+describe("tar writer (node-tar backend)", () => {
   it("creates a tar with long paths that the WASM 7zz lists and extracts", async () => {
     const tmp = tmpDir("sat_");
     try {
-      // ustar-prefix path: deep ASCII dir chain whose relative name exceeds
-      // the 100-byte name field (prefix 155 + name 100 = 255 max).
+      // Deep ASCII dir chain whose relative name exceeds the 100-byte
+      // ustar name field — node-tar splits it into prefix + name.
       const deep = path.join(tmp, "d".repeat(50), "e".repeat(30), "f".repeat(20));
       fs.mkdirSync(deep, { recursive: true });
       const deepFile = path.join(deep, "payload.txt");
       fs.writeFileSync(deepFile, "deep content");
-      // GNU LongLink fallback: single CJK basename > 100 bytes.
+      // PAX path record: single CJK basename > 100 bytes.
       const longBase = "只".repeat(40) + ".文档";
       expect(Buffer.byteLength(longBase)).toBeGreaterThan(100);
       fs.writeFileSync(path.join(tmp, longBase), "cjk content");
