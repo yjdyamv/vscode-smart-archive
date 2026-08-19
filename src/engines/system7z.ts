@@ -197,7 +197,6 @@ export function hasSystem7z(): boolean {
 }
 
 interface SevenZipCapabilities {
-  version: number;
   /** Raw `7zz i` output; codec support is matched by name. */
   codecsText: string;
 }
@@ -237,13 +236,8 @@ function probe7z(binaryPath: string): SevenZipCapabilities | null {
       timeout: BINARY_DETECT_TIMEOUT,
       windowsHide: true,
     });
-    const out = (r.stdout?.toString() ?? "") + (r.stderr?.toString() ?? "");
-    const m = out.match(/7-Zip\s+(?:\(z\)\s+)?(\d+)\.(\d+)/i);
-    if (m) {
-      caps = {
-        version: parseInt(m[1], 10) + parseInt(m[2], 10) / 100,
-        codecsText: out,
-      };
+    if (r.status === 0) {
+      caps = { codecsText: (r.stdout?.toString() ?? "") + (r.stderr?.toString() ?? "") };
     }
   } catch {
     caps = null;
@@ -329,12 +323,16 @@ export function system7zCanDecompress(inputPath: string): boolean {
   return true;
 }
 
-/** True when `candidate` exposes at least the codecs and version of `reference`. */
+/**
+ * True when `candidate` exposes at least the codecs of `reference`. Version
+ * is deliberately not compared: any accepted binary is a modern 7-Zip, and
+ * the bundled fork's extra codecs below are exactly the set stock 7-Zip
+ * lacks — a system 7z that misses one of them falls back to the bundle.
+ */
 function isAtLeastAsCapable(candidate: string, reference: string): boolean {
   const a = probe7z(candidate);
   const b = probe7z(reference);
   if (!a || !b) return false;
-  if (a.version < b.version) return false;
   // The bundled fork's extra codecs are the ones stock 7-Zip lacks.
   for (const codec of ["FLZMA2", "ZSTD", "BROTLI", "LZ4", "LIZARD"]) {
     if (hasCodec(b, codec) && !hasCodec(a, codec)) return false;
