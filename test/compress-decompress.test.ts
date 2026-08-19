@@ -719,7 +719,7 @@ describe("tar LongLink (production tar-writer)", () => {
     }
   });
 
-  it("follows top-level symlinks, skips nested ones (WASM 7z has no type '2')", async () => {
+  it("follows symlinks at top level and nested, skips broken links", async () => {
     const tmp = tmpDir("sat_");
     try {
       const nested = path.join(tmp, "nested");
@@ -729,7 +729,11 @@ describe("tar LongLink (production tar-writer)", () => {
         // Windows needs Developer Mode / admin to create symlinks; without
         // either this throws EPERM — skip like the sibling symlink test above.
         fs.symlinkSync("real.txt", path.join(tmp, "link.txt"));
-        fs.symlinkSync("real.txt", path.join(nested, "inner-link.txt"));
+        // Valid nested link: absolute target, resolved by the writer.
+        fs.symlinkSync(path.join(tmp, "real.txt"), path.join(nested, "inner-link.txt"));
+        // Broken nested link: relative target that does not exist inside
+        // nested/, so following it fails — the writer must skip it.
+        fs.symlinkSync("real.txt", path.join(nested, "broken-link.txt"));
       } catch {
         return; // filesystem without symlink support
       }
@@ -745,7 +749,9 @@ describe("tar LongLink (production tar-writer)", () => {
       copyFS(j, "/o1", "", gotTop);
       expect(gotTop["link.txt"]).toBe("data");
 
-      // Nested symlink: skipped entirely.
+      // Nested symlink: the writer dereferences it (WASM 7z has no GNU tar
+      // type '2'), so the valid link is packed as its target's content and
+      // the broken link is skipped.
       await createTarFile(path.join(tmp, "nested.tar"), [nested]);
       const j2 = await trackedJS7z();
       j2.FS.writeFile("/n.tar", fs.readFileSync(path.join(tmp, "nested.tar")));
@@ -753,7 +759,8 @@ describe("tar LongLink (production tar-writer)", () => {
       await run7z(j2, ["x", "/n.tar", "-o/o2"]);
       const gotNested: Record<string, string> = {};
       copyFS(j2, "/o2", "", gotNested);
-      expect(Object.keys(gotNested).length).toBe(0);
+      expect(gotNested["nested/inner-link.txt"]).toBe("data");
+      expect(Object.keys(gotNested)).toEqual(["nested/inner-link.txt"]);
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
