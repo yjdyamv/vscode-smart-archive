@@ -57,14 +57,7 @@ import { checkTotalSize } from "../utils/security";
 import { collectTarPaths } from "./tar-writer";
 import { isRarExt } from "../utils/rar";
 import { ensureDirSync } from "../utils/fs";
-import {
-  bundled7zPath,
-  testBinary,
-  versionOk,
-  MIN_VERSION,
-  MIN_VERSION_ZSTD,
-  resetBundledMacPrep,
-} from "./bundled7z";
+import { bundled7zPath, testBinary, resetBundledMacPrep } from "./bundled7z";
 
 // ── Detection (cached) ───────────────────────────────────────────────
 
@@ -171,15 +164,14 @@ function findSystem7z(): string | null {
   }
 
   for (const c of candidates) {
-    // Check version before accepting — skip old p7zip if newer 7z/7zz is also present.
-    if (fs.existsSync(c) && testBinary(c) && versionOk(c)) return c;
+    if (fs.existsSync(c) && testBinary(c)) return c;
   }
 
   const names =
     process.platform === "win32" ? ["7z.exe", "7za.exe", "7zz.exe"] : ["7z", "7za", "7zz"];
   for (const name of names) {
     const found = resolveFromPath(name);
-    if (found && testBinary(found) && versionOk(found)) return found;
+    if (found && testBinary(found)) return found;
   }
   return null;
 }
@@ -201,17 +193,8 @@ export function hasSystem7z(): boolean {
     return false;
   }
 
-  if (!checkVersion(sz)) {
-    if (setting === "native") {
-      vscode.window.showWarningMessage(t("system7z.tooOld"));
-    }
-    return false;
-  }
-
   return true;
 }
-
-let _cachedVersion: number | undefined;
 
 interface SevenZipCapabilities {
   version: number;
@@ -239,7 +222,6 @@ const _probeCache = new Map<string, SevenZipCapabilities | null>();
  */
 export function resetDetectionCache(): void {
   _cachedPath = undefined;
-  _cachedVersion = undefined;
   _probeCache.clear();
   resetBundledMacPrep();
 }
@@ -370,43 +352,6 @@ function resolveMethodForBinary(binaryPath: string, wanted: SevenZipMethod): Sev
   return method;
 }
 
-function checkVersion(binaryPath: string, minVersion = MIN_VERSION): boolean {
-  if (_cachedVersion !== undefined) return _cachedVersion >= minVersion;
-
-  try {
-    const result = spawnSync(binaryPath, [], {
-      stdio: "pipe",
-      timeout: BINARY_DETECT_TIMEOUT,
-      windowsHide: true,
-    });
-    const output = result.stdout.toString();
-    const m = output.match(/7-Zip\s+(?:\(z\)\s+)?(\d+)\.(\d+)/i);
-    if (m) {
-      const major = parseInt(m[1], 10);
-      const minor = parseInt(m[2], 10);
-      _cachedVersion = major + minor / 100;
-      logger.info({
-        event: "system7z.version",
-        raw: m[0],
-        major,
-        minor,
-        cached: _cachedVersion,
-        minBase: MIN_VERSION,
-      });
-      return _cachedVersion >= minVersion;
-    }
-    logger.warn({ event: "system7z.version.unparseable", output: output.slice(0, 100) });
-  } catch (err) {
-    logger.warn({ event: "system7z.version.checkFailed", err });
-  }
-
-  // Do NOT cache the failure: a transient spawn failure (AV lock, momentary
-  // load, timeout) must not permanently downgrade the whole session to WASM.
-  // Leaving _cachedVersion undefined lets the next call re-probe; detection
-  // already validated the binary via versionOk, so this only affects retries.
-  return false;
-}
-
 const ZSTD_EXTS = new Set([".zst", ".tar.zst", ".tzst"]);
 const LZ4_EXTS = new Set([".tar.lz4", ".tlz4"]);
 const BROTLI_EXTS = new Set([".tar.br", ".tbr"]);
@@ -438,12 +383,6 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
     if (!rarSz) {
       if (setting === "native") {
         vscode.window.showWarningMessage(t("system7z.notInstalled"));
-      }
-      return false;
-    }
-    if (!checkVersion(rarSz)) {
-      if (setting === "native") {
-        vscode.window.showWarningMessage(t("system7z.tooOld"));
       }
       return false;
     }
@@ -482,15 +421,6 @@ export function hasSystem7zForFormat(extOrLabel: string, isDecompress = false): 
   // System 7z cannot create zstd archives at all (only decompress)
   if (isZstd && !isDecompress) {
     logger.info({ event: "system7z.skipCreate", ext: extOrLabel });
-    return false;
-  }
-  // Decompressing zstd → requires v24+
-  const minVer = isZstd && isDecompress ? MIN_VERSION_ZSTD : MIN_VERSION;
-
-  if (!checkVersion(sz, minVer)) {
-    if (setting === "native") {
-      vscode.window.showWarningMessage(t("system7z.tooOld"));
-    }
     return false;
   }
 
@@ -605,15 +535,9 @@ function decodeBuffer(buf: Buffer): string {
 
 // ── Compress ─────────────────────────────────────────────────────────
 
-/** Combined check: binary found AND version acceptable */
+/** Binary found and usable (spawn-tested) */
 function getSystem7zOrNull(): string | null {
-  const sz = detectSystem7z();
-  if (!sz) return null;
-  if (!checkVersion(sz)) {
-    logger.info({ event: "system7z.fallback.version" });
-    return null;
-  }
-  return sz;
+  return detectSystem7z();
 }
 
 const _rarSupportCache = new Map<string, boolean>();
@@ -749,6 +673,10 @@ export async function compressWithSystem7z(
       const listFile = path.join(path.dirname(tarPath), "files.list");
       fs.writeFileSync(listFile, list.join("\r\n"));
       const tarArgs = ["a", "-ttar", tarPath, "@" + listFile];
+      // Standard PAX headers (POSIX-correct long names, matches the node-tar
+      // backend). The bundled 7zz and any system 7-Zip accepted here are all
+      // modern builds (bundled 7-Zip ZS 26.02), so -mm=pax always works.
+      tarArgs.splice(1, 0, "-mm=pax");
       if (progress) tarArgs.splice(1, 0, "-bsp1");
       logger.info({
         event: "system7z.compress.wrap.tar",

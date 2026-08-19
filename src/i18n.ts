@@ -1109,13 +1109,6 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw":
       '未安裝系統 7-Zip。請將 smart-archiver.backend.7z 設為 "auto" 或 "wasm" 以使用內建引擎。',
   },
-  "system7z.tooOld": {
-    en: 'System 7-Zip version is too old (requires v21+). Install a newer version or set smart-archiver.backend.7z to "wasm".',
-    "zh-cn":
-      '系统 7-Zip 版本太旧（需要 v21+）。请安装新版本或将 smart-archiver.backend.7z 设为 "wasm"。',
-    "zh-tw":
-      '系統 7-Zip 版本太舊（需要 v21+）。請安裝新版本或將 smart-archiver.backend.7z 設為 "wasm"。',
-  },
   "security.symlinkEntry": {
     en: "Archive contains symbolic-link entries; refusing to extract with system 7-Zip to prevent path-traversal writes outside the output directory.",
     "zh-cn": "归档包含符号链接条目；为防止路径遍历写入到输出目录之外，已拒绝使用系统 7-Zip 解压。",
