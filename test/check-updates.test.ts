@@ -88,13 +88,13 @@ describe("checkUpdates", () => {
     const fetchJson = makeFetchJson({
       [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
       [githubUpstream]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      [githubRar5]: { tag_name: "0.4.0" },
+      [githubRar5]: { tag_name: "0.4.1" },
       [npmSnappy]: { version: "7.3.3" },
     });
     const results = await checkUpdates({ fetchJson, snappyPkgPath: snappyPkg("7.3.3") });
     const rar5 = results.find((r) => r.key === "rar5")!;
     expect(rar5.status).toBe("update-available");
-    expect(rar5.latest).toBe("0.4.0");
+    expect(rar5.latest).toBe("0.4.1");
   });
 
   it("flags a newer snappy release against the installed version", async () => {
