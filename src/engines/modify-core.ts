@@ -271,8 +271,8 @@ export async function addToArchiveCore(
         );
 
         const aArgs = vfsDir
-          ? ["a", VFS_INNER_TAR, "-aot", vfsDir]
-          : ["a", VFS_INNER_TAR, "-aot", ...vfsPaths];
+          ? ["a", VFS_INNER_TAR, "-aot", "-mm=pax", vfsDir]
+          : ["a", VFS_INNER_TAR, "-aot", "-mm=pax", ...vfsPaths];
         if (password) {
           validatePassword(password);
           aArgs.splice(1, 0, `-p${password}`);
@@ -348,7 +348,7 @@ export async function deleteFromArchiveCore(
       archivePath,
       password,
       async (js7z2) => {
-        const dArgs = ["d", VFS_INNER_TAR, "-y"];
+        const dArgs = ["d", VFS_INNER_TAR, "-mm=pax", "-y"];
         if (password) {
           validatePassword(password);
           dArgs.splice(1, 0, `-p${password}`);
@@ -413,7 +413,13 @@ export async function renameInArchiveCore(
       archivePath,
       password,
       async (js7z2) => {
-        const rnArgs = ["rn", VFS_INNER_TAR, sanitizeCliPath(oldNorm), sanitizeCliPath(newNorm)];
+        const rnArgs = [
+          "rn",
+          VFS_INNER_TAR,
+          "-mm=pax",
+          sanitizeCliPath(oldNorm),
+          sanitizeCliPath(newNorm),
+        ];
         if (password) {
           validatePassword(password);
           rnArgs.splice(1, 0, `-p${password}`);
@@ -503,8 +509,8 @@ export async function createFolderInArchiveCore(
         const parts = folderPath.split("/").filter(Boolean);
         const firstLevel = parts[0];
         const aArgs = firstLevel
-          ? ["a", VFS_INNER_TAR, "-aot", `/${firstLevel}`]
-          : ["a", VFS_INNER_TAR, "-aot", dotfile];
+          ? ["a", VFS_INNER_TAR, "-aot", "-mm=pax", `/${firstLevel}`]
+          : ["a", VFS_INNER_TAR, "-aot", "-mm=pax", dotfile];
         if (password) {
           validatePassword(password);
           aArgs.splice(1, 0, `-p${password}`);

@@ -14,11 +14,6 @@ import { spawnSync } from "child_process";
 import { BINARY_DETECT_TIMEOUT } from "../constants";
 import { logger } from "../utils/logger-core";
 
-/** Minimum 7-Zip version required (v21+ covers all non-zstd operations) */
-export const MIN_VERSION = 21;
-/** Zstd decompression requires v24+ */
-export const MIN_VERSION_ZSTD = 24;
-
 /**
  * Resolve the full-format 7-Zip console binary bundled under vendor/7z-bin/ for the
  * current platform/arch (staged by scripts/install-7z-platforms.js). On Unix
@@ -52,7 +47,7 @@ export function bundled7zPath(): string | null {
   // detection falls back to WASM instead of "detecting" a binary that would
   // only fail at spawn time. (mac prep above must run first, or this test spawn
   // could itself be Gatekeeper-blocked.)
-  if (!testBinary(p) || !versionOk(p)) {
+  if (!testBinary(p)) {
     logger.warn({ event: "system7z.bundled.notRunnable", path: p });
     return null;
   }
@@ -112,48 +107,6 @@ export function testBinary(binaryPath: string): boolean {
       { event: "system7z.testBinary.failed", path: binaryPath, err },
       "Failed to test 7z binary",
     );
-    return false;
-  }
-}
-
-/** Quick version check during detection — no shared cache pollution */
-export function versionOk(binaryPath: string): boolean {
-  try {
-    const result = spawnSync(binaryPath, [], {
-      stdio: "pipe",
-      timeout: BINARY_DETECT_TIMEOUT,
-      windowsHide: true,
-    });
-    const output = result.stdout.toString();
-    const m = output.match(/7-Zip\s+(?:\(z\)\s+)?(\d+)\.(\d+)/i);
-    if (m) {
-      const ver = parseInt(m[1], 10) + parseInt(m[2], 10) / 100;
-      const ok = ver >= MIN_VERSION;
-      logger.info({
-        event: "system7z.detect.version",
-        path: binaryPath,
-        platform: process.platform,
-        raw: m[0],
-        version: ver,
-        minRequired: MIN_VERSION,
-        ok,
-      });
-      return ok;
-    }
-    logger.warn({
-      event: "system7z.detect.unparseable",
-      path: binaryPath,
-      platform: process.platform,
-      output: output.slice(0, 80),
-    });
-    return false;
-  } catch (err) {
-    logger.warn({
-      event: "system7z.detect.failed",
-      path: binaryPath,
-      platform: process.platform,
-      err,
-    });
     return false;
   }
 }
