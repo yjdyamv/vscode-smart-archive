@@ -63,7 +63,8 @@
     "iconv-lite": "^0.7.3",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1",
-    "snappy": "^7.3.3"
+    "snappy": "^7.3.3",
+    "tar": "^7.5.22"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
