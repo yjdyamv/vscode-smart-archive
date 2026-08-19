@@ -73,12 +73,12 @@ describe("planUpdates", () => {
   it("plans a rar5 version bump (normalized without the v prefix)", async () => {
     const fetchJson = makeFetchJson({
       [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      [githubRar5]: { tag_name: "v0.4.0" },
+      [githubRar5]: { tag_name: "v0.4.1" },
       [npmSnappy]: { version: "7.3.3" },
     });
     const updates = await planUpdates({ fetchJson, snappyRootPkg: rootPkg("^7.3.3") });
     const rar5 = updates.find((u) => u.key === "rar5")!;
-    expect(rar5.latest).toBe("0.4.0");
+    expect(rar5.latest).toBe("0.4.1");
     expect(rar5.constant).toBe("RAR5_VERSION");
   });
 
