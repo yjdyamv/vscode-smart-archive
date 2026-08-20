@@ -41,6 +41,7 @@ import { lz4Compress, lz4Decompress } from "./lz4-codec";
 import { snappyCompress, snappyDecompress } from "./snappy-codec";
 import { JS7z } from "./js7z-factory";
 import { disposeJS7z } from "./js7z-lifecycle";
+import { atomicWriteFile } from "../utils/fs";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike } from "../utils/cancellation";
 
@@ -159,7 +160,7 @@ export async function withWrappedArchiveCore(
       }
 
       if (token?.isCancellationRequested) throw new CancelledError();
-      fs.writeFileSync(archivePath, Buffer.from(compressedData));
+      atomicWriteFile(archivePath, Buffer.from(compressedData));
     } finally {
       disposeJS7z(js7z2);
     }
@@ -370,7 +371,7 @@ export async function addToArchiveCore(
 
     if (token?.isCancellationRequested) throw new CancelledError();
     const updated = js7z.FS.readFile(archiveFsPath, { encoding: "binary" });
-    fs.writeFileSync(archivePath, Buffer.from(updated));
+    atomicWriteFile(archivePath, Buffer.from(updated));
 
     logger.info({
       event: "addToArchive.ok",
@@ -438,7 +439,7 @@ export async function deleteFromArchiveCore(
       items: selectedPaths.length,
       newSizeBytes: updated.byteLength,
     });
-    fs.writeFileSync(archivePath, Buffer.from(updated));
+    atomicWriteFile(archivePath, Buffer.from(updated));
   } finally {
     disposeJS7z(js7z);
   }
@@ -508,7 +509,7 @@ export async function renameInArchiveCore(
 
     if (token?.isCancellationRequested) throw new CancelledError();
     const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
-    fs.writeFileSync(archivePath, Buffer.from(updated));
+    atomicWriteFile(archivePath, Buffer.from(updated));
     logger.info({ event: "rename.ok", archivePath, oldPath, newPath });
   } finally {
     disposeJS7z(js7z);
@@ -616,7 +617,7 @@ export async function createFolderInArchiveCore(
 
     if (token?.isCancellationRequested) throw new CancelledError();
     const updated = js7z.FS.readFile(fsPath, { encoding: "binary" });
-    fs.writeFileSync(archivePath, Buffer.from(updated));
+    atomicWriteFile(archivePath, Buffer.from(updated));
     logger.info({ event: "createFolder.ok", archivePath, folderPath });
   } finally {
     disposeJS7z(js7z);

@@ -487,6 +487,35 @@ export function renameOverwrite(src: string, dst: string): void {
   }
 }
 
+/**
+ * Atomically replace `dstPath` with `data`: write a temp file in the same
+ * directory (rename stays on one volume), then rename it over the
+ * destination. A crash or failed write midway leaves the original file
+ * untouched; the temp file is removed on failure.
+ *
+ * Used by archive mutations — the WASM modify path used to overwrite the
+ * archive in place, so an interrupted write destroyed the original.
+ */
+export function atomicWriteFile(dstPath: string, data: Buffer | Uint8Array): void {
+  const dir = path.dirname(dstPath);
+  const ext = path.extname(dstPath);
+  const tmpPath = path.join(
+    dir,
+    `.sa_tmp_${process.pid}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}${ext}`,
+  );
+  try {
+    fs.writeFileSync(tmpPath, data);
+    renameOverwrite(tmpPath, dstPath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch {
+      // best effort
+    }
+    throw err;
+  }
+}
+
 export interface AtomicOutputOptions {
   /** Final output path the caller promised to the user. */
   dstPath: string;
