@@ -222,9 +222,28 @@ function copyDirToFSRecursive(
   vfsDir: string,
   exclusions?: ExclusionSet,
   token?: TokenLike,
+  visitedDirs: Set<string> = new Set(),
 ): void {
+  // Real-path guard (same as copyDirToFS/collectTarPaths): a circular
+  // junction is entered once, so the copy cannot recurse into itself.
+  // Entries run in reverse readdir order so a directory link wins over
+  // its real target (LIFO, like collectTarPaths).
+  let real: string;
+  try {
+    real = fs.realpathSync(localDir);
+  } catch {
+    logger.info({ event: "addToArchive.brokenSkip", path: localDir, vfsDir });
+    return; // broken link target — not packed
+  }
+  if (visitedDirs.has(real)) {
+    logger.warn({ event: "addToArchive.cycleSkip", path: localDir, real, vfsDir });
+    return;
+  }
+  visitedDirs.add(real);
+
   const entries = fs.readdirSync(localDir, { withFileTypes: true });
-  for (const entry of entries) {
+  // oxlint-disable-next-line unicorn/no-array-reverse -- ES2022 target lacks toReversed
+  for (const entry of [...entries].reverse()) {
     if (token?.isCancellationRequested) throw new CancelledError();
     if (exclusions && isPathExcluded(entry.name, exclusions)) {
       logger.info({
@@ -238,7 +257,24 @@ function copyDirToFSRecursive(
     const vfsEntry = `${vfsDir}/${entry.name}`;
     if (entry.isDirectory()) {
       js7z.FS.mkdir(vfsEntry);
-      copyDirToFSRecursive(js7z, localEntry, vfsEntry, exclusions, token);
+      copyDirToFSRecursive(js7z, localEntry, vfsEntry, exclusions, token, visitedDirs);
+    } else if (entry.isSymbolicLink()) {
+      // Follow the link like the tar backends: a link to a directory is
+      // copied recursively, a link to a file is stored as its content.
+      // Broken links are skipped.
+      let st: fs.Stats;
+      try {
+        st = fs.statSync(localEntry);
+      } catch {
+        logger.info({ event: "addToArchive.brokenSkip", path: localEntry, vfsDir: vfsEntry });
+        continue;
+      }
+      if (st.isDirectory()) {
+        js7z.FS.mkdir(vfsEntry);
+        copyDirToFSRecursive(js7z, localEntry, vfsEntry, exclusions, token, visitedDirs);
+      } else {
+        streamToVFS(js7z, localEntry, vfsEntry);
+      }
     } else {
       streamToVFS(js7z, localEntry, vfsEntry);
     }
