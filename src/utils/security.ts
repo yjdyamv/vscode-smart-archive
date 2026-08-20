@@ -220,7 +220,22 @@ export function checkTotalSize(current: number, added: number): number {
 }
 
 /**
- * Validate password for safe use in 7z CLI arguments.
+ * True when an entry is a FIFO, socket, block or character device. Reading
+ * such an entry as a regular file blocks forever (a FIFO waits for a
+ * writer, a device may never yield data), so every compress-side walker
+ * must skip it instead of feeding it to a packer/streamer.
+ */
+export function isSpecialEntry(x: {
+  isFIFO(): boolean;
+  isSocket(): boolean;
+  isBlockDevice(): boolean;
+  isCharacterDevice(): boolean;
+}): boolean {
+  return x.isFIFO() || x.isSocket() || x.isBlockDevice() || x.isCharacterDevice();
+}
+
+/**
+ * Validate a password for safe use in 7z CLI arguments.
  * Rejects passwords starting with '-' (could be parsed as flags),
  * containing null bytes, newlines, or invalid characters.
  * Also limits password to a reasonable maximum length.

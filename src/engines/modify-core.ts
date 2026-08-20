@@ -24,7 +24,12 @@ import {
   VFS_TMP_PV2,
   VFS_INNER_TAR,
 } from "../constants";
-import { checkArchiveSize, validatePassword, sanitizeCliPath } from "../utils/security";
+import {
+  checkArchiveSize,
+  validatePassword,
+  sanitizeCliPath,
+  isSpecialEntry,
+} from "../utils/security";
 import { PreviewTooLargeError } from "../utils/errors";
 import { getBaseName } from "../utils/path";
 import { logger } from "../utils/logger-core";
@@ -204,6 +209,12 @@ function copyLocalToFSWithPrefix(
     }
     const vfsTarget = vfsBase ? `${vfsBase}/${name}` : `/${name}`;
     const stat = fs.statSync(localPath);
+    if (isSpecialEntry(stat)) {
+      // FIFO/socket/device: reading it would block forever. Skip it so the
+      // modify operation never hangs on an unreadable entry.
+      logger.warn({ event: "addToArchive.specialSkip", path: localPath, vfsTarget });
+      continue;
+    }
 
     if (stat.isDirectory()) {
       js7z.FS.mkdir(vfsTarget);
@@ -272,9 +283,13 @@ function copyDirToFSRecursive(
       if (st.isDirectory()) {
         js7z.FS.mkdir(vfsEntry);
         copyDirToFSRecursive(js7z, localEntry, vfsEntry, exclusions, token, visitedDirs);
+      } else if (isSpecialEntry(st)) {
+        logger.warn({ event: "addToArchive.specialSkip", path: localEntry, vfsDir: vfsEntry });
       } else {
         streamToVFS(js7z, localEntry, vfsEntry);
       }
+    } else if (isSpecialEntry(entry)) {
+      logger.warn({ event: "addToArchive.specialSkip", path: localEntry, vfsDir: vfsEntry });
     } else {
       streamToVFS(js7z, localEntry, vfsEntry);
     }

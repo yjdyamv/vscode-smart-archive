@@ -35,7 +35,7 @@ import {
 import { t } from "../i18n";
 import { logger } from "../utils/logger";
 import { isPasswordOrEncryptError } from "../utils/errorClassifier";
-import { validatePassword, sanitizeCliPath } from "../utils/security";
+import { validatePassword, sanitizeCliPath, isSpecialEntry } from "../utils/security";
 import { parse7zListing } from "../utils/parse7z";
 import { withStage } from "../utils/progress-scale";
 import { getBaseName } from "../utils/path";
@@ -657,6 +657,12 @@ export async function compressWithSystem7z(
       for (const tg of wrapTargets) {
         const st = fs.statSync(tg.fsPath);
         if (!st.isDirectory()) {
+          if (isSpecialEntry(st)) {
+            // A top-level FIFO/socket/device would block 7-Zip's reader
+            // forever — skip it instead of hanging the compression.
+            logger.warn({ event: "system7z.specialSkip", path: tg.fsPath });
+            continue;
+          }
           files.push(tg.fsPath);
           continue;
         }
