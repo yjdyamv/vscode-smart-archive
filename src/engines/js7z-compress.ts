@@ -48,7 +48,30 @@ export async function compressWith7z(
   }
 
   if (engine === "system7z") {
-    await compressWithSystem7z(options, progress, token, excludePatterns);
+    try {
+      await compressWithSystem7z(options, progress, token, excludePatterns);
+    } catch (err) {
+      if (isCancellationError(err)) throw new vscode.CancellationError();
+      // Auto mode promises best-effort: a runtime failure of the chosen
+      // binary (corrupt binary, missing shared lib, permission issue) must
+      // not surface to the user as a hard error when the WASM worker can
+      // still do the job. Explicit native/bundled settings keep their
+      // chosen binary and surface the failure instead.
+      const setting = vscode.workspace
+        .getConfiguration("smart-archiver")
+        .get<string>("backend.7z", "auto");
+      if (setting !== "auto") throw err;
+      logger.warn(
+        { event: "compress.system7z.fallback", err },
+        "System 7-Zip compression failed; retrying with the WASM worker",
+      );
+      await runArchiveOp(
+        "compress",
+        { options, excludePatterns },
+        progress as ProgressLike | undefined,
+        token as TokenLike | undefined,
+      );
+    }
     return;
   }
 

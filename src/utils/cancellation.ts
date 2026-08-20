@@ -12,8 +12,8 @@
 
 /**
  * Error thrown by vscode-free engine code when an operation is cancelled.
- * Name matches vscode.CancellationError ("Cancelled") so isCancellationError
- * recognises both without importing vscode.
+ * Name matches vscode.CancellationError (American spelling) so
+ * isCancellationError recognises both without importing vscode.
  */
 export class CancelledError extends Error {
   constructor() {
@@ -27,11 +27,17 @@ export class CancelledError extends Error {
  * Also true for "AbortError" (DOMException from AbortController.reject) —
  * the rar5 native binding surfaces cancellation as an AbortError rejection,
  * and this module owns every AbortController in the codebase.
+ * Matches both the British ("Cancelled") and American ("Canceled") spelling
+ * of the vscode error name.
  * Use at every catch site that previously did `instanceof vscode.CancellationError`.
  */
 export function isCancellationError(err: unknown): boolean {
   if (err instanceof CancelledError) return true;
-  if (err instanceof Error && (err.name === "Cancelled" || err.name === "AbortError")) return true;
+  if (
+    err instanceof Error &&
+    (err.name === "Cancelled" || err.name === "Canceled" || err.name === "AbortError")
+  )
+    return true;
   return false;
 }
 

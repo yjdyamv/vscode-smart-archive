@@ -160,6 +160,11 @@ export function resetZstdDetectionCache(): void {
   sysZstdPath = null;
 }
 
+/** Test-only seam: force the resolved system-zstd path (skips PATH lookup). */
+export function setSystemZstdPathForTest(p: string | null): void {
+  sysZstdPath = p;
+}
+
 function resolveSystemZstd(): string | null {
   const setting = zstdBackendSetting();
 
@@ -268,14 +273,17 @@ export function zstdCompressFile(
         } else {
           cleanup(output);
           const stderr = Buffer.concat(stderrChunks).toString();
-          logger.error({
-            event: "zstd.compress.system.failed",
-            code,
-            stderr: stderr.slice(0, 200),
-            input,
-            output,
-          });
-          reject(new Error(`zstd exited with code ${code}: ${stderr.slice(0, 200)}`));
+          logger.warn(
+            {
+              event: "zstd.compress.system.failed",
+              code,
+              stderr: stderr.slice(0, 200),
+              input,
+              output,
+            },
+            "System zstd compression failed, falling back to bundled 7zz then WASM",
+          );
+          fallbackNativeThenWasm(input, output, level, progress).then(resolve, reject);
         }
       });
 
