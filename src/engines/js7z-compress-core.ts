@@ -24,8 +24,8 @@ import {
   copyInputsToFS,
   run7z,
 } from "./js7z-helpers";
-import { streamToVFS } from "./vfs-io";
-import { sumTreeBytes } from "../utils/fs";
+import { streamToVFS, copyToVFS } from "./vfs-io";
+import { sumTreeBytes, copyDirToFS } from "../utils/fs";
 import { withStage } from "../utils/progress-scale";
 import { joinFSPath, getBaseName } from "../utils/path";
 import { t } from "../i18n";
@@ -46,6 +46,35 @@ import {
   SEVEN_ZIP_METHOD_CODECS,
   xzMethodParam,
 } from "../utils/sevenZipMethod";
+
+// ── Tar backend for wrapped formats (tar.gz, tar.zst, …) ──────────────
+// auto/node-tar: node-tar's Pack streams entries from disk (no VFS memory
+// cost). wasm: 7zz writes the tar itself — inputs must be copied into the
+// VFS first (VFS memory ≈ input size), and the archive gets standard PAX
+// headers via -mm=pax (7z defaults to GNU LongLink, which the WASM 7z
+// unpacker ignores). Entry names come out relative because 7zz resolves
+// its inputs against the VFS cwd (FS.chdir), matching the node-tar
+// backend's dirname(targets[0]) base.
+let tarBackend: "auto" | "node-tar" | "wasm" = "auto";
+
+/** Engine-config seam (worker handler / host bridge). */
+export function setTarBackend(backend: "auto" | "node-tar" | "wasm"): void {
+  tarBackend = backend;
+}
+
+/** mkdir every missing segment of a VFS path (FS.mkdir is single-level). */
+function mkdirTree(js7z: JS7zInstance, vfsDir: string): void {
+  const parts = vfsDir.split("/").filter(Boolean);
+  let cur = "";
+  for (const part of parts) {
+    cur += "/" + part;
+    try {
+      js7z.FS.mkdir(cur);
+    } catch {
+      // already exists
+    }
+  }
+}
 
 function buildCompressArgs(
   outputFile: string,
@@ -201,13 +230,75 @@ export async function compressWith7z(
               return !targetNames.has(stripped);
             })
           : (excludePatterns ?? []);
-        await createTarFile(
-          tarDiskPath,
-          options.targets.map((target) => target.fsPath),
-          token,
-          filteredExcludes,
-          packProgress,
-        );
+        if (tarBackend === "wasm") {
+          // 7zz-wasm tar backend (explicit setting): copy inputs into the
+          // VFS (mirroring the non-wrapped path), then let 7zz write the
+          // tar. VFS memory ≈ input size — the node-tar backend streams
+          // from disk instead, which is why auto stays on node-tar.
+          const copyProgress = progress ? withStage(progress, "copy") : undefined;
+          copyProgress?.report({ message: t("compress.readingFiles") });
+          js7z.FS.mkdir(INPUT_DIR);
+          js7z.FS.mkdir(OUTPUT_DIR);
+          // Multi-target exclusion filter (same as the non-wrapped path).
+          let filteredPaths = localPaths;
+          if (!singleTarget && excludePatterns?.length) {
+            const exclusions = prepareExclusions(excludePatterns);
+            filteredPaths = localPaths.filter((lp) => !isTargetExcluded(lp, exclusions));
+          }
+          // Place inputs under their relative paths (base = dirname of the
+          // first target, mirroring collectTarPaths) so the tar entries
+          // match the node-tar backend exactly.
+          const rootDir = path.dirname(options.targets[0].fsPath);
+          const fsInputs: string[] = [];
+          const copyTotal = progress ? sumTreeBytes(filteredPaths) : 0;
+          let prevCopyPct = 0;
+          let offset = 0;
+          const reportCopy = (cumulative: number): void => {
+            if (!copyProgress || copyTotal <= 0) return;
+            const pct = Math.min(99, Math.floor((cumulative / copyTotal) * 100));
+            if (pct > prevCopyPct && pct > 0) {
+              copyProgress.report({ message: `${pct}%`, increment: pct - prevCopyPct });
+              prevCopyPct = pct;
+            }
+          };
+          for (const lp of filteredPaths) {
+            if (token?.isCancellationRequested) throw new CancelledError();
+            const rel = path.relative(rootDir, lp).replace(/\\/g, "/");
+            const fsTarget = joinFSPath(INPUT_DIR, rel);
+            const parentDir = path.posix.dirname(fsTarget);
+            if (parentDir !== INPUT_DIR) mkdirTree(js7z, parentDir);
+            const stat = fs.statSync(lp);
+            if (stat.isDirectory()) {
+              js7z.FS.mkdir(fsTarget);
+              offset += copyDirToFS(js7z, lp, fsTarget, token, reportCopy, offset);
+            } else {
+              offset += copyToVFS(js7z, lp, fsTarget, reportCopy, offset);
+            }
+            fsInputs.push(rel);
+          }
+          packProgress?.report({ message: t("compress.creatingTar") });
+          const tarFsPath = joinFSPath(OUTPUT_DIR, innerName);
+          js7z.FS.chdir(INPUT_DIR);
+          await run7z(
+            js7z,
+            ["a", "-ttar", "-mm=pax", tarFsPath, ...fsInputs],
+            packProgress,
+            undefined,
+            undefined,
+            printBridge,
+          );
+          const tarBytes = js7z.FS.readFile(tarFsPath, { encoding: "binary" });
+          js7z.FS.unlink(tarFsPath);
+          fs.writeFileSync(tarDiskPath, Buffer.from(tarBytes));
+        } else {
+          await createTarFile(
+            tarDiskPath,
+            options.targets.map((target) => target.fsPath),
+            token,
+            filteredExcludes,
+            packProgress,
+          );
+        }
         if (token?.isCancellationRequested) throw new CancelledError();
 
         const compressProgress = progress ? withStage(progress, "compress") : undefined;

@@ -70,5 +70,9 @@
   "config.backend.snappy.description": "选择 tar.sz 使用的 snappy 实现。原生 Node 插件更快；WASM 引擎用于没有原生二进制的平台。",
   "config.backend.snappy.auto": "原生 Node 插件可用时使用原生，否则回退到 WASM 引擎（默认）。",
   "config.backend.snappy.native": "始终使用原生 Node 插件；不可用时提示错误。",
-  "config.backend.snappy.wasm": "始终使用 WASM 引擎，即使原生插件可用。"
+  "config.backend.snappy.wasm": "始终使用 WASM 引擎，即使原生插件可用。",
+  "config.backend.tar.description": "WASM 引擎压缩包装格式（tar.gz、tar.zst 等）时内层 tar 的写入方式。system7z 引擎始终用自带的 7-Zip 写 tar；此设置只影响 WASM/worker 路径。",
+  "config.backend.tar.auto": "跟随引擎选择（默认）：存在原生/捆绑 7-Zip 时由其写 tar；否则 WASM 引擎用 node-tar 流式写入（不占 WASM 内存）。",
+  "config.backend.tar.node-tar": "WASM 引擎内始终用 node-tar 流式写 tar，即使 7-Zip 可写。",
+  "config.backend.tar.wasm": "让捆绑的 7zz-WASM 引擎自己写 tar（标准 PAX 头）。输入需拷入 WASM 虚拟文件系统，内存占用约等于输入总大小。"
 }

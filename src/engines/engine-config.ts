@@ -29,6 +29,7 @@ import { setLz4Config } from "./lz4-codec";
 import { setRar5Config, resetRar5BindingCache } from "./rar5-engine";
 import { setSnappyConfig, resetSnappyBindingCache } from "./snappy-codec";
 import { setModifyConfig } from "./modify-core";
+import { setTarBackend } from "./js7z-compress-core";
 import { setWorkerMemoryLimitMb } from "./worker/memory-guard";
 import {
   DEFAULT_COMPRESSION_LEVEL,
@@ -52,6 +53,7 @@ export const DEFAULT_ENGINE_CONFIG: Required<EngineConfig> = {
   lz4Backend: "auto",
   rar5Backend: "auto",
   snappyBackend: "auto",
+  tarBackend: "auto",
   compressionLevel: DEFAULT_COMPRESSION_LEVEL,
   workerMemoryMb: WORKER_MEMORY_LIMIT_DEFAULT_MB,
   logLevel: "info",
@@ -86,6 +88,7 @@ export function applyEngineConfig(config: EngineConfig, deps: EngineConfigDeps):
   setLz4Config({ backend: cfg.lz4Backend });
   setRar5Config({ backend: cfg.rar5Backend });
   setSnappyConfig({ backend: cfg.snappyBackend });
+  setTarBackend(cfg.tarBackend);
   setModifyConfig({ compressionLevel: cfg.compressionLevel });
   setWorkerMemoryLimitMb(cfg.workerMemoryMb);
 
