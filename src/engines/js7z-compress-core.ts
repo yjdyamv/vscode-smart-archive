@@ -38,7 +38,7 @@ import { snappyCompressFile } from "./snappy-codec";
 import { createTarFile } from "./tar-writer";
 import { logger } from "../utils/logger-core";
 import { validatePassword } from "../utils/security";
-import { prepareExclusions, isTargetExcluded } from "../utils/exclude";
+import { prepareExclusions, isTargetExcluded, type ExclusionSet } from "../utils/exclude";
 import type { SevenZipMethod } from "../types";
 import {
   mapLizardLevel,
@@ -185,13 +185,16 @@ export async function compressWith7z(
   //   node_modules/.git that the user selected alongside real code.
   const singleTarget = options.targets.length === 1;
   const targetNames = new Set(options.targets.map((tg) => path.basename(tg.fsPath)));
-  const excludeArgs = (excludePatterns ?? [])
-    .filter((p) => {
-      if (!singleTarget) return true;
-      const stripped = p.replace(/^(\*\*\/)+/, "");
-      return !targetNames.has(stripped);
-    })
-    .map((p) => "-xr!" + p.replace(/^(\*\*\/)+/, ""));
+  // Single target: skip patterns matching the target's basename (prevents
+  //   excluding the one item the user explicitly chose, e.g. a folder named "output").
+  // Multiple targets: keep ALL patterns — they filter noisy targets like
+  //   node_modules/.git that the user selected alongside real code.
+  const effectivePatterns = (excludePatterns ?? []).filter((p) => {
+    if (!singleTarget) return true;
+    const stripped = p.replace(/^(\*\*\/)+/, "");
+    return !targetNames.has(stripped);
+  });
+  const excludeArgs = effectivePatterns.map((p) => "-xr!" + p.replace(/^(\*\*\/)+/, ""));
 
   try {
     const localPaths = options.targets.map((target) => target.fsPath);
@@ -219,17 +222,10 @@ export async function compressWith7z(
 
       try {
         const packProgress = progress ? withStage(progress, "pack") : undefined;
-        packProgress?.report({ message: t("compress.creatingTar") });
         // Apply single-target exclusion filter for wrapped formats (tar.gz, etc.).
         // Single target: skip patterns matching the target's basename to prevent
         // excluding the only item the user selected (e.g. a folder named "node_modules").
         // Multiple targets: keep all patterns — they filter noisy co-selected targets.
-        const filteredExcludes = singleTarget
-          ? (excludePatterns ?? []).filter((p) => {
-              const stripped = p.replace(/^(\*\*\/)+/, "");
-              return !targetNames.has(stripped);
-            })
-          : (excludePatterns ?? []);
         if (tarBackend === "wasm") {
           // 7zz-wasm tar backend (explicit setting): copy inputs into the
           // VFS (mirroring the non-wrapped path), then let 7zz write the
@@ -241,16 +237,18 @@ export async function compressWith7z(
           js7z.FS.mkdir(OUTPUT_DIR);
           // Multi-target exclusion filter (same as the non-wrapped path).
           let filteredPaths = localPaths;
-          if (!singleTarget && excludePatterns?.length) {
-            const exclusions = prepareExclusions(excludePatterns);
-            filteredPaths = localPaths.filter((lp) => !isTargetExcluded(lp, exclusions));
+          let exclusions: ExclusionSet | undefined;
+          if (effectivePatterns.length) {
+            const excl = prepareExclusions(effectivePatterns);
+            exclusions = excl;
+            filteredPaths = localPaths.filter((lp) => !isTargetExcluded(lp, excl));
           }
           // Place inputs under their relative paths (base = dirname of the
           // first target, mirroring collectTarPaths) so the tar entries
           // match the node-tar backend exactly.
           const rootDir = path.dirname(options.targets[0].fsPath);
           const fsInputs: string[] = [];
-          const copyTotal = progress ? sumTreeBytes(filteredPaths) : 0;
+          const copyTotal = progress ? sumTreeBytes(filteredPaths, exclusions) : 0;
           let prevCopyPct = 0;
           let offset = 0;
           const reportCopy = (cumulative: number): void => {
@@ -270,7 +268,7 @@ export async function compressWith7z(
             const stat = fs.statSync(lp);
             if (stat.isDirectory()) {
               js7z.FS.mkdir(fsTarget);
-              offset += copyDirToFS(js7z, lp, fsTarget, token, reportCopy, offset);
+              offset += copyDirToFS(js7z, lp, fsTarget, token, reportCopy, offset, exclusions);
             } else {
               offset += copyToVFS(js7z, lp, fsTarget, reportCopy, offset);
             }
@@ -291,11 +289,12 @@ export async function compressWith7z(
           js7z.FS.unlink(tarFsPath);
           fs.writeFileSync(tarDiskPath, Buffer.from(tarBytes));
         } else {
+          packProgress?.report({ message: t("compress.creatingTar") });
           await createTarFile(
             tarDiskPath,
             options.targets.map((target) => target.fsPath),
             token,
-            filteredExcludes,
+            effectivePatterns,
             packProgress,
           );
         }
@@ -371,24 +370,32 @@ export async function compressWith7z(
     // Multi-target: pre-filter targets matching exclusion patterns
     // (e.g. node_modules, .git selected alongside src at project root)
     let filteredPaths = localPaths;
-    if (!singleTarget && excludePatterns?.length) {
-      const exclusions = prepareExclusions(excludePatterns);
-      filteredPaths = localPaths.filter((lp) => !isTargetExcluded(lp, exclusions));
+    let exclusions: ExclusionSet | undefined;
+    if (effectivePatterns.length) {
+      const excl = prepareExclusions(effectivePatterns);
+      exclusions = excl;
+      filteredPaths = localPaths.filter((lp) => !isTargetExcluded(lp, excl));
     }
 
     js7z.FS.mkdir(INPUT_DIR);
     js7z.FS.mkdir(OUTPUT_DIR);
 
-    const copyTotal = progress ? sumTreeBytes(filteredPaths) : 0;
+    const copyTotal = progress ? sumTreeBytes(filteredPaths, exclusions) : 0;
     let prevCopyPct = 0;
-    const allInputPaths = copyInputsToFS(js7z, filteredPaths, token, (cumulative) => {
-      if (!copyProgress || copyTotal <= 0) return;
-      const pct = Math.min(99, Math.floor((cumulative / copyTotal) * 100));
-      if (pct > prevCopyPct && pct > 0) {
-        copyProgress.report({ message: `${pct}%`, increment: pct - prevCopyPct });
-        prevCopyPct = pct;
-      }
-    });
+    const allInputPaths = copyInputsToFS(
+      js7z,
+      filteredPaths,
+      token,
+      (cumulative) => {
+        if (!copyProgress || copyTotal <= 0) return;
+        const pct = Math.min(99, Math.floor((cumulative / copyTotal) * 100));
+        if (pct > prevCopyPct && pct > 0) {
+          copyProgress.report({ message: `${pct}%`, increment: pct - prevCopyPct });
+          prevCopyPct = pct;
+        }
+      },
+      exclusions,
+    );
     // Yield briefly so queued worker messages (e.g. cancel) can run after the
     // synchronous VFS copy and before callMain blocks the event loop. The
     // window is bounded so fast operations are not delayed meaningfully.

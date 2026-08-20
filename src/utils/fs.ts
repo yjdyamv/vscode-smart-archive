@@ -15,6 +15,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { safeJoinPath, checkTotalSize, isSpecialEntry, isReservedWinName } from "./security";
+import { isPathExcluded, type ExclusionSet } from "./exclude";
 import { getFullExt, MAX_COLLISION_RETRIES } from "../constants";
 import { logger } from "./logger-core";
 import { streamToVFS } from "../engines/vfs-io";
@@ -78,8 +79,18 @@ export function copyDirToFS(
   token?: TokenLike,
   onProgress?: (cumulativeBytes: number) => void,
   offsetBytes = 0,
+  exclusions?: ExclusionSet,
 ): number {
-  return copyDirToFSRec(js7z, localDir, fsDir, token, onProgress, offsetBytes, new Set<string>());
+  return copyDirToFSRec(
+    js7z,
+    localDir,
+    fsDir,
+    token,
+    onProgress,
+    offsetBytes,
+    new Set<string>(),
+    exclusions,
+  );
 }
 
 /**
@@ -99,6 +110,7 @@ function copyDirToFSRec(
   onProgress?: (cumulativeBytes: number) => void,
   offsetBytes = 0,
   visitedDirs: Set<string> = new Set(),
+  exclusions?: ExclusionSet,
 ): number {
   let real: string;
   try {
@@ -125,9 +137,19 @@ function copyDirToFSRec(
     if (token?.isCancellationRequested) throw new CancelledError();
     const localEntry = path.join(localDir, entry.name);
     const fsEntry = `${fsDir}/${entry.name}`;
+    if (exclusions && isPathExcluded(entry.name, exclusions)) continue;
     if (entry.isDirectory()) {
       js7z.FS.mkdir(fsEntry);
-      const sub = copyDirToFSRec(js7z, localEntry, fsEntry, token, onProgress, offset, visitedDirs);
+      const sub = copyDirToFSRec(
+        js7z,
+        localEntry,
+        fsEntry,
+        token,
+        onProgress,
+        offset,
+        visitedDirs,
+        exclusions,
+      );
       copied += sub;
       offset += sub;
     } else if (entry.isSymbolicLink()) {
@@ -156,6 +178,7 @@ function copyDirToFSRec(
           onProgress,
           offset,
           visitedDirs,
+          exclusions,
         );
         copied += sub;
         offset += sub;
@@ -197,11 +220,12 @@ function copyDirToFSRec(
  * matching the traversal of copyDirToFS/streamToVFS closely enough for
  * progress estimation. Symlinked files are counted via their target size.
  */
-export function sumTreeBytes(localPaths: readonly string[]): number {
+export function sumTreeBytes(localPaths: readonly string[], exclusions?: ExclusionSet): number {
   let total = 0;
   for (const localPath of localPaths) {
     const st = fs.statSync(localPath);
     if (!st.isDirectory()) {
+      if (exclusions && isPathExcluded(path.basename(localPath), exclusions)) continue;
       total += st.size;
       continue;
     }
@@ -226,6 +250,7 @@ export function sumTreeBytes(localPaths: readonly string[]): number {
       const entries = fs.readdirSync(current, { withFileTypes: true });
       for (const e of entries) {
         const full = path.join(current, e.name);
+        if (exclusions && isPathExcluded(e.name, exclusions)) continue;
         if (e.isDirectory()) {
           stack.push(full);
         } else if (e.isSymbolicLink()) {

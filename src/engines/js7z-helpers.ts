@@ -12,6 +12,7 @@ import * as fs from "fs";
 import type { JS7zInstance } from "../types";
 import { getBaseName, joinFSPath } from "../utils/path";
 import { copyDirToFS } from "../utils/fs";
+import type { ExclusionSet } from "../utils/exclude";
 import { t } from "../i18n";
 import { RUN7Z_TIMEOUT, MEMORY_CHECK_EVERY_PRINT } from "../constants";
 import { logger } from "../utils/logger-core";
@@ -31,6 +32,7 @@ function copyInputsToFS(
   localPaths: readonly string[],
   token?: TokenLike,
   onProgress?: (cumulativeBytes: number) => void,
+  exclusions?: ExclusionSet,
 ): string[] {
   const fsPaths: string[] = [];
   let offset = 0;
@@ -42,7 +44,7 @@ function copyInputsToFS(
 
     if (stat.isDirectory()) {
       js7z.FS.mkdir(fsTarget);
-      offset += copyDirToFS(js7z, localPath, fsTarget, token, onProgress, offset);
+      offset += copyDirToFS(js7z, localPath, fsTarget, token, onProgress, offset, exclusions);
     } else {
       offset += copyToVFS(js7z, localPath, fsTarget, onProgress, offset);
     }
