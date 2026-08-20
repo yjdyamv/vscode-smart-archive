@@ -63,6 +63,7 @@ export function readEngineConfig(): EngineConfig {
     ]),
     rar5Backend: validBackend(config.get("backend.rar", DEFAULT_ENGINE_CONFIG.rar5Backend)),
     snappyBackend: validBackend(config.get("backend.snappy", DEFAULT_ENGINE_CONFIG.snappyBackend)),
+    tarBackend: validTarBackend(config.get("backend.tar", DEFAULT_ENGINE_CONFIG.tarBackend)),
     compressionLevel: config.get(
       "default.compressionLevel",
       DEFAULT_ENGINE_CONFIG.compressionLevel,
@@ -77,6 +78,11 @@ export function readEngineConfig(): EngineConfig {
 
 function validBackend(raw: string): Rar5Backend | SnappyBackend {
   return raw === "native" || raw === "wasm" ? raw : "auto";
+}
+
+/** Validate the tar backend value against its allowed tiers (node-tar, 7zz-wasm). */
+function validTarBackend(raw: string): "auto" | "node-tar" | "wasm" {
+  return raw === "node-tar" || raw === "wasm" ? raw : "auto";
 }
 
 /** Validate a unified engine-backend value against its allowed native tiers. */

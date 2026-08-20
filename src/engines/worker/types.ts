@@ -31,6 +31,8 @@ export interface EngineConfig {
   rar5Backend?: "auto" | "native" | "wasm";
   /** Snappy backend: auto | native | wasm */
   snappyBackend?: "auto" | "native" | "wasm";
+  /** Tar (wrapped-format) backend: auto | node-tar | wasm (7zz writes PAX tar) */
+  tarBackend?: "auto" | "node-tar" | "wasm";
   /** Worker RSS memory guard threshold in MiB (0 = disabled) */
   workerMemoryMb?: number;
   /** Default compression level (0-9) for wrapped-format mutations */

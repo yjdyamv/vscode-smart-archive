@@ -21,7 +21,7 @@ import {
   disposeJS7z,
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
-import { compressWith7z as compressWasmCore } from "../src/engines/js7z-compress-core";
+import { compressWith7z as compressWasmCore, setTarBackend } from "../src/engines/js7z-compress-core";
 import { copyDirToFS, ensureDirSync } from "../src/utils/fs";
 import { createTarFile } from "../src/engines/tar-writer";
 import { tmpDir } from "./tmp";
@@ -372,6 +372,79 @@ describe("wrapped format round-trips", () => {
       }
     });
   }
+});
+
+describe("tar backend selection (smart-archiver.backend.tar)", () => {
+  const wrappedFormat = { label: "tar.gz", description: "", canCreate: true, supportsEncryption: false };
+
+  async function decompressToMap(archivePath: string): Promise<Record<string, string>> {
+    const j = await trackedJS7z();
+    try {
+      j.FS.writeFile("/a.tar.gz", new Uint8Array(fs.readFileSync(archivePath)));
+      j.FS.mkdir("/o1");
+      await run7z(j, ["x", "/a.tar.gz", "-o/o1", "-y"]);
+      const top = j.FS.readdir("/o1").filter((e: string) => e !== "." && e !== "..");
+      const innerTar = top[0];
+      const innerData = j.FS.readFile("/o1/" + innerTar, { encoding: "binary" });
+      j.FS.writeFile("/_inner.tar", new Uint8Array(innerData));
+      j.FS.mkdir("/o2");
+      await run7z(j, ["x", "/_inner.tar", "-o/o2", "-y"]);
+      const result: Record<string, string> = {};
+      copyFS(j, "/o2", "", result);
+      return result;
+    } finally {
+      disposeJS7z(j);
+    }
+  }
+
+  it("wasm backend: 7zz-written PAX tar round-trips with node-tar layout", async () => {
+    const work = tmpDir("sat_tarb_");
+    const srcDir = path.join(work, "src");
+    const sub = path.join(srcDir, "sub");
+    fs.mkdirSync(sub, { recursive: true });
+    fs.writeFileSync(path.join(sub, "a.txt"), "hello");
+    fs.writeFileSync(path.join(srcDir, "b.txt"), "world");
+    const longName = "file_" + "x".repeat(120) + ".txt";
+    fs.writeFileSync(path.join(srcDir, longName), "long name content");
+
+    setTarBackend("wasm");
+    try {
+      const out = path.join(work, "w.tar.gz");
+      await compressWasmCore({
+        targets: [{ fsPath: srcDir }],
+        format: wrappedFormat,
+        outputPath: out,
+        password: "",
+        level: 5,
+      });
+      const result = await decompressToMap(out);
+      expect(result["src/sub/a.txt"]).toBe("hello");
+      expect(result["src/b.txt"]).toBe("world");
+      // The 7zz backend writes standard PAX headers, so the long name
+      // survives (7z's default GNU LongLink is ignored by the WASM
+      // unpacker — that is why -mm=pax is mandatory here).
+      expect(result["src/" + longName]).toBe("long name content");
+    } finally {
+      setTarBackend("auto");
+    }
+  });
+
+  it("node-tar backend (auto default) keeps the same layout", async () => {
+    const work = tmpDir("sat_tarb2_");
+    const srcDir = path.join(work, "src");
+    fs.mkdirSync(path.join(srcDir, "sub"), { recursive: true });
+    fs.writeFileSync(path.join(srcDir, "sub", "a.txt"), "hello");
+    const out = path.join(work, "w.tar.gz");
+    await compressWasmCore({
+      targets: [{ fsPath: srcDir }],
+      format: wrappedFormat,
+      outputPath: out,
+      password: "",
+      level: 5,
+    });
+    const result = await decompressToMap(out);
+    expect(result["src/sub/a.txt"]).toBe("hello");
+  });
 });
 
 describe("xz method mapping (flzma2 → HC4 fast LZMA2)", () => {

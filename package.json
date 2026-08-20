@@ -624,6 +624,21 @@
           ],
           "description": "%config.backend.snappy.description%"
         },
+        "smart-archiver.backend.tar": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "node-tar",
+            "wasm"
+          ],
+          "enumDescriptions": [
+            "%config.backend.tar.auto%",
+            "%config.backend.tar.node-tar%",
+            "%config.backend.tar.wasm%"
+          ],
+          "description": "%config.backend.tar.description%"
+        },
         "smart-archiver.compression.method": {
           "type": "string",
           "default": "flzma2",
