@@ -234,6 +234,25 @@ export function isSpecialEntry(x: {
   return x.isFIFO() || x.isSocket() || x.isBlockDevice() || x.isCharacterDevice();
 }
 
+// DOS device names Windows resolves to hardware (CON = console, NUL =
+// null device, COM1-9 = serial ports, LPT1-9 = parallel ports, CONIN$/CONOUT$
+// = console handles). The match is on the basename with any extension
+// stripped, case-insensitive, e.g. "CON.txt", "aux.md", "com1.log".
+const RESERVED_WIN_DEVICE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9]|conin\$|conout\$)$/i;
+
+/**
+ * True when a file NAME cannot be created on Windows: a DOS reserved
+ * device name (with or without extension), or a trailing dot/space that
+ * Windows silently strips (making "foo." collide with "foo"). Such names
+ * are legal in Unix archives but fail or corrupt when extracted to NTFS.
+ */
+export function isReservedWinName(name: string): boolean {
+  if (!name) return false;
+  if (name.endsWith(".") || name.endsWith(" ")) return true;
+  const base = name.split(".")[0];
+  return RESERVED_WIN_DEVICE.test(base);
+}
+
 /**
  * Validate a password for safe use in 7z CLI arguments.
  * Rejects passwords starting with '-' (could be parsed as flags),

@@ -14,7 +14,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
-import { safeJoinPath, checkTotalSize, isSpecialEntry } from "./security";
+import { safeJoinPath, checkTotalSize, isSpecialEntry, isReservedWinName } from "./security";
 import { getFullExt, MAX_COLLISION_RETRIES } from "../constants";
 import { logger } from "./logger-core";
 import { streamToVFS } from "../engines/vfs-io";
@@ -303,6 +303,18 @@ function _copyDirFromFS(
     // these indicate a malicious archive attempting path traversal
     if (entry.includes("/") || entry.includes("\\") || entry.includes("\0")) {
       logger.warn({ event: "fs.pathTraversal", entry }, "Path traversal blocked");
+      continue;
+    }
+
+    // Windows cannot create DOS reserved device names (CON, NUL, COM1, …)
+    // or names with trailing dots/spaces: writing them opens the device or
+    // silently corrupts the name. Legal in Unix archives, so extract skips
+    // them like any other unrepresentable entry.
+    if (isReservedWinName(entry)) {
+      logger.warn(
+        { event: "fs.reservedNameSkip", entry, dir: fsDir },
+        "Skipped entry with Windows-reserved name",
+      );
       continue;
     }
 
