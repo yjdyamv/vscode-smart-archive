@@ -15,6 +15,7 @@ import { snappyCompressFile } from "../src/engines/snappy-codec";
 import { brotliCompressFile } from "../src/engines/brotli-codec";
 import {
   zstdCompressFile,
+  setSystemZstdPathForTest,
 } from "../src/engines/zstd-codec";
 import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
@@ -128,4 +129,33 @@ describe("codec compress progress (WASM fallback)", () => {
       fs.rmSync(path.dirname(input), { recursive: true, force: true });
     });
   }
+});
+
+describe("zstd file-path fallback", () => {
+  afterEach(() => {
+    setSystemZstdPathForTest(null);
+    setForceWasmCodec(false);
+    applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG }, { warn: () => {} });
+  });
+
+  it("falls back to bundled 7zz/WASM when the system zstd exits non-zero", async () => {
+    // Node rejects the zstd-style flags and exits non-zero, simulating a
+    // system zstd that is installed but unusable at runtime. The file path
+    // must not surface that as a hard error — it retries with the native
+    // bundled 7zz, then the WASM engine.
+    setSystemZstdPathForTest(process.execPath);
+    applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG, zstdBackend: "auto" }, { warn: () => {} });
+
+    const input = makeInput("in.tar");
+    const output = input + ".zst";
+    await zstdCompressFile(input, output, 5, { report: () => {} });
+
+    expect(fs.existsSync(output)).toBe(true);
+    const data = fs.readFileSync(output);
+    expect(data[0]).toBe(0x28);
+    expect(data[1]).toBe(0xb5);
+    expect(data[2]).toBe(0x2f);
+    expect(data[3]).toBe(0xfd);
+    fs.rmSync(path.dirname(input), { recursive: true, force: true });
+  });
 });

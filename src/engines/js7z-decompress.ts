@@ -43,14 +43,38 @@ export async function decompressWith7z(
   logger.info({ event: "decompress.engine", engine, reason });
 
   if (engine === "system7z") {
-    await decompressWithSystem7z(options, progress, token);
-    // Unwrap inner tars with 7-Zip itself so no WASM work remains on this path.
-    await unwrapInnerTarsWithSystem7z(
-      options.outputDir,
-      progress as ProgressLike | undefined,
-      token as TokenLike | undefined,
-      !!options.allowOversize,
-    );
+    try {
+      await decompressWithSystem7z(options, progress, token);
+      // Unwrap inner tars with 7-Zip itself so no WASM work remains on this path.
+      await unwrapInnerTarsWithSystem7z(
+        options.outputDir,
+        progress as ProgressLike | undefined,
+        token as TokenLike | undefined,
+        !!options.allowOversize,
+      );
+    } catch (err) {
+      if (isCancellationError(err)) throw new vscode.CancellationError();
+      // Auto mode promises best-effort: a runtime failure of the chosen
+      // binary must not surface as a hard error when the WASM worker can
+      // still extract. Explicit native/bundled settings keep their chosen
+      // binary and surface the failure instead. The worker path re-extracts
+      // and merges into outputDir, so a partially-unwrapped directory from
+      // the failed system-7z attempt is safe to reuse.
+      const setting = vscode.workspace
+        .getConfiguration("smart-archiver")
+        .get<string>("backend.7z", "auto");
+      if (setting !== "auto") throw err;
+      logger.warn(
+        { event: "decompress.system7z.fallback", err },
+        "System 7-Zip decompression failed; retrying with the WASM worker",
+      );
+      await runArchiveOp(
+        "decompress",
+        { options },
+        progress as ProgressLike | undefined,
+        token as TokenLike | undefined,
+      );
+    }
   } else {
     try {
       await runArchiveOp(
