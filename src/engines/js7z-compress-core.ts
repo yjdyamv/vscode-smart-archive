@@ -363,6 +363,29 @@ export async function compressWith7z(
       return;
     }
 
+    // Plain .tar honours the tar backend like the wrapped formats: with the
+    // auto/node-tar backend the WASM engine streams the tar straight to disk
+    // (no VFS copy, no WASM memory cost); only the explicit "wasm" backend
+    // copies inputs into the VFS and lets 7zz write it.
+    if (options.format.label === "tar" && tarBackend !== "wasm") {
+      const packProgress = progress ? withStage(progress, "pack") : undefined;
+      packProgress?.report({ message: t("compress.creatingTar") });
+      let tarTargets = options.targets;
+      if (effectivePatterns.length) {
+        const excl = prepareExclusions(effectivePatterns);
+        tarTargets = options.targets.filter((tg) => !isTargetExcluded(tg.fsPath, excl));
+      }
+      await createTarFile(
+        options.outputPath,
+        tarTargets.map((tg) => tg.fsPath),
+        token,
+        effectivePatterns,
+        packProgress,
+      );
+      logger.info({ event: "compress.wasm.ok", outputPath: options.outputPath });
+      return;
+    }
+
     // Non-wrapped formats: copy inputs to VFS for 7z
     const copyProgress = progress ? withStage(progress, "copy") : undefined;
     copyProgress?.report({ message: t("compress.readingFiles") });
@@ -417,14 +440,13 @@ export async function compressWith7z(
       options.sevenZipMethod,
       options.solid,
     );
-    await run7z(
-      js7z,
-      [...args, ...excludeArgs],
-      progress ? withStage(progress, "compress") : undefined,
-      undefined,
-      undefined,
-      printBridge,
-    );
+    const packStage = progress
+      ? withStage(progress, options.format.label === "tar" ? "pack" : "compress")
+      : undefined;
+    packStage?.report({
+      message: options.format.label === "tar" ? t("compress.stage.pack") : t("compress.inProgress"),
+    });
+    await run7z(js7z, [...args, ...excludeArgs], packStage, undefined, undefined, printBridge);
 
     if (options.volumeSize) {
       writeVolumeFiles(js7z, OUTPUT_DIR, options.outputPath);

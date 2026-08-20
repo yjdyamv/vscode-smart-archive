@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "node:crypto";
 import { compressWith7z } from "../src/engines/js7z-compress";
-import { compressWith7z as compressWasmCore } from "../src/engines/js7z-compress-core";
+import { compressWith7z as compressWasmCore, setTarBackend } from "../src/engines/js7z-compress-core";
 import { compressWithSystem7z } from "../src/engines/system7z";
 
 import { itIf } from "./gates";
@@ -104,6 +104,63 @@ describe("full-pipeline compress progress", () => {
     fs.rmSync(td, { recursive: true, force: true });
   });
 
+
+  it("plain tar reports a pack stage, not compress (tar does no compression)", async () => {
+    const td = tmpDir("sat_tar_");
+    const src = path.join(td, "data.bin");
+    fs.writeFileSync(src, crypto.randomBytes(4 * 1024 * 1024));
+    const out = path.join(td, "data.tar");
+
+    const reports: Report[] = [];
+    await compressWasmCore(
+      {
+        targets: [{ fsPath: src }],
+        format: { label: "tar", description: "", canCreate: true, supportsEncryption: false },
+        outputPath: out,
+        password: "",
+        level: 1,
+      },
+      { report: (r) => reports.push(r) } as never,
+    );
+
+    expect(fs.existsSync(out)).toBe(true);
+    // auto backend streams the tar with node-tar: pack stage only, no VFS
+    // copy, and never a misleading compress stage.
+    expect(stagePcts(reports, "pack").length).toBeGreaterThan(0);
+    expect(stagePcts(reports, "copy").length).toBe(0);
+    expect(stagePcts(reports, "compress").length).toBe(0);
+    fs.rmSync(td, { recursive: true, force: true });
+  });
+
+  it("plain tar with the explicit wasm backend copies into the VFS then packs", async () => {
+    setTarBackend("wasm");
+    try {
+      const td = tmpDir("sat_tar2_");
+      const src = path.join(td, "data.bin");
+      fs.writeFileSync(src, crypto.randomBytes(4 * 1024 * 1024));
+      const out = path.join(td, "data.tar");
+
+      const reports: Report[] = [];
+      await compressWasmCore(
+        {
+          targets: [{ fsPath: src }],
+          format: { label: "tar", description: "", canCreate: true, supportsEncryption: false },
+          outputPath: out,
+          password: "",
+          level: 1,
+        },
+        { report: (r) => reports.push(r) } as never,
+      );
+
+      expect(fs.existsSync(out)).toBe(true);
+      expect(stagePcts(reports, "copy").length).toBeGreaterThan(0);
+      expect(stagePcts(reports, "pack").length).toBeGreaterThan(0);
+      expect(stagePcts(reports, "compress").length).toBe(0);
+      fs.rmSync(td, { recursive: true, force: true });
+    } finally {
+      setTarBackend("auto");
+    }
+  });
 
   itIf("system7z", "system-7z wrapped pipeline (tar.gz) scales progress across tar + gzip", async () => {
     const td = tmpDir("sat_full2_");
