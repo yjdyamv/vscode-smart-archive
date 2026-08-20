@@ -44,14 +44,14 @@ Press `F5` in VS Code to launch the Extension Development Host.
 > `stage:natives`, which downloads and unpacks the bundled 7-Zip binaries.
 > A fresh checkout therefore needs 7-Zip installed locally to bootstrap the
 > staging — **required on Windows** (install from
-> https://www.7-zip.org/), recommended on Linux/macOS (`p7zip`/`7zz` via
+> <https://www.7-zip.org/>), recommended on Linux/macOS (`p7zip`/`7zz` via
 > your package manager). End users do **not** need a local 7-Zip: the VSIX
 > already bundles the binaries.
 
 ## Usage
 
 | Action | How |
-|--------|-----|
+| -------- | ----- |
 | Compress | Right-click file(s)/folder(s) → `Smart Archiver: Compress` → pick format → optional password → save |
 | Decompress | Right-click archive → `Smart Archiver: Decompress` → optional password → extracts to `<name>.extracted/` |
 | Browse | Right-click archive → `Smart Archiver: Browse Contents`, or double-click the archive file |
@@ -59,7 +59,7 @@ Press `F5` in VS Code to launch the Extension Development Host.
 ### Archive Browser Shortcuts
 
 | Key | Action |
-|-----|--------|
+| ----- | -------- |
 | `↑` `↓` | Move selection up/down (hold Shift to extend) |
 | `PageUp` `PageDown` | Scroll viewport by one page + move selection |
 | `Home` `End` | Jump to first/last item |
@@ -76,7 +76,7 @@ Press `F5` in VS Code to launch the Extension Development Host.
 ### Compression (create)
 
 | Format | Encryption | Notes |
-|--------|------------|-------|
+| -------- | ------------ | ------- |
 | 7z | AES-256 | Best ratio, solid archive, header encryption |
 | zip | AES-256 (7-Zip default) | Universal compatibility |
 | rar | AES-256 | RAR5 creation, header encryption, multi-volume, recovery records |
@@ -97,7 +97,7 @@ All formats supported by 7-Zip (including CAB, ARJ, LZH, CHM, MSI, ISO, VHD, VMD
 ## Configuration
 
 | Setting | Default | Description |
-|---------|---------|-------------|
+| --------- | --------- | ------------- |
 | `smart-archiver.default.format` | `7z` | Default archive format |
 | `smart-archiver.default.compressionLevel` | `5` | Compression level (0=store, 5=normal, 9=ultra) |
 | `smart-archiver.limits.maxArchiveSize` | `"1g"` | Max size of the compressed archive file itself; warning threshold when the WASM fallback loads the whole archive into memory. Extraction and single-file preview can continue after confirmation |
@@ -142,7 +142,7 @@ npm run release          # check + package:cross (pre-release validation)
 > **UI development, two flows:**
 >
 > - **Browser preview (fastest):** `npm run dev:webview` serves the webview UI
->   at http://localhost:5173 with HMR and a mock archive (`webview-ui/src/devMock.ts`
+>   at <http://localhost:5173> with HMR and a mock archive (`webview-ui/src/devMock.ts`
 >   simulates the host: lazy tree expansion, search, selection). No VS Code
 >   needed — ideal for iterating on components.
 > - **Real panel:** run the VS Code `watch` build task (extension compile +
@@ -154,7 +154,7 @@ npm run release          # check + package:cross (pre-release validation)
 ## Dependencies
 
 | Package | Purpose |
-|---------|---------|
+| --------- | --------- |
 | [7-Zip ZS WebAssembly](https://github.com/yjdyamv/7-Zip-zstd-wasm) | Bundled WASM fallback (`vendor/7zz-wasm`, downloaded at install) — all compression & extraction; final fallback for zstd/brotli/lz4 |
 | [7-Zip ZS native](https://github.com/yjdyamv/7-Zip-zstd-native) | Bundled native binary (`vendor/7z-bin`, staged at build) — main engine and the native fast path for zstd/lz4/brotli streams |
 | [smart-archive-rar](https://github.com/yjdyamv/smart-archive-rar) | RAR5 creation engine — native napi-rs binding with a WASI (`wasm32-wasip1-threads`) fallback; AES-256, header encryption, multi-volume, recovery records, progress |
