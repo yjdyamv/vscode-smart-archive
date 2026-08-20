@@ -72,8 +72,8 @@
   "config.backend.snappy.auto": "Use the native Node addon when available; fall back to the WASM engine otherwise (default).",
   "config.backend.snappy.native": "Always use the native Node addon. Show an error if it is unavailable.",
   "config.backend.snappy.wasm": "Always use the WASM engine, even if the native addon is available.",
-  "config.backend.tar.description": "How the inner tar is written when a wrapped format (tar.gz, tar.zst, …) is compressed by the WASM engine. The system7z engine always writes tars with its own 7-Zip; this setting only affects the WASM/worker path.",
-  "config.backend.tar.auto": "Follow the engine choice (default): a native/bundled 7-Zip writes the tar when present; otherwise the WASM engine streams it with node-tar (no WASM memory cost).",
-  "config.backend.tar.node-tar": "Always stream the tar with node-tar in the WASM engine, even when 7-Zip could write it.",
-  "config.backend.tar.wasm": "Let the bundled 7zz-WASM engine write the tar itself (standard PAX headers). Inputs are copied into the WASM virtual FS, so memory usage roughly equals the total input size."
+  "config.backend.wasmTar.description": "How the inner tar is written when a wrapped format (tar.gz, tar.zst, …) is compressed by the WASM engine. The system7z engine always writes tars with its own 7-Zip; this setting only affects the WASM/worker path.",
+  "config.backend.wasmTar.auto": "Follow the engine choice (default): a native/bundled 7-Zip writes the tar when present; otherwise the WASM engine streams it with node-tar (no WASM memory cost).",
+  "config.backend.wasmTar.node-tar": "Always stream the tar with node-tar in the WASM engine, even when 7-Zip could write it.",
+  "config.backend.wasmTar.wasm": "Let the bundled 7zz-WASM engine write the tar itself (standard PAX headers). Inputs are copied into the WASM virtual FS, so memory usage roughly equals the total input size."
 }

@@ -63,7 +63,7 @@ export function readEngineConfig(): EngineConfig {
     ]),
     rar5Backend: validBackend(config.get("backend.rar", DEFAULT_ENGINE_CONFIG.rar5Backend)),
     snappyBackend: validBackend(config.get("backend.snappy", DEFAULT_ENGINE_CONFIG.snappyBackend)),
-    tarBackend: validTarBackend(config.get("backend.tar", DEFAULT_ENGINE_CONFIG.tarBackend)),
+    tarBackend: validTarBackend(config.get("backend.wasmTar", DEFAULT_ENGINE_CONFIG.tarBackend)),
     compressionLevel: config.get(
       "default.compressionLevel",
       DEFAULT_ENGINE_CONFIG.compressionLevel,

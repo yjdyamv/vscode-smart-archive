@@ -624,7 +624,7 @@
           ],
           "description": "%config.backend.snappy.description%"
         },
-        "smart-archiver.backend.tar": {
+        "smart-archiver.backend.wasmTar": {
           "type": "string",
           "default": "auto",
           "enum": [
@@ -633,11 +633,11 @@
             "wasm"
           ],
           "enumDescriptions": [
-            "%config.backend.tar.auto%",
-            "%config.backend.tar.node-tar%",
-            "%config.backend.tar.wasm%"
+            "%config.backend.wasmTar.auto%",
+            "%config.backend.wasmTar.node-tar%",
+            "%config.backend.wasmTar.wasm%"
           ],
-          "description": "%config.backend.tar.description%"
+          "description": "%config.backend.wasmTar.description%"
         },
         "smart-archiver.compression.method": {
           "type": "string",
