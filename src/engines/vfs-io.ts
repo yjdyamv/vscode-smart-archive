@@ -13,7 +13,7 @@ import * as path from "path";
 import type { JS7zInstance } from "../types";
 import { getBaseName } from "../utils/path";
 import { t } from "../i18n";
-import { checkArchiveSize } from "../utils/security";
+import { checkArchiveSize, isSpecialEntry } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { checkWorkerMemory } from "./worker/memory-guard";
 import { VFS_CHUNK, MEMORY_CHECK_EVERY_CHUNKS } from "../constants";
@@ -38,6 +38,12 @@ export function copyToVFS(
   offsetBytes = 0,
 ): number {
   const stat = fs.statSync(filePath);
+  if (isSpecialEntry(stat)) {
+    // Last line of defence: every caller is expected to skip FIFOs/sockets/
+    // devices before streaming, but any path that slips through must fail
+    // loudly here instead of blocking forever on a read.
+    throw new Error(t("security.specialFile", filePath));
+  }
   if (stat.size <= MAX_BUFFER) {
     const data = fs.readFileSync(filePath);
     js7z.FS.writeFile(vfsPath, data);

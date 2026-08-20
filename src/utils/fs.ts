@@ -14,7 +14,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { JS7zInstance } from "../types";
-import { safeJoinPath, checkTotalSize } from "./security";
+import { safeJoinPath, checkTotalSize, isSpecialEntry } from "./security";
 import { getFullExt, MAX_COLLISION_RETRIES } from "../constants";
 import { logger } from "./logger-core";
 import { streamToVFS } from "../engines/vfs-io";
@@ -160,11 +160,29 @@ function copyDirToFSRec(
         copied += sub;
         offset += sub;
       } else {
+        if (isSpecialEntry(st)) {
+          // FIFO/socket/device: reading it as a file would block forever
+          // (a FIFO waits for a writer). Skip like the tar backends do.
+          logger.warn({
+            event: "fs.copy.specialSkip",
+            path: localEntry,
+            fsDir: fsEntry,
+          });
+          continue;
+        }
         streamToVFS(js7z, localEntry, fsEntry, onProgress, offset);
         copied += st.size;
         offset += st.size;
       }
     } else {
+      if (isSpecialEntry(entry)) {
+        logger.warn({
+          event: "fs.copy.specialSkip",
+          path: localEntry,
+          fsDir: fsEntry,
+        });
+        continue;
+      }
       const size = fs.statSync(localEntry).size;
       streamToVFS(js7z, localEntry, fsEntry, onProgress, offset);
       copied += size;
@@ -219,7 +237,11 @@ export function sumTreeBytes(localPaths: readonly string[]): number {
             continue; // broken link — not packed
           }
           if (linkStat.isDirectory()) stack.push(full);
-          else total += linkStat.size;
+          else if (isSpecialEntry(linkStat)) {
+            logger.warn({ event: "fs.sumTree.specialSkip", path: full });
+          } else total += linkStat.size;
+        } else if (isSpecialEntry(e)) {
+          logger.warn({ event: "fs.sumTree.specialSkip", path: full });
         } else {
           total += fs.statSync(full).size;
         }

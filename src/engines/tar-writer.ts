@@ -17,6 +17,7 @@ import { Pack } from "tar";
 import { prepareExclusions, isPathExcluded } from "../utils/exclude";
 import { CancelledError } from "../utils/cancellation";
 import { logger } from "../utils/logger-core";
+import { isSpecialEntry } from "../utils/security";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 
 /**
@@ -94,9 +95,23 @@ export function collectTarPaths(
         if (target.isDirectory()) {
           dirs.push(full);
           stack.push(full);
+        } else if (isSpecialEntry(target)) {
+          // A link to a FIFO/socket/device must not be packed: reading it
+          // would block forever.
+          logger.warn({
+            event: "tarWriter.specialSkip",
+            path: full,
+            source: "collectTarPaths",
+          });
         } else {
           files.push(full);
         }
+      } else if (isSpecialEntry(e)) {
+        logger.warn({
+          event: "tarWriter.specialSkip",
+          path: full,
+          source: "collectTarPaths",
+        });
       }
     }
     if (!sawEntry) emptyDirs.push(current);
@@ -122,6 +137,10 @@ function computeTotalBytes(
     if (token?.isCancellationRequested) throw new CancelledError();
     const st = fs.statSync(loc);
     if (!st.isDirectory()) {
+      if (isSpecialEntry(st)) {
+        logger.warn({ event: "tarWriter.specialSkip", path: loc, source: "computeTotalBytes" });
+        continue;
+      }
       total += st.size;
       continue;
     }
@@ -163,9 +182,21 @@ function computeTotalBytes(
           }
           if (target.isDirectory()) {
             stack.push(full);
+          } else if (isSpecialEntry(target)) {
+            logger.warn({
+              event: "tarWriter.specialSkip",
+              path: full,
+              source: "computeTotalBytes",
+            });
           } else {
             total += target.size;
           }
+        } else if (isSpecialEntry(e)) {
+          logger.warn({
+            event: "tarWriter.specialSkip",
+            path: full,
+            source: "computeTotalBytes",
+          });
         }
       }
     }
@@ -200,6 +231,12 @@ export async function createTarFile(
     // statSync follows top-level symlinks: a link to a file is stored as
     // its content, a link to a directory is walked like a directory.
     const st = fs.statSync(loc);
+    if (isSpecialEntry(st)) {
+      // A top-level FIFO/socket/device has no readable content — packing
+      // it would block forever. Skip it so the packer never waits on it.
+      logger.warn({ event: "tarWriter.specialSkip", path: loc, source: "createTarFile" });
+      continue;
+    }
     entries.push(toRel(loc));
     if (st.isDirectory()) {
       const walk = collectTarPaths(loc, exclusions, token);

@@ -692,6 +692,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "正在向壓縮檔新增檔案: ",
   },
   // ---- Security / Validation ----
+  "security.specialFile": {
+    en: "Cannot read {0}: it is a FIFO, socket or device file, not a regular file",
+    "zh-cn": "无法读取 {0}：它是管道、套接字或设备文件，不是普通文件",
+    "zh-tw": "無法讀取 {0}：它是管道、通訊端或裝置檔，不是普通檔案",
+  },
   "security.passwordStartDash": {
     en: "Password must not start with '-'",
     "zh-cn": "密码不能以 '-' 开头",
