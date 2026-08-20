@@ -56,14 +56,19 @@ describe("js7z compress/decompress", () => {
       j.FS.mkdir("/in/tmp");
       copyDirToFS(j, tmp, "/in/tmp");
 
-      const viaReal = Buffer.from(
-        j.FS.readFile("/in/tmp/real/a.txt", { encoding: "binary" }),
-      ).toString();
-      const viaLink = Buffer.from(
-        j.FS.readFile("/in/tmp/link/a.txt", { encoding: "binary" }),
-      ).toString();
-      expect(viaReal).toBe("hello");
-      expect(viaLink).toBe("hello");
+      // Cycle guard stores the symlinked tree exactly once — under either
+      // the link or its real name, whichever the walk visits first (the
+      // same first-wins semantics as the native collectTarPaths walk).
+      const has = (p: string): boolean => {
+        try {
+          j.FS.readFile(p, { encoding: "binary" });
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      expect(has("/in/tmp/real/a.txt") || has("/in/tmp/link/a.txt")).toBe(true);
+      expect(has("/in/tmp/real/a.txt") && has("/in/tmp/link/a.txt")).toBe(false);
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }

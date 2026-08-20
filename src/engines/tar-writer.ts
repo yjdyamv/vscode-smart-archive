@@ -16,6 +16,7 @@ import * as path from "path";
 import { Pack } from "tar";
 import { prepareExclusions, isPathExcluded } from "../utils/exclude";
 import { CancelledError } from "../utils/cancellation";
+import { logger } from "../utils/logger-core";
 import type { TokenLike, ProgressLike } from "../utils/cancellation";
 
 /**
@@ -46,7 +47,18 @@ export function collectTarPaths(
     if (token?.isCancellationRequested) throw new CancelledError();
     const current = stack.pop()!;
     const real = fs.realpathSync(current);
-    if (visitedDirs.has(real)) continue;
+    if (visitedDirs.has(real)) {
+      // A symlink/junction loop closes back on an already-walked real
+      // directory. Warn (like fs.maxDepth.reached): the cycle is skipped so
+      // packing cannot recurse until the OS path limit.
+      logger.warn({
+        event: "tarWriter.cycleSkip",
+        path: current,
+        real,
+        source: "collectTarPaths",
+      });
+      continue;
+    }
     visitedDirs.add(real);
     const entries = fs.readdirSync(current, { withFileTypes: true });
     let sawEntry = false;
@@ -70,6 +82,13 @@ export function collectTarPaths(
         try {
           target = fs.statSync(full);
         } catch {
+          // Broken link — not packed. Informational: this is the expected
+          // handling, not an error.
+          logger.info({
+            event: "tarWriter.brokenSkip",
+            path: full,
+            source: "collectTarPaths",
+          });
           continue;
         }
         if (target.isDirectory()) {
@@ -111,7 +130,15 @@ function computeTotalBytes(
     while (stack.length > 0) {
       const current = stack.pop()!;
       const real = fs.realpathSync(current);
-      if (visitedDirs.has(real)) continue;
+      if (visitedDirs.has(real)) {
+        logger.warn({
+          event: "tarWriter.cycleSkip",
+          path: current,
+          real,
+          source: "computeTotalBytes",
+        });
+        continue;
+      }
       visitedDirs.add(real);
       const entries = fs.readdirSync(current, { withFileTypes: true });
       for (const e of entries) {
@@ -127,6 +154,11 @@ function computeTotalBytes(
           try {
             target = fs.statSync(full);
           } catch {
+            logger.info({
+              event: "tarWriter.brokenSkip",
+              path: full,
+              source: "computeTotalBytes",
+            });
             continue; // broken link — not packed
           }
           if (target.isDirectory()) {

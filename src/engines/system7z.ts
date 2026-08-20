@@ -1468,18 +1468,35 @@ const SIZE_MONITOR_INTERVAL_MS = 200;
  */
 function sumTargetBytes(targets: readonly { fsPath: string }[]): number {
   let total = 0;
-  const stack = [...targets];
-  while (stack.length > 0) {
-    const p = stack.pop()!.fsPath;
-    try {
-      const st = fs.statSync(p);
-      if (st.isDirectory()) {
-        for (const e of fs.readdirSync(p)) stack.push({ fsPath: path.join(p, e) });
-      } else {
-        total += st.size;
+  for (const target of targets) {
+    const stack = [target.fsPath];
+    // Real-path guard (same as collectTarPaths): a circular junction would
+    // otherwise push the same directory until the OS path limit.
+    const visitedDirs = new Set<string>();
+    while (stack.length > 0) {
+      const p = stack.pop()!;
+      try {
+        const st = fs.statSync(p);
+        if (st.isDirectory()) {
+          let real: string;
+          try {
+            real = fs.realpathSync(p);
+          } catch {
+            logger.info({ event: "system7z.sumTarget.brokenSkip", path: p });
+            continue;
+          }
+          if (visitedDirs.has(real)) {
+            logger.warn({ event: "system7z.sumTarget.cycleSkip", path: p, real });
+            continue;
+          }
+          visitedDirs.add(real);
+          for (const e of fs.readdirSync(p)) stack.push(path.join(p, e));
+        } else {
+          total += st.size;
+        }
+      } catch {
+        // best effort — an unreadable entry just skews the estimate
       }
-    } catch {
-      // best effort — an unreadable entry just skews the estimate
     }
   }
   return total;

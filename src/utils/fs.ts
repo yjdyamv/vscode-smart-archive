@@ -79,26 +79,84 @@ export function copyDirToFS(
   onProgress?: (cumulativeBytes: number) => void,
   offsetBytes = 0,
 ): number {
+  return copyDirToFSRec(js7z, localDir, fsDir, token, onProgress, offsetBytes, new Set<string>());
+}
+
+/**
+ * Recursive core of copyDirToFS. The realpath guard breaks circular
+ * symlinks/junctions (a link pointing at an ancestor is entered once),
+ * mirroring collectTarPaths so a loop cannot recurse to the OS path
+ * limit; broken links are skipped like the tar backends do. Entries are
+ * processed in reverse readdir order so a directory link wins over its
+ * real target (matching collectTarPaths' LIFO stack: the later-seen
+ * entry is visited first), keeping native and WASM archives identical.
+ */
+function copyDirToFSRec(
+  js7z: JS7zInstance,
+  localDir: string,
+  fsDir: string,
+  token?: TokenLike,
+  onProgress?: (cumulativeBytes: number) => void,
+  offsetBytes = 0,
+  visitedDirs: Set<string> = new Set(),
+): number {
+  let real: string;
+  try {
+    real = fs.realpathSync(localDir);
+  } catch {
+    // Broken link target — not packed (mirrors the tar backends).
+    logger.info({ event: "fs.copy.brokenSkip", path: localDir, fsDir });
+    return 0;
+  }
+  if (visitedDirs.has(real)) {
+    // A symlink/junction loop closes back on an already-copied real
+    // directory. Warn (like fs.maxDepth.reached): the cycle is skipped so
+    // the VFS copy cannot recurse until the OS path limit.
+    logger.warn({ event: "fs.copy.cycleSkip", path: localDir, real, fsDir });
+    return 0;
+  }
+  visitedDirs.add(real);
+
   const entries = fs.readdirSync(localDir, { withFileTypes: true });
   let copied = 0;
   let offset = offsetBytes;
-  for (const entry of entries) {
+  // oxlint-disable-next-line unicorn/no-array-reverse -- ES2022 target lacks toReversed
+  for (const entry of [...entries].reverse()) {
     if (token?.isCancellationRequested) throw new CancelledError();
     const localEntry = path.join(localDir, entry.name);
     const fsEntry = `${fsDir}/${entry.name}`;
     if (entry.isDirectory()) {
       js7z.FS.mkdir(fsEntry);
-      const sub = copyDirToFS(js7z, localEntry, fsEntry, token, onProgress, offset);
+      const sub = copyDirToFSRec(js7z, localEntry, fsEntry, token, onProgress, offset, visitedDirs);
       copied += sub;
       offset += sub;
     } else if (entry.isSymbolicLink()) {
       // Follow symlinks (like sumTreeBytes and the rar5 engine do): a link
       // to a directory must be copied recursively, not read as a file
-      // (fs.readFileSync on a symlinked directory throws EISDIR).
-      const st = fs.statSync(localEntry);
+      // (fs.readFileSync on a symlinked directory throws EISDIR). Broken
+      // links are skipped.
+      let st: fs.Stats;
+      try {
+        st = fs.statSync(localEntry);
+      } catch {
+        logger.info({
+          event: "fs.copy.brokenSkip",
+          path: localEntry,
+          fsDir: fsEntry,
+        });
+        continue;
+      }
       if (st.isDirectory()) {
         js7z.FS.mkdir(fsEntry);
-        const sub = copyDirToFS(js7z, localEntry, fsEntry, token, onProgress, offset);
+        const sub = copyDirToFSRec(
+          js7z,
+          localEntry,
+          fsEntry,
+          token,
+          onProgress,
+          offset,
+          visitedDirs,
+        );
         copied += sub;
         offset += sub;
       } else {
@@ -130,15 +188,36 @@ export function sumTreeBytes(localPaths: readonly string[]): number {
       continue;
     }
     const stack = [localPath];
+    // Real-path guard (same as copyDirToFS): a circular junction would
+    // otherwise push the same directory until the OS path limit.
+    const visitedDirs = new Set<string>();
     while (stack.length > 0) {
       const current = stack.pop()!;
+      let real: string;
+      try {
+        real = fs.realpathSync(current);
+      } catch {
+        logger.info({ event: "fs.sumTree.brokenSkip", path: current });
+        continue; // broken link target — not packed
+      }
+      if (visitedDirs.has(real)) {
+        logger.warn({ event: "fs.sumTree.cycleSkip", path: current, real });
+        continue;
+      }
+      visitedDirs.add(real);
       const entries = fs.readdirSync(current, { withFileTypes: true });
       for (const e of entries) {
         const full = path.join(current, e.name);
         if (e.isDirectory()) {
           stack.push(full);
         } else if (e.isSymbolicLink()) {
-          const linkStat = fs.statSync(full);
+          let linkStat: fs.Stats;
+          try {
+            linkStat = fs.statSync(full);
+          } catch {
+            logger.info({ event: "fs.sumTree.brokenSkip", path: full });
+            continue; // broken link — not packed
+          }
           if (linkStat.isDirectory()) stack.push(full);
           else total += linkStat.size;
         } else {
