@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import { withAtomicOutput, renameOverwrite } from "../src/utils/fs";
+import { withAtomicOutput, renameOverwrite, atomicWriteFile } from "../src/utils/fs";
 import { tmpDir } from "./tmp";
 
 describe("withAtomicOutput (single file)", () => {
@@ -162,5 +162,30 @@ describe("renameOverwrite", () => {
     renameOverwrite(src, dst);
     expect(fs.readFileSync(dst, "utf8")).toBe("new");
     expect(fs.existsSync(src)).toBe(false);
+  });
+});
+
+describe("atomicWriteFile", () => {
+  it("replaces the destination via temp+rename and leaves no leftovers", () => {
+    const dir = tmpDir("saaw-");
+    const dst = path.join(dir, "archive.7z");
+    fs.writeFileSync(dst, "old-archive");
+    atomicWriteFile(dst, Buffer.from("new-archive"));
+    expect(fs.readFileSync(dst, "utf8")).toBe("new-archive");
+    expect(fs.readdirSync(dir)).toEqual(["archive.7z"]);
+  });
+
+  it("preserves the original when the swap cannot complete", () => {
+    const dir = tmpDir("saaw-");
+    // A directory where a file is expected: the temp write succeeds but the
+    // rename-over cannot replace it — the original stays untouched and the
+    // temp file is cleaned up.
+    const dst = path.join(dir, "archive.7z");
+    fs.mkdirSync(dst);
+    fs.writeFileSync(path.join(dst, "member.txt"), "precious");
+    expect(() => atomicWriteFile(dst, Buffer.from("new-archive"))).toThrow();
+    expect(fs.readdirSync(dst)).toEqual(["member.txt"]);
+    const leftovers = fs.readdirSync(dir).filter((f) => f.startsWith(".sa_tmp_"));
+    expect(leftovers).toEqual([]);
   });
 });
