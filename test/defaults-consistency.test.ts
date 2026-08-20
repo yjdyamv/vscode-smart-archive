@@ -87,7 +87,7 @@ describe("package.json defaults match code defaults", () => {
     expect(settingDefault("backend.snappy")).toBe(DEFAULT_ENGINE_CONFIG.snappyBackend);
   });
 
-  it("backend.tar", () => {
-    expect(settingDefault("backend.tar")).toBe(DEFAULT_ENGINE_CONFIG.tarBackend);
+  it("backend.wasmTar", () => {
+    expect(settingDefault("backend.wasmTar")).toBe(DEFAULT_ENGINE_CONFIG.tarBackend);
   });
 });
