@@ -8,6 +8,7 @@
 
 import * as path from "path";
 import * as fs from "fs";
+import { execSync } from "child_process";
 import {
   mkdirP,
   run7z,
@@ -445,6 +446,43 @@ describe("tar backend selection (smart-archiver.backend.tar)", () => {
     const result = await decompressToMap(out);
     expect(result["src/sub/a.txt"]).toBe("hello");
   });
+
+  it.runIf(process.platform === "win32")(
+    "wasm backend: a .claude directory junction is dereferenced into the archive",
+    async () => {
+      const work = tmpDir("sat_tarb3_");
+      const proj = path.join(work, "proj");
+      const agent = path.join(proj, ".agent");
+      fs.mkdirSync(agent, { recursive: true });
+      fs.writeFileSync(path.join(agent, "config.json"), '{"a":1}');
+      fs.mkdirSync(path.join(proj, "src"), { recursive: true });
+      fs.writeFileSync(path.join(proj, "src", "main.ts"), "export {}");
+      // .claude → .agent junction (same as tar-writer-symlink test).
+      execSync(`cmd /c mklink /J "${path.join(proj, ".claude")}" "${agent}"`);
+
+      setTarBackend("wasm");
+      try {
+        const out = path.join(work, "w.tar.gz");
+        await compressWasmCore({
+          targets: [{ fsPath: proj }],
+          format: wrappedFormat,
+          outputPath: out,
+          password: "",
+          level: 5,
+        });
+        const result = await decompressToMap(out);
+        // Junction contents land in the archive exactly once (first-wins,
+        // like collectTarPaths): .claude/config.json present, no duplicate
+        // copy under .agent.
+        expect(result["proj/.claude/config.json"]).toBe('{"a":1}');
+        expect(result["proj/src/main.ts"]).toBe("export {}");
+        const agentFiles = Object.keys(result).filter((k) => k.startsWith("proj/.agent"));
+        expect(agentFiles).toHaveLength(0);
+      } finally {
+        setTarBackend("auto");
+      }
+    },
+  );
 });
 
 describe("xz method mapping (flzma2 → HC4 fast LZMA2)", () => {
