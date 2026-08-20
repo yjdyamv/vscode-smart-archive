@@ -826,8 +826,9 @@ export async function compressWithSystem7z(
     argsPreview: args.filter((a) => !a.startsWith("-p")).join(" "),
   });
 
-  const compressProgress = progress ? withStage(progress, "compress") : undefined;
-  compressProgress?.report({ message: t("compress.inProgress") });
+  const isTar = options.format.label === "tar";
+  const packProgress = progress ? withStage(progress, isTar ? "pack" : "compress") : undefined;
+  packProgress?.report({ message: isTar ? t("compress.stage.pack") : t("compress.inProgress") });
 
   try {
     const monitorOutput = progress
@@ -842,7 +843,7 @@ export async function compressWithSystem7z(
       outputPath: options.outputPath,
       totalInputBytes: monitorOutput?.totalInputBytes,
     });
-    await run7z(sz, args, compressProgress, token, undefined, options.password, monitorOutput);
+    await run7z(sz, args, packProgress, token, undefined, options.password, monitorOutput);
   } catch (err) {
     logger.error({ event: "system7z.compress.failed", err }, "System 7z compression failed");
     throw err;
