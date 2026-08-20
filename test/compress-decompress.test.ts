@@ -483,6 +483,82 @@ describe("tar backend selection (smart-archiver.backend.tar)", () => {
       }
     },
   );
+
+  it("wasm backend honours nested exclusion patterns (node_modules anywhere in the tree)", async () => {
+    const work = tmpDir("sat_tarb4_");
+    const proj = path.join(work, "proj");
+    fs.mkdirSync(path.join(proj, "webview-ui", "node_modules", "pkg"), { recursive: true });
+    fs.writeFileSync(path.join(proj, "webview-ui", "node_modules", "pkg", "index.js"), "x");
+    fs.writeFileSync(path.join(proj, "webview-ui", "app.js"), "app");
+    fs.mkdirSync(path.join(proj, "node_modules", "dep"), { recursive: true });
+    fs.writeFileSync(path.join(proj, "node_modules", "dep", "a.js"), "a");
+
+    setTarBackend("wasm");
+    try {
+      const out = path.join(work, "w.tar.gz");
+      await compressWasmCore(
+        {
+          targets: [{ fsPath: proj }],
+          format: wrappedFormat,
+          outputPath: out,
+          password: "",
+          level: 1,
+        },
+        undefined,
+        undefined,
+        ["node_modules"],
+      );
+      const result = await decompressToMap(out);
+      expect(result["proj/webview-ui/app.js"]).toBe("app");
+      // No node_modules entry at the top level nor nested under webview-ui.
+      const keys = Object.keys(result);
+      expect(keys.filter((k) => k.includes("node_modules"))).toHaveLength(0);
+    } finally {
+      setTarBackend("auto");
+    }
+  });
+
+  async function decompressSimpleToMap(archivePath: string): Promise<Record<string, string>> {
+    const j = await trackedJS7z();
+    try {
+      j.FS.writeFile("/a.7z", new Uint8Array(fs.readFileSync(archivePath)));
+      j.FS.mkdir("/o");
+      await run7z(j, ["x", "/a.7z", "-o/o", "-y"]);
+      const result: Record<string, string> = {};
+      copyFS(j, "/o", "", result);
+      return result;
+    } finally {
+      disposeJS7z(j);
+    }
+  }
+
+  it("wasm non-wrapped 7z honours nested exclusion patterns through copyInputsToFS", async () => {
+    const work = tmpDir("sat_tarb5_");
+    const proj = path.join(work, "proj");
+    fs.mkdirSync(path.join(proj, "src", "node_modules", "pkg"), { recursive: true });
+    fs.writeFileSync(path.join(proj, "src", "node_modules", "pkg", "index.js"), "x");
+    fs.writeFileSync(path.join(proj, "src", "app.js"), "app");
+    fs.mkdirSync(path.join(proj, "node_modules", "dep"), { recursive: true });
+    fs.writeFileSync(path.join(proj, "node_modules", "dep", "a.js"), "a");
+
+    const out = path.join(work, "out.7z");
+    await compressWasmCore(
+      {
+        targets: [{ fsPath: proj }],
+        format: { label: "7z", description: "", canCreate: true, supportsEncryption: false },
+        outputPath: out,
+        password: "",
+        level: 1,
+      },
+      undefined,
+      undefined,
+      ["node_modules"],
+    );
+    const result = await decompressSimpleToMap(out);
+    expect(result["proj/src/app.js"]).toBe("app");
+    const keys = Object.keys(result);
+    expect(keys.filter((k) => k.includes("node_modules"))).toHaveLength(0);
+  });
 });
 
 describe("xz method mapping (flzma2 → HC4 fast LZMA2)", () => {
