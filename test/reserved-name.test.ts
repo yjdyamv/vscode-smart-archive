@@ -45,6 +45,17 @@ describe("isReservedWinName classification", () => {
     expect(isReservedWinName("LPT9")).toBe(true);
     expect(isReservedWinName("conin$")).toBe(true);
     expect(isReservedWinName("CONOUT$")).toBe(true);
+    expect(isReservedWinName("CLOCK$")).toBe(true);
+    expect(isReservedWinName("clock$.txt")).toBe(true);
+  });
+
+  it("detects control characters and Windows-forbidden characters", () => {
+    expect(isReservedWinName("tab\there.md")).toBe(true);
+    expect(isReservedWinName("a<b>.txt")).toBe(true);
+    expect(isReservedWinName("why?.md")).toBe(true);
+    expect(isReservedWinName('say"hi.txt')).toBe(true);
+    expect(isReservedWinName("a|b.txt")).toBe(true);
+    expect(isReservedWinName("a*b.txt")).toBe(true);
   });
 
   it("accepts ordinary names", () => {

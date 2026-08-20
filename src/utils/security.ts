@@ -235,20 +235,29 @@ export function isSpecialEntry(x: {
 }
 
 // DOS device names Windows resolves to hardware (CON = console, NUL =
-// null device, COM1-9 = serial ports, LPT1-9 = parallel ports, CONIN$/CONOUT$
-// = console handles). The match is on the basename with any extension
-// stripped, case-insensitive, e.g. "CON.txt", "aux.md", "com1.log".
-const RESERVED_WIN_DEVICE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9]|conin\$|conout\$)$/i;
+// null device, COM1-9 = serial ports, LPT1-9 = parallel ports, CONIN$/CONOUT$/
+// CLOCK$ = console handles / system clock). The match is on the basename
+// with any extension stripped, case-insensitive, e.g. "CON.txt", "aux.md",
+// "com1.log".
+const RESERVED_WIN_DEVICE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9]|conin\$|conout\$|clock\$)$/i;
+
+// Characters Windows forbids in file names (besides the path separators
+// and null bytes, which the traversal check already rejects).
+const ILLEGAL_WIN_CHARS = /[<>:"|?*]/;
 
 /**
  * True when a file NAME cannot be created on Windows: a DOS reserved
- * device name (with or without extension), or a trailing dot/space that
- * Windows silently strips (making "foo." collide with "foo"). Such names
- * are legal in Unix archives but fail or corrupt when extracted to NTFS.
+ * device name (with or without extension), a control character, one of
+ * Windows' forbidden characters (< > : " | ? *), or a trailing dot/space
+ * that Windows silently strips (making "foo." collide with "foo"). Such
+ * names are legal in Unix archives but fail or corrupt when extracted to
+ * NTFS.
  */
 export function isReservedWinName(name: string): boolean {
   if (!name) return false;
   if (name.endsWith(".") || name.endsWith(" ")) return true;
+  if (ILLEGAL_WIN_CHARS.test(name)) return true;
+  if (/[\u0001-\u001f]/.test(name)) return true;
   const base = name.split(".")[0];
   return RESERVED_WIN_DEVICE.test(base);
 }
