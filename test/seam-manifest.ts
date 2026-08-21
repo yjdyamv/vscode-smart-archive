@@ -38,6 +38,7 @@ export const SEAM_COVERED: Record<string, string[]> = {
   ],
   "src/constants.ts": [
     "defaults-consistency.test.ts",
+    "package-json-sync.test.ts",
     "preview.test.ts",
     "rar5-exclusion.test.ts",
     "security-exclusion.test.ts",

@@ -380,6 +380,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "覆盖",
     "zh-tw": "覆蓋",
   },
+  "decompress.extractToDisabled": {
+    en: "Extract to… is disabled. Enable the 'smart-archiver.extractTo.enabled' setting to use it.",
+    "zh-cn": "“Extract to…” 已禁用。开启 “smart-archiver.extractTo.enabled” 设置后可使用。",
+    "zh-tw": "「Extract to…」已停用。開啟「smart-archiver.extractTo.enabled」設定後可使用。",
+  },
   "decompress.progressTitle": {
     en: "Decompressing...",
     "zh-cn": "正在解压...",
