@@ -46,7 +46,7 @@ if (prefs?.sortKey) sort.setSort(prefs.sortKey);
 if (prefs?.sortAsc === false) sort.sortAsc.value = false;
 
 watch([sort.sortKey, sort.sortAsc], () => {
-  treeData.value = sort.sortNodes([...treeData.value]);
+  treeData.value = sort.sortNodes([...treeData.value], descCounts.value);
   saveState({ sortKey: sort.sortKey.value, sortAsc: sort.sortAsc.value });
 });
 
@@ -122,7 +122,7 @@ onMounted(() => {
         totalFiles.value = initial.files;
         totalDirs.value = initial.dirs;
       }
-      treeData.value = sort.sortNodes(initial.tree);
+      treeData.value = sort.sortNodes(initial.tree, descCounts.value);
       viewState.value = "content";
       tree.initExpandedFromTree(undefined, initial.expanded);
       const validPaths = new Set(tree.nodeMap.value.keys());

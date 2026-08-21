@@ -418,7 +418,7 @@ describe("useSort.sortNodes", () => {
     expect(result.map((n) => n.name)).toEqual(["b", "c", "a"]);
   });
 
-  it("directories always come before files", () => {
+  it("directories always come before files in name sort", () => {
     const sort = useSort();
     const result = sort.sortNodes([f("z"), d("a"), f("m")]);
     expect(result.map((n) => n.name)).toEqual(["a", "m", "z"]);
@@ -428,6 +428,25 @@ describe("useSort.sortNodes", () => {
     const sort = useSort();
     const result = sort.sortNodes([f("z"), d("c"), f("a"), d("b")]);
     expect(result.map((n) => n.name)).toEqual(["b", "c", "a", "z"]);
+  });
+
+  it("size sort keeps folders above files, sorting each group by size", () => {
+    const sort = useSort();
+    sort.setSort("size");
+    sort.setSort("size"); // toggle to descending
+    const result = sort.sortNodes([f("small", 100), d("bigdir"), d("middir"), f("big", 500)], {
+      bigdir: { files: 2, dirs: 0, size: 900 },
+      middir: { files: 1, dirs: 0, size: 300 },
+    });
+    // Folders first (by aggregate size), then files (by own size).
+    expect(result.map((n) => n.name)).toEqual(["bigdir", "middir", "big", "small"]);
+  });
+
+  it("size sort ascending keeps folders above files with zero-size folders first", () => {
+    const sort = useSort();
+    sort.setSort("size");
+    const result = sort.sortNodes([f("small", 100), d("unknown"), f("tiny", 10)]);
+    expect(result.map((n) => n.name)).toEqual(["unknown", "tiny", "small"]);
   });
 
   it("recursively sorts children", () => {
