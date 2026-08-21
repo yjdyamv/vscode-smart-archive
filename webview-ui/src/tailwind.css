@@ -143,25 +143,86 @@
     animation: var(--animate-sa-spin-sm);
   }
 
-  .search-input {
+  .search-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     background: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border, transparent);
-    padding: 3px 8px;
     border-radius: var(--radius-sa);
-    font-size: var(--text-sa-md);
-    width: 120px;
-    min-width: 80px;
-    max-width: 200px;
-    outline: none;
+    padding: 1px 4px;
     transition: border-color 0.15s;
   }
-  .search-input:focus {
+  .search-box:focus-within,
+  .search-box.search-on {
     border-color: var(--vscode-focusBorder);
   }
-  .search-input.search-error {
+  .search-box.search-error {
     border-color: var(--color-sa-error);
     box-shadow: var(--shadow-sa-error-ring);
+  }
+  .search-box .codicon.search-ico {
+    font-size: var(--text-sa-md);
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+  }
+  .search-input {
+    background: transparent;
+    color: var(--vscode-input-foreground);
+    border: none;
+    outline: none;
+    padding: 2px 4px;
+    font-size: var(--text-sa-md);
+    min-width: 60px;
+    width: 0;
+    flex: 1 1 auto;
+  }
+  .search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+  }
+  .search-mode {
+    display: inline-flex;
+    flex-shrink: 0;
+    border-radius: var(--radius-sa);
+    overflow: hidden;
+  }
+  .search-mode-btn {
+    background: transparent;
+    border: none;
+    color: var(--vscode-descriptionForeground);
+    font-size: var(--text-sa-2xs);
+    padding: 2px 7px;
+    border-radius: var(--radius-sa-sm);
+    cursor: pointer;
+    transition: var(--transition-sa-fast);
+  }
+  .search-mode-btn:hover {
+    color: var(--vscode-foreground);
+    background: var(--vscode-toolbar-hoverBackground);
+  }
+  .search-mode-btn.on {
+    color: var(--vscode-input-foreground);
+    background: var(--vscode-toolbar-hoverBackground);
+    font-weight: 600;
+  }
+  .search-mode-btn .codicon {
+    font-size: var(--text-sa-md);
+    line-height: 1;
+  }
+  .search-clear {
+    flex-shrink: 0;
+  }
+  .search-clear .codicon {
+    font-size: var(--text-sa-md);
+  }
+  .search-error-msg {
+    display: block;
+    font-size: var(--text-sa-2xs);
+    color: var(--color-sa-error);
+    max-width: 320px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .sort-lbl {
@@ -282,6 +343,20 @@
     color: var(--vscode-foreground);
   }
 
+  /* Search results — flat rows with a path crumb instead of tree guides.
+   * The crumb takes what it needs and truncates, keeping the name readable. */
+  .row-res .res-crumb {
+    font-size: var(--text-sa-sm);
+    color: var(--vscode-descriptionForeground);
+    margin-left: 8px;
+    max-width: 40%;
+    flex-shrink: 1;
+  }
+  .row.sel .res-crumb {
+    color: var(--vscode-list-activeSelectionForeground);
+    opacity: 0.8;
+  }
+
   /* Narrow list — hide the trailing size/count columns so names keep the
    * full row width instead of being squeezed into ellipses (see FileTree
    * scroll container's @container). */
@@ -296,7 +371,8 @@
    * wrapped rows stay compact. The app column root carries the @container,
    * so both the toolbar and the status bar collapse to icons together. */
   @container (max-width: 40em) {
-    .btn .btn-lbl {
+    .btn .btn-lbl,
+    .search-mode-btn .btn-lbl {
       display: none;
     }
   }

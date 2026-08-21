@@ -446,6 +446,34 @@ const messages: Record<string, Record<Locale, string>> = {
   "ui.size": { en: "Size", "zh-cn": "大小", "zh-tw": "大小" },
   "ui.filter": { en: "Filter…", "zh-cn": "筛选…", "zh-tw": "篩選…" },
   "ui.regex": { en: "Regex…", "zh-cn": "正则…", "zh-tw": "正則…" },
+  "ui.searchPlaceholder": {
+    en: "Filter entries…",
+    "zh-cn": "筛选条目…",
+    "zh-tw": "篩選條目…",
+  },
+  "ui.filterMode": { en: "Filter", "zh-cn": "筛选", "zh-tw": "篩選" },
+  "ui.regexMode": { en: "Regex", "zh-cn": "正则", "zh-tw": "正則" },
+  "ui.searchTitle": {
+    en: "Filter entries — Esc to clear",
+    "zh-cn": "筛选条目 — Esc 清空",
+    "zh-tw": "篩選條目 — Esc 清空",
+  },
+  "ui.clearSearchTitle": {
+    en: "Clear search (Esc)",
+    "zh-cn": "清除搜索 (Esc)",
+    "zh-tw": "清除搜尋 (Esc)",
+  },
+  "ui.clear": { en: "Clear", "zh-cn": "清除", "zh-tw": "清除" },
+  "ui.filteringFuzzy": {
+    en: "Fuzzy matching names and paths",
+    "zh-cn": "正在按名称与路径模糊匹配",
+    "zh-tw": "正在依名稱與路徑模糊匹配",
+  },
+  "ui.filteringRegex": {
+    en: "Regex matching names and paths",
+    "zh-cn": "正在按名称与路径正则匹配",
+    "zh-tw": "正在依名稱與路徑正則匹配",
+  },
   "ui.fuzzySearch": {
     en: "Switch to fuzzy search",
     "zh-cn": "切换到模糊搜索",

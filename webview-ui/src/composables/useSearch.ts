@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { ui } from "./useUi";
-import type { TreeNodeData } from "../types";
+import type { TreeNodeData, FlatNode } from "../types";
 import { MAX_REGEX_LENGTH } from "../constants";
 
 // Patterns with nested quantifiers or excessive repetition are potential ReDoS vectors
@@ -89,7 +89,6 @@ export function collectMatches(
   nodes: TreeNodeData[],
   re: RegExp | null,
   fuzzy: string | null,
-  out: Set<string>,
   directOut: Set<string>,
 ): boolean {
   let any = false;
@@ -103,15 +102,11 @@ export function collectMatches(
     }
     if (hit) {
       directOut.add(node.path);
-      out.add(node.path);
       any = true;
     }
     if (node.children && node.children.length > 0) {
-      const childHit = collectMatches(node.children, re, fuzzy, out, directOut);
-      if (childHit) {
-        out.add(node.path);
-        any = true;
-      }
+      const childHit = collectMatches(node.children, re, fuzzy, directOut);
+      if (childHit) any = true;
     }
   }
   return any;
@@ -119,10 +114,32 @@ export function collectMatches(
 
 export type SearchController = ReturnType<typeof useSearch>;
 
+/**
+ * Build the search-results list: every direct match plus the children of
+ * matched folders the user has expanded. Expanded matched folders act as
+ * drill-in points — their contents (which may not match the query) become
+ * visible so the user can look inside a hit folder.
+ */
+export function filterResults(
+  flatNodes: FlatNode[],
+  directMatches: Set<string>,
+  expandedPaths: Set<string>,
+): FlatNode[] {
+  if (directMatches.size === 0) return [];
+  const openPrefixes: string[] = [];
+  for (const fn of flatNodes) {
+    if (fn.node.kind === "DIRECTORY" && directMatches.has(fn.path) && expandedPaths.has(fn.path)) {
+      openPrefixes.push(fn.path + "/");
+    }
+  }
+  return flatNodes.filter(
+    (fn) => directMatches.has(fn.path) || openPrefixes.some((p) => fn.path.startsWith(p)),
+  );
+}
+
 export function useSearch() {
   const query = ref("");
   const isRegex = ref(false);
-  const matchSet = ref(new Set<string>());
   const directMatchSet = ref(new Set<string>());
   const regexError = ref("");
 
@@ -130,11 +147,9 @@ export function useSearch() {
     query.value = q;
     regexError.value = "";
     const raw = q.trim();
-    const matched = new Set<string>();
     const directMatched = new Set<string>();
 
     if (!raw) {
-      matchSet.value = matched;
       directMatchSet.value = directMatched;
       return;
     }
@@ -146,22 +161,16 @@ export function useSearch() {
           return;
         }
         const re = new RegExp(raw, "i");
-        collectMatches(nodes, re, null, matched, directMatched);
+        collectMatches(nodes, re, null, directMatched);
       } catch (e) {
         regexError.value = (e as Error).message;
       }
     } else {
       const lower = raw.toLowerCase();
-      collectMatches(nodes, null, lower, matched, directMatched);
+      collectMatches(nodes, null, lower, directMatched);
     }
 
-    matchSet.value = matched;
     directMatchSet.value = directMatched;
-  }
-
-  function isVisible(path: string): boolean {
-    if (!query.value.trim()) return true;
-    return matchSet.value.has(path);
   }
 
   function toggleRegex(nodes: TreeNodeData[]): void {
@@ -176,10 +185,8 @@ export function useSearch() {
     query,
     isRegex,
     regexError,
-    matchSet,
     directMatchSet,
     updateSearch,
-    isVisible,
     toggleRegex,
   };
 }

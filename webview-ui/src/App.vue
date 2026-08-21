@@ -6,7 +6,7 @@ import { loadInitialState } from "./bootstrap";
 import { useMessage, saveState, loadState } from "./composables/useMessage";
 import { useSelection } from "./composables/useSelection";
 import { useSort, type SortKey } from "./composables/useSort";
-import { useSearch } from "./composables/useSearch";
+import { useSearch, filterResults } from "./composables/useSearch";
 import { useTreeFlatten } from "./composables/useTree";
 import { useArchiveView } from "./composables/useArchiveView";
 import { ui } from "./composables/useUi";
@@ -14,6 +14,7 @@ import LoadingSpinner from "./components/LoadingSpinner.vue";
 import PasswordBox from "./components/PasswordBox.vue";
 import Toolbar from "./components/Toolbar.vue";
 import FileTree from "./components/FileTree.vue";
+import SearchResults from "./components/SearchResults.vue";
 import StatusBar from "./components/StatusBar.vue";
 import Toast from "./components/Toast.vue";
 import ContextMenu from "./components/ContextMenu.vue";
@@ -55,15 +56,27 @@ watch(
 );
 
 const visibleFlatNodes = computed(() => {
-  return tree.flatNodes.value.filter((fn) => {
-    if (search.query.value.trim()) return search.isVisible(fn.path);
-    return true;
-  });
+  if (search.query.value.trim()) {
+    // Search shows a flat results list: direct matches only, plus the
+    // contents of matched folders the user expands (see filterResults).
+    return filterResults(
+      tree.flatNodes.value,
+      search.directMatchSet.value,
+      tree.expandedPaths.value,
+    );
+  }
+  return tree.flatNodes.value;
 });
 
 const fileTreeRef = ref<InstanceType<typeof FileTree> | null>(null);
-const containerEl = computed(() => fileTreeRef.value?.containerEl ?? null);
-const scrollToPath = (path: string) => fileTreeRef.value?.scrollToPath(path);
+const searchResultsRef = ref<InstanceType<typeof SearchResults> | null>(null);
+const containerEl = computed(
+  () => fileTreeRef.value?.containerEl ?? searchResultsRef.value?.containerEl ?? null,
+);
+const scrollToPath = (path: string) => {
+  if (search.query.value.trim()) searchResultsRef.value?.scrollToPath(path);
+  else fileTreeRef.value?.scrollToPath(path);
+};
 
 const av = useArchiveView({
   post,
@@ -211,7 +224,6 @@ const emptyState = computed(() => {
         :search-query="search.query.value"
         :is-regex="search.isRegex.value"
         :regex-error="search.regexError.value"
-        :search-match-count="av.searchMatchCount.value"
         :last-add-dir="selection.state.lastAddDir"
         @extract-all="av.extAll"
         @extract-selected="av.extSel"
@@ -230,7 +242,7 @@ const emptyState = computed(() => {
       />
       <template v-if="viewState === 'content'">
         <FileTree
-          v-if="visibleFlatNodes.length > 0 || !search.query.value.trim()"
+          v-if="!search.query.value.trim()"
           ref="fileTreeRef"
           :flat-nodes="visibleFlatNodes"
           :tree-data="treeData"
@@ -245,6 +257,20 @@ const emptyState = computed(() => {
           @expand-click="av.handleExpandClick"
           @context-menu="av.handleContextMenu"
         />
+        <SearchResults
+          v-else-if="visibleFlatNodes.length > 0"
+          ref="searchResultsRef"
+          :flat-nodes="visibleFlatNodes"
+          :selected="selection.state.selected"
+          :search-query="search.query.value"
+          :loading-paths="tree.loadingPaths.value"
+          :desc-counts="descCounts"
+          @row-click="av.handleRowClick"
+          @row-dblclick="av.handleRowDblClick"
+          @check-click="av.handleCheckClick"
+          @expand="av.handleExpandClick"
+          @context-menu="av.handleContextMenu"
+        />
         <div
           v-else
           class="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--vscode-descriptionForeground)]"
@@ -254,6 +280,12 @@ const emptyState = computed(() => {
           </div>
           <div class="text-sa-xl text-[var(--vscode-foreground)]">{{ emptyState.title }}</div>
           <div class="text-sa-base opacity-70">{{ emptyState.hint }}</div>
+          <div class="text-sa-sm opacity-60">
+            {{ search.isRegex.value ? ui("ui.filteringRegex") : ui("ui.filteringFuzzy") }}
+          </div>
+          <button class="btn mt-1 !px-3 !py-1 !text-sa-sm" @click="av.onSearch('')">
+            <span class="codicon codicon-close"></span>{{ ui("ui.clear") }}
+          </button>
         </div>
       </template>
       <div

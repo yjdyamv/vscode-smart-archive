@@ -8,12 +8,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { TreeNodeData } from "../types";
+import type { TreeNodeData, FlatNode } from "../types";
 import {
   fuzzyMatch,
   isRedosSafe,
   collectMatches,
   segmentHighlight,
+  filterResults,
 } from "../composables/useSearch";
 import { dedupPaths } from "../composables/useSelection";
 import { buildNodeMap } from "../composables/useTree";
@@ -125,54 +126,108 @@ describe("collectMatches", () => {
     { name: "README.md", path: "README.md", size: 500, kind: "REGULAR_FILE" },
   ];
 
-  it("exact name match includes parents", () => {
-    const out = new Set<string>();
+  it("exact name match collects the direct hit only", () => {
     const directOut = new Set<string>();
-    collectMatches(nodes, /^index\.ts$/, null, out, directOut);
+    collectMatches(nodes, /^index\.ts$/, null, directOut);
     expect(directOut.has("src/index.ts")).toBe(true);
-    expect(out.has("src/index.ts")).toBe(true);
-    // parent should be included for tree visibility
-    expect(out.has("src")).toBe(true);
+    // ancestors are not part of the flat results list
+    expect(directOut.has("src")).toBe(false);
   });
 
   it("partial name match with regex", () => {
-    const out = new Set<string>();
     const directOut = new Set<string>();
-    collectMatches(nodes, /\.ts$/, null, out, directOut);
+    collectMatches(nodes, /\.ts$/, null, directOut);
     expect(directOut.has("src/index.ts")).toBe(true);
     expect(directOut.has("src/utils.ts")).toBe(true);
     expect(directOut.has("src/lib/helper.ts")).toBe(true);
   });
 
   it("fuzzy match by name substring", () => {
-    const out = new Set<string>();
     const directOut = new Set<string>();
-    collectMatches(nodes, null, "readme", out, directOut);
+    collectMatches(nodes, null, "readme", directOut);
     expect(directOut.has("README.md")).toBe(true);
   });
 
-  it("returns false when nothing matches", () => {
-    const out = new Set<string>();
+  it("matches by full path too", () => {
     const directOut = new Set<string>();
-    const hit = collectMatches(nodes, /^nonexistent$/, null, out, directOut);
+    collectMatches(nodes, /lib\/helper/, null, directOut);
+    expect(directOut.has("src/lib/helper.ts")).toBe(true);
+  });
+
+  it("returns false when nothing matches", () => {
+    const directOut = new Set<string>();
+    const hit = collectMatches(nodes, /^nonexistent$/, null, directOut);
     expect(hit).toBe(false);
-    expect(out.size).toBe(0);
+    expect(directOut.size).toBe(0);
   });
 
   it("empty nodes array returns false", () => {
-    const out = new Set<string>();
     const directOut = new Set<string>();
-    const hit = collectMatches([], /a/, null, out, directOut);
+    const hit = collectMatches([], /a/, null, directOut);
     expect(hit).toBe(false);
   });
 
-  it("empty directory with matching ancestors does not include it", () => {
-    const out = new Set<string>();
+  it("empty directory with matching ancestors is not collected", () => {
     const directOut = new Set<string>();
     // The empty dir "src/empty" has no children that match, so it should not be included
-    collectMatches(nodes, /^helper\.ts$/, null, out, directOut);
+    collectMatches(nodes, /^helper\.ts$/, null, directOut);
     expect(directOut.has("src/lib/helper.ts")).toBe(true);
-    expect(out.has("src/empty")).toBe(false);
+    expect(directOut.has("src/empty")).toBe(false);
+  });
+});
+
+describe("filterResults", () => {
+  function fn(name: string, path: string, kind: "DIRECTORY" | "REGULAR_FILE"): FlatNode {
+    return {
+      node: { name, path, size: 0, kind, children: kind === "DIRECTORY" ? [] : undefined },
+      depth: path.split("/").length - 1,
+      path,
+      expanded: false,
+      hasChildren: kind === "DIRECTORY",
+      visible: true,
+      inheritCollapsed: false,
+    };
+  }
+
+  const flatNodes: FlatNode[] = [
+    fn("src", "src", "DIRECTORY"),
+    fn("lib", "src/lib", "DIRECTORY"),
+    fn("helper.ts", "src/lib/helper.ts", "REGULAR_FILE"),
+    fn("README.md", "README.md", "REGULAR_FILE"),
+  ];
+
+  it("returns only direct matches when no matched folder is expanded", () => {
+    const out = filterResults(flatNodes, new Set(["src/lib"]), new Set());
+    expect(out.map((f) => f.path)).toEqual(["src/lib"]);
+  });
+
+  it("includes the contents of expanded matched folders", () => {
+    const out = filterResults(
+      flatNodes,
+      new Set(["src/lib"]),
+      new Set(["src", "src/lib"]),
+    );
+    expect(out.map((f) => f.path)).toEqual(["src/lib", "src/lib/helper.ts"]);
+  });
+
+  it("does not leak contents of expanded folders that are not matches", () => {
+    // "src" is expanded but is not a direct match — its children stay hidden
+    // unless they match or sit under an expanded matched folder.
+    const out = filterResults(flatNodes, new Set(["README.md"]), new Set(["src", "src/lib"]));
+    expect(out.map((f) => f.path)).toEqual(["README.md"]);
+  });
+
+  it("collapsed matched folders hide their contents", () => {
+    const out = filterResults(
+      flatNodes,
+      new Set(["src/lib"]),
+      new Set(["src"]), // src expanded, lib not
+    );
+    expect(out.map((f) => f.path)).toEqual(["src/lib"]);
+  });
+
+  it("returns an empty list when nothing matched", () => {
+    expect(filterResults(flatNodes, new Set(), new Set())).toEqual([]);
   });
 });
 

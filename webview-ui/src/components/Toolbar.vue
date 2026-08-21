@@ -73,40 +73,60 @@
           :class="sortAsc ? 'codicon-chevron-down' : 'codicon-chevron-up'"
         ></span
       ></span>
-      <input
-        class="search-input"
-        :class="{ 'search-error': regexError }"
-        :title="regexError || ''"
-        type="text"
-        :value="searchQuery"
-        :placeholder="ui(isRegex ? 'ui.regex' : 'ui.filter')"
-        @input="$emit('search', ($event.target as HTMLInputElement).value)"
-      />
-      <button
-        class="btn-ico search-regex-btn"
-        :class="[
-          isRegex
-            ? 'text-[var(--vscode-focusBorder,#007acc)] bg-[var(--vscode-toolbar-hoverBackground)]'
-            : '',
-        ]"
-        :title="ui(isRegex ? 'ui.fuzzySearch' : 'ui.useRegex')"
-        @click="$emit('toggle-regex')"
-      >
-        <span class="codicon codicon-regex"></span>
-      </button>
-      <span
-        v-if="searchQuery && (searchMatchCount ?? 0) > 0"
-        class="search-match text-sa-2xs text-[var(--vscode-descriptionForeground)] whitespace-nowrap"
-        >{{ searchMatchCount }}
-        {{ (searchMatchCount ?? 0) > 1 ? ui("ui.matches") : ui("ui.match") }}</span
-      >
+      <div class="flex flex-col min-w-[140px] max-w-[320px] flex-1 items-stretch">
+        <div
+          class="search-box"
+          :class="{ 'search-on': !!searchQuery, 'search-error': regexError }"
+        >
+          <span class="codicon codicon-search search-ico"></span>
+          <input
+            class="search-input"
+            :value="searchQuery"
+            :placeholder="ui('ui.searchPlaceholder')"
+            :title="regexError || ui('ui.searchTitle')"
+            @input="$emit('search', ($event.target as HTMLInputElement).value)"
+            @keydown.esc="onEsc"
+          />
+          <span class="search-mode" role="group" aria-label="Search mode">
+            <button
+              class="search-mode-btn"
+              :class="{ on: !isRegex }"
+              :aria-pressed="!isRegex"
+              :title="ui('ui.fuzzySearch')"
+              @click="setMode(false)"
+            >
+              <span class="codicon codicon-filter"></span
+              ><span class="btn-lbl">{{ ui("ui.filterMode") }}</span>
+            </button>
+            <button
+              class="search-mode-btn"
+              :class="{ on: isRegex }"
+              :aria-pressed="isRegex"
+              :title="ui('ui.useRegex')"
+              @click="setMode(true)"
+            >
+              <span class="codicon codicon-regex"></span
+              ><span class="btn-lbl">{{ ui("ui.regexMode") }}</span>
+            </button>
+          </span>
+          <button
+            v-if="searchQuery"
+            class="btn-ico search-clear"
+            :title="ui('ui.clearSearchTitle')"
+            @click="clearSearch"
+          >
+            <span class="codicon codicon-close"></span>
+          </button>
+        </div>
+        <span v-if="regexError" class="search-error-msg">{{ regexError }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ui } from "../composables/useUi";
-defineProps<{
+const props = defineProps<{
   selectedCount: number;
   selectedFiles: number;
   selectedDirs: number;
@@ -118,10 +138,9 @@ defineProps<{
   lastAddDir: string;
   isRegex?: boolean;
   regexError?: string;
-  searchMatchCount?: number;
   readOnly?: boolean;
 }>();
-defineEmits<{
+const emit = defineEmits<{
   (e: "extract-all"): void;
   (e: "extract-selected"): void;
   (e: "delete-selected"): void;
@@ -133,4 +152,18 @@ defineEmits<{
   (e: "convert"): void;
   (e: "toggle-regex"): void;
 }>();
+
+function setMode(regex: boolean): void {
+  if (props.isRegex !== regex) emit("toggle-regex");
+}
+
+function clearSearch(e: MouseEvent): void {
+  emit("search", "");
+  (e.target as HTMLElement).blur?.();
+}
+
+function onEsc(e: KeyboardEvent): void {
+  emit("search", "");
+  (e.target as HTMLElement).blur();
+}
 </script>

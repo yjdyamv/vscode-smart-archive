@@ -60,14 +60,9 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     );
   }
 
-  // ── Search debounce ────────────────────────────────────────────────
+  // ── Search ─────────────────────────────────────────────────────────
 
   let searchDebounce: ReturnType<typeof setTimeout> | null = null;
-
-  const searchMatchCount = computed(() => {
-    if (!search.query.value.trim()) return 0;
-    return search.directMatchSet.value.size;
-  });
 
   function onToggleRegex() {
     search.toggleRegex(treeData.value);
@@ -75,7 +70,6 @@ export function useArchiveView(ctx: ArchiveViewContext) {
 
   function onSearch(q: string) {
     search.query.value = q;
-    if (!q.trim()) search.matchSet.value = new Set();
     if (searchDebounce) clearTimeout(searchDebounce);
     searchDebounce = setTimeout(() => search.updateSearch(q, treeData.value), SEARCH_DEBOUNCE_MS);
   }
@@ -326,7 +320,6 @@ export function useArchiveView(ctx: ArchiveViewContext) {
     toast,
     showToast,
     // Search
-    searchMatchCount,
     onToggleRegex,
     onSearch,
     // Selection
