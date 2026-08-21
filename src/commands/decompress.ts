@@ -63,6 +63,13 @@ export async function decompressToCommand(
   uri: vscode.Uri | undefined,
   selectedUris: readonly vscode.Uri[] | undefined,
 ): Promise<void> {
+  const enabled = vscode.workspace
+    .getConfiguration("smart-archiver")
+    .get<boolean>("extractTo.enabled", false);
+  if (!enabled) {
+    vscode.window.showInformationMessage(t("decompress.extractToDisabled"));
+    return;
+  }
   const uris = selectedUris && selectedUris.length > 0 ? selectedUris : uri ? [uri] : [];
   if (uris.length === 0) {
     vscode.window.showErrorMessage(t("decompress.noFile"));

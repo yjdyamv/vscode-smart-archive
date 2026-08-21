@@ -53,8 +53,8 @@ Press `F5` in VS Code to launch the Extension Development Host.
 | Action | How |
 | -------- | ----- |
 | Compress | Right-click file(s)/folder(s) → `Smart Archiver: Compress` → pick format → optional password → save |
-| Decompress | Right-click archive → `Smart Archiver: Extract` → optional password → extracts to `<name>.extracted/` |
-| Extract to… | Right-click archive → `Smart Archiver: Extract to…` → pick the destination folder → optional password → extracts into it (conflicting files are confirmed first) |
+| Extract | Right-click archive → `Smart Archiver: Extract` → optional password → extracts to `<name>.extracted/` |
+| Extract to… | Right-click archive → `Smart Archiver: Extract to…` → pick the destination folder → optional password → extracts into it (conflicting files are confirmed first). Opt-in: enable the `smart-archiver.extractTo.enabled` setting |
 | Browse | Right-click archive → `Smart Archiver: Browse Contents`, or double-click the archive file |
 
 ### Archive Browser Shortcuts

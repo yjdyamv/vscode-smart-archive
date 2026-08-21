@@ -13,7 +13,7 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as childProcess from "child_process";
 import * as vscode from "vscode";
-import { __quickPicks, __setSaveDialogResult, __setOpenDialogResult, __dialogs } from "./__mocks__/vscode";
+import { __quickPicks, __setSaveDialogResult, __setOpenDialogResult, __setConfig, __dialogs } from "./__mocks__/vscode";
 
 import { j7zDecompress, j7zCompressDir } from "./helpers";
 import { gate } from "./gates";
@@ -110,12 +110,27 @@ describe("decompress command (real engine)", () => {
     fs.writeFileSync(archive, buf);
 
     const destDir = path.join(dir, "chosen");
+    __setConfig("smart-archiver", "extractTo.enabled", true);
     __setOpenDialogResult([vscode.Uri.file(destDir)]);
     await decompressToCommand(vscode.Uri.file(archive), undefined);
 
     expect(fs.readFileSync(path.join(destDir, "a.txt"), "utf8")).toBe("to chosen folder");
     expect(fs.readFileSync(path.join(destDir, "sub", "c.txt"), "utf8")).toBe("deep chosen");
     expect(fs.existsSync(path.join(dir, "input.extracted"))).toBe(false);
+  });
+
+  it("refuses to run extract-to while the setting is off", async () => {
+    const buf = await j7zCompressDir({ "/a.txt": "nope" }, "/x.7z");
+    const archive = path.join(dir, "input.7z");
+    fs.writeFileSync(archive, buf);
+
+    __setConfig("smart-archiver", "extractTo.enabled", false);
+    __setOpenDialogResult([vscode.Uri.file(path.join(dir, "chosen"))]);
+    await decompressToCommand(vscode.Uri.file(archive), undefined);
+
+    const infos = __dialogs().filter((d) => d.kind === "information");
+    expect(infos.some((d) => d.message.includes("disabled"))).toBe(true);
+    expect(fs.existsSync(path.join(dir, "chosen"))).toBe(false);
   });
 
   it("asks before overwriting existing files in the chosen folder", async () => {
@@ -127,6 +142,7 @@ describe("decompress command (real engine)", () => {
     fs.mkdirSync(destDir, { recursive: true });
     fs.writeFileSync(path.join(destDir, "a.txt"), "precious data");
 
+    __setConfig("smart-archiver", "extractTo.enabled", true);
     __setOpenDialogResult([vscode.Uri.file(destDir)]);
     // The dialog mock resolves undefined (no confirmation) → extraction aborts.
     await decompressToCommand(vscode.Uri.file(archive), undefined);
