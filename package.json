@@ -31,6 +31,9 @@
   },
   "publisher": "yjdyamv",
   "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "scripts": {
     "postinstall": "node scripts/install-7zz-wasm.mjs && npm --prefix webview-ui install",
     "compile": "vite build --config vite.extension.config.mts",
@@ -255,8 +258,14 @@
       },
       {
         "command": "yjdyamv.smart-archiver.decompress",
-        "title": "Smart Archiver: Decompress",
-        "shortTitle": "Decompress",
+        "title": "Smart Archiver: Extract",
+        "shortTitle": "Extract",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "yjdyamv.smart-archiver.extractTo",
+        "title": "Smart Archiver: Extract to…",
+        "shortTitle": "Extract to…",
         "icon": "$(folder-opened)"
       },
       {
@@ -299,6 +308,10 @@
           "when": "false"
         },
         {
+          "command": "yjdyamv.smart-archiver.extractTo",
+          "when": "false"
+        },
+        {
           "command": "yjdyamv.smart-archiver.browse",
           "when": "false"
         },
@@ -326,6 +339,11 @@
         },
         {
           "command": "yjdyamv.smart-archiver.decompress",
+          "group": "7_modification",
+          "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|tbr|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|tar\\.br|tar\\.sz|tsz|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
+        },
+        {
+          "command": "yjdyamv.smart-archiver.extractTo",
           "group": "7_modification",
           "when": "resourceFilename =~ /\\.(7z|7z\\.[0-9]+|zip|zip\\.[0-9]+|rar|r\\d{2}|tar|gz|bz2|xz|zst|wim|tgz|tbz2|tbz|txz|tzst|tlz|tlz4|tbr|lz|lzma|tar\\.gz|tar\\.bz2|tar\\.xz|tar\\.zst|tar\\.lz|tar\\.lzma|tar\\.lz4|tar\\.br|tar\\.sz|tsz|cab|arj|lzh|chm|msi|z|cpio|rpm|deb|uha|xar|iso|vhd|vmdk|fat|ntfs|squashfs|dmg|hfs|apm|mbr|vsix)$/"
         },

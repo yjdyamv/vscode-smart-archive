@@ -202,11 +202,7 @@ describe("filterResults", () => {
   });
 
   it("includes the contents of expanded matched folders", () => {
-    const out = filterResults(
-      flatNodes,
-      new Set(["src/lib"]),
-      new Set(["src", "src/lib"]),
-    );
+    const out = filterResults(flatNodes, new Set(["src/lib"]), new Set(["src", "src/lib"]));
     expect(out.map((f) => f.path)).toEqual(["src/lib", "src/lib/helper.ts"]);
   });
 
