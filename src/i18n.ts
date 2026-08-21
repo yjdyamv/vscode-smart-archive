@@ -360,6 +360,26 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": '文件类型 "{0}" 不在已知支持列表中。将继续尝试解压...',
     "zh-tw": '檔案類型 "{0}" 不在已知支援列表中。將繼續嘗試解壓...',
   },
+  "decompress.pickFolderTitle": {
+    en: "Choose the extraction folder",
+    "zh-cn": "选择解压目录",
+    "zh-tw": "選擇解壓目錄",
+  },
+  "decompress.pickFolderLabel": {
+    en: "Extract to This Folder",
+    "zh-cn": "解压到此目录",
+    "zh-tw": "解壓到此目錄",
+  },
+  "decompress.conflictMessage": {
+    en: "{0} existing file(s) in the target folder will be overwritten. Continue?",
+    "zh-cn": "目标目录中的 {0} 个已有文件将被覆盖。继续吗？",
+    "zh-tw": "目標目錄中的 {0} 個既有檔案將被覆蓋。繼續嗎？",
+  },
+  "decompress.overwrite": {
+    en: "Overwrite",
+    "zh-cn": "覆盖",
+    "zh-tw": "覆蓋",
+  },
   "decompress.progressTitle": {
     en: "Decompressing...",
     "zh-cn": "正在解压...",

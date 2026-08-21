@@ -13,7 +13,7 @@ import * as path from "path";
 import { compressCommand } from "./commands/compress";
 import { repairCommand } from "./commands/repair";
 import { rebuildVolumesCommand } from "./commands/rebuildVolumes";
-import { decompressCommand, browseCommand } from "./commands/decompress";
+import { decompressCommand, decompressToCommand, browseCommand } from "./commands/decompress";
 import { registerArchiveEditor, pasteCopiedFromArchive } from "./providers/archiveProvider";
 import { runAddToArchive } from "./providers/archive";
 import { logger } from "./utils/logger";
@@ -156,6 +156,13 @@ export function activate(context: vscode.ExtensionContext): void {
     (uri: vscode.Uri, selectedUris: readonly vscode.Uri[]) => decompressCommand(uri, selectedUris),
   );
 
+  // Register extract-to command (advanced: user picks the destination folder)
+  const extractToDisposable = vscode.commands.registerCommand(
+    "yjdyamv.smart-archiver.extractTo",
+    (uri: vscode.Uri, selectedUris: readonly vscode.Uri[]) =>
+      decompressToCommand(uri, selectedUris),
+  );
+
   // Register browse command
   const browseDisposable = vscode.commands.registerCommand(
     "yjdyamv.smart-archiver.browse",
@@ -189,6 +196,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     compressDisposable,
     decompressDisposable,
+    extractToDisposable,
     browseDisposable,
     pasteDisposable,
     addToArchiveDisposable,

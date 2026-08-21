@@ -13,12 +13,12 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as childProcess from "child_process";
 import * as vscode from "vscode";
-import { __quickPicks, __setSaveDialogResult } from "./__mocks__/vscode";
+import { __quickPicks, __setSaveDialogResult, __setOpenDialogResult, __dialogs } from "./__mocks__/vscode";
 
 import { j7zDecompress, j7zCompressDir } from "./helpers";
 import { gate } from "./gates";
 import { compressCommand } from "../src/commands/compress";
-import { decompressCommand } from "../src/commands/decompress";
+import { decompressCommand, decompressToCommand } from "../src/commands/decompress";
 import { repairCommand } from "../src/commands/repair";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
 import { bundled7zPath } from "../src/engines/bundled7z";
@@ -99,6 +99,43 @@ describe("decompress command (real engine)", () => {
     const outDir = path.join(dir, "input.extracted");
     expect(fs.readFileSync(path.join(outDir, "a.txt"), "utf8")).toBe("decompress me");
     expect(fs.readFileSync(path.join(outDir, "sub", "c.txt"), "utf8")).toBe("deep");
+  });
+
+  it("extracts an archive into a user-chosen folder via extract-to", async () => {
+    const buf = await j7zCompressDir(
+      { "/a.txt": "to chosen folder", "/sub/c.txt": "deep chosen" },
+      "/x.7z",
+    );
+    const archive = path.join(dir, "input.7z");
+    fs.writeFileSync(archive, buf);
+
+    const destDir = path.join(dir, "chosen");
+    __setOpenDialogResult([vscode.Uri.file(destDir)]);
+    await decompressToCommand(vscode.Uri.file(archive), undefined);
+
+    expect(fs.readFileSync(path.join(destDir, "a.txt"), "utf8")).toBe("to chosen folder");
+    expect(fs.readFileSync(path.join(destDir, "sub", "c.txt"), "utf8")).toBe("deep chosen");
+    expect(fs.existsSync(path.join(dir, "input.extracted"))).toBe(false);
+  });
+
+  it("asks before overwriting existing files in the chosen folder", async () => {
+    const buf = await j7zCompressDir({ "/a.txt": "new content" }, "/x.7z");
+    const archive = path.join(dir, "input.7z");
+    fs.writeFileSync(archive, buf);
+
+    const destDir = path.join(dir, "chosen");
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.writeFileSync(path.join(destDir, "a.txt"), "precious data");
+
+    __setOpenDialogResult([vscode.Uri.file(destDir)]);
+    // The dialog mock resolves undefined (no confirmation) → extraction aborts.
+    await decompressToCommand(vscode.Uri.file(archive), undefined);
+
+    const warnings = __dialogs().filter((d) => d.kind === "warning");
+    expect(warnings.length).toBe(1);
+    expect(warnings[0].message).toContain("1");
+    // The existing file is untouched.
+    expect(fs.readFileSync(path.join(destDir, "a.txt"), "utf8")).toBe("precious data");
   });
 });
 

@@ -60,13 +60,7 @@ const virtualItems = computed(() => virtualizer.value.getVirtualItems());
 
 function onRowClick(e: MouseEvent, fn: FlatNode) {
   if ((e.target as HTMLElement).closest(".checkbox")) return;
-  emit(
-    "row-click",
-    fn.path,
-    fn.node.kind === "DIRECTORY",
-    e.shiftKey,
-    e.ctrlKey || e.metaKey,
-  );
+  emit("row-click", fn.path, fn.node.kind === "DIRECTORY", e.shiftKey, e.ctrlKey || e.metaKey);
 }
 
 function onRowContextMenu(e: MouseEvent, fn: FlatNode) {

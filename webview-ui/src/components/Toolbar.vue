@@ -74,10 +74,7 @@
         ></span
       ></span>
       <div class="flex flex-col min-w-[140px] max-w-[320px] flex-1 items-stretch">
-        <div
-          class="search-box"
-          :class="{ 'search-on': !!searchQuery, 'search-error': regexError }"
-        >
+        <div class="search-box" :class="{ 'search-on': !!searchQuery, 'search-error': regexError }">
           <span class="codicon codicon-search search-ico"></span>
           <input
             class="search-input"
