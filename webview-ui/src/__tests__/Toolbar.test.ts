@@ -110,32 +110,59 @@ describe("Toolbar", () => {
     expect(nameLabel.text()).toContain("Name");
   });
 
-  it('emits "toggle-regex" on regex button click', async () => {
+  it('emits "toggle-regex" when switching to regex mode', async () => {
     const w = mountToolbar();
-    const regexBtn = w.find(".search-regex-btn");
-    await regexBtn.trigger("click");
+    const modeBtns = w.findAll(".search-mode-btn");
+    await modeBtns[1].trigger("click");
     expect(w.emitted("toggle-regex")).toBeTruthy();
   });
 
-  it("shows regex button as active when isRegex is true", () => {
+  it('emits "toggle-regex" when switching back to filter mode', async () => {
     const w = mountToolbar({ isRegex: true });
-    const regexBtn = w.find(".search-regex-btn");
-    expect(regexBtn.classes().join(" ")).toContain("text-[var(--vscode-focusBorder,#007acc)]");
+    const modeBtns = w.findAll(".search-mode-btn");
+    await modeBtns[0].trigger("click");
+    expect(w.emitted("toggle-regex")).toBeTruthy();
   });
 
-  it("shows search match count when query has results", () => {
-    const w = mountToolbar({ searchQuery: "test", searchMatchCount: 5 });
-    expect(w.find(".search-match").text()).toContain("5 matches");
+  it("does not emit toggle-regex when clicking the active mode", async () => {
+    const w = mountToolbar({ isRegex: false });
+    const modeBtns = w.findAll(".search-mode-btn");
+    await modeBtns[0].trigger("click");
+    expect(w.emitted("toggle-regex")).toBeFalsy();
   });
 
-  it("shows singular match text for one result", () => {
-    const w = mountToolbar({ searchQuery: "test", searchMatchCount: 1 });
-    expect(w.find(".search-match").text()).toContain("1 match");
+  it("marks the active search mode", () => {
+    const w = mountToolbar({ isRegex: true });
+    const modeBtns = w.findAll(".search-mode-btn");
+    expect(modeBtns[0].classes()).not.toContain("on");
+    expect(modeBtns[1].classes()).toContain("on");
   });
 
-  it("shows error border when regexError is set", () => {
-    const w = mountToolbar({ regexError: "Invalid pattern" });
-    expect(w.find(".search-error").exists()).toBe(true);
+  it('emits "search" with empty query on clear button click', async () => {
+    const w = mountToolbar({ searchQuery: "test" });
+    await w.find(".search-clear").trigger("click");
+    expect(w.emitted("search")).toBeTruthy();
+    expect(w.emitted("search")![0]).toEqual([""]);
+  });
+
+  it('emits "search" with empty query on Esc', async () => {
+    const w = mountToolbar({ searchQuery: "test" });
+    await w.find("input.search-input").trigger("keydown", { key: "Escape" });
+    expect(w.emitted("search")).toBeTruthy();
+    expect(w.emitted("search")![0]).toEqual([""]);
+  });
+
+  it("marks the search box with error state and shows the message", () => {
+    const w = mountToolbar({ searchQuery: "(", regexError: "Invalid pattern" });
+    expect(w.find(".search-box").classes()).toContain("search-error");
+    expect(w.find(".search-error-msg").text()).toBe("Invalid pattern");
+  });
+
+  it("marks the search box as active while a query is set", () => {
+    const w = mountToolbar({ searchQuery: "test" });
+    expect(w.find(".search-box").classes()).toContain("search-on");
+    const w2 = mountToolbar();
+    expect(w2.find(".search-box").classes()).not.toContain("search-on");
   });
 
   it('emits "expand-all" and "collapse-all"', async () => {
