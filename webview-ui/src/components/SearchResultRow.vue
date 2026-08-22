@@ -99,13 +99,13 @@ function onExpandClick(e: MouseEvent) {
       <span class="checkmark" :class="{ on: selected }"></span>
     </span>
     <span class="codicon icon" :class="'codicon-' + icon.codicon"></span>
-    <span class="name truncate flex-1 min-w-0" :title="node.path"
+    <span class="name truncate flex-1 min-w-0" v-tip="node.path"
       ><template v-for="(seg, i) in nameSegments" :key="i"
         ><mark v-if="seg.mark">{{ seg.text }}</mark
         ><template v-else>{{ seg.text }}</template></template
       ></span
     >
-    <span v-if="crumb" class="res-crumb truncate" :title="node.path"
+    <span v-if="crumb" class="res-crumb truncate" v-tip="node.path"
       ><template v-for="(seg, i) in crumbSegments" :key="i"
         ><mark v-if="seg.mark">{{ seg.text }}</mark
         ><template v-else>{{ seg.text }}</template></template

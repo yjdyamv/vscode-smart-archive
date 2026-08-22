@@ -3,13 +3,13 @@
     class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1 text-[0.85em] text-[var(--vscode-descriptionForeground)] bg-[var(--vscode-statusBar-background,var(--vscode-sideBarSectionHeader-background))] border-t border-[var(--vscode-sideBarSectionHeader-border)] flex-shrink-0"
   >
     <div class="flex flex-wrap items-center gap-1.5">
-      <button v-if="isSplit" class="btn" :title="ui('ui.mergeTitle')" @click="$emit('merge')">
+      <button v-if="isSplit" class="btn" v-tip="ui('ui.mergeTitle')" @click="$emit('merge')">
         <span class="codicon codicon-merge"></span><span class="btn-lbl">{{ ui("ui.merge") }}</span>
       </button>
       <button
         v-if="canSplit && !isSplit"
         class="btn"
-        :title="ui('ui.splitTitle')"
+        v-tip="ui('ui.splitTitle')"
         @click="$emit('split')"
       >
         <span class="codicon codicon-split-horizontal"></span
@@ -19,7 +19,7 @@
         <button
           v-if="isEncrypted"
           class="btn"
-          :title="ui('ui.decryptTitle')"
+          v-tip="ui('ui.decryptTitle')"
           @click="$emit('decrypt')"
         >
           <span class="codicon codicon-unlock"></span
@@ -28,14 +28,14 @@
         <button
           v-if="!isEncrypted"
           class="btn"
-          :title="ui('ui.encryptTitle')"
+          v-tip="ui('ui.encryptTitle')"
           @click="$emit('encrypt')"
         >
           <span class="codicon codicon-lock"></span
           ><span class="btn-lbl">{{ ui("ui.encrypt") }}</span>
         </button>
       </template>
-      <button class="btn-ico" :title="ui('ui.testTitle')" @click="$emit('test')">
+      <button class="btn-ico" v-tip="ui('ui.testTitle')" @click="$emit('test')">
         <span class="codicon codicon-verified"></span>
       </button>
       <span class="sep"></span>

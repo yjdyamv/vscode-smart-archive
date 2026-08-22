@@ -17,6 +17,7 @@
   /* Z-index */
   --z-index-toast: 999;
   --z-index-menu: 1000;
+  --z-index-tip: 1010;
 
   /* Shadows */
   --shadow-sa-menu: 0 4px 12px rgba(0, 0, 0, 0.25);
@@ -468,6 +469,32 @@
     flex-shrink: 0;
     line-height: var(--size-sa-row);
     font-size: var(--text-sa-2xl);
+  }
+
+  /* Tooltip — themed like VS Code's own hover widgets (rounded, subtle
+   * border and shadow). Rendered by the v-tip directive (directives/tooltip),
+   * content is plain text set via textContent. */
+  .sa-tip {
+    position: fixed;
+    z-index: var(--z-index-tip);
+    max-width: 420px;
+    padding: 3px 8px;
+    font-size: var(--text-sa-xs);
+    line-height: 1.4;
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    background: var(--vscode-editorHoverWidget-background);
+    border: 1px solid var(--vscode-editorHoverWidget-border);
+    border-radius: var(--radius-sa-md);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition-sa-fast);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-line;
+  }
+  .sa-tip.show {
+    opacity: 1;
   }
 }
 

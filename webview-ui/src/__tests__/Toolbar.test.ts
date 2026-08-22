@@ -168,8 +168,8 @@ describe("Toolbar", () => {
   it('emits "expand-all" and "collapse-all"', async () => {
     const w = mountToolbar();
     const btns = w.findAll("button.btn-ico");
-    const expandAll = btns.find((b) => b.attributes("title") === "Expand All");
-    const collapseAll = btns.find((b) => b.attributes("title") === "Collapse All");
+    const expandAll = btns.find((b) => b.find(".codicon-expand-all").exists());
+    const collapseAll = btns.find((b) => b.find(".codicon-collapse-all").exists());
     await expandAll?.trigger("click");
     await collapseAll?.trigger("click");
     expect(w.emitted("expand-all")).toBeTruthy();
