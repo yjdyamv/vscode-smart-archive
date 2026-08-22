@@ -6,7 +6,7 @@
       <button
         class="btn"
         :disabled="selectedCount === 0"
-        :title="ui('ui.extractSelected')"
+        v-tip="ui('ui.extractSelected')"
         @click="$emit('extract-selected')"
       >
         <span class="codicon codicon-arrow-down"></span
@@ -15,7 +15,7 @@
       <button
         class="btn"
         :disabled="readOnly || selectedCount === 0"
-        :title="ui('ui.delete')"
+        v-tip="ui('ui.delete')"
         @click="$emit('delete-selected')"
       >
         <span class="codicon codicon-trash"></span
@@ -25,25 +25,25 @@
         class="btn"
         :disabled="readOnly"
         @click="$emit('add-files')"
-        :title="ui('ui.addTo') + (lastAddDir || ui('ui.archiveRoot'))"
+        v-tip="ui('ui.addTo') + (lastAddDir || ui('ui.archiveRoot'))"
       >
         <span class="codicon codicon-add"></span
         ><span class="btn-lbl">{{ ui("ui.addFiles") }}</span>
       </button>
       <span class="sep"></span>
-      <button class="btn" :title="ui('ui.extractAll')" @click="$emit('extract-all')">
+      <button class="btn" v-tip="ui('ui.extractAll')" @click="$emit('extract-all')">
         <span class="codicon codicon-desktop-download"></span
         ><span class="btn-lbl">{{ ui("ui.extractAll") }}</span>
       </button>
-      <button class="btn" :title="ui('ui.convert')" @click="$emit('convert')">
+      <button class="btn" v-tip="ui('ui.convert')" @click="$emit('convert')">
         <span class="codicon codicon-arrow-swap"></span
         ><span class="btn-lbl">{{ ui("ui.convert") }}</span>
       </button>
       <span class="sep"></span>
-      <button class="btn-ico" :title="ui('ui.expandAll')" @click="$emit('expand-all')">
+      <button class="btn-ico" v-tip="ui('ui.expandAll')" @click="$emit('expand-all')">
         <span class="codicon codicon-expand-all"></span>
       </button>
-      <button class="btn-ico" :title="ui('ui.collapseAll')" @click="$emit('collapse-all')">
+      <button class="btn-ico" v-tip="ui('ui.collapseAll')" @click="$emit('collapse-all')">
         <span class="codicon codicon-collapse-all"></span>
       </button>
     </div>
@@ -80,7 +80,7 @@
             class="search-input"
             :value="searchQuery"
             :placeholder="ui('ui.searchPlaceholder')"
-            :title="regexError || ui('ui.searchTitle')"
+            v-tip="regexError || ui('ui.searchTitle')"
             @input="$emit('search', ($event.target as HTMLInputElement).value)"
             @keydown.esc="onEsc"
           />
@@ -89,7 +89,7 @@
               class="search-mode-btn"
               :class="{ on: !isRegex }"
               :aria-pressed="!isRegex"
-              :title="ui('ui.fuzzySearch')"
+              v-tip="ui('ui.fuzzySearch')"
               @click="setMode(false)"
             >
               <span class="codicon codicon-filter"></span
@@ -99,7 +99,7 @@
               class="search-mode-btn"
               :class="{ on: isRegex }"
               :aria-pressed="isRegex"
-              :title="ui('ui.useRegex')"
+              v-tip="ui('ui.useRegex')"
               @click="setMode(true)"
             >
               <span class="codicon codicon-regex"></span
@@ -109,7 +109,7 @@
           <button
             v-if="searchQuery"
             class="btn-ico search-clear"
-            :title="ui('ui.clearSearchTitle')"
+            v-tip="ui('ui.clearSearchTitle')"
             @click="clearSearch"
           >
             <span class="codicon codicon-close"></span>

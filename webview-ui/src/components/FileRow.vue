@@ -111,7 +111,7 @@ function onExpandClick(e: MouseEvent) {
       <span v-else-if="isDir" class="codicon codicon-chevron-right arrow-icon"></span>
     </span>
     <span class="codicon icon" :class="'codicon-' + icon.codicon"></span>
-    <span class="name truncate flex-1" :title="node.path"
+    <span class="name truncate flex-1" v-tip="node.path"
       ><template v-for="(seg, i) in nameSegments" :key="i"
         ><mark v-if="seg.mark">{{ seg.text }}</mark
         ><template v-else>{{ seg.text }}</template></template
