@@ -11,10 +11,9 @@ const Host = defineComponent({
   props: { msg: { type: String, default: "tip text" } },
   setup(props) {
     return () =>
-      withDirectives(
-        h("div", { class: "anchor", style: "width:100px;height:20px" }, props.msg),
-        [[vTip, props.msg]],
-      );
+      withDirectives(h("div", { class: "anchor", style: "width:100px;height:20px" }, props.msg), [
+        [vTip, props.msg],
+      ]);
   },
 });
 

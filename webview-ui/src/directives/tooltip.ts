@@ -85,10 +85,7 @@ function attach(el: HTMLElement): { set: (text: string) => void; dispose: () => 
   const onFocus = () => {
     const r = el.getBoundingClientRect();
     if (timer !== undefined) window.clearTimeout(timer);
-    timer = window.setTimeout(
-      () => show(text, r.left + r.width / 2, r.bottom),
-      SHOW_DELAY,
-    );
+    timer = window.setTimeout(() => show(text, r.left + r.width / 2, r.bottom), SHOW_DELAY);
   };
   const onBlur = () => onLeave();
 
