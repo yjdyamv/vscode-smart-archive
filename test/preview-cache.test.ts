@@ -541,7 +541,12 @@ describe("orphan reclamation (origins index)", () => {
         mtimeMs: st.mtimeMs,
         size: st.size,
       });
-      fs.writeFileSync(arc, "changed bytes"); // mtime+size change
+      fs.writeFileSync(arc, "changed bytes"); // content change…
+      // …but same-length writes can land in one Windows clock tick, leaving
+      // mtimeMs identical — pin an unambiguous old stamp so the stat
+      // mismatch is deterministic on every filesystem.
+      const old = new Date(Date.now() - 60_000);
+      fs.utimesSync(arc, old, old);
       expect(sweepPreviewCache(cache)).toBe(1);
       expect(fs.existsSync(f)).toBe(false);
     } finally {
