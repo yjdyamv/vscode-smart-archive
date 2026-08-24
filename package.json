@@ -61,8 +61,8 @@
     "vscode:prepublish": "npm run stage:natives && npm run build"
   },
   "dependencies": {
-    "@napi-rs/wasm-runtime": "^1.2.2",
-    "@vscode/codicons": "^0.0.45",
+    "@napi-rs/wasm-runtime": "^1.2.3",
+    "@vscode/codicons": "^0.0.46-24",
     "iconv-lite": "^0.7.3",
     "minimatch": "^10.2.5",
     "pino": "^10.3.1",
@@ -75,10 +75,10 @@
     "@vscode/vsce": "^3.9.2",
     "cross-env": "^10.1.0",
     "https-proxy-agent": "^9.1.0",
-    "oxfmt": "^0.62.0",
-    "oxlint": "^1.74.0",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "brace-expansion": "5.0.9",
