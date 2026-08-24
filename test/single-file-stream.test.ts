@@ -285,15 +285,20 @@ describe("wrapped preview fast path (7z auto-unpacks the inner tar)", () => {
         expect(first.length).toBe(1);
         const cachedPath = path.join(previewDir(), first[0]);
         expect(fs.readFileSync(cachedPath, "utf8")).toBe("inside " + ext + "\n".repeat(1000));
-        const cachedMtime = fs.statSync(cachedPath).mtimeMs;
 
         // Warm: cache hit — same file untouched, no new files, and the hit
         // refreshes mtime (idle-TTL LRU: revisited entries keep their slot).
+        // Comparing raw mtimes across two rapid calls is flaky on Windows
+        // (coarse/oddly-rounded timestamps can go backwards a few ms), so
+        // anchor the file's stamp clearly in the past and require the hit
+        // to pull it back to ~now — a large, granularity-proof delta.
+        const stale = new Date(Date.now() - 60_000);
+        fs.utimesSync(cachedPath, stale, stale);
         await previewFileFromArchive(arc, main);
         const createdAfter = fs
           .readdirSync(previewDir())
           .filter((f) => !before.has(f) && f !== first[0]);
-        expect(fs.statSync(cachedPath).mtimeMs).toBeGreaterThanOrEqual(cachedMtime);
+        expect(fs.statSync(cachedPath).mtimeMs).toBeGreaterThan(Date.now() - 30_000);
         expect(createdAfter.length).toBe(0);
       } finally {
         fs.rmSync(td, { recursive: true, force: true });
