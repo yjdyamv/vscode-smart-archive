@@ -57,6 +57,28 @@ function findFileInTree(root, basename) {
   return null;
 }
 
+/**
+ * Pure-Node PATH lookup — replaces spawning `command -v` (a shell builtin,
+ * so execFileSync always threw ENOENT and was silently swallowed) and
+ * `where` (Windows-only). Checks each PATH dir for an executable match.
+ */
+function findOnPath(name) {
+  const exts = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
+  for (const dir of (process.env.PATH || "").split(path.delimiter)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      const p = path.join(dir, name + ext);
+      try {
+        fs.accessSync(p, fs.constants.X_OK);
+        return p;
+      } catch {
+        /* not here — keep looking */
+      }
+    }
+  }
+  return null;
+}
+
 /** Find a 7z/7zz binary usable on the current host to unpack Windows SFX. */
 function findHostSevenZip(platform, stagedRoot) {
   // Linux: use the just-staged linux-x64 7zz
@@ -74,18 +96,8 @@ function findHostSevenZip(platform, stagedRoot) {
     ]) {
       if (fs.existsSync(p)) return p;
     }
-    try {
-      execFileSync("command", ["-v", "7zz"], { stdio: "pipe" });
-      return "7zz";
-    } catch {
-      /* not on PATH */
-    }
-    try {
-      execFileSync("command", ["-v", "7z"], { stdio: "pipe" });
-      return "7z";
-    } catch {
-      /* not on PATH */
-    }
+    const found = findOnPath("7zz") ?? findOnPath("7z");
+    if (found) return found;
     // Fall back to just-staged darwin binary
     for (const a of ["arm64", "x64"]) {
       const p = path.join(stagedRoot, "darwin", a, "7zz");
@@ -107,18 +119,8 @@ function findHostSevenZip(platform, stagedRoot) {
     ]) {
       if (fs.existsSync(p)) return p;
     }
-    try {
-      execFileSync("where", ["7z.exe"], { stdio: "pipe" });
-      return "7z.exe";
-    } catch {
-      /* not on PATH */
-    }
-    try {
-      execFileSync("where", ["7zz.exe"], { stdio: "pipe" });
-      return "7zz.exe";
-    } catch {
-      /* not on PATH */
-    }
+    const found = findOnPath("7z.exe") ?? findOnPath("7zz.exe");
+    if (found) return found;
     // Fall back to a just-staged win32 binary of the current arch only.
     for (const bin of ["7zz.exe", "7z.exe"]) {
       const p = path.join(stagedRoot, "win32", process.arch, bin);
