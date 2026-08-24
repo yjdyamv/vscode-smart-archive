@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
+import { x as tarExtract } from "tar";
 
 /**
  * Extract the first file ending with ".node" from a gzipped npm tarball (tgz).
@@ -129,8 +130,10 @@ function findHostSevenZip(platform, stagedRoot) {
 }
 
 /**
- * Extract an archive into destDir. kind "tgz" uses the system tar; kind "zip"
- * uses a host 7z/7zz binary (staged binaries included) to unpack Windows SFX.
+ * Extract an archive into destDir. kind "tgz" uses the npm `tar` package
+ * (NOT the system tar — Git's MSYS tar on Windows misparses `C:\...` paths
+ * as `host:path` remote syntax and fails); kind "zip" uses a host 7z/7zz
+ * binary (staged binaries included) to unpack Windows SFX.
  * On Windows hosts without any 7-Zip, the built-in PowerShell Expand-Archive
  * is used — the win32 7zz.exe we stage lives inside the very zip we need to
  * unpack, so requiring a system 7-Zip there would break fresh staging.
@@ -143,7 +146,9 @@ function extractArchive(
 ) {
   fs.mkdirSync(destDir, { recursive: true });
   if (kind === "tgz") {
-    execFileSync("tar", ["-xzf", archivePath, "-C", destDir], { stdio: "inherit" });
+    // sync mode keeps extractArchive synchronous; file modes are preserved so
+    // the staged linux/darwin 7zz binaries stay executable.
+    tarExtract({ file: archivePath, cwd: destDir, gzip: true, sync: true });
     return;
   }
   if (kind !== "zip") throw new Error(`unsupported archive kind: ${kind}`);
