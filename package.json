@@ -1,7 +1,7 @@
 {
   "name": "smart-archiver",
   "displayName": "Smart Archiver",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "description": "Create, extract, and browse archives in VS Code — bundled 7-Zip with WASM fallback, AES-256 encryption.",
   "categories": [
