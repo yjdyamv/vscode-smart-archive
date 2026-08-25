@@ -114,6 +114,36 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          # Build artifact comes from the build job; this checkout only feeds
+          # release-note generation, so it must see the full tag history.
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
+          fetch-depth: 0
+      - name: Generate release notes from commits
+        id: notes
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          TAG="${RELEASE_TAG}"
+          PREV="$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1)"
+          [ -n "$PREV" ] || PREV="$(git rev-list --max-parents=0 HEAD)"
+          {
+            echo "## What's Changed"
+            echo
+            echo "### ✨ Features"
+            git log --no-merges --format='%s' "$PREV..$TAG" | grep -E '^feat' | sed 's/^/- /' || true
+            echo
+            echo "### 🐛 Fixes"
+            git log --no-merges --format='%s' "$PREV..$TAG" | grep -E '^fix' | sed 's/^/- /' || true
+            echo
+            echo "### 🔧 Maintenance"
+            git log --no-merges --format='%s' "$PREV..$TAG" | grep -Ev '^(feat|fix|Bump|bump)' | sed 's/^/- /' || true
+            echo
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV}...${TAG}"
+          } > notes.md
+          echo "Generated notes for ${TAG} (previous tag: ${PREV}):"
+          cat notes.md
       - uses: actions/download-artifact@v7
         with:
           name: vsix
@@ -123,11 +153,11 @@ jobs:
           # input is empty and the action falls back to the pushing ref.
           tag_name: ${{ github.event.inputs.release_tag }}
           files: "*.vsix"
-          generate_release_notes: true
-          # Re-running a release (manual dispatch on an existing tag)
-          # must overwrite the previous assets and notes, not fail.
-          allow_overwrite: true
-          update_release_body: true
+          body_path: notes.md
+          # v3 semantics: overwrite_files replaces existing assets, and
+          # body is fully replaced on re-run (append_body defaults to
+          # false) — so re-running a release never accumulates notes.
+          overwrite_files: true
 
   # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
   # Downloads the same 7-Zip ZS arm64 binary the install script stages from
