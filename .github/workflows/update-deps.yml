@@ -22,6 +22,9 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
 
@@ -68,13 +71,16 @@ jobs:
             echo "\`\`\`"
           } > "$RUNNER_TEMP/pr-body.md"
 
+      # NOTE: `with:` inputs are NOT shell-expanded — `$RUNNER_TEMP` would be
+      # passed through literally (the action then reports the file missing).
+      # Use the runner.temp expression instead.
       - name: Open pull request
         if: steps.check.outputs.updates == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1 (node24)
         with:
           branch: deps/engine-update
           delete-branch: true
           commit-message: "chore(deps): update bundled engine dependencies"
           title: "chore(deps): update bundled engine dependencies"
-          body-path: "$RUNNER_TEMP/pr-body.md"
+          body-path: "${{ runner.temp }}/pr-body.md"
           labels: dependencies
