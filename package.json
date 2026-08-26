@@ -398,6 +398,29 @@
           ],
           "description": "%config.default.format.description%"
         },
+        "smart-archiver.default.formatOrder": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "7z",
+              "zip",
+              "rar",
+              "tar.zst",
+              "tar.gz",
+              "tar.xz",
+              "tar",
+              "tar.bz2",
+              "tar.lz4",
+              "tar.br",
+              "tar.sz",
+              "wim"
+            ]
+          },
+          "description": "%config.default.formatOrder.description%"
+        },
         "smart-archiver.default.compressionLevel": {
           "type": "integer",
           "default": 5,

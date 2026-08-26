@@ -356,6 +356,36 @@ export function lookupFormat(label: string): FormatInfo {
 /** Regex for RAR-family extensions (including multi-volume .r00–.r99) */
 export { isRarExt } from "./utils/rar";
 
+/**
+ * Resolve the format list shown in the compress wizard.
+ *
+ * `order` is the user-configured whitelist (labels in display order);
+ * unknown labels are ignored. An empty/undefined order falls back to the
+ * default table order. The configured default format is always included
+ * and pinned to the top, so it can never become unselectable.
+ */
+export function resolveCompressFormats(
+  order: readonly string[] | undefined,
+  defaultFormat: string,
+  formats: readonly FormatInfo[] = COMPRESS_FORMATS,
+): FormatInfo[] {
+  const base =
+    order && order.length > 0
+      ? order
+          .map((label) => formats.find((f) => f.label === label))
+          .filter((f): f is FormatInfo => f !== undefined)
+      : [...formats];
+  const idx = base.findIndex((f) => f.label === defaultFormat);
+  if (idx > 0) {
+    const [def] = base.splice(idx, 1);
+    base.unshift(def);
+  } else if (idx < 0) {
+    const def = formats.find((f) => f.label === defaultFormat);
+    if (def) base.unshift(def);
+  }
+  return base;
+}
+
 /** Extensions that may contain encrypted data (7z/ZIP/RAR) */
 export const ENCRYPTABLE_EXTS: readonly string[] = FORMAT_TABLE.filter(
   (f) => f.supportsEncryption,

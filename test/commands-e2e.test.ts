@@ -77,6 +77,22 @@ describe("compress command (real engine)", () => {
     expect(extracted["src/a.txt"]).toBe("hello command");
     expect(extracted["src/deep/b.txt"]).toBe("nested world");
   });
+
+  it("offers only whitelisted formats in the configured order", async () => {
+    __setConfig("smart-archiver", "default.formatOrder", ["zip", "tar.gz"]);
+    const p = compressCommand(vscode.Uri.file(path.join(dir, "src")), []);
+    await vi.waitFor(() => expect(__quickPicks().length).toBe(1));
+    // default.format ("7z") is pinned to the top, then the whitelist order
+    expect((qp(1).items as { label: string }[]).map((i) => i.label)).toEqual([
+      "7z",
+      "zip",
+      "tar.gz",
+    ]);
+    // cancel at the format step — nothing further may be offered
+    qp(1).hide();
+    await p;
+    expect(__quickPicks().length).toBe(1);
+  });
 });
 
 describe("decompress command (real engine)", () => {

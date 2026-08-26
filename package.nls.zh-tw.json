@@ -1,5 +1,6 @@
 {
   "config.default.format.description": "壓縮檔案時使用的預設歸檔格式。",
+  "config.default.formatOrder.description": "壓縮精靈中顯示的格式及順序（白名單）。留空 = 預設清單；未知項目會被忽略；預設格式一律置頂。",
   "config.default.format.7z": "7-Zip — 最佳壓縮率，AES-256 加密",
   "config.default.format.zip": "ZIP — 通用相容性，AES-256 加密",
   "config.default.format.tar": "TAR — 僅歸檔，不壓縮",

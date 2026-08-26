@@ -1,5 +1,6 @@
 {
   "config.default.format.description": "Default archive format used when compressing files.",
+  "config.default.formatOrder.description": "Formats shown in the compress picker, in display order (whitelist). Empty = default list; unknown entries are ignored; the configured default format is always pinned to the top.",
   "config.default.format.7z": "7-Zip — best compression ratio, AES-256 encryption",
   "config.default.format.zip": "ZIP — universal compatibility, AES-256 encryption",
   "config.default.format.tar": "TAR — archive only, no compression",
