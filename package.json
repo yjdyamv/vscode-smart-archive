@@ -1,7 +1,7 @@
 {
   "name": "smart-archiver",
   "displayName": "Smart Archiver",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "private": true,
   "description": "Compress, extract, and browse archives in VS Code — bundled 7-Zip, AES-256, zero install.",
   "categories": [
