@@ -3,15 +3,30 @@
 
 # Source code — always LF
 *.ts text eol=lf
+*.mts text eol=lf
+*.cts text eol=lf
+*.tsx text eol=lf
 *.vue text eol=lf
 *.js text eol=lf
 *.mjs text eol=lf
+*.cjs text eol=lf
+*.jsx text eol=lf
 *.json text eol=lf
+*.jsonc text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.md text eol=lf
 *.html text eol=lf
 *.css text eol=lf
+*.scss text eol=lf
+*.svg text eol=lf
+*.map text eol=lf
+*.vscodeignore text eol=lf
+
+# No-extension text files — always LF
+LICENSE text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
 
 # Windows-specific
 *.bat text eol=crlf
@@ -23,5 +38,13 @@
 *.vsix binary
 *.png binary
 *.jpg binary
+*.jpeg binary
 *.gif binary
 *.ico binary
+*.webp binary
+*.avif binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
