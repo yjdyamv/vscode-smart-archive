@@ -1,103 +1,69 @@
-# Smart Archiver — Roadmap
+# Roadmap
 
-> Planning document for the maintainer. Current baseline: **v1.30.0** — a mature
-> VS Code archive extension (~25k LOC, 790+ tests, clean lint/typecheck, 3-language UI,
-> custom-editor archive browser with in-place add/delete/rename/convert/split/merge,
-> AES-256, multi-volume, progress + cancellation, worker_threads offload, WASM 7-Zip with system-tool fast path).
->
-> The core feature set is essentially complete. The work below is about **shipping it to
-> users, hardening it under load, and closing the few real functional gaps** — not a rewrite.
+Maintainer planning doc. Baseline: **v2.5.0** — mature (~25k LOC, 794+ tests, 3-language UI, archive browser with in-place add/delete/rename, AES-256, multi-volume, WASM compress/extract on `worker_threads`, WASM 7-Zip with system-tool fast path). Core features are complete — remaining work is **shipping, hardening, closing small gaps**, not a rewrite.
 
-Legend — **Priority**: 🔴 high · 🟡 medium · 🟢 nice-to-have. **Effort**: S (≤1 day) · M (2–4 days) · L (1–2 weeks).
+Legend — **Pri:** 🔴 high · 🟡 medium · 🟢 nice-to-have. **Effort:** S ≤1d · M 2–4d · L 1–2w.
 
----
+## Phase 1 — Ship it
 
-## Phase 1 — Ship it (release & distribution)
+Publish to where users actually install from. **Highest leverage — everything else is invisible until then.** (Tag builds already produce a VSIX + GitHub Release.)
 
-The extension builds a `.vsix` and creates a GitHub Release on tag, but it never reaches
-the two places users actually install from. This phase turns a private build into a
-published product. **This is the highest-leverage phase — everything else is invisible
-until users can install it.**
+| # | Item | Pri | Effort |
+|---|------|-----|--------|
+| 1.1 | Marketplace + Open VSX publish in CI on `v*` tags (`vsce`/`ovsx`, `VSCE_PAT`/`OVSX_PAT` secrets) | 🔴 | S |
+| 1.2 | `CHANGELOG.md` (Keep-a-Changelog), backfilled from git history | 🔴 | S |
+| 1.3 | Release script: bump version + changelog heading + tag + push (removes manual drift) | 🟡 | S |
+| 1.4 | README polish for Marketplace: hero GIF, browser screenshots, badges | 🟡 | M |
+| 1.5 | Pre-release channel (`vsce publish --pre-release`) | 🟢 | S |
 
-| # | Item | Pri | Effort | Notes |
-|---|------|-----|--------|-------|
-| 1.1 | **Automated Marketplace + Open VSX publish** in CI on `v*` tags | 🔴 | S | Wire `vsce publish` / `ovsx publish` into `build.yml` behind a tag trigger, using `VSCE_PAT` / `OVSX_PAT` repo secrets. Keep the existing artifact + GH Release steps. |
-| 1.2 | **`CHANGELOG.md`** (Keep-a-Changelog format) | 🔴 | S | The Marketplace renders CHANGELOG on the extension page; today there is none. Backfill from git history (`generate_release_notes` is already on for GH Releases — reuse that content). |
-| 1.3 | **Release checklist / version-bump script** | 🟡 | S | Single command that bumps `package.json`, updates CHANGELOG heading, tags, and pushes. Removes the manual drift between `version`, tag, and changelog. |
-| 1.4 | **README polish for Marketplace**: hero GIF, screenshots of the browser, badges (installs, version, rating) | 🟡 | M | The archive browser is the standout feature and it is currently text-only in the README. One good animated GIF of browse → multi-select → extract sells the extension. |
-| 1.5 | **Pre-release channel** via `vsce publish --pre-release` | 🟢 | S | Lets power users opt into `main` builds without destabilizing the stable channel. |
+**Exit:** a green tag build is installable from both marketplaces with a changelog and screenshot.
 
-**Exit criteria:** a green tag build results in the extension being installable from both
-Marketplaces, with a readable changelog and at least one screenshot.
+## Phase 2 — Performance & robustness
 
----
+WASM compress/extract already runs off the host thread; remaining work is benchmarking, observability, and edge-case robustness.
 
-## Phase 2 — Performance & robustness under load
+| # | Item | Pri | Effort |
+|---|------|-----|--------|
+| 2.2 | Large-file benchmark suite (1/5/10 GB fixtures, generated not committed) | 🟡 | M |
+| 2.3 | Opt-in error reporting via `TelemetryLogger` (classified error codes only, never paths) | 🟡 | M |
 
-All compression/extraction runs on the extension-host thread. For small archives this is
-fine; for multi-GB archives the WASM 7-Zip work can stall the host (autocomplete, other
-extensions, the UI). Progress + cancellation already exist, which makes the remaining work
-tractable.
-
-| # | Item | Pri | Effort | Notes |
-|---|------|-----|--------|-------|
-| 2.1 | **Move WASM compress/extract to a `worker_threads` worker** | 🔴 | L | The single most impactful reliability change. The engine layer (`src/engines/js7z-*`) is already well-isolated behind `archiveService`; a worker boundary fits the existing seam. Progress/cancel messages marshal across the port. Keep the system-7z (child-process) path as-is since it already runs off-thread. |
-| 2.2 | **Large-file benchmark suite** (1 GB / 5 GB / 10 GB fixtures, generated not committed) | 🟡 | M | Guards against regressions in the chunked-I/O / NODEFS paths the README advertises. Run manually / nightly, not on every PR. |
-| 2.3 | **Opt-in error reporting** via VS Code `TelemetryLogger` (respecting `telemetry.telemetryLevel`) | 🟡 | M | There is currently zero visibility into real-world failures. Report only classified error codes from `errorClassifier` + format/engine — never paths or filenames. Off unless the user's telemetry setting allows it. |
-| 2.4 | **Memory-pressure guardrails**: surface a clear warning before operations that would exceed the configured `maxExtractTotalSize` in RAM, and prefer streaming paths | 🟡 | M | Bomb detection exists; this is the proactive "this will be slow/heavy" heads-up. |
-| 2.5 | **Concurrency limit for batch compress** of many small inputs | 🟢 | S | Avoids spawning unbounded work when a user compresses a huge folder tree. |
-
-**Exit criteria:** compressing/extracting a 5 GB archive keeps the VS Code UI responsive;
-benchmarks are reproducible.
-
----
+**Exit:** compressing/extracting a 5 GB archive keeps the VS Code UI responsive.
 
 ## Phase 3 — Feature gaps
 
-Grounded, high-value additions the current architecture supports. Ordered by user value.
+Grounded additions the current architecture supports, ordered by user value.
 
-| # | Item | Pri | Effort | Notes |
-|---|------|-----|--------|-------|
-| 3.1 | **Edit-in-place / save-back**: open a file from the archive, edit it, save → write the changes back into the archive | 🔴 | L | Today `preview.ts` opens files read-only. Save-back is the most-requested capability for archive tools and the `archive/modify.ts` + temp-file plumbing already exists to build on. Guard behind a "reopen from archive" dirty-tracking model. |
-| 3.2 | **Drag files from OS / Explorer into the browser** to add them | 🟡 | M | No drop handler exists yet — add native drops and VS Code Explorer drags. Complements the existing add/paste flows. |
-| 3.3 | **Explorer quick actions**: "Extract Here" and "Extract to <name>/" as distinct context-menu items | 🟡 | S | Current single "Decompress" always extracts to `<name>.extracted/`. Two explicit choices match every desktop archive tool and are a small `package.json` + command change. |
-| 3.4 | **Archive compare / diff** — pick two archives (or an archive vs. a folder) and show added/removed/changed entries | 🟢 | L | Natural extension of the tree-builder; useful for verifying backups and releases. |
-| 3.5 | **Nested archive browse** — open an archive-within-an-archive without manual extract | 🟢 | M | The custom editor already keys off virtual entries; nesting reuses the extraction-to-temp path. |
-| 3.6 | **Compression tuning UI** — expose dictionary size, solid block, thread count, and per-format method in a quick-pick before compressing | 🟢 | M | Power-user knob; keep the current one-click default untouched so casual users are unaffected. |
+| # | Item | Pri | Effort |
+|---|------|-----|--------|
+| 3.1 | Edit-in-place / save-back into the archive (most-requested; `modify.ts` + temp-file plumbing exists) | 🔴 | L |
+| 3.2 | Drag files from OS / Explorer into the browser | 🟡 | M |
+| 3.3 | "Extract Here" quick action (the "Extract to…" folder-picker already shipped, opt-in) | 🟡 | S |
+| 3.4 | Archive compare / diff (two archives, or archive vs folder) | 🟢 | L |
+| 3.5 | Nested archive browse (archive-within-archive) | 🟢 | M |
+| 3.6 | Compression tuning UI (dictionary, solid block, threads) | 🟢 | M |
 
-**Exit criteria:** edit-save-back ships behind tests; the two extract actions and native
-drag-in feel native.
-
----
+**Exit:** save-back ships tested; "Extract Here" and drag-in feel native.
 
 ## Phase 4 — Engineering quality
 
-Keeps the project maintainable and contributor-friendly as it grows.
+| # | Item | Pri | Effort |
+|---|------|-----|--------|
+| 4.1 | VS Code integration/E2E tests with `@vscode/test-electron` (today ~794 unit tests mock `vscode`; nothing exercises the real custom-editor lifecycle) | 🔴 | L |
+| 4.2 | `CONTRIBUTING.md` + architecture note (`engines → services → providers → webview` layering) | 🟡 | S |
+| 4.3 | Unit tests for system-7z detection / path logic on Windows + macOS (CI already validates Windows pure-fs and the bundled mac 7zz binary) | 🟡 | M |
+| 4.4 | Coverage reporting in CI (non-blocking) | 🟢 | S |
 
-| # | Item | Pri | Effort | Notes |
-|---|------|-----|--------|-------|
-| 4.1 | **Real VS Code integration/E2E tests** with `@vscode/test-electron` | 🔴 | L | The ~790 unit tests mock the `vscode` module (`test/__mocks__/vscode.ts`). Nothing exercises the actual custom-editor lifecycle, command registration, or webview messaging in a running VS Code. Add a thin E2E layer for the critical paths (open archive → browse → extract → compress round-trip). |
-| 4.2 | **`CONTRIBUTING.md` + architecture note** | 🟡 | S | Document the `engines → services → providers → webview` layering (it is clean but undocumented) so future changes respect the seams that Phase 2/3 depend on. |
-| 4.3 | **CI matrix on Windows + macOS** for the native codecs (`zstd-napi`, `lz4-napi`) and system-7z detection | 🟡 | M | `package:cross` handles multi-platform binaries, but tests only run on `ubuntu-latest`. The system-tool detection and path logic are exactly the code most likely to break per-OS. |
-| 4.4 | **Coverage reporting** in CI (Vitest `--coverage`) with a non-blocking threshold badge | 🟢 | S | Visibility, not a gate. |
-| 4.5 | **Dependency & WASM-binary update cadence** (Dependabot or scheduled job, plus a bump path for 7zz-wasm / 7-Zip version) | 🟢 | S | 7zz-wasm tracks upstream 7-Zip; a documented, low-friction bump keeps format support and security current. |
+**Exit:** a PR runs unit + E2E tests on all three OSes; contributors have a codebase map.
 
-**Exit criteria:** a PR runs unit + E2E tests on all three OSes; contributors have a map of the codebase.
+## Sequencing
 
----
+1. **Next release:** 1.1, 1.2, 1.4 — published with changelog and screenshots.
+2. **Then:** 4.1 (E2E harness) — the biggest de-risker.
+3. **Then:** 3.1 (edit-save-back) as the next flagship, backed by the E2E harness.
+4. **Ongoing:** 4.3, 2.3, and 🟢 items as capacity allows.
 
-## Suggested sequencing
+## Out of scope (for now)
 
-1. **Now (next release):** 1.1, 1.2, 1.4 — get it published with a changelog and screenshots.
-2. **Then:** 2.1 (worker thread) + 4.1 (E2E harness) in parallel — the two changes that most
-   de-risk everything after them.
-3. **Then:** 3.1 (edit-save-back) as the flagship feature of the release after, backed by the
-   E2E harness from step 2.
-4. **Ongoing:** 4.3 (OS matrix), 2.3 (telemetry), and the 🟢 items as capacity allows.
-
-## Explicitly out of scope (for now)
-
-- Rewriting engines or swapping the WASM 7-Zip core — it works and is fast with the system fast-path.
-- Cloud/remote archive sources (S3, etc.) — large surface, unclear demand; revisit if requested.
-- Additional _creation_ formats beyond the current 12 — decompression already covers 40+, and
-  new create-formats add test/maintenance cost for little gain.
+- Engine rewrites / swapping the WASM 7-Zip core — it works and is fast with the system fast-path.
+- Cloud/remote archive sources (S3, etc.) — large surface, unclear demand.
+- New *creation* formats — extract already covers 40+, and new ones add test/maintenance cost for little gain.
