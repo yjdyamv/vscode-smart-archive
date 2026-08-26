@@ -16,9 +16,9 @@ import * as path from "path";
 import { compressWith7z } from "../engines/js7z-compress";
 import {
   COMPRESS_EXCLUDE_DEFAULTS,
-  COMPRESS_FORMATS,
   DEFAULT_COMPRESSION_LEVEL,
   lookupFormat,
+  resolveCompressFormats,
 } from "../constants";
 import { resolveSaveName } from "../utils/path";
 import { getVolumeSizes } from "../utils/volume-sizes";
@@ -170,12 +170,11 @@ const LEVEL_VALUES = [0, 1, 3, 5, 7, 9];
 async function promptFormatWizard(): Promise<StepResult<FormatInfo>> {
   const config = vscode.workspace.getConfiguration("smart-archiver");
   const defaultFormat = config.get<string>("default.format", "7z");
-  const items = COMPRESS_FORMATS.map((f) => ({ label: f.label, description: f.description }));
-  const defaultIdx = items.findIndex((i) => i.label === defaultFormat);
-  if (defaultIdx > 0) {
-    const [def] = items.splice(defaultIdx, 1);
-    items.unshift(def);
-  }
+  const formatOrder = config.get<string[]>("default.formatOrder", []);
+  const items = resolveCompressFormats(formatOrder, defaultFormat).map((f) => ({
+    label: f.label,
+    description: f.description,
+  }));
   const res = await promptQuickPick(items, {
     placeHolder: t("compress.selectFormat"),
     withBack: false,

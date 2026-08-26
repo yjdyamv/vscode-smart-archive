@@ -1,5 +1,6 @@
 {
   "config.default.format.description": "压缩文件时使用的默认归档格式。",
+  "config.default.formatOrder.description": "压缩向导中显示的格式及顺序（白名单）。留空 = 默认列表；未知项被忽略；默认格式始终置顶。",
   "config.default.format.7z": "7-Zip — 最佳压缩率，AES-256 加密",
   "config.default.format.zip": "ZIP — 通用兼容性，AES-256 加密",
   "config.default.format.tar": "TAR — 仅归档，不压缩",
