@@ -82,7 +82,7 @@ describe("1 GiB + 20% recovery record (manual)", () => {
 
       // delete it back
       t0 = Date.now();
-      const deleted = deleteWithRar5(archive, ["extra"], "");
+      const deleted = await deleteWithRar5(archive, ["extra"], "");
       const deleteMs = Date.now() - t0;
       expect(deleted).toBeGreaterThan(0);
 

@@ -53,7 +53,7 @@ export async function deleteFromArchive(
           ext,
           count: selectedPaths.length,
         });
-        const deleted = deleteWithRar5(archivePath, selectedPaths, password ?? "");
+        const deleted = await deleteWithRar5(archivePath, selectedPaths, password ?? "");
         logger.info({ event: "deleteFromArchive.rar5.direct.ok", archivePath, deleted });
         return;
       } catch (err) {

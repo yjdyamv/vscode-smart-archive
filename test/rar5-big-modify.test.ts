@@ -105,7 +105,7 @@ describe("big archive direct modify (manual)", () => {
 
     // 3) DELETE the appended directory (no rebuild)
     t0 = Date.now();
-    const deleted = deleteWithRar5(archive, ["proj/extra"], "");
+    const deleted = await deleteWithRar5(archive, ["proj/extra"], "");
     const deleteMs = Date.now() - t0;
     console.log(`[delete] ${deleteMs} ms (${deleted} members), size=${fs.statSync(archive).size}`);
 

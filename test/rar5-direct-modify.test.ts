@@ -133,7 +133,7 @@ describe("rar5 direct delete (no rebuild)", () => {
         [],
       );
 
-      const deleted = deleteWithRar5(archive, ["proj/drop"], "");
+      const deleted = await deleteWithRar5(archive, ["proj/drop"], "");
       expect(deleted).toBeGreaterThan(0);
 
       const names = listRar5Entries(archive);
@@ -165,7 +165,7 @@ describe("rar5 direct delete (no rebuild)", () => {
       );
       expect(fs.existsSync(archive)).toBe(true);
 
-      const deleted = deleteWithRar5(archive, ["proj/a.txt", "proj/b.txt"], "");
+      const deleted = await deleteWithRar5(archive, ["proj/a.txt", "proj/b.txt"], "");
       expect(deleted).toBe(2);
       expect(fs.existsSync(archive)).toBe(false);
     },
