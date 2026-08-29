@@ -257,8 +257,10 @@ export function readRecoveryPercent(archivePath: string): number | undefined {
  * header and file-data block before the `{RB}` parity tail. The on-disk
  * archive size includes the recovery record, which inflates the
  * compression ratio shown in the archive view. Falls back to `fullSize`
- * when the archive is not RAR5 or has no readable recovery record
- * (header-encrypted archives cannot be sniffed without the password).
+ * when the archive is not RAR5 or has no readable recovery record.
+ * Header-encrypted archives cannot be walked (every block header is
+ * encrypted), but the `{RB}` chunk data is stored in the clear, so a
+ * validated scan recovers the protected size there too.
  */
 export function getRarPayloadSize(archivePath: string, fullSize: number): number {
   const fd = fs.openSync(archivePath, "r");
@@ -321,7 +323,13 @@ export function getRarPayloadSize(archivePath: string, fullSize: number): number
         dataSize = v.value;
         p += v.len;
       }
-      if (type.value === 4) return fullSize; // encrypted headers — cannot sniff
+      if (type.value === 4) {
+        // Header-encrypted archives hide every block header, so the walk
+        // cannot proceed. The recovery-record {RB} chunk data is stored in
+        // the clear (only the RR service header is encrypted), so scan for
+        // a structurally valid chunk and read its protected_size.
+        return scanRarPayloadSize(fd, fullSize) ?? fullSize;
+      }
       if (type.value === 3) {
         const fflags = vintAt(p);
         if (!fflags) return fullSize;
@@ -363,6 +371,107 @@ export function getRarPayloadSize(archivePath: string, fullSize: number): number
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * CRC64/XZ over `data`, mirroring crates/rar/src/recovery/rar5.rs (the
+ * reversed bit-order variant: right shift, poly 0xc96c5795d7870f42, init
+ * and final xor 0xffffffffffffffff). BigInt is needed for the u64
+ * arithmetic.
+ */
+function crc64Xz(data: Buffer): bigint {
+  const POLY = 0xc96c5795d7870f42n;
+  let crc = 0xffffffffffffffffn;
+  for (const byte of data) {
+    crc ^= BigInt(byte);
+    for (let i = 0; i < 8; i++) {
+      const mask = 0n - (crc & 1n);
+      crc = (crc >> 1n) ^ (POLY & mask);
+    }
+  }
+  return crc ^ 0xffffffffffffffffn;
+}
+
+/**
+ * For header-encrypted archives the block walk cannot see the {RB}
+ * recovery chunk (its service header is encrypted), but the chunk data
+ * itself is written in the clear. Scan the file for a structurally valid
+ * chunk — {RB} marker + header_size/version sanity + the chunk CRC64 —
+ * and return its protected_size; `null` when no valid chunk exists.
+ */
+function scanRarPayloadSize(fd: number, fullSize: number): number | null {
+  const MARKER = Buffer.from("{RB}");
+  const CHUNK = 1 << 20;
+  const buf = Buffer.alloc(CHUNK);
+  let base = 0; // file offset of buf[0]
+  let len = 0; // valid bytes in buf
+  const refill = (from: number): number => {
+    base = from;
+    len = fs.readSync(fd, buf, 0, CHUNK, from);
+    return len;
+  };
+  const readAt = (from: number, need: number): boolean => {
+    if (from >= base && from + need <= base + len) return true;
+    refill(from);
+    return from + need <= base + len;
+  };
+  const byteAt = (off: number): number | null => {
+    if (!readAt(off, 1)) return null;
+    return buf[off - base];
+  };
+  const u32 = (off: number): number | null => {
+    if (!readAt(off, 4)) return null;
+    return buf.readUInt32LE(off - base);
+  };
+  const u64 = (off: number): bigint | null => {
+    if (!readAt(off, 8)) return null;
+    return buf.readBigUInt64LE(off - base);
+  };
+
+  let pos = 8;
+  while (pos + 4 <= fullSize) {
+    if (refill(pos) < 4) break;
+    const idx = buf.indexOf(MARKER, pos - base);
+    if (idx === -1) {
+      // Keep a 3-byte overlap so a marker straddling the window edge is
+      // still caught; stop when the window cannot advance.
+      const next = base + len - 3;
+      if (next <= pos) break;
+      pos = next;
+      continue;
+    }
+    const start = base + idx;
+    const totalSize = u32(start + 0x0c);
+    const headerSize = u32(start + 0x10);
+    const versionOk = byteAt(start + 0x14) === 1 && byteAt(start + 0x15) === 1;
+    if (
+      totalSize === null ||
+      headerSize === null ||
+      headerSize < 0x48 ||
+      headerSize > totalSize ||
+      start + totalSize > fullSize ||
+      !versionOk
+    ) {
+      pos = start + 1;
+      continue;
+    }
+    // CRC64 covers [0x0c .. total_size); a false-positive marker in file
+    // data fails it with probability ~2^-64.
+    const crcData = Buffer.alloc(totalSize - 0x0c);
+    const n = fs.readSync(fd, crcData, 0, crcData.length, start + 0x0c);
+    const expected = u64(start + 0x04);
+    if (n !== crcData.length || expected === null || crc64Xz(crcData) !== expected) {
+      pos = start + 1;
+      continue;
+    }
+    const protectedSize = u64(start + 0x22);
+    if (protectedSize === null || protectedSize <= 0n || protectedSize > BigInt(fullSize)) {
+      pos = start + 1;
+      continue;
+    }
+    return Number(protectedSize);
+  }
+  return null;
 }
 
 export interface RebuildRarOptions {
