@@ -58,8 +58,7 @@ describe("getRarPayloadSize (recovery record)", () => {
     }
   });
 
-  it.runIf(HAS_RAR5_ENGINE)("falls back to the full size for archives without RR or non-RAR", async () => {
-    const dir = tmpDir("sat_ratio2-");
+  it.runIf(HAS_RAR5_ENGINE)("falls back to the full size for archives without RR or non-RAR", async () => {    const dir = tmpDir("sat_ratio2-");
     try {
       const plain = path.join(dir, "plain.bin");
       fs.writeFileSync(plain, "not a rar");
@@ -76,6 +75,39 @@ describe("getRarPayloadSize (recovery record)", () => {
       );
       const full = fs.statSync(archive).size;
       expect(getRarPayloadSize(archive, full)).toBe(full);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(HAS_RAR5_ENGINE)("excludes the RR parity tail from the ratio size for header-encrypted archives", async () => {
+    const dir = tmpDir("sat_ratio3-");
+    try {
+      const file = path.join(dir, "data.bin");
+      fs.writeFileSync(file, "payload ".repeat(2000));
+      const archive = path.join(dir, "hp-rr.rar");
+      await compressWithRar5(
+        {
+          format: FORMAT,
+          outputPath: archive,
+          targets: [{ fsPath: file }],
+          password: "hunter2",
+          encryptHeaders: true,
+          recoveryPercent: 20,
+          level: 3,
+        },
+        undefined,
+        undefined,
+        [],
+      );
+      const full = fs.statSync(archive).size;
+      const payload = getRarPayloadSize(archive, full);
+      expect(payload).toBeGreaterThan(0);
+      expect(payload).toBeLessThan(full);
+      expect(full - payload).toBeGreaterThan(100);
+      const rb = fs.readFileSync(archive).indexOf(Buffer.from("{RB}"));
+      expect(rb).toBeGreaterThan(0);
+      expect(payload).toBeLessThanOrEqual(rb);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
