@@ -90,7 +90,7 @@ async function scenario(dir: string, label: string, encryptHeaders: boolean) {
 
   // DELETE with password (directory selection)
   const t1 = Date.now();
-  const deleted = deleteWithRar5(archive, ["proj/extra"], "pw123");
+  const deleted = await deleteWithRar5(archive, ["proj/extra"], "pw123");
   const deleteMs = Date.now() - t1;
   expect(deleted).toBeGreaterThan(0);
 

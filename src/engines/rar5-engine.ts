@@ -109,7 +109,7 @@ interface Rar5Binding {
     onProgress?: (err: Error | null, p: { done: number; total: number }) => void,
     signal?: AbortSignal,
   ): Promise<{ files: string[] }>;
-  deleteEntries(archivePath: string, names: string[], password?: string): number;
+  deleteEntries(archivePath: string, names: string[], password?: string): Promise<number>;
   listEntries(archivePath: string, password?: string): string[];
   listEntriesDetailed(
     archivePath: string,
@@ -132,8 +132,8 @@ interface Rar5Binding {
     },
     signal?: AbortSignal,
   ): Promise<void>;
-  repairArchive(inputPath: string, outputPath: string): void;
-  rebuildMissingVolumes(firstVolume: string): string[];
+  repairArchive(inputPath: string, outputPath: string): Promise<boolean>;
+  rebuildMissingVolumes(firstVolume: string): Promise<string[]>;
 }
 
 /** One member's details from [`listRar5EntriesDetailed`]. */
@@ -384,9 +384,9 @@ function totalBytes(entries: CollectedEntry[]): number {
 }
 
 /** Repair a damaged RAR5 archive using its inline recovery record. */
-export function repairWithRar5(inputPath: string, outputPath: string): void {
+export async function repairWithRar5(inputPath: string, outputPath: string): Promise<boolean> {
   const mod = loadBinding();
-  mod.repairArchive(inputPath, outputPath);
+  return (await mod.repairArchive(inputPath, outputPath)) as boolean;
 }
 
 /**
@@ -394,9 +394,9 @@ export function repairWithRar5(inputPath: string, outputPath: string): void {
  * recovery volumes (WinRAR `rc` equivalent). `firstVolume` is the path
  * of `name.part1.rar`; returns the paths of all volumes produced.
  */
-export function rebuildMissingVolumesWithRar5(firstVolume: string): string[] {
+export async function rebuildMissingVolumesWithRar5(firstVolume: string): Promise<string[]> {
   const mod = loadBinding();
-  return mod.rebuildMissingVolumes(firstVolume);
+  return (await mod.rebuildMissingVolumes(firstVolume)) as string[];
 }
 
 export async function compressWithRar5(
@@ -682,16 +682,16 @@ export async function appendWithRar5(
  * the selection are expanded to all members below them via
  * {@link expandRarSelection}. Returns the number of deleted members.
  */
-export function deleteWithRar5(
+export async function deleteWithRar5(
   archivePath: string,
   selectedPaths: string[],
   password: string,
-): number {
+): Promise<number> {
   const mod = loadBinding();
   const allNames = mod.listEntries(archivePath, password || undefined);
   const names = expandRarSelection(allNames, selectedPaths);
   if (names.length === 0) {
     throw new Error("No members match the selection");
   }
-  return mod.deleteEntries(archivePath, names, password || undefined);
+  return (await mod.deleteEntries(archivePath, names, password || undefined)) as number;
 }

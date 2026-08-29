@@ -53,14 +53,7 @@ export async function repairCommand(uri?: vscode.Uri): Promise<void> {
       },
       async (progress) => {
         progress.report({ message: t("rar5.modifyExtracting") });
-        await new Promise<void>((resolve, reject) => {
-          try {
-            repairWithRar5(archivePath!, outputPath);
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
+        await repairWithRar5(archivePath!, outputPath);
       },
     );
     const size = fs.statSync(outputPath).size;

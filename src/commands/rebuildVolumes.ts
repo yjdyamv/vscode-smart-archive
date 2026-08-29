@@ -105,8 +105,8 @@ export async function rebuildVolumesCommand(uri?: vscode.Uri): Promise<void> {
         cancellable: false,
       },
       async () => {
-        // Synchronous binding call; the set is small (parity streams only).
-        return rebuildMissingVolumesWithRar5(firstVolume!);
+        // Async binding call (the parity streams may take a while).
+        return await rebuildMissingVolumesWithRar5(firstVolume!);
       },
     );
     logger.info({ event: "rebuildVolumes.done", firstVolume, rebuilt: rebuilt.length });
