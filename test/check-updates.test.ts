@@ -33,7 +33,7 @@ function makeFetchJson(stubs: Record<string, unknown>) {
 
 const github7z = `https://api.github.com/repos/yjdyamv/7-Zip-zstd-native/releases/latest`;
 const githubUpstream = `https://api.github.com/repos/mcmilk/7-Zip-zstd/releases/latest`;
-const githubRar5 = `https://api.github.com/repos/yjdyamv/smart-archive-rar/releases/latest`;
+const githubRar5 = `https://api.github.com/repos/yjdyamv/rar-rs/releases/latest`;
 const npmSnappy = `https://registry.npmjs.org/snappy/latest`;
 
 function snappyPkg(version: string): string {
