@@ -27,17 +27,15 @@ node_modules/
 !node_modules/@vscode/codicons/dist/codicon.css
 !node_modules/@vscode/codicons/dist/codicon.ttf
 !node_modules/@vscode/codicons/LICENSE
-# snappy (zstd) native binding + WASI fallback
-!node_modules/snappy/index.js
-!node_modules/snappy/index.d.ts
-!node_modules/snappy/snappy.*.node
+# snappy (zstd) native binding + WASI fallback — re-include the whole
+# package so the CJS entry chain (main.js -> index.js + stream-polyfill.*)
+# and all platform .node + WASI files ship. Enumerate-per-file here is
+# fragile: snappy's main.js requires stream-polyfill.{js,mjs}, and any
+# future addition silently breaks require("snappy") in the installed
+# extension (seen in 2.6.3: "Cannot find module .../snappy/main.js").
+!node_modules/snappy/**
 # ia32 (32 位 x86 Windows) 已无 VS Code 支持（1.77 起停止发布）
 node_modules/snappy/snappy.win32-ia32-msvc.node
-!node_modules/snappy/snappy.wasi.cjs
-!node_modules/snappy/snappy.wasm32-wasi.wasm
-!node_modules/snappy/wasi-worker.mjs
-!node_modules/snappy/package.json
-!node_modules/snappy/LICENSE
 # napi-rs wasm runtime: 只保留 CommonJS require 链（runtime.cjs →
 # dist/emnapi-plugins.cjs + dist/fs-proxy.cjs → @emnapi/core/@emnapi/runtime）。
 # ESM 变体（runtime.js / dist/fs.js / dist/emnapi-plugins.js / fs-proxy.js）
