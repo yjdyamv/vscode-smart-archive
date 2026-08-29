@@ -9,7 +9,7 @@ Smart Archiver uses the following third-party libraries, each under its own lice
 | @vscode/codicons | CC-BY-4.0 | <https://github.com/microsoft/vscode-codicons> |
 | 7-Zip ZS (7zz-wasm, vendor/7zz-wasm/) | LGPL-2.1+ (7-Zip) | <https://github.com/yjdyamv/7-Zip-zstd-wasm> |
 | 7-Zip ZS (7zz) | LGPL-2.1+ with unRAR restriction | <https://github.com/yjdyamv/7-Zip-zstd-native> |
-| smart-archive-rar | | <https://github.com/yjdyamv/smart-archive-rar> |
+| smart-archive-rar | | <https://github.com/yjdyamv/rar-rs> |
 
 ## Bundled Dependencies (inlined into extension.js)
 

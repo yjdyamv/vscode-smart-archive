@@ -22,7 +22,7 @@ import { pathToFileURL } from "node:url";
  *
  *   2. Release mode (default) — downloads smart-archive-rar.<triple>.node from
  *      the binding's GitHub Release assets
- *      (https://github.com/yjdyamv/smart-archive-rar/releases), pinned against
+ *      (https://github.com/yjdyamv/rar-rs/releases), pinned against
  *      a SHA-256 hash (fail-closed). Set SA_RAR5_REQUIRE=1 for a fail-closed
  *      release build where every platform must stage.
  *
@@ -56,20 +56,20 @@ async function resolveVersion() {
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "e38efef9177e246bb7a685148d16a71c339015bcc50a014dffb828fd155f0bb1",
-  "linux-x64-musl": "ad6bc44bfb2894553203fb7131f87e25a69780b14596f362f56717e3ee196db7",
-  "linux-arm64-gnu": "79122dfe520946c160d2e9bb9bfe537055f922f45fe4abb8db36142582f2c132",
-  "linux-arm64-musl": "56c71a506359be9946147922ac07151a84b27ce13d3073dc194ecd8cab4a5d84",
-  "linux-arm-gnueabihf": "d4423cbfcc7c4fa9497f9c191ac1261dec30a52017db06b486817750f904e890",
-  "darwin-arm64": "c6be93a4d0094557cb24cc4b11c0b3caa67ab10c3146cbd5f37f57d859800624",
-  "win32-x64-msvc": "e07fc92d4ae8191e029db23dbc7fdf1346feefa44a895a642c0bc28ef94fcc77",
-  "win32-arm64-msvc": "4a8e3ed57ab8bcee7fafa1d95b33616836d05728c8f3831199ee88d5d96b8ba6",
+  "linux-x64-gnu": "bedab298af7a5d1969f734be71cfab39eb9839a4f14c3354b22427aee509f071",
+  "linux-x64-musl": "9fa782fe9fb5a58408085790d728be0d38347a340f47b0e43631c8c7783da818",
+  "linux-arm64-gnu": "caaee80ff129a9a68c1e286282e3820e95b60e1ff07e1c3605e20a01c1fbddc7",
+  "linux-arm64-musl": "5024ec24c910e28cb7f2e6fcc29daa87ec34df404ef5d44afd72a00f4b641af6",
+  "linux-arm-gnueabihf": "815d73cb6f2fb45692cc8dbd2ebefc419e8dec5aab662999c1a6dbb5d52a086d",
+  "darwin-arm64": "1a6370906206ff3b6426a12ce5cfe9a6755a63fa45fb11d0a19d4aa9951ff7c4",
+  "win32-x64-msvc": "e696e115fd6c5a56e4f60dad45cc1907b6ec1cc029752691b2d05cf36a4e2db5",
+  "win32-arm64-msvc": "7540b4822861a2f15c4faec0c0f56864bc129ac8ae2d5a9ff3eb53d8f07f66eb",
   // WASI fallback bundle (smart-archive-rar >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "smart-archive-rar.wasm32-wasi.wasm":
-    "095b98864c6deb6a2adc49ae394d1420c6b885f896ac0a96da9df0e89af6d755",
-  "smart-archive-rar.wasi.cjs": "fcf01d50f302795572302ad8024bf8dc057138a4d5dec36536f8fbcb1f9ef3cd",
+    "bafb393913800110fc401b167e186453e14de4295041e8bf6367ea1911af019e",
+  "smart-archive-rar.wasi.cjs": "e2726773f2410a65ab0ba434e57cf805264cd3f6092c65acaa562b05656f9e2e",
   "wasi-path-map.cjs": "c6847fd35b642bc3c202f902ad6891faf7b1f158ae6071b41ab0b1b5f84276d4",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
 };

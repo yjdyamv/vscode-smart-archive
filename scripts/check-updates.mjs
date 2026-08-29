@@ -8,7 +8,7 @@
  *   1. 7-Zip ZS native + WASM  — yjdyamv/7-Zip-zstd-native latest release tag
  *      vs SEVEN_ZIP_ZSTD_TAG (also warns when the mirror repo lags behind
  *      upstream mcmilk/7-Zip-zstd — a security-relevant staleness signal).
- *   2. rar5 binding             — yjdyamv/smart-archive-rar latest release tag
+ *   2. rar5 binding             — yjdyamv/rar-rs latest release tag
  *      vs RAR5_VERSION.
  *   3. snappy (npm)             — registry latest vs the installed
  *      node_modules/snappy version (what install-snappy-platforms stages).
