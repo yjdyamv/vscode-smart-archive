@@ -55,9 +55,9 @@
     "stage:natives": "node scripts/install-7zz-wasm.mjs && node scripts/install-snappy-platforms.mjs && node scripts/install-7z-platforms.mjs && node scripts/install-rar5-platforms.mjs",
     "verify:downloads": "node scripts/verify-downloads.mjs",
     "prepackage:cross": "node scripts/clear-native-locks.mjs",
-    "package:cross": "node scripts/npm-ci-safe.mjs && node scripts/npm-ci-safe.mjs --prefix webview-ui && node scripts/install-7zz-wasm.mjs && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.mjs && node scripts/package-native.mjs",
+    "package:cross": "node scripts/npm-ci-safe.mjs && node scripts/npm-ci-safe.mjs --prefix webview-ui && node scripts/install-7zz-wasm.mjs && node scripts/install-snappy-platforms.mjs && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.mjs && node scripts/package-native.mjs",
     "prepackage:wasm": "node scripts/clear-native-locks.mjs",
-    "package:wasm": "node scripts/install-7zz-wasm.mjs && node scripts/install-rar5-platforms.mjs && node scripts/package-wasm.mjs",
+    "package:wasm": "node scripts/install-7zz-wasm.mjs && node scripts/install-snappy-platforms.mjs && node scripts/install-rar5-platforms.mjs && node scripts/package-wasm.mjs",
     "vscode:prepublish": "npm run stage:natives && npm run build"
   },
   "dependencies": {
