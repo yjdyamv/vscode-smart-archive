@@ -121,7 +121,7 @@ export async function planUpdates({
   if (normalizeTag(rar5Tag) !== RAR5_VERSION) {
     updates.push({
       key: "rar5",
-      name: "rar5 binding (smart-archive-rar)",
+      name: "rar5 binding (rar-rs-napi)",
       current: RAR5_VERSION,
       latest: normalizeTag(rar5Tag),
       kind: "tag",

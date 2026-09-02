@@ -53,7 +53,7 @@ function probeBundled7zz(): boolean {
 
 function probeRar5Binding(): boolean {
   // Mirrors the staging layout used by scripts/install-rar5-platforms.js:
-  // vendor/rar5-bin/<platform>/<arch>/smart-archive-rar.<triple>.node
+  // vendor/rar5-bin/<platform>/<arch>/rar-rs-napi.<triple>.node
   try {
     const dir = path.join(ROOT, "vendor", "rar5-bin", process.platform, process.arch);
     if (!fs.existsSync(dir)) return false;
@@ -82,7 +82,7 @@ function probeRar5Cli(): boolean {
 }
 
 function probeRar5Wasm(): boolean {
-  return fs.existsSync(path.join(ROOT, "vendor", "rar5-wasm", "smart-archive-rar.wasm32-wasi.wasm"));
+  return fs.existsSync(path.join(ROOT, "vendor", "rar5-wasm", "rar-rs-napi.wasm32-wasi.wasm"));
 }
 
 function probeSystemZstd(): boolean {

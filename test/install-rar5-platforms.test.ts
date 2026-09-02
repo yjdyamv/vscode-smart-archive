@@ -40,7 +40,7 @@ function stagedNodes(): { triple: string; file: string }[] {
     .readdirSync(root, { recursive: true })
     .filter((f) => typeof f === "string" && f.endsWith(".node"))
     .map((f) => ({
-      triple: path.basename(f as string, ".node").replace(/^smart-archive-rar\./, ""),
+      triple: path.basename(f as string, ".node").replace(/^rar-rs-napi\./, ""),
       file: path.join(root, f as string),
     }));
 }
@@ -66,11 +66,11 @@ describe("rar5 platform config", () => {
     // byte-identical to the local dev build. Anything else that deviates
     // from the pinned hash fails the packaging gate.
     const devProject =
-      process.env.SA_RAR5_DEV_PROJECT ?? path.join(os.homedir(), "桌面", "smart-archive-rar");
+      process.env.SA_RAR5_DEV_PROJECT ?? path.join(os.homedir(), "桌面", "rar-rs", "crates", "rar-napi");
     for (const { triple, file } of staged) {
       const actual = crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
       if (actual === EXPECTED_HASHES[triple]) continue;
-      const devFile = path.join(devProject, `smart-archive-rar.${triple}.node`);
+      const devFile = path.join(devProject, `rar-rs-napi.${triple}.node`);
       const devHash =
         fs.existsSync(devFile) && fs.statSync(devFile).isFile()
           ? crypto.createHash("sha256").update(fs.readFileSync(devFile)).digest("hex")
@@ -110,7 +110,7 @@ describe("rar5 release digest verification", () => {
 
     const assets = [
       ...allTriples().map((triple) => ({
-        asset: `smart-archive-rar.${triple}.node`,
+        asset: `rar-rs-napi.${triple}.node`,
         pinKey: triple,
       })),
       ...WASM_ASSETS.map((name) => ({ asset: name, pinKey: name })),

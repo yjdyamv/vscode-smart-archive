@@ -14,10 +14,12 @@ import { findFileInTree, extractArchive } from "./lib/archive.mjs";
  * builds under vendor/7z-bin/, so the extension can bundle a native fast-path
  * engine (the WASM 7zz engine remains the universal fallback).
  *
- *   linux x64/arm64, macOS arm64, Windows x64/arm64: native 7-Zip ZS
- *   binaries from yjdyamv/7-Zip-zstd-native (mcmilk fork). Single static
- *   binaries (`7zz` on Linux/macOS, `7zz.exe` on Windows — one consistent
- *   name across platforms, all codecs included).
+ *   linux x64/arm64: native 7-Zip ZS **musl-static** binaries from
+ *   yjdyamv/7-Zip-zstd-native (mcmilk fork) — fully static, so one binary
+ *   per arch runs on BOTH glibc and musl (Alpine) hosts. macOS arm64,
+ *   Windows x64/arm64: native 7-Zip ZS (`7zz` on Linux/macOS, `7zz.exe`
+ *   on Windows — one consistent name across platforms, all codecs
+ *   included).
  *
  * Platforms without a native build (linux arm, macOS x64, Windows ia32) get
  * no bundled binary — system7z.ts returns null there and the WASM engine
@@ -42,11 +44,12 @@ const TAG = SEVEN_ZIP_ZSTD_TAG;
 // with no pinned hash the build refuses the binary unless SA_HASH_BOOTSTRAP=1.
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-7z-platforms.mjs
 const EXPECTED_HASHES = {
-  "7zz-linux-x64.tar.gz": "4b8185422d870425862c410854d352af30ab9c7e3b284589d14778236db32e96",
-  "7zz-linux-arm64.tar.gz": "eb766d7a642241ded7c4544f43ea48b3c80a41aac344fd4fe10685b0be4eb476",
-  "7zz-macos-arm64.tar.gz": "ff50ad7541a4124f276f9172e22b59dae6c777063b80883ead530f163c10c4a1",
-  "7zz-windows-x64.zip": "02c72574b7b6cf53380f210b411bcacba5830c4d46deaf90c501fb79c0d62df4",
-  "7zz-windows-arm64.zip": "67b0dac184c2ba13fec818140b513fd06edc195992d4598ed5b0dbe131256250",
+  // musl-static: fully static 7zz — runs on glibc and Alpine alike.
+  "7zz-linux-x64-musl.tar.gz": "481cf7d91ecce01e2347aaf8e4b872a11bd6289f57791e7cc2953a28a85aa326",
+  "7zz-linux-arm64-musl.tar.gz": "91dc2553d5949b6c18220b2c4ef29f8bca71a29dba3043e529c01ad49adebb5b",
+  "7zz-macos-arm64.tar.gz": "50c02c7f35a41b44d639aca4687aa099572c5c2a53831598dbe6d88250fe9829",
+  "7zz-windows-x64.zip": "ca09104c7b9ec47b7f2b622de7c9ea7d0190fa04bc22e57603e720c53e8d5195",
+  "7zz-windows-arm64.zip": "d089c6ccfac5c080708073ca4143ccba75beae52bac9b919ad4e0b011dc45ea2",
 };
 
 const OUT = path.join(import.meta.dirname, "..", "vendor", "7z-bin");
@@ -58,14 +61,14 @@ const cacheDir = path.join(import.meta.dirname, "..", ".cache", "7z-platforms");
 // pick  : { <path-inside-archive-basename>: <output-basename> }
 const TARGETS = [
   {
-    asset: "7zz-linux-x64.tar.gz",
+    asset: "7zz-linux-x64-musl.tar.gz",
     kind: "tgz",
     dests: [["linux", "x64"]],
     pick: { "7zz": "7zz" },
     native: true,
   },
   {
-    asset: "7zz-linux-arm64.tar.gz",
+    asset: "7zz-linux-arm64-musl.tar.gz",
     kind: "tgz",
     dests: [["linux", "arm64"]],
     pick: { "7zz": "7zz" },
@@ -98,6 +101,12 @@ const TARGETS = [
 async function processTarget(t) {
   console.log(`[7z ${t.asset}]`);
 
+  // Bootstrap mode (SA_HASH_BOOTSTRAP=1): download WITHOUT the pinned hash
+  // so a stale pin cannot reject the freshly released archive, then persist
+  // the new hash into EXPECTED_HASHES. Mirror the rar5 installer's logic.
+  const bootstrapping = process.env.SA_HASH_BOOTSTRAP === "1";
+  const pin = EXPECTED_HASHES[t.asset];
+
   // Use downloadWithCache for the archive's on-disk path (a temp dir) — the
   // cache key is the asset name, so re-builds reuse the cached archive.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sa7zdl_"));
@@ -108,7 +117,7 @@ async function processTarget(t) {
     cacheDir,
     cacheKey: t.asset,
     destPath: archivePath,
-    expectedSha256: EXPECTED_HASHES[t.asset],
+    expectedSha256: bootstrapping ? undefined : pin,
     requireHash: true,
     label: t.asset,
     fetch: () =>
@@ -116,7 +125,7 @@ async function processTarget(t) {
         repo: REPO,
         tag: TAG,
         assetName: t.asset,
-        expectedSha256: EXPECTED_HASHES[t.asset],
+        expectedSha256: bootstrapping ? undefined : pin,
       }),
   });
 

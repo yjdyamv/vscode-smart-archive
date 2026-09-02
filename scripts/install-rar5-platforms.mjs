@@ -9,7 +9,7 @@ import { persistBootstrapHash } from "./lib/hash-pins.mjs";
 import { mapLimit } from "./lib/async.mjs";
 import { pathToFileURL } from "node:url";
 /**
- * Stage the rar5 native binding (smart-archive-rar, napi-rs) under
+ * Stage the rar5 native binding (rar-rs-napi, napi-rs) under
  * vendor/rar5-bin/
  * for all desktop platforms, so the extension can create RAR5 archives
  * without any external binary.
@@ -17,17 +17,17 @@ import { pathToFileURL } from "node:url";
  * Modes:
  *
  *   1. Dev mode  — SA_RAR5_DEV=1 copies the locally built .node files from
- *      the binding project (default ~/桌面/smart-archive-rar). Use after:
- *        cd ~/桌面/smart-archive-rar && npm install && npx napi build --platform --release
+ *      the binding project (default ~/桌面/rar-rs/crates/rar-napi). Use after:
+ *        cd ~/桌面/rar-rs/crates/rar-napi && npm install && npx napi build --platform --release
  *
- *   2. Release mode (default) — downloads smart-archive-rar.<triple>.node from
+ *   2. Release mode (default) — downloads rar-rs-napi.<triple>.node from
  *      the binding's GitHub Release assets
  *      (https://github.com/yjdyamv/rar-rs/releases), pinned against
  *      a SHA-256 hash (fail-closed). Set SA_RAR5_REQUIRE=1 for a fail-closed
  *      release build where every platform must stage.
  *
  * The loader (src/engines/rar5-engine.ts) resolves
- * vendor/rar5-bin/<platform>/<arch>/smart-archive-rar.<triple>.node
+ * vendor/rar5-bin/<platform>/<arch>/rar-rs-napi.<triple>.node
  *
  * Version policy: the release version is PINNED in-repo
  * (scripts/lib/releases.mjs — RAR5_VERSION), because the pinned hashes below
@@ -40,7 +40,7 @@ import { pathToFileURL } from "node:url";
  */
 
 // Binding repo, overridable (e.g. a fork):
-//   SA_RAR5_REPO=me/smart-archive-rar
+//   SA_RAR5_REPO=me/rar-rs-napi
 import { RAR5_REPO, RAR5_VERSION } from "./lib/releases.mjs";
 const REPO = process.env.SA_RAR5_REPO || RAR5_REPO;
 
@@ -50,26 +50,26 @@ async function resolveVersion() {
 }
 
 // SHA-256 of each platform .node release asset plus the WASI fallback bundle
-// (smart-archive-rar 0.3.1: append/delete/repair/rebuild operations,
+// (rar-rs-napi 0.6.0: append/delete/repair/rebuild operations,
 // relocated recovery repair, WASI win32 path mapping); fail-closed. Verify
 // against the official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test)
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "1c9764e9a79fb7eecf9ae741aa1780f9be0518e48c7a09ebae8bb38aad78be3c",
-  "linux-x64-musl": "9f87240e0ddd3d86183ad22ecf09a82d951e7cd52bc9e59cb84a1eeb1b5c15d3",
-  "linux-arm64-gnu": "337aa49d40a8908ea054f5c1f8a13aa8ceab53f62359a2f360c35936a17c668e",
-  "linux-arm64-musl": "dcddb829f6c856f6e42c12f78f6d8bb72fdd2806575a17ced30862fada50e149",
-  "linux-arm-gnueabihf": "9a1c97c271e9f29a5a775d8f5776f6530566f1385f11523ebaaa5538eece2073",
-  "darwin-arm64": "f1e20b3db3543d29af8b699188a818f91279ddf39c078ce2fceca74864f3b67f",
-  "win32-x64-msvc": "db10a9c0547066ff675e2d0a0d65b191108cc85b26086e594dde59d90b363061",
-  "win32-arm64-msvc": "c926c74ede6ce60d6198532c3d83ad647077a41f04cc4504b9c84b39fbb5b414",
-  // WASI fallback bundle (smart-archive-rar >= 0.3.0), staged under
+  "linux-x64-gnu": "64b71912e36bde52b8f36889299c837e537d1fb228419157ec45a19337e3816d",
+  "linux-x64-musl": "4703e1c175cf0b3f403ee5bbe78c69512013ff56e36a189c090f326435c3ce39",
+  "linux-arm64-gnu": "90687d2b2265449ff84963f980a916348841206274e0ccc9219b1928948ff430",
+  "linux-arm64-musl": "fc94e05cb4d53453f2271bbb4a653e26ad997e4a465857768f5efd755663e391",
+  "linux-arm-gnueabihf": "7c72614c4044aa892a1a52685529ab7b2c7547b6558e54622b2e3b72ac6605ba",
+  "darwin-arm64": "40a63041c9dcc6727da6eae699ac7c9d5cc2874b97c1e07344bd90c19dba8b28",
+  "win32-x64-msvc": "b48b734107c549b565951dfbe573e9403c5258c16d98ef39c0e540f9a6cfd56f",
+  "win32-arm64-msvc": "2d23181813ca00cf448cc6180473eb686058ea4e2209cc2d837ca683cfda4244",
+  // WASI fallback bundle (rar-rs-napi >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
-  "smart-archive-rar.wasm32-wasi.wasm":
-    "4bbecdf16e53408f209617ad624cacfac25fb5247951a104248fc31886f89b13",
-  "smart-archive-rar.wasi.cjs": "51520d93482b4033f364303d3f4ac00d188a09090e456adfd1f8f8eef5d822e7",
+  "rar-rs-napi.wasm32-wasi.wasm":
+    "0786e38e86826bbd4d31da4687cf58251ba600bfe90904611d9b4b2cd686a2e5",
+  "rar-rs-napi.wasi.cjs": "b5c5c423fc3bc0f1b271ed53d40791abd6740332bb2ca752849c3803df5dd908",
   "wasi-path-map.cjs": "c6847fd35b642bc3c202f902ad6891faf7b1f158ae6071b41ab0b1b5f84276d4",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
 };
@@ -84,22 +84,22 @@ const TRIPLES = {
   "win32/arm64": ["win32-arm64-msvc"],
 };
 
-// WASI fallback bundle (smart-archive-rar >= 0.3.0): generated Node loader +
+// WASI fallback bundle (rar-rs-napi >= 0.3.0): generated Node loader +
 // release WASM module + threads worker. Staged to vendor/rar5-wasm/ so
 // src/engines/rar5-engine.ts can require the loader when no native .node
 // matches the host. The `.debug.wasm` variant is deliberately not staged:
 // the napi loader prefers it whenever it exists, which would make
 // production run the debug build.
 const WASM_ASSETS = [
-  "smart-archive-rar.wasm32-wasi.wasm",
-  "smart-archive-rar.wasi.cjs",
+  "rar-rs-napi.wasm32-wasi.wasm",
+  "rar-rs-napi.wasi.cjs",
   "wasi-path-map.cjs",
   "wasi-worker.mjs",
 ];
 const wasmDestDir = path.join(import.meta.dirname, "..", "vendor", "rar5-wasm");
 
 function devProject() {
-  return process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "smart-archive-rar");
+  return process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "rar-rs", "crates", "rar-napi");
 }
 
 const destDir = path.join(import.meta.dirname, "..", "vendor", "rar5-bin");
@@ -110,7 +110,7 @@ function stageNode(nodeData, triple) {
   const found = Object.entries(TRIPLES).find(([, triples]) => triples.includes(triple));
   if (!found) throw new Error(`unknown triple: ${triple}`);
   const [platform, arch] = found[0].split("/");
-  const destPath = path.join(destDir, platform, arch, `smart-archive-rar.${triple}.node`);
+  const destPath = path.join(destDir, platform, arch, `rar-rs-napi.${triple}.node`);
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
   writeFileAtomic(destPath, nodeData);
   console.log(`  staged ${triple} -> vendor/rar5-bin/${platform}/${arch}/`);
@@ -136,7 +136,7 @@ function devMode() {
   }
   const files = fs.readdirSync(buildDir).filter((f) => f.endsWith(".node"));
   for (const f of files) {
-    const triple = f.replace(/^smart-archive-rar\./, "").replace(/\.node$/, "");
+    const triple = f.replace(/^rar-rs-napi\./, "").replace(/\.node$/, "");
     stageNode(fs.readFileSync(path.join(buildDir, f)), triple);
   }
   for (const name of WASM_ASSETS) {
@@ -220,8 +220,8 @@ async function releaseMode(strict) {
         platform,
         arch,
         triple,
-        nodeFileName: `smart-archive-rar.${triple}.node`,
-        destPath: path.join(destDir, platform, arch, `smart-archive-rar.${triple}.node`),
+        nodeFileName: `rar-rs-napi.${triple}.node`,
+        destPath: path.join(destDir, platform, arch, `rar-rs-napi.${triple}.node`),
         hash: EXPECTED_HASHES[triple],
       });
     }

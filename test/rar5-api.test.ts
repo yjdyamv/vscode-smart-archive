@@ -1,7 +1,7 @@
 /**
  * Latest rar5 binding API — Smart Archiver
  *
- * Exercises the newest smart-archive-rar surface through rar5-engine:
+ * Exercises the newest rar-rs-napi surface through rar5-engine:
  * dictionary size / solid / BLAKE2 compression options, detailed member
  * listing and native extraction. Needs a real RAR5 engine (native binding
  * or WASI fallback), so these run where one is staged.
@@ -44,6 +44,7 @@ describe("rar5 latest API", () => {
           dictSize: "64m",
           solid: true,
           blake2: true,
+          level: 3,
         });
         expect(fs.existsSync(archive)).toBe(true);
         expect(fs.readFileSync(archive).subarray(0, 8).toString("latin1")).toBe("Rar!\u001a\u0007\u0001\u0000");
@@ -69,6 +70,8 @@ describe("rar5 latest API", () => {
           outputPath: archive,
           targets: [{ fsPath: file }],
           password: "",
+          // 7z level 5 = normal -> mapLevel(5) = rar5 method 3 (asserted below).
+          level: 5,
         });
         const entries = listRar5EntriesDetailed(archive);
         const entry = entries.find((e) => e.name === "data.bin");
@@ -96,6 +99,7 @@ describe("rar5 latest API", () => {
           outputPath: archive,
           targets: [{ fsPath: file }],
           password: "pw",
+          level: 3,
         });
 
         const dest = path.join(dir, "out");
