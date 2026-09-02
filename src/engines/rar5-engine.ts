@@ -1,7 +1,7 @@
 /**
  * RAR5 creation engine — Smart Archiver VSCode Extension
  *
- * Native napi-rs binding (`smart-archive-rar`) wrapping the pure-Rust
+ * Native napi-rs binding (`rar-rs-napi`) wrapping the pure-Rust
  * `rar5` library (codeberg.org/yjdyamv/rar-rs fork), with a WASI
  * (wasm32-wasip1-threads) fallback when no native `.node` matches the host.
  * Creates RAR5 archives with AES-256 encryption, multi-volume output, and
@@ -10,7 +10,7 @@
  *
  * The platform .node binary is staged under vendor/rar5-bin/<platform>/<arch>/
  * by scripts/install-rar5-platforms.js; the WASI bundle lives under
- * vendor/rar5-wasm/ (smart-archive-rar.wasi.cjs + wasm modules + worker).
+ * vendor/rar5-wasm/ (rar-rs-napi.wasi.cjs + wasm modules + worker).
  *
  * @module engines/rar5-engine
  */
@@ -208,7 +208,7 @@ function loadNativeBinding(): Rar5Binding {
     "rar5-bin",
     process.platform,
     process.arch,
-    `smart-archive-rar.${triple}.node`,
+    `rar-rs-napi.${triple}.node`,
   );
   // Compiled bundle: out/extension.js → <root>/vendor/rar5-bin. Vitest/dev
   // (source modules): src/engines/... → <root>/vendor/rar5-bin. Try both.
@@ -234,7 +234,7 @@ function loadNativeBinding(): Rar5Binding {
 function loadWasmBinding(): Rar5Binding {
   if (wasmBinding) return wasmBinding;
   if (wasmBindingError) throw wasmBindingError;
-  const rel = path.join("vendor", "rar5-wasm", "smart-archive-rar.wasi.cjs");
+  const rel = path.join("vendor", "rar5-wasm", "rar-rs-napi.wasi.cjs");
   const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
   const loaderPath = candidates.find((c) => fs.existsSync(c));
   if (!loaderPath) {

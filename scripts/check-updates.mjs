@@ -90,7 +90,7 @@ async function checkSevenZip(fetchJson) {
 async function checkRar5(fetchJson) {
   const latest = await latestGithubTag(RAR5_REPO, fetchJson);
   return {
-    name: "rar5 binding (smart-archive-rar)",
+    name: "rar5 binding (rar-rs-napi)",
     current: RAR5_VERSION,
     latest,
     status: normalizeTag(latest) === normalizeTag(RAR5_VERSION) ? "up-to-date" : "update-available",
