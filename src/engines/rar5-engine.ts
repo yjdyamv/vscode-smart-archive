@@ -110,18 +110,22 @@ interface Rar5Binding {
     signal?: AbortSignal,
   ): Promise<{ files: string[] }>;
   deleteEntries(archivePath: string, names: string[], password?: string): Promise<number>;
-  listEntries(archivePath: string, password?: string): string[];
+  // rar-rs-napi >= 0.7.0 returns tasks (Promises) for listing; the WASI
+  // fallback and progress reporting require the async forms.
+  listEntries(archivePath: string, password?: string): Promise<string[]>;
   listEntriesDetailed(
     archivePath: string,
     password?: string,
-  ): Array<{
-    name: string;
-    size: number;
-    packedSize: number;
-    method: number;
-    isDir: boolean;
-    mtime: number;
-  }>;
+  ): Promise<
+    Array<{
+      name: string;
+      size: number;
+      packedSize: number;
+      method: number;
+      isDir: boolean;
+      mtime: number;
+    }>
+  >;
   extractArchive(
     archivePath: string,
     opts: {
@@ -528,13 +532,16 @@ function cleanupPartialOutput(outputPath: string): void {
 }
 
 /** List the member names of a RAR5 archive (for directory expansion). */
-export function listRar5Entries(archivePath: string, password?: string): string[] {
+export async function listRar5Entries(archivePath: string, password?: string): Promise<string[]> {
   const mod = loadBinding();
   return mod.listEntries(archivePath, password || undefined);
 }
 
 /** List the members of a RAR5 archive with sizes and methods. */
-export function listRar5EntriesDetailed(archivePath: string, password?: string): Rar5EntryInfo[] {
+export async function listRar5EntriesDetailed(
+  archivePath: string,
+  password?: string,
+): Promise<Rar5EntryInfo[]> {
   const mod = loadBinding();
   return mod.listEntriesDetailed(archivePath, password || undefined);
 }
@@ -688,7 +695,7 @@ export async function deleteWithRar5(
   password: string,
 ): Promise<number> {
   const mod = loadBinding();
-  const allNames = mod.listEntries(archivePath, password || undefined);
+  const allNames = await mod.listEntries(archivePath, password || undefined);
   const names = expandRarSelection(allNames, selectedPaths);
   if (names.length === 0) {
     throw new Error("No members match the selection");
