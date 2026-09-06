@@ -63,16 +63,16 @@ async function scenario(dir: string, label: string, encryptHeaders: boolean) {
   const x0 = path.join(dir, "x0");
   run(RAR_CLI, ["x", "-p", "pw123", archive, x0 + "/"]);
   const baseHashes: Record<string, string> = {};
-  for (const n of listRar5Entries(archive, "pw123")) {
+  for (const n of await listRar5Entries(archive, "pw123")) {
     const h = sha256(path.join(x0, n));
     if (h) baseHashes[n] = h;
   }
   // Header-encrypted archives hide member names without the password.
   if (encryptHeaders) {
     // Header-encrypted archives refuse to list without the password.
-    expect(() => listRar5Entries(archive)).toThrow(/password|encrypted/i);
+    await expect(listRar5Entries(archive)).rejects.toThrow(/password|encrypted/i);
   } else {
-    expect(listRar5Entries(archive).length).toBeGreaterThan(0);
+    expect((await listRar5Entries(archive)).length).toBeGreaterThan(0);
   }
 
   // APPEND with password
@@ -84,7 +84,7 @@ async function scenario(dir: string, label: string, encryptHeaders: boolean) {
   const appendMs = Date.now() - t0;
 
   // member visible with password; list without password must fail for header-encrypted
-  const names = listRar5Entries(archive, "pw123");
+  const names = await listRar5Entries(archive, "pw123");
   expect(names).toContain("proj/extra/n.txt");
   expect(names).toContain("proj/a.txt");
 
@@ -94,7 +94,7 @@ async function scenario(dir: string, label: string, encryptHeaders: boolean) {
   const deleteMs = Date.now() - t1;
   expect(deleted).toBeGreaterThan(0);
 
-  const after = listRar5Entries(archive, "pw123");
+  const after = await listRar5Entries(archive, "pw123");
   expect(after).not.toContain("proj/extra/n.txt");
 
   // Byte-level verification of kept members

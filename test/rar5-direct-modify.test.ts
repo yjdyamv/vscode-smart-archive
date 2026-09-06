@@ -70,7 +70,7 @@ describe("rar5 direct append (no rebuild)", () => {
       expect(listing).toContain("proj/keep/extra/n1.txt");
       expect(listing).toContain("proj/keep/extra/n2.txt");
 
-      const names = listRar5Entries(archive);
+      const names = await listRar5Entries(archive);
       expect(names).toContain("proj/keep/a.txt");
       expect(names).toContain("proj/top.txt");
 
@@ -136,7 +136,7 @@ describe("rar5 direct delete (no rebuild)", () => {
       const deleted = await deleteWithRar5(archive, ["proj/drop"], "");
       expect(deleted).toBeGreaterThan(0);
 
-      const names = listRar5Entries(archive);
+      const names = await listRar5Entries(archive);
       expect(names).not.toContain("proj/drop/b.txt");
       expect(names).not.toContain("proj/drop/sub/c.txt");
       expect(names).toContain("proj/keep/a.txt");

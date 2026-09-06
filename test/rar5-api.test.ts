@@ -49,7 +49,7 @@ describe("rar5 latest API", () => {
         expect(fs.existsSync(archive)).toBe(true);
         expect(fs.readFileSync(archive).subarray(0, 8).toString("latin1")).toBe("Rar!\u001a\u0007\u0001\u0000");
         // The archive round-trips through the binding.
-        const names = listRar5Entries(archive);
+        const names = await listRar5Entries(archive);
         expect(names).toContain("data.bin");
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
@@ -73,7 +73,7 @@ describe("rar5 latest API", () => {
           // 7z level 5 = normal -> mapLevel(5) = rar5 method 3 (asserted below).
           level: 5,
         });
-        const entries = listRar5EntriesDetailed(archive);
+        const entries = await listRar5EntriesDetailed(archive);
         const entry = entries.find((e) => e.name === "data.bin");
         expect(entry).toBeDefined();
         expect(entry!.size).toBe(26000);

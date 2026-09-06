@@ -73,7 +73,7 @@ describe("big archive direct modify (manual)", () => {
     console.log(`[create] ${Date.now() - t0} ms, size=${fs.statSync(archive).size}`);
 
     // baseline hashes of every member
-    const baseNames = listRar5Entries(archive);
+    const baseNames = await listRar5Entries(archive);
     console.log(`[members] ${baseNames.length}`);
     const baseHashes: Record<string, string> = {};
     const listOut = run(RAR_CLI, ["l", archive]);
@@ -99,7 +99,7 @@ describe("big archive direct modify (manual)", () => {
     const appendMs = Date.now() - t0;
     console.log(`[append] ${appendMs} ms, size=${fs.statSync(archive).size}`);
 
-    const afterAppend = listRar5Entries(archive);
+    const afterAppend = await listRar5Entries(archive);
     expect(afterAppend).toContain("proj/extra/n0.txt");
     expect(afterAppend).toContain("proj/extra/sub/deep.txt");
 
@@ -109,7 +109,7 @@ describe("big archive direct modify (manual)", () => {
     const deleteMs = Date.now() - t0;
     console.log(`[delete] ${deleteMs} ms (${deleted} members), size=${fs.statSync(archive).size}`);
 
-    const afterDelete = listRar5Entries(archive);
+    const afterDelete = await listRar5Entries(archive);
     expect(afterDelete).not.toContain("proj/extra/n0.txt");
     expect(afterDelete).not.toContain("proj/extra/sub/deep.txt");
 

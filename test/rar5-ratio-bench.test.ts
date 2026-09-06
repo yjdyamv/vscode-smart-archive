@@ -78,7 +78,7 @@ describe("1 GiB + 20% recovery record (manual)", () => {
       t0 = Date.now();
       await appendWithRar5(archive, [extra], "", "", []);
       const appendMs = Date.now() - t0;
-      expect(listRar5Entries(archive)).toContain("extra/n0.txt");
+      expect(await listRar5Entries(archive)).toContain("extra/n0.txt");
 
       // delete it back
       t0 = Date.now();

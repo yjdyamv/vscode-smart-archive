@@ -58,7 +58,7 @@ describe.runIf(HAVE_BINARIES)("folder append (manual)", () => {
       fs.mkdirSync(empty, { recursive: true });
 
       await appendWithRar5(archive, [docs, empty], "", "", []);
-      let names = listRar5Entries(archive);
+      let names = await listRar5Entries(archive);
       expect(names).toContain("docs/");
       expect(names).toContain("docs/sub/");
       expect(names).toContain("docs/sub/deep/");
@@ -70,7 +70,7 @@ describe.runIf(HAVE_BINARIES)("folder append (manual)", () => {
       fs.mkdirSync(extra2, { recursive: true });
       fs.writeFileSync(path.join(extra2, "z.txt"), "z");
       await appendWithRar5(archive, [extra2], "docs/sub", "", []);
-      names = listRar5Entries(archive);
+      names = await listRar5Entries(archive);
       expect(names).toContain("docs/sub/extra2/");
       expect(names).toContain("docs/sub/extra2/z.txt");
 
