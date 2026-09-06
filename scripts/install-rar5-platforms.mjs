@@ -56,21 +56,21 @@ async function resolveVersion() {
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "64b71912e36bde52b8f36889299c837e537d1fb228419157ec45a19337e3816d",
-  "linux-x64-musl": "4703e1c175cf0b3f403ee5bbe78c69512013ff56e36a189c090f326435c3ce39",
-  "linux-arm64-gnu": "90687d2b2265449ff84963f980a916348841206274e0ccc9219b1928948ff430",
-  "linux-arm64-musl": "fc94e05cb4d53453f2271bbb4a653e26ad997e4a465857768f5efd755663e391",
-  "linux-arm-gnueabihf": "7c72614c4044aa892a1a52685529ab7b2c7547b6558e54622b2e3b72ac6605ba",
-  "darwin-arm64": "40a63041c9dcc6727da6eae699ac7c9d5cc2874b97c1e07344bd90c19dba8b28",
-  "win32-x64-msvc": "b48b734107c549b565951dfbe573e9403c5258c16d98ef39c0e540f9a6cfd56f",
-  "win32-arm64-msvc": "2d23181813ca00cf448cc6180473eb686058ea4e2209cc2d837ca683cfda4244",
+  "linux-x64-gnu": "eb0160540c98742314b00c73d0ab325403827bd44989160ebf18c3a12340d5bb",
+  "linux-x64-musl": "b94284330f49696de43d464410ff997b34a4e1ed80d528491a324a08bca07d8f",
+  "linux-arm64-gnu": "151590f6a4ed6ed0e08a633400f5e9997130ec20a082cf9d5800d6ed2c14c14f",
+  "linux-arm64-musl": "a6ea40a11c5df4da6295afbd86f9c86b8d25efd36da794bed4e9060f19773f23",
+  "linux-arm-gnueabihf": "19f275eacad37b3cd2c8619ede9e35ffe7793fe594d7c40315873e7584f5a258",
+  "darwin-arm64": "038976d8d5cd8e76d14a25e65f354d9c7c2be529f51b2abf6f0aa32da5801182",
+  "win32-x64-msvc": "03e8bde236af67aea80c441dd862b33f3e74dc6e5f4a8239812d9835cdfe1019",
+  "win32-arm64-msvc": "f0e86a3e16d3e0928489d651fe46c9ea7604cb76bee5e05aedac3f1f494ecc7f",
   // WASI fallback bundle (rar-rs-napi >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "rar-rs-napi.wasm32-wasi.wasm":
-    "0786e38e86826bbd4d31da4687cf58251ba600bfe90904611d9b4b2cd686a2e5",
-  "rar-rs-napi.wasi.cjs": "b5c5c423fc3bc0f1b271ed53d40791abd6740332bb2ca752849c3803df5dd908",
-  "wasi-path-map.cjs": "c6847fd35b642bc3c202f902ad6891faf7b1f158ae6071b41ab0b1b5f84276d4",
+    "669d5a40972781437b3dc4e0c95f14cfeca293b0a2c55b3c389b03a1a8724c59",
+  "rar-rs-napi.wasi.cjs": "f0e67d7107d87249884700bf60c1dd1a8b812143fc16a664dabe031fe122d5a4",
+  "wasi-path-map.cjs": "89939c5e2f78f4735f11b3b34dd69b1670082cc5f99446b01204619c5b0ed564",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
 };
 
@@ -99,7 +99,9 @@ const WASM_ASSETS = [
 const wasmDestDir = path.join(import.meta.dirname, "..", "vendor", "rar5-wasm");
 
 function devProject() {
-  return process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "rar-rs", "crates", "rar-napi");
+  return (
+    process.env.SA_RAR5_PROJECT || path.join(os.homedir(), "桌面", "rar-rs", "crates", "rar-napi")
+  );
 }
 
 const destDir = path.join(import.meta.dirname, "..", "vendor", "rar5-bin");
