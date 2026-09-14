@@ -59,19 +59,19 @@ const WASM_ASSETS = ["snappy.wasi.cjs", "snappy.wasm32-wasi.wasm", "wasi-worker.
 // refuses any binary lacking a pinned hash. To (re)generate after bump:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-snappy-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "a112d9faa4bb2db1da0845b5a84dc2dee1ab8184d60fc5d4b309411342698699",
-  "linux-x64-musl": "6f648fe3446cc4cdc7010f0d12cf8b956ae44af724818172edc58de559708249",
-  "linux-arm64-gnu": "0bf9a22cf860286d0dee438b13794c38e93182237629b276fec95942a7917164",
-  "linux-arm64-musl": "693cf61183461b4877feec0f8762329c889d4f676b698003175adcf2c4720ac4",
-  "linux-arm-gnueabihf": "87d7a625526f10278348ba71571e691b0b56cdd265c5708230f75c83810cc4f9",
-  "darwin-x64": "b657fda4bf98df552a146245f354262352a542c4055c939b6939f6eb203c9c02",
-  "darwin-arm64": "32bcaae89285906c6aa0bb0cf8dbdbbb432bf117f8526382159188dcf7ce6538",
-  "win32-x64-msvc": "c5a65f8f07d69e80c1e1bc1e656434ed9a41515f0209312149585316e3c9e984",
-  "win32-arm64-msvc": "0a41b81e166d3b00a5275b2aa6be501cb987985cf2e911dc231c8b3a0070235b",
+  "linux-x64-gnu": "6d4de54bb2233e2199abe0e8fd299f01436501d135afe09b6ff50b0fdf184fa3",
+  "linux-x64-musl": "cce9e75e7cef317db6b9870a523cb46bcb744816c6300ab79040e1fec35dd775",
+  "linux-arm64-gnu": "c8b9330b842422d9e895ca6358c481b023afe69943c0e5ed8f31321eae78d71c",
+  "linux-arm64-musl": "4b661cc383e60b0f5a517a4dbb4bd7bf5150db540c4f727dbc4010c115632296",
+  "linux-arm-gnueabihf": "380c14efda6b0eebdf7ddabdfc6cdcf0bf1022267c5ff7fec04968b5b9b7d639",
+  "darwin-x64": "34eb09686d42246fec0772954eb7aaf438fdcf94e6ec27cd3f6a5d2aee6cc839",
+  "darwin-arm64": "4df10dd30850e04d02663729aa177153ee3c8546e8bb701bb0e324a5d51c42cb",
+  "win32-x64-msvc": "b9870a043571b729b7e6b945f7dee2359aa028c45a2be7b5bcd66546814aac8b",
+  "win32-arm64-msvc": "77c28362232d0b59696c632b6ef95c270dfe79504a603694752390196c61c028",
   // WASI fallback bundle (snappy >= 7.3.1). Placeholder pins are regenerated
   // with SA_HASH_BOOTSTRAP=1 after the dependency bump.
   "snappy.wasi.cjs": "c99c41f788cf56647b138fdbd85d7ec9e9108af22a2ce72861552e59089657ed",
-  "snappy.wasm32-wasi.wasm": "cb27874ccb2b61051bd23e3c1cf427f7928fe67c8b6e116cddd8709687042cfc",
+  "snappy.wasm32-wasi.wasm": "fb82aad244bf89464fd2b57606efaa2a345fb3467c2db41498ecdcaad5653c47",
   "wasi-worker.mjs": "fcba42b35462dc3f402b9626d8a2f30e9e7f73e9783e41d74c0003e02adc6ca1",
 };
 
