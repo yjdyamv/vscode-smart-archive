@@ -56,21 +56,21 @@ async function resolveVersion() {
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "eb0160540c98742314b00c73d0ab325403827bd44989160ebf18c3a12340d5bb",
-  "linux-x64-musl": "b94284330f49696de43d464410ff997b34a4e1ed80d528491a324a08bca07d8f",
-  "linux-arm64-gnu": "151590f6a4ed6ed0e08a633400f5e9997130ec20a082cf9d5800d6ed2c14c14f",
-  "linux-arm64-musl": "a6ea40a11c5df4da6295afbd86f9c86b8d25efd36da794bed4e9060f19773f23",
-  "linux-arm-gnueabihf": "19f275eacad37b3cd2c8619ede9e35ffe7793fe594d7c40315873e7584f5a258",
-  "darwin-arm64": "038976d8d5cd8e76d14a25e65f354d9c7c2be529f51b2abf6f0aa32da5801182",
-  "win32-x64-msvc": "03e8bde236af67aea80c441dd862b33f3e74dc6e5f4a8239812d9835cdfe1019",
-  "win32-arm64-msvc": "f0e86a3e16d3e0928489d651fe46c9ea7604cb76bee5e05aedac3f1f494ecc7f",
+  "linux-x64-gnu": "5ac3379a44b15cf1f67e939192b141a73e07c9c4f29c4496586dad6daee73160",
+  "linux-x64-musl": "d0732c9b84a8f1a7857bc85286a48a8c4a97c7179160523c34417ca6a98c9831",
+  "linux-arm64-gnu": "8f70e5fda7d26305639e81d5946f0e27daae4ab7af4be45103272635705c710a",
+  "linux-arm64-musl": "571955fc400feb1449b512e040677db926a0c3f2ecbf92e8ee396c87862bec02",
+  "linux-arm-gnueabihf": "b7630f5871962e028bbaba0afaa2d7e6009f0c9c4cb38a2b12a60337a933b589",
+  "darwin-arm64": "b7d91220b69066d1d66a3c140b04c822889194d09f0ac1f5188b68392c358e53",
+  "win32-x64-msvc": "866f8289fb2088cd391067fc8b55c169d46cfab280e25dcee910819917345c3c",
+  "win32-arm64-msvc": "328270f4c65d65fec213535b1464583757d6a8f925d47507865dad0593192d25",
   // WASI fallback bundle (rar-rs-napi >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "rar-rs-napi.wasm32-wasi.wasm":
-    "669d5a40972781437b3dc4e0c95f14cfeca293b0a2c55b3c389b03a1a8724c59",
-  "rar-rs-napi.wasi.cjs": "f0e67d7107d87249884700bf60c1dd1a8b812143fc16a664dabe031fe122d5a4",
-  "wasi-path-map.cjs": "89939c5e2f78f4735f11b3b34dd69b1670082cc5f99446b01204619c5b0ed564",
+    "12477fbdcf34f5e7fe32ed60c9ca8d06bb3a7c2ea24a3b843d2f8038ceb577c3",
+  "rar-rs-napi.wasi.cjs": "8db96e1fc58c055c2e957931bc012b71270c0a76dcabbd6cfa87245184e68bcd",
+  "wasi-path-map.cjs": "7158e3183c393c2d6403c2363cc1f0b6000e5e5aa2e9de9ff4045b915fc9ae86",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
 };
 
