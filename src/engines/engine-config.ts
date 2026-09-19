@@ -93,6 +93,8 @@ export function applyEngineConfig(config: EngineConfig, deps: EngineConfigDeps):
   setWorkerMemoryLimitMb(cfg.workerMemoryMb);
 
   resetZstdDetectionCache();
-  resetRar5BindingCache();
-  resetSnappyBindingCache();
+  // Fire and forget: the resets are best-effort and never reject; a settings
+  // change must not block on terminating old WASI worker threads.
+  void resetRar5BindingCache();
+  void resetSnappyBindingCache();
 }

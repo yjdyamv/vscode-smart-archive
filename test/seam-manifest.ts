@@ -138,6 +138,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/engines/tar-writer.ts": [
     "compress-decompress.test.ts"
   ],
+  "src/engines/wasi-dispose.ts": [
+    "wasi-dispose.test.ts"
+  ],
   "src/engines/worker/handler.ts": [
     "worker.test.ts"
   ],

@@ -42,10 +42,14 @@ function applyBackends(config: Partial<EngineConfig>): void {
   applyEngineConfig({ ...DEFAULT_ENGINE_CONFIG, ...config }, NOOP_WARN);
 }
 
-afterEach(() => {
+afterEach(async () => {
   applyBackends({});
-  resetRar5BindingCache();
-  resetSnappyBindingCache();
+  // Terminate the WASI worker threads the settings-change reset spawned:
+  // a forgotten binding's emnapi workers throw an unhandled
+  // `memory access out of bounds` after this file finishes (vitest then
+  // exits 1 even though every test passed).
+  await resetRar5BindingCache();
+  await resetSnappyBindingCache();
   delete process.env.SA_RAR5_FORCE_WASM;
   delete process.env.NAPI_RS_FORCE_WASI;
 });
