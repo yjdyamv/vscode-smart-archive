@@ -56,19 +56,19 @@ async function resolveVersion() {
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "5ac3379a44b15cf1f67e939192b141a73e07c9c4f29c4496586dad6daee73160",
-  "linux-x64-musl": "d0732c9b84a8f1a7857bc85286a48a8c4a97c7179160523c34417ca6a98c9831",
-  "linux-arm64-gnu": "8f70e5fda7d26305639e81d5946f0e27daae4ab7af4be45103272635705c710a",
-  "linux-arm64-musl": "571955fc400feb1449b512e040677db926a0c3f2ecbf92e8ee396c87862bec02",
-  "linux-arm-gnueabihf": "b7630f5871962e028bbaba0afaa2d7e6009f0c9c4cb38a2b12a60337a933b589",
-  "darwin-arm64": "b7d91220b69066d1d66a3c140b04c822889194d09f0ac1f5188b68392c358e53",
-  "win32-x64-msvc": "866f8289fb2088cd391067fc8b55c169d46cfab280e25dcee910819917345c3c",
-  "win32-arm64-msvc": "328270f4c65d65fec213535b1464583757d6a8f925d47507865dad0593192d25",
+  "linux-x64-gnu": "41f7f7f4ab92ed0959abdce6058222e7159a019006bbd5daf3a1745757329dcc",
+  "linux-x64-musl": "2488ceed3b80cd08d93289a38a51c3dd1944f11bf26200e39331b97c4671c5a5",
+  "linux-arm64-gnu": "644198486147cd31f6d6bcd567acb9404e8194581162b1d456a8f45c49b4f173",
+  "linux-arm64-musl": "70d183d82fd60b954e5d0984a7c4543efe040a46211086c330d5c5203e90f826",
+  "linux-arm-gnueabihf": "32425eab99e3d035436a2825684b8b668a64d5461ad41affa59cd42519c291b2",
+  "darwin-arm64": "ada7b00b2f7c5a3496eaddb1309ed2b5ec1dba035c9f3ba263dabfc1a1cb5b3f",
+  "win32-x64-msvc": "29ff6d874e81778945f0dce9aa2739b93082a2c8dbad6aad9ad454df5acbc458",
+  "win32-arm64-msvc": "e8cbe21c15ab65dbec0219400ae91007d19f6b33ead4606277d1269c884ed633",
   // WASI fallback bundle (rar-rs-napi >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "rar-rs-napi.wasm32-wasi.wasm":
-    "12477fbdcf34f5e7fe32ed60c9ca8d06bb3a7c2ea24a3b843d2f8038ceb577c3",
+    "6b3ee9207ee39344327f0ef1b8245b248b76fd970325b061b43249e6fb994003",
   "rar-rs-napi.wasi.cjs": "8db96e1fc58c055c2e957931bc012b71270c0a76dcabbd6cfa87245184e68bcd",
   "wasi-path-map.cjs": "7158e3183c393c2d6403c2363cc1f0b6000e5e5aa2e9de9ff4045b915fc9ae86",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
