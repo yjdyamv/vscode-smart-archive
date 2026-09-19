@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { CODEC_CHUNK } from "../constants";
 import { isMusl } from "../utils/platform";
+import { disposeWasiBinding } from "./wasi-dispose";
 
 const OPTS = { copyOutputData: true };
 
@@ -44,12 +45,20 @@ let wasmSnappy: SnappyLike | undefined;
 let nativeSnappyError: Error | undefined;
 let wasmSnappyError: Error | undefined;
 
-/** Drop cached bindings/errors (e.g. after a setting change or re-stage). */
-export function resetSnappyBindingCache(): void {
+/**
+ * Drop cached bindings/errors (e.g. after a setting change or re-stage).
+ *
+ * Like the rar5 cache, a cached WASI binding is disposed rather than merely
+ * forgotten, so its emnapi worker threads do not outlive it (see
+ * `wasi-dispose.ts`). Never rejects, so callers may fire and forget.
+ */
+export async function resetSnappyBindingCache(): Promise<void> {
+  const wasm = wasmSnappy;
   nativeSnappy = undefined;
   wasmSnappy = undefined;
   nativeSnappyError = undefined;
   wasmSnappyError = undefined;
+  await disposeWasiBinding(wasm);
 }
 
 function loadNativeSnappy(): SnappyLike {

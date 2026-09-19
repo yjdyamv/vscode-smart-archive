@@ -26,6 +26,7 @@ import { prepareExclusions, isPathExcluded, isTargetExcluded } from "../utils/ex
 import { isMusl } from "../utils/platform";
 import { parseSize } from "../utils/security";
 import { currentCompressionLevel } from "./compression-level";
+import { disposeWasiBinding } from "./wasi-dispose";
 import { logger } from "../utils/logger-core";
 
 /**
@@ -196,12 +197,22 @@ let wasmBinding: Rar5Binding | undefined;
 let nativeBindingError: Error | undefined;
 let wasmBindingError: Error | undefined;
 
-/** Drop cached bindings/errors (e.g. after a setting change or re-stage). */
-export function resetRar5BindingCache(): void {
+/**
+ * Drop cached bindings/errors (e.g. after a setting change or re-stage).
+ *
+ * A cached WASI binding is *disposed*, not just forgotten: the loader's
+ * `Symbol.for("napi.rs.wasi.dispose")` terminates its worker threads, which
+ * would otherwise outlive the reference and throw an unhandled
+ * `memory access out of bounds` from the emnapi runtime later (see
+ * `wasi-dispose.ts`). Never rejects, so callers may fire and forget.
+ */
+export async function resetRar5BindingCache(): Promise<void> {
+  const wasm = wasmBinding;
   nativeBinding = undefined;
   wasmBinding = undefined;
   nativeBindingError = undefined;
   wasmBindingError = undefined;
+  await disposeWasiBinding(wasm);
 }
 
 function loadNativeBinding(): Rar5Binding {
