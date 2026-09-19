@@ -59,6 +59,9 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "system7z-rar.test.ts",
     "verify.ts"
   ],
+  "src/engines/compression-level.ts": [
+    "rar5-append-level.test.ts"
+  ],
   "src/engines/engine-config.ts": [
     "backend-config.test.ts",
     "codec-progress.test.ts",

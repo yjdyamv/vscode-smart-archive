@@ -39,17 +39,18 @@ import { zstdCompress } from "./zstd-codec";
 import { brotliCompress, brotliDecompress } from "./brotli-codec";
 import { lz4Compress, lz4Decompress } from "./lz4-codec";
 import { snappyCompress, snappyDecompress } from "./snappy-codec";
+import { currentCompressionLevel, setCompressionLevel } from "./compression-level";
 import { JS7z } from "./js7z-factory";
 import { disposeJS7z } from "./js7z-lifecycle";
 import { atomicWriteFile } from "../utils/fs";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike } from "../utils/cancellation";
 
-/** Injected config (locale-independent): default compression level. */
-let _compressionLevel = 5;
-
+/** Injected config (locale-independent). The level itself lives in
+ *  `compression-level.ts`, because the rar5 append path reads the same value;
+ *  this setter stays the wrapped-tar codecs' entry point. */
 export function setModifyConfig(config: { compressionLevel?: number }): void {
-  if (typeof config.compressionLevel === "number") _compressionLevel = config.compressionLevel;
+  if (typeof config.compressionLevel === "number") setCompressionLevel(config.compressionLevel);
 }
 
 // ── Wrapped archive helper ──
@@ -130,11 +131,14 @@ export async function withWrappedArchiveCore(
 
       let compressedData: Uint8Array;
       if (wrapExt === "zst") {
-        compressedData = await zstdCompress(new Uint8Array(modifiedTar), _compressionLevel);
+        compressedData = await zstdCompress(new Uint8Array(modifiedTar), currentCompressionLevel());
       } else if (wrapExt === "lz4") {
         compressedData = await lz4Compress(new Uint8Array(modifiedTar));
       } else if (wrapExt === "br") {
-        compressedData = await brotliCompress(new Uint8Array(modifiedTar), _compressionLevel);
+        compressedData = await brotliCompress(
+          new Uint8Array(modifiedTar),
+          currentCompressionLevel(),
+        );
       } else if (wrapExt === "sz") {
         compressedData = await snappyCompress(new Uint8Array(modifiedTar));
       } else {

@@ -25,6 +25,7 @@ import { withStage } from "../utils/progress-scale";
 import { prepareExclusions, isPathExcluded, isTargetExcluded } from "../utils/exclude";
 import { isMusl } from "../utils/platform";
 import { parseSize } from "../utils/security";
+import { currentCompressionLevel } from "./compression-level";
 import { logger } from "../utils/logger-core";
 
 /**
@@ -662,7 +663,11 @@ export async function appendWithRar5(
       {
         archivePath,
         entries: bindingEntries,
-        level: 3,
+        // Appended members honor the configured level like every other
+        // write path (`mapLevel(5) = 3`, so the shipped default is
+        // unchanged); this used to be a hardcoded rar level 3, which
+        // silently ignored `default.compressionLevel` for appends.
+        level: mapLevel(currentCompressionLevel()),
         password: password || undefined,
         dictSize: undefined,
       },
