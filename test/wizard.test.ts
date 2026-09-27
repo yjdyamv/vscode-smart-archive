@@ -2,9 +2,10 @@
  * Compress-wizard state machine tests — Smart Archiver
  *
  * Drives the real wizard code with the scriptable vscode test double to
- * verify the RAR flow: forced header encryption, split-volume recovery
- * volumes (exact count) vs inline recovery record (percent), and the
- * final options passed to the compress engine. The engine call itself is
+ * verify the RAR flow: forced header encryption, the split-RAR recovery
+ * steps (inline record percent, then the .rev recovery-volume count), the
+ * non-split inline record, and the final options passed to the compress
+ * engine. The engine call itself is
  * mocked here — the decision tables under test live in the command; the
  * engine behind the seam is exercised end-to-end in commands-e2e.test.ts.
  */
@@ -73,7 +74,7 @@ describe("compress wizard (RAR)", () => {
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it("encryption forces header encryption; split RAR offers recovery volumes by count", async () => {
+  it("encryption forces header encryption; split RAR offers the inline record then recovery volumes", async () => {
     const uri = vscode.Uri.file(dir);
 
     const p = compressCommand(uri, []).catch((e) => {
@@ -97,13 +98,18 @@ describe("compress wizard (RAR)", () => {
     // 5. password
     await vi.waitFor(() => expect(__inputBoxes().length).toBe(2));
     await typeValue(currentInputBox(2), "pw");
-    // 5.6 recovery volumes — the wizard must show count options (not percent)
+    // 5.6 inline recovery record — split RAR offers the per-volume percent
     await vi.waitFor(() => expect(__quickPicks().length).toBe(5));
-    const recoveryQp = currentQuickPick(5);
-    const labels = recoveryQp.items.map((i) => i.label);
-    expect(labels.some((l) => /recovery volume/.test(l)), `expected count options, got: ${labels.join(", ")}`).toBe(true);
-    expect(labels.some((l) => /of archive size/.test(l)), "must NOT offer archive-size percent for split RAR").toBe(false);
-    await pickLabel(recoveryQp, recoveryQp.items.find((i) => i.value === 2)!.label);
+    const recordQp = currentQuickPick(5);
+    const recordLabels = recordQp.items.map((i) => i.label);
+    expect(recordLabels.some((l) => /of each volume/.test(l)), `expected per-volume percent, got: ${recordLabels.join(", ")}`).toBe(true);
+    await pickLabel(recordQp, recordQp.items.find((i) => i.value === 5)!.label);
+    // 5.7 recovery volumes — then the .rev count
+    await vi.waitFor(() => expect(__quickPicks().length).toBe(6));
+    const volumeQp = currentQuickPick(6);
+    const volumeLabels = volumeQp.items.map((i) => i.label);
+    expect(volumeLabels.some((l) => /recovery volume/.test(l)), `expected count options, got: ${volumeLabels.join(", ")}`).toBe(true);
+    await pickLabel(volumeQp, volumeQp.items.find((i) => i.value === 2)!.label);
     // 6. save name
     await vi.waitFor(() => expect(__inputBoxes().length).toBe(3));
     await typeValue(currentInputBox(3), "out");
@@ -118,7 +124,7 @@ describe("compress wizard (RAR)", () => {
     };
     expect(options.encryptHeaders).toBe(true);
     expect(options.recoveryVolumeCount).toBe(2);
-    expect(options.recoveryPercent).toBe(0);
+    expect(options.recoveryPercent).toBe(5);
     expect(options.volumeSize).toBe("32k");
   });
 

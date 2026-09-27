@@ -243,6 +243,11 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "添加恢复记录（可修复损坏的归档）？",
     "zh-tw": "新增恢復記錄（可修復損壞的歸檔）？",
   },
+  "recovery.splitTitle": {
+    en: "Add an inline recovery record to every volume (repair damaged volumes)?",
+    "zh-cn": "为每个分卷添加内联恢复记录（可修复损坏的分卷）？",
+    "zh-tw": "為每個分卷新增內聯恢復記錄（可修復損壞的分卷）？",
+  },
   "recovery.none": {
     en: "No recovery record",
     "zh-cn": "无恢复记录",
@@ -252,6 +257,11 @@ const messages: Record<string, Record<Locale, string>> = {
     en: "{0}% of archive size",
     "zh-cn": "归档大小的 {0}%",
     "zh-tw": "歸檔大小的 {0}%",
+  },
+  "recovery.percentPerVolume": {
+    en: "{0}% of each volume",
+    "zh-cn": "每个分卷的 {0}%",
+    "zh-tw": "每個分卷的 {0}%",
   },
   "recovery.volumesTitle": {
     en: "Recovery volumes (.rev) — about {0} volumes, cap at volume count",

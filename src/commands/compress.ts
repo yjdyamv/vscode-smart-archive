@@ -364,7 +364,7 @@ export async function compressCommand(
   let recoveryPercent = 0;
   let recoveryVolumeCount = 0;
 
-  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 56=recovery, 6=save
+  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 56=recovery record, 57=recovery volumes, 6=save
 
   while (true) {
     switch (step) {
@@ -456,38 +456,48 @@ export async function compressCommand(
         continue;
       }
 
-      // ── 5.6 Recovery record / recovery volumes (RAR only) ──
+      // ── 5.6 Inline recovery record (RAR only) ──
       case 56: {
-        const isSplitRar = format!.label === "rar" && Boolean(volumeSize);
-        if (!isSplitRar) {
-          // Inline recovery record, percent of archive size.
-          const res = await promptQuickPick(
-            [
-              { label: t("recovery.none"), value: 0 },
-              { label: t("recovery.percent", "1"), value: 1 },
-              { label: t("recovery.percent", "3"), value: 3 },
-              { label: t("recovery.percent", "5"), value: 5 },
-              { label: t("recovery.percent", "10"), value: 10 },
-              { label: t("recovery.percent", "20"), value: 20 },
-            ],
-            { placeHolder: t("recovery.title"), title: t("recovery.title") },
-          );
-          if (res.kind !== "ok") {
-            if (res.kind === "back") {
-              step = password ? 5 : 4;
-              continue;
-            }
-            return;
+        // Percent of the archive size. For a split archive the binding writes
+        // one record per volume, each protecting that volume's own prefix
+        // (WinRAR -rr with -v), so the wording says "per volume".
+        const split = Boolean(volumeSize);
+        const title = split ? t("recovery.splitTitle") : t("recovery.title");
+        const percentLabel = (p: string) =>
+          split ? t("recovery.percentPerVolume", p) : t("recovery.percent", p);
+        const res = await promptQuickPick(
+          [
+            { label: t("recovery.none"), value: 0 },
+            { label: percentLabel("1"), value: 1 },
+            { label: percentLabel("3"), value: 3 },
+            { label: percentLabel("5"), value: 5 },
+            { label: percentLabel("10"), value: 10 },
+            { label: percentLabel("20"), value: 20 },
+          ],
+          { placeHolder: title, title },
+        );
+        if (res.kind !== "ok") {
+          if (res.kind === "back") {
+            step = password ? 5 : 4;
+            continue;
           }
-          recoveryPercent = res.value.value;
+          return;
+        }
+        recoveryPercent = res.value.value;
+        step = volumeSize ? 57 : 6;
+        continue;
+      }
+
+      // ── 5.7 Recovery volumes (split RAR only) ──
+      case 57: {
+        if (!volumeSize) {
           step = 6;
           continue;
         }
-
-        // Split RAR: recovery volumes (.rev), exact count. The count is
-        // capped at the (estimated) volume count; the encoder silently
-        // caps it at the actual volume count too.
-        const estimatedVolumes = estimateVolumeCount(targets, volumeSize!);
+        // .rev recovery volumes, exact count. The count is capped at the
+        // (estimated) volume count; the encoder silently caps it at the
+        // actual volume count too.
+        const estimatedVolumes = estimateVolumeCount(targets, volumeSize);
         const maxFixed = Math.min(10, estimatedVolumes);
         const items: { label: string; value: number; description?: string }[] = [
           { label: t("recovery.none"), value: 0 },
@@ -503,7 +513,7 @@ export async function compressCommand(
         });
         if (res.kind !== "ok") {
           if (res.kind === "back") {
-            step = password ? 5 : 4;
+            step = 56;
             continue;
           }
           return;
@@ -546,13 +556,16 @@ export async function compressCommand(
           const r = await promptSaveNameWizard(defaultName, ext);
           if (r.kind !== "ok") {
             if (r.kind === "back") {
-              step = doEncrypt
-                ? 5
-                : format!.label === "rar"
-                  ? 56
-                  : format!.supportsEncryption
-                    ? 4
-                    : 3;
+              step =
+                format!.label === "rar"
+                  ? volumeSize
+                    ? 57
+                    : 56
+                  : doEncrypt
+                    ? 5
+                    : format!.supportsEncryption
+                      ? 4
+                      : 3;
               continue;
             }
             return;
