@@ -8,7 +8,7 @@
 - **格式 (format)** — 归档格式元数据条目（`FORMAT_TABLE`：label、exts、canCreate、supportsEncryption、category）；`.tar.gz`、`.tar.zst` 等复合扩展是独立格式。
 - **包装格式 (wrapped format)** — 先 tar 打包再压缩的格式（tar.gz、tar.zst、tar.lz4、tar.br、tar.sz）。
 - **分卷 (split volume)** — `.7z.001` 与 `.r00` 系列（解析见 `getSplitVolumeBase`）。
-- **恢复记录 (recovery record)** — RAR5 内联 rr% 与分卷恢复卷两种机制；wizard 对非分卷只问内联 rr%（按归档大小），对分卷两者都问（先内联 rr%，逐卷各带一份；再 `.rev` 恢复卷数），可同时写入。
+- **恢复记录 (recovery record)** — RAR5 内联 rr% 与分卷恢复卷两种机制；wizard 对非分卷只问内联 rr%（按归档大小），对分卷两者都问（先内联 rr%，逐卷各带一份；再 `.rev` 恢复卷——按分卷数百分比 `-rv<N%>` 或个数 `-rv<N>`，百分比由编码器按最终分卷数换算），可同时写入。
 - **引擎 (engine)** — 压缩/解压后端：system7z（child process）、worker（WASM 7zz core）、rar5（native/WASI binding）、rarRebuild；`selectEngine` 是唯一选型决策点。
 - **op** — worker 协议操作名（compress/decompress/list/isEncrypted/unwrap/extract/modify…）；`dispatchOp` 是 op → core 唯一映射。
 - **core** — vscode-free 执行层（`*-core.ts`、codecs、js7z-factory）；host 分发器与 worker 都经 `dispatchOp` 进入。

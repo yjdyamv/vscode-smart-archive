@@ -79,6 +79,7 @@ interface Rar5Binding {
       encryptHeaders?: boolean;
       recoveryPercent?: number;
       recoveryVolumeCount?: number;
+      recoveryVolumesPercent?: number;
       volumeSize?: number;
       maxTotalBytes?: number;
       dictSize?: string;
@@ -486,6 +487,7 @@ export async function compressWithRar5(
         encryptHeaders: options.encryptHeaders ?? false,
         recoveryPercent: options.recoveryPercent ?? 0,
         recoveryVolumeCount: options.recoveryVolumeCount ?? 0,
+        recoveryVolumesPercent: options.recoveryVolumesPercent ?? 0,
         volumeSize: volumeSize && volumeSize > 0 ? volumeSize : undefined,
         dictSize: options.dictSize || undefined,
         solid: options.solid ?? undefined,

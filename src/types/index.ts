@@ -55,6 +55,12 @@ export interface CompressOptions {
   /** RAR5 recovery volumes (.rev) count (WinRAR -rv); auto-capped at the data volume count. */
   recoveryVolumeCount?: number;
   /**
+   * RAR5 recovery volumes (.rev) as a percent of the data-volume count
+   * (WinRAR -rv<N%>). Mutually exclusive with recoveryVolumeCount; the encoder
+   * applies it to the actual volume count.
+   */
+  recoveryVolumesPercent?: number;
+  /**
    * RAR5 dictionary size (WinRAR -md, e.g. "64m", "1g"). Values up to
    * 4 GiB must be powers of two; values above 4 GiB produce RAR7 (v70)
    * archives.

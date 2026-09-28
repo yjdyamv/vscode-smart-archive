@@ -263,15 +263,55 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "每个分卷的 {0}%",
     "zh-tw": "每個分卷的 {0}%",
   },
-  "recovery.volumesTitle": {
-    en: "Recovery volumes (.rev) — about {0} volumes, cap at volume count",
-    "zh-cn": "恢复卷（.rev）— 预计分卷数约 {0} 个，超出自动取分卷数",
-    "zh-tw": "恢復卷（.rev）— 預計分卷數約 {0} 個，超出自動取分卷數",
+  "recovery.percentCost": {
+    en: "≈ +{0} per volume",
+    "zh-cn": "每卷约 +{0}",
+    "zh-tw": "每卷約 +{0}",
   },
-  "recovery.volumesCount": {
-    en: "{0} recovery volume(s)",
-    "zh-cn": "{0} 个恢复卷",
-    "zh-tw": "{0} 個恢復卷",
+  "recovery.percentCustom": {
+    en: "Custom percentage...",
+    "zh-cn": "自定义百分比...",
+    "zh-tw": "自訂百分比...",
+  },
+  "recovery.percentCustomPrompt": {
+    en: "Recovery record size as a percent of the archive (1-100)",
+    "zh-cn": "恢复记录大小，占归档的百分比（1–100）",
+    "zh-tw": "恢復記錄大小，佔歸檔的百分比（1–100）",
+  },
+  "recovery.percentInvalid": {
+    en: "Enter a whole number between 1 and 100",
+    "zh-cn": "请输入 1 到 100 之间的整数",
+    "zh-tw": "請輸入 1 到 100 之間的整數",
+  },
+  "recovery.volumesTitle": {
+    en: "Recovery volumes (.rev) — about {0} data volumes, capped at the final count",
+    "zh-cn": "恢复卷（.rev）— 预计约 {0} 个数据分卷，按最终分卷数封顶",
+    "zh-tw": "恢復卷（.rev）— 預計約 {0} 個資料分卷，按最終分卷數封頂",
+  },
+  "recovery.volumesPercent": {
+    en: "{0}% of volumes",
+    "zh-cn": "分卷数的 {0}%",
+    "zh-tw": "分卷數的 {0}%",
+  },
+  "recovery.volumesPercentPrompt": {
+    en: "Recovery volumes as a percent of the volume count (1-100)",
+    "zh-cn": "恢复卷数量，占分卷数的百分比（1–100）",
+    "zh-tw": "恢復卷數量，佔分卷數的百分比（1–100）",
+  },
+  "recovery.recommendedSuffix": {
+    en: "recommended",
+    "zh-cn": "推荐",
+    "zh-tw": "推薦",
+  },
+  "recovery.volumesRepairs": {
+    en: "repairs up to {0} lost volume(s)",
+    "zh-cn": "可修复最多 {0} 个丢失/损坏的分卷",
+    "zh-tw": "可修復最多 {0} 個遺失/損壞的分卷",
+  },
+  "recovery.volumesCost": {
+    en: "about +{0}",
+    "zh-cn": "约增加 {0}",
+    "zh-tw": "約增加 {0}",
   },
   "recovery.volumesCustom": {
     en: "Custom count...",
@@ -279,9 +319,9 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "自訂個數...",
   },
   "recovery.volumesCustomPrompt": {
-    en: "Recovery volume count (exceeding the volume count is capped automatically)",
-    "zh-cn": "恢复卷个数（超过分卷数时自动取分卷数）",
-    "zh-tw": "恢復卷個數（超過分卷數時自動取分卷數）",
+    en: "Recovery volume count — up to {0} (capped automatically)",
+    "zh-cn": "恢复卷个数——最多 {0} 个（超出自动取分卷数）",
+    "zh-tw": "恢復卷個數——最多 {0} 個（超出自動取分卷數）",
   },
   "recovery.volumesInvalid": {
     en: "Enter a whole number between 1 and 1000",

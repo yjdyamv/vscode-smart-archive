@@ -26,7 +26,7 @@ import { parseSize } from "../utils/security";
 import { promptSavePath } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
 import { normalizeSevenZipMethod } from "../utils/sevenZipMethod";
-import { t, compressLevels, formatDuration } from "../i18n";
+import { t, compressLevels, formatDuration, formatCompactSize } from "../i18n";
 import { logger } from "../utils/logger";
 import { isCancellationError } from "../utils/cancellation";
 import { StageProgress, type ProgressStage, type StageDuration } from "../ui/stage-progress";
@@ -305,6 +305,18 @@ function estimateVolumeCount(targets: readonly { fsPath: string }[], volumeSize:
   return Math.max(1, Math.ceil(total / size));
 }
 
+/**
+ * Number of `.rev` files for `volumes` data volumes at `percent` (1-100),
+ * mirroring rar-rs's `plan_recovery_volume_count`:
+ * `max(1, ceil(percent * volumes / 100))`, capped at the volume count.
+ * (Must stay in sync with the encoder, which applies the same formula to the
+ * actual volume count when given a percent.)
+ */
+function planRecoveryVolumeCount(volumes: number, percent: number): number {
+  const pct = Math.min(percent, 100);
+  return Math.min(volumes, Math.max(1, Math.ceil((pct * volumes) / 100)));
+}
+
 export async function compressCommand(
   uri: vscode.Uri | undefined,
   selectedUris: readonly vscode.Uri[] | undefined,
@@ -363,6 +375,7 @@ export async function compressCommand(
   let encryptHeaders = false;
   let recoveryPercent = 0;
   let recoveryVolumeCount = 0;
+  let recoveryVolumesPercent = 0;
 
   let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 56=recovery record, 57=recovery volumes, 6=save
 
@@ -460,22 +473,26 @@ export async function compressCommand(
       case 56: {
         // Percent of the archive size. For a split archive the binding writes
         // one record per volume, each protecting that volume's own prefix
-        // (WinRAR -rr with -v), so the wording says "per volume".
+        // (WinRAR -rr with -v), so the wording says "per volume" and the
+        // per-volume cost is known and shown.
         const split = Boolean(volumeSize);
         const title = split ? t("recovery.splitTitle") : t("recovery.title");
-        const percentLabel = (p: string) =>
-          split ? t("recovery.percentPerVolume", p) : t("recovery.percent", p);
-        const res = await promptQuickPick(
-          [
-            { label: t("recovery.none"), value: 0 },
-            { label: percentLabel("1"), value: 1 },
-            { label: percentLabel("3"), value: 3 },
-            { label: percentLabel("5"), value: 5 },
-            { label: percentLabel("10"), value: 10 },
-            { label: percentLabel("20"), value: 20 },
-          ],
-          { placeHolder: title, title },
-        );
+        const perVolumeSize = volumeSize ? parseSize(volumeSize, 0) : 0;
+        const percentItem = (p: number) => ({
+          label: split
+            ? t("recovery.percentPerVolume", String(p))
+            : t("recovery.percent", String(p)),
+          value: p,
+          description: split
+            ? t("recovery.percentCost", formatCompactSize((perVolumeSize * p) / 100))
+            : undefined,
+        });
+        const items: { label: string; value: number; description?: string }[] = [
+          { label: t("recovery.none"), value: 0 },
+          ...[1, 3, 5, 10, 20].map(percentItem),
+          { label: t("recovery.percentCustom"), value: -1 },
+        ];
+        const res = await promptQuickPick(items, { placeHolder: title, title });
         if (res.kind !== "ok") {
           if (res.kind === "back") {
             step = password ? 5 : 4;
@@ -483,7 +500,28 @@ export async function compressCommand(
           }
           return;
         }
-        recoveryPercent = res.value.value;
+        if (res.value.value === -1) {
+          const ibRes = await promptInputBox({
+            prompt: t("recovery.percentCustomPrompt"),
+            placeholder: "3",
+            validate: (v) => {
+              const num = parseInt(v.trim(), 10);
+              if (!/^\d+$/.test(v.trim()) || num < 1 || num > 100) {
+                return t("recovery.percentInvalid");
+              }
+              return undefined;
+            },
+          });
+          if (ibRes.kind !== "ok") {
+            if (ibRes.kind === "back") {
+              continue; // re-ask the percent list
+            }
+            return;
+          }
+          recoveryPercent = parseInt(ibRes.value, 10);
+        } else {
+          recoveryPercent = res.value.value;
+        }
         step = volumeSize ? 57 : 6;
         continue;
       }
@@ -494,18 +532,39 @@ export async function compressCommand(
           step = 6;
           continue;
         }
-        // .rev recovery volumes, exact count. The count is capped at the
-        // (estimated) volume count; the encoder silently caps it at the
-        // actual volume count too.
+        // .rev recovery volumes. Offered as a percent of the data-volume count
+        // (WinRAR -rv<N%>, the same ceil formula rar-rs uses), so the list is a
+        // fixed ladder and never enumerates 1..N; the encoder applies the
+        // percent to the actual volume count. An exact count can also be typed,
+        // like WinRAR's -rv<N>.
         const estimatedVolumes = estimateVolumeCount(targets, volumeSize);
-        const maxFixed = Math.min(10, estimatedVolumes);
-        const items: { label: string; value: number; description?: string }[] = [
-          { label: t("recovery.none"), value: 0 },
-          ...Array.from({ length: maxFixed }, (_, i) => ({
-            label: t("recovery.volumesCount", String(i + 1)),
-            value: i + 1,
-          })),
-          { label: t("recovery.volumesCustom"), value: -1 },
+        const recommended = planRecoveryVolumeCount(estimatedVolumes, 5);
+        const perVolumeSize = parseSize(volumeSize, 0);
+        const percentItem = (p: number) => {
+          const n = planRecoveryVolumeCount(estimatedVolumes, p);
+          return {
+            label:
+              p === 5
+                ? `${t("recovery.volumesPercent", String(p))} (${t("recovery.recommendedSuffix")})`
+                : t("recovery.volumesPercent", String(p)),
+            value: p,
+            mode: "percent" as const,
+            description: [
+              t("recovery.volumesRepairs", String(n)),
+              t("recovery.volumesCost", formatCompactSize(perVolumeSize * n)),
+            ].join(" · "),
+          };
+        };
+        const items: {
+          label: string;
+          value: number;
+          mode: "none" | "percent" | "customPercent" | "customCount";
+          description?: string;
+        }[] = [
+          { label: t("recovery.none"), value: 0, mode: "none" },
+          ...[1, 3, 5, 10].map(percentItem),
+          { label: t("recovery.percentCustom"), value: 0, mode: "customPercent" },
+          { label: t("recovery.volumesCustom"), value: 0, mode: "customCount" },
         ];
         const res = await promptQuickPick(items, {
           placeHolder: t("recovery.volumesTitle", String(estimatedVolumes)),
@@ -518,27 +577,38 @@ export async function compressCommand(
           }
           return;
         }
-        if (res.value.value === -1) {
+        const picked = res.value;
+        if (picked.mode === "customPercent" || picked.mode === "customCount") {
+          const isPercent = picked.mode === "customPercent";
           const ibRes = await promptInputBox({
-            prompt: t("recovery.volumesCustomPrompt"),
-            placeholder: String(Math.min(estimatedVolumes, 10)),
+            prompt: isPercent
+              ? t("recovery.volumesPercentPrompt")
+              : t("recovery.volumesCustomPrompt", String(estimatedVolumes)),
+            placeholder: isPercent ? "5" : String(recommended),
             validate: (v) => {
               const num = parseInt(v.trim(), 10);
-              if (!/^\d+$/.test(v.trim()) || num < 1 || num > 1000) {
-                return t("recovery.volumesInvalid");
+              const max = isPercent ? 100 : 1000;
+              if (!/^\d+$/.test(v.trim()) || num < 1 || num > max) {
+                return isPercent ? t("recovery.percentInvalid") : t("recovery.volumesInvalid");
               }
               return undefined;
             },
           });
           if (ibRes.kind !== "ok") {
             if (ibRes.kind === "back") {
-              continue; // re-ask the count list
+              continue; // re-ask the list
             }
             return;
           }
-          recoveryVolumeCount = parseInt(ibRes.value, 10);
+          const value = parseInt(ibRes.value, 10);
+          recoveryVolumesPercent = isPercent ? value : 0;
+          recoveryVolumeCount = isPercent ? 0 : value;
+        } else if (picked.mode === "percent") {
+          recoveryVolumesPercent = picked.value;
+          recoveryVolumeCount = 0;
         } else {
-          recoveryVolumeCount = res.value.value;
+          recoveryVolumesPercent = 0;
+          recoveryVolumeCount = 0;
         }
         step = 6;
         continue;
@@ -620,6 +690,7 @@ export async function compressCommand(
           encryptHeaders,
           recoveryPercent,
           recoveryVolumeCount,
+          recoveryVolumesPercent,
           sevenZipMethod: normalizeSevenZipMethod(
             vscode.workspace
               .getConfiguration("smart-archiver")
