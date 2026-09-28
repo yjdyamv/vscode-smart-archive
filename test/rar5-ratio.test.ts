@@ -9,7 +9,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { describe, expect, it } from "vitest";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
-import { getRarPayloadSize } from "../src/providers/archive/rar5-modify";
+import { getRarPayloadSize, getRarPayloadSizeForSet } from "../src/providers/archive/rar5-modify";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
 
@@ -108,6 +108,45 @@ describe("getRarPayloadSize (recovery record)", () => {
       const rb = fs.readFileSync(archive).indexOf(Buffer.from("{RB}"));
       expect(rb).toBeGreaterThan(0);
       expect(payload).toBeLessThanOrEqual(rb);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(HAS_RAR5_ENGINE)("sums the per-volume RR payload across a split set", async () => {
+    const dir = tmpDir("sat_ratio-split-");
+    try {
+      // Random (incompressible) payload so the archive really splits.
+      const file = path.join(dir, "data.bin");
+      fs.writeFileSync(file, require("crypto").randomBytes(100_000));
+      const archive = path.join(dir, "set.part1.rar");
+      await compressWithRar5(
+        {
+          format: FORMAT,
+          outputPath: archive,
+          targets: [{ fsPath: file }],
+          password: "",
+          level: 3,
+          volumeSize: "32k",
+          recoveryPercent: 10,
+        },
+        undefined,
+        undefined,
+        [],
+      );
+      const volumes = fs
+        .readdirSync(dir)
+        .filter((f) => /\.part\d+\.rar$/i.test(f))
+        .sort()
+        .map((f) => path.join(dir, f));
+      expect(volumes.length).toBeGreaterThan(1);
+      const full = volumes.reduce((sum, v) => sum + fs.statSync(v).size, 0);
+      const payload = getRarPayloadSizeForSet(archive);
+      // Every volume's own RR tail is excluded, and the whole set counts —
+      // not just the first volume (the old single-file bug).
+      expect(payload).toBeGreaterThan(0);
+      expect(payload).toBeLessThan(full);
+      expect(payload).toBeGreaterThan(fs.statSync(volumes[0]).size);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

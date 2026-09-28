@@ -20,7 +20,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { getFullExt } from "../../constants";
+import { getFullExt, listArchiveVolumeFiles } from "../../constants";
 import { isRarExt, isRarVolume } from "../../utils/rar";
 import { isPathExcluded, type ExclusionSet } from "../../utils/exclude";
 import { logger } from "../../utils/logger";
@@ -371,6 +371,20 @@ export function getRarPayloadSize(archivePath: string, fullSize: number): number
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * Recovery-record-aware payload size for a whole archive (single file or
+ * multi-volume set): each data volume contributes its RR-protected prefix
+ * (per-volume inline records) or its full size. The webview ratio uses this
+ * so a split set is never measured from its first volume alone.
+ */
+export function getRarPayloadSizeForSet(filePath: string): number {
+  let total = 0;
+  for (const volume of listArchiveVolumeFiles(filePath)) {
+    total += getRarPayloadSize(volume, fs.statSync(volume).size);
+  }
+  return total;
 }
 
 /**

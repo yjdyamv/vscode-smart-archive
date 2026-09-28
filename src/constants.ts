@@ -483,56 +483,44 @@ export function resolveSplitVolume(filePath: string): string | null {
 }
 
 /**
- * Returns the total compressed size of an archive, summing all split
- * volumes if the archive is a multi-volume set.
+ * All data-volume files of an archive's multi-volume set, including the
+ * given file; a one-element list for a plain single-file archive. Only the
+ * data volumes are returned — `.rev` recovery volumes are never included.
  */
-export function getCompressedArchiveSize(filePath: string): number {
+export function listArchiveVolumeFiles(filePath: string): string[] {
   const fileName = path.basename(filePath);
+  const dir = path.dirname(filePath);
+  const collect = (pattern: RegExp): string[] =>
+    fs
+      .readdirSync(dir)
+      .filter((f) => pattern.test(f))
+      .map((f) => path.join(dir, f));
 
   if (isSplitVolume(filePath)) {
-    const dir = path.dirname(filePath);
     const base = getSplitVolumeBase(fileName);
-    if (!base) return fs.statSync(filePath).size;
+    if (!base) return [filePath];
 
     const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    let pattern: RegExp;
-    if (/\.(7z|zip|wim)\.\d+$/i.test(fileName)) {
-      pattern = new RegExp(`^${escapedBase}\\.\\d+$`);
-    } else if (/\.part\d+\.rar$/i.test(fileName)) {
-      pattern = new RegExp(`^${escapedBase}\\.part\\d+\\.rar$`, "i");
-    } else if (/\.r\d{2}$/i.test(fileName)) {
-      pattern = new RegExp(`^${escapedBase}\\.r\\d{2}$`, "i");
-    } else {
-      return fs.statSync(filePath).size;
-    }
-
-    return fs
-      .readdirSync(dir)
-      .filter((f) => pattern.test(f))
-      .reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
+    if (/\.(7z|zip|wim)\.\d+$/i.test(fileName))
+      return collect(new RegExp(`^${escapedBase}\\.\\d+$`));
+    if (/\.part\d+\.rar$/i.test(fileName))
+      return collect(new RegExp(`^${escapedBase}\\.part\\d+\\.rar$`, "i"));
+    if (/\.r\d{2}$/i.test(fileName)) return collect(new RegExp(`^${escapedBase}\\.r\\d{2}$`, "i"));
+    return [filePath];
   }
 
   // RAR main file (.rar) may have old-style .rNN continuation volumes
   if (/\.rar$/i.test(filePath)) {
-    const dir = path.dirname(filePath);
     const base = path.basename(filePath, ".rar");
     const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const rnnPattern = new RegExp(`^${escapedBase}\\.r\\d{2}$`, "i");
-    const rnnVols = fs.readdirSync(dir).filter((f) => rnnPattern.test(f));
-    if (rnnVols.length > 0) {
-      const total = rnnVols.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
-      return total + fs.statSync(filePath).size;
-    }
-    const partPattern = new RegExp(`^${escapedBase}\\.part\\d+\\.rar$`, "i");
-    const partVols = fs.readdirSync(dir).filter((f) => partPattern.test(f));
-    if (partVols.length > 0) {
-      const total = partVols.reduce((sum, f) => sum + fs.statSync(path.join(dir, f)).size, 0);
-      return total + fs.statSync(filePath).size;
-    }
+    const rnnVols = collect(new RegExp(`^${escapedBase}\\.r\\d{2}$`, "i"));
+    if (rnnVols.length > 0) return [filePath, ...rnnVols];
+    const partVols = collect(new RegExp(`^${escapedBase}\\.part\\d+\\.rar$`, "i"));
+    if (partVols.length > 0) return [filePath, ...partVols];
   }
 
-  return fs.statSync(filePath).size;
+  return [filePath];
 }
 
 export function isWrappedFormat(ext: string): boolean {

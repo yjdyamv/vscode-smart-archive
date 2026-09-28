@@ -10,15 +10,10 @@ import { isCancellationError } from "../../../utils/cancellation";
 import { logger } from "../../../utils/logger";
 import { t, formatCompactSize } from "../../../i18n";
 import { isPasswordOrEncryptError } from "../../../utils/errorClassifier";
-import {
-  getFullExt,
-  isSplitVolume,
-  isEncryptableExt,
-  getCompressedArchiveSize,
-} from "../../../constants";
+import { getFullExt, isSplitVolume, isEncryptableExt } from "../../../constants";
 import { fetchFileList } from "../../fileListing";
 import { saveArchivePassword } from "../../passwordVault";
-import { getRarPayloadSize } from "../../archive/rar5-modify";
+import { getRarPayloadSizeForSet } from "../../archive/rar5-modify";
 import {
   buildTreeRootOnly,
   buildEntryIndex,
@@ -88,12 +83,8 @@ export const handlePassword: MessageHandler = async (ctx) => {
         format: ext,
         count: pwStats.total,
         size: formatCompactSize(pwStats.totalSize),
-        // Exclude the recovery-record parity tail from the ratio.
-        ratio:
-          pwStats.totalSize > 0
-            ? getRarPayloadSize(s.filePath, getCompressedArchiveSize(s.filePath)) /
-              pwStats.totalSize
-            : 0,
+        // Exclude the recovery-record parity tails (per volume) from the ratio.
+        ratio: pwStats.totalSize > 0 ? getRarPayloadSizeForSet(s.filePath) / pwStats.totalSize : 0,
       },
       getNoisyPatterns(),
       pwToast,

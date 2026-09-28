@@ -16,10 +16,9 @@ import {
   isEncryptableExt,
   isSplitVolume,
   resolveSplitVolume,
-  getCompressedArchiveSize,
 } from "../../constants";
 import { isRarVolume, resolveRarVolume } from "../../utils/rar";
-import { getRarPayloadSize } from "../archive/rar5-modify";
+import { getRarPayloadSizeForSet } from "../archive/rar5-modify";
 import { isOversizeError } from "../../utils/security";
 import { logger } from "../../utils/logger";
 import { t, formatCompactSize } from "../../i18n";
@@ -248,10 +247,9 @@ export async function setupWebview(
   const fileCount = stats.files;
   const dirCount = stats.dirs;
   const itemCount = stats.total;
-  const archiveFileSize = getCompressedArchiveSize(filePath);
-  // The recovery-record parity tail inflates the on-disk size; base the
-  // ratio on the protected payload instead.
-  const payloadSize = getRarPayloadSize(filePath, archiveFileSize);
+  // The recovery-record parity tails inflate the on-disk size; base the
+  // ratio on the protected payload of the whole set (per-volume records).
+  const payloadSize = getRarPayloadSizeForSet(filePath);
   const ratio = totalSize > 0 ? payloadSize / totalSize : 0;
   const roExt = resolvedExt;
   const roToast =
