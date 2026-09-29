@@ -51,6 +51,7 @@
     "lint:fix": "oxlint -D correctness -D suspicious -A no-underscore-dangle -A unicorn/require-post-message-target-origin -A unicorn/no-array-sort -A unicorn/consistent-function-scoping -A no-control-regex --fix src/ test/ webview-ui/src/ scripts/",
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
+    "fix:f5-debug": "node scripts/patch-vscode-jsdebug.mjs",
     "release": "npm run check && npm run package:cross",
     "stage:natives": "node scripts/install-7zz-wasm.mjs && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.mjs && node scripts/install-snappy-platforms.mjs && node scripts/install-7z-platforms.mjs",
     "verify:downloads": "node scripts/verify-downloads.mjs",
