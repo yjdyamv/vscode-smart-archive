@@ -172,9 +172,7 @@ describe("rebuildRarArchive", () => {
   it("asks before rebuilding a RAR4 archive (declined → aborts)", async () => {
     const old = fakeArchive(dir, "old.rar", RAR4_SIG);
     const spy = vi.spyOn(vscode.window, "showWarningMessage").mockResolvedValueOnce(undefined);
-    await expect(
-      rebuildRarArchive({ archivePath: old, mutate: () => {} }),
-    ).rejects.toThrow(/RAR4/);
+    await expect(rebuildRarArchive({ archivePath: old, mutate: () => {} })).rejects.toThrow(/RAR4/);
     expect(spy).toHaveBeenCalledOnce();
     expect(decompressWithSystem7z).not.toHaveBeenCalled();
   });
@@ -208,9 +206,9 @@ describe("rebuildRarArchive", () => {
     vi.mocked(decompressWithSystem7z).mockImplementation(async (opts) => {
       fs.mkdirSync(opts.outputDir, { recursive: true });
     });
-    await expect(
-      rebuildRarArchive({ archivePath, mutate: () => {} }),
-    ).rejects.toThrow(/empty|为空/i);
+    await expect(rebuildRarArchive({ archivePath, mutate: () => {} })).rejects.toThrow(
+      /empty|为空/i,
+    );
   });
 });
 

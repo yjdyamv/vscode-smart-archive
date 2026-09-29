@@ -52,9 +52,12 @@ describe("mapLimit", () => {
 
 describe("countStatuses", () => {
   it("groups downloadWithCache statuses into the run summary", () => {
-    expect(
-      countStatuses(["downloaded", "cached", "skipped", "failed", "downloaded"]),
-    ).toEqual({ installed: 2, cached: 1, skipped: 1, failed: 1 });
+    expect(countStatuses(["downloaded", "cached", "skipped", "failed", "downloaded"])).toEqual({
+      installed: 2,
+      cached: 1,
+      skipped: 1,
+      failed: 1,
+    });
   });
 });
 

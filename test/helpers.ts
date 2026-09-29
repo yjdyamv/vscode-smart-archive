@@ -31,9 +31,7 @@ export function resetActiveInstances(): void {
   _activeInstances = [];
 }
 
-export async function trackedJS7z(
-  opts?: Record<string, unknown>,
-): Promise<JS7zInstance> {
+export async function trackedJS7z(opts?: Record<string, unknown>): Promise<JS7zInstance> {
   const instance = await JS7z(opts);
   _activeInstances.push(instance);
   return instance;
@@ -57,9 +55,22 @@ export interface JS7zInstance {
     stat(p: string): { mode: number; size: number };
     isDir(mode: number): boolean;
     mount(type: unknown, opts: { root: string }, mountPoint: string): void;
-    createDataFile(parent: string, name: string, data: Uint8Array, canRead: boolean, canWrite: boolean, canOwn?: number): void;
+    createDataFile(
+      parent: string,
+      name: string,
+      data: Uint8Array,
+      canRead: boolean,
+      canWrite: boolean,
+      canOwn?: number,
+    ): void;
     open(path: string, flags: string): unknown;
-    write(stream: unknown, buffer: Uint8Array, offset: number, length: number, position: number): void;
+    write(
+      stream: unknown,
+      buffer: Uint8Array,
+      offset: number,
+      length: number,
+      position: number,
+    ): void;
     close(stream: unknown): void;
   };
   callMain(args: string[]): number;
@@ -143,7 +154,9 @@ export async function j7zCompressDir(
       if (dir && dir !== "/") mkdirP(j, dir);
       j.FS.writeFile(fp, new Uint8Array(Buffer.from(content)));
     }
-    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.replace(/^\/+/, "").split("/")[0]))];
+    const tops = [
+      ...new Set(Object.keys(files).map((f) => "/" + f.replace(/^\/+/, "").split("/")[0])),
+    ];
     await run7z(j, ["a", archive, ...tops, ...extra]);
     return Buffer.from(j.FS.readFile(archive, { encoding: "binary" }));
   } finally {
@@ -151,7 +164,12 @@ export async function j7zCompressDir(
   }
 }
 
-export function copyFS(j: JS7zInstance, dir: string, prefix: string, res: Record<string, string>): void {
+export function copyFS(
+  j: JS7zInstance,
+  dir: string,
+  prefix: string,
+  res: Record<string, string>,
+): void {
   for (const e of j.FS.readdir(dir)) {
     if (e === "." || e === "..") continue;
     const fp = path.posix.join(dir, e);
@@ -185,7 +203,11 @@ export async function j7zSelective(
     j.FS.writeFile("/a", new Uint8Array(buf));
     j.FS.mkdir("/o");
     const args = ["x", "/a", "-o/o"];
-    if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
+    if (pw) {
+      args.splice(1, 0, "-p" + pw);
+    } else {
+      args.splice(1, 0, "-p-");
+    }
     args.push(...paths);
     const res: Record<string, string> = {};
     await run7z(j, args);
@@ -202,7 +224,11 @@ export async function j7zDecompress(buf: Buffer, pw = ""): Promise<Record<string
     j.FS.writeFile("/a", new Uint8Array(buf));
     j.FS.mkdir("/o");
     const args = ["x", "/a", "-o/o"];
-    if (pw) { args.splice(1, 0, "-p" + pw); } else { args.splice(1, 0, "-p-"); }
+    if (pw) {
+      args.splice(1, 0, "-p" + pw);
+    } else {
+      args.splice(1, 0, "-p-");
+    }
     const res: Record<string, string> = {};
     await run7z(j, args);
     copyFS(j, "/o", "", res);
@@ -229,7 +255,9 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       if (d && d !== "/") mkdirP(j1, d);
       j1.FS.writeFile(fp, new Uint8Array(Buffer.from(c)));
     }
-    const tops = [...new Set(Object.keys(files).map((f) => "/" + f.replace(/^\/+/, "").split("/")[0]))];
+    const tops = [
+      ...new Set(Object.keys(files).map((f) => "/" + f.replace(/^\/+/, "").split("/")[0])),
+    ];
     await run7z(j1, ["a", "/_t.tar", ...tops]);
     const tb = Buffer.from(j1.FS.readFile("/_t.tar", { encoding: "binary" }));
     if (ext === "tar.zst" || ext === "tzst") {
@@ -239,9 +267,11 @@ export async function createWrapped(files: Record<string, string>, ext: string):
       return Buffer.from(await wasmCompress(tb, "lz4", 5));
     }
     if (ext === "tar.br" || ext === "tbr") {
-      return Buffer.from(zlib.brotliCompressSync(Buffer.from(tb), {
-        params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 },
-      }));
+      return Buffer.from(
+        zlib.brotliCompressSync(Buffer.from(tb), {
+          params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 },
+        }),
+      );
     }
     if (ext === "tar.sz" || ext === "tsz") {
       const compressed = snappy.compressSync(tb);

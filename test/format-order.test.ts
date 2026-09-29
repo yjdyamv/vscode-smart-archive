@@ -31,10 +31,7 @@ describe("resolveCompressFormats", () => {
   });
 
   it("ignores unknown labels", () => {
-    expect(labels(resolveCompressFormats(["zip", "nope", "7z", ""], "7z"))).toEqual([
-      "7z",
-      "zip",
-    ]);
+    expect(labels(resolveCompressFormats(["zip", "nope", "7z", ""], "7z"))).toEqual(["7z", "zip"]);
   });
 
   it("pins the default format on top even when not whitelisted", () => {
@@ -54,9 +51,7 @@ describe("resolveCompressFormats", () => {
   });
 
   it("the package.json enum lists exactly the creatable formats", () => {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
-    ) as {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")) as {
       contributes: {
         configuration: {
           properties: {
@@ -65,9 +60,8 @@ describe("resolveCompressFormats", () => {
         };
       };
     };
-    const enumLabels = pkg.contributes.configuration.properties[
-      "smart-archiver.default.formatOrder"
-    ].items.enum;
+    const enumLabels =
+      pkg.contributes.configuration.properties["smart-archiver.default.formatOrder"].items.enum;
     expect(enumLabels).toEqual(labels(COMPRESS_FORMATS));
   });
 });

@@ -17,8 +17,7 @@ import { logger } from "../src/utils/logger";
 const flush = () => new Promise((r) => setTimeout(r, 50));
 
 /** Extract the event name (e.g. "info.before") from a rendered line. */
-const eventsFrom = (rendered: string[]) =>
-  rendered.map((l) => l.match(/[a-z]+\.[a-z0-9_]+/)?.[0]);
+const eventsFrom = (rendered: string[]) => rendered.map((l) => l.match(/[a-z]+\.[a-z0-9_]+/)?.[0]);
 
 /** A plain OutputChannel double: appendLine + working clear(). */
 function makeChannel() {
@@ -144,11 +143,7 @@ describe("logger.setLevel", () => {
       freshLogger.debug({ event: "live.one" });
       freshLogger.info({ event: "info.after" });
       await flush();
-      expect(eventsFrom(rendered)).toEqual([
-        "info.before",
-        "live.one",
-        "info.after",
-      ]);
+      expect(eventsFrom(rendered)).toEqual(["info.before", "live.one", "info.after"]);
     } finally {
       spy.mockRestore();
     }
@@ -162,11 +157,7 @@ describe("logger.setLevel", () => {
       freshLogger.info({ event: "mode.info" });
       freshLogger.debug({ event: "mode.debug2" });
       await flush();
-      expect(eventsFrom(rendered)).toEqual([
-        "mode.debug1",
-        "mode.info",
-        "mode.debug2",
-      ]);
+      expect(eventsFrom(rendered)).toEqual(["mode.debug1", "mode.info", "mode.debug2"]);
 
       // Lowering re-renders at the info floor: debug lines disappear, the
       // info line keeps its position.

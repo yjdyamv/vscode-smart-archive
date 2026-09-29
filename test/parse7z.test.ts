@@ -38,9 +38,7 @@ describe("parse7zListing — archivePath self-reference filter", () => {
       "",
     ].join("\n");
 
-    const results = parse7zListing(
-      stdout, "archive.tar.gz", "C:\\Users\\test\\archive.tar.gz",
-    );
+    const results = parse7zListing(stdout, "archive.tar.gz", "C:\\Users\\test\\archive.tar.gz");
     expect(results).toHaveLength(1);
     expect(results[0].path).toBe("readme.md");
   });
@@ -57,9 +55,7 @@ describe("parse7zListing — archivePath self-reference filter", () => {
       "",
     ].join("\n");
 
-    const results = parse7zListing(
-      stdout, "archive.7z", "d:\\other\\path\\archive.7z",
-    );
+    const results = parse7zListing(stdout, "archive.7z", "d:\\other\\path\\archive.7z");
     expect(results).toHaveLength(1);
     expect(results[0].path).toBe("data.txt");
   });

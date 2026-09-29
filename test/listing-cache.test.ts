@@ -74,7 +74,10 @@ describe("readListingCache / writeListingCache", () => {
     const entries = await readListingCache(cache, src);
     expect(entries).toEqual(ENTRIES);
 
-    const snap = JSON.parse(fs.readFileSync(cacheFilePath(cache, src), "utf8")) as Record<string, unknown>;
+    const snap = JSON.parse(fs.readFileSync(cacheFilePath(cache, src), "utf8")) as Record<
+      string,
+      unknown
+    >;
     expect(snap.v).toBe(1);
     expect(snap.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(snap.entries).toEqual(ENTRIES);
@@ -103,7 +106,7 @@ describe("readListingCache / writeListingCache", () => {
     await writeListingCache(cache, src, ENTRIES);
 
     const cacheFile = cacheFilePath(cache, src);
-    fs.writeFileSync(cacheFile, "{\"v\":1,\"entries\":[broken");
+    fs.writeFileSync(cacheFile, '{"v":1,"entries":[broken');
     expect(await readListingCache(cache, src)).toBeNull();
 
     await writeListingCache(cache, src, ENTRIES);
@@ -358,7 +361,10 @@ describe("initListingCache / pruneListingCache", () => {
 
     const pruned = pruneListingCache(cache, 3);
     expect(pruned).toBe(2);
-    const remaining = fs.readdirSync(cache).filter((f) => f.endsWith(".json")).sort();
+    const remaining = fs
+      .readdirSync(cache)
+      .filter((f) => f.endsWith(".json"))
+      .sort();
     expect(remaining).toEqual(["f2.json", "f3.json", "f4.json"]);
     expect(fs.existsSync(path.join(cache, "keep.tmp"))).toBe(true);
   });

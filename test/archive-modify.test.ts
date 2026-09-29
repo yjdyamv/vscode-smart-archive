@@ -131,7 +131,6 @@ describe("add-to-archive", () => {
 // Rename
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("rename", () => {
   it("simple file rename via 7z rn", async () => {
     const j = await trackedJS7z();
@@ -189,7 +188,6 @@ describe("rename", () => {
 // Format / encoding utilities
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("format conversion", () => {
   const files27z = { "/sub/a.txt": "one", "/c.txt": "two" };
 
@@ -223,7 +221,6 @@ describe("format conversion", () => {
 // ════════════════════════════════════════════════════════════════════
 // Merge split volumes → single archive
 // ════════════════════════════════════════════════════════════════════
-
 
 describe("merge/split operations", () => {
   it("merge: split 7z back to single", async () => {
@@ -297,15 +294,13 @@ describe("merge/split operations", () => {
 // Encrypt / decrypt
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("encrypt/decrypt", () => {
   it("convert: encrypted 7z round-trip preserves encryption", async () => {
     const pw = "p4ssw0rd";
-    const src = await j7zCompressDir(
-      { "/sub/a.txt": "one", "/c.txt": "two" },
-      "/_enc.7z",
-      [`-p${pw}`, "-mhe=on"],
-    );
+    const src = await j7zCompressDir({ "/sub/a.txt": "one", "/c.txt": "two" }, "/_enc.7z", [
+      `-p${pw}`,
+      "-mhe=on",
+    ]);
     const orig = await j7zDecompress(src, pw);
     expect(orig["sub/a.txt"]).toBe("one");
 
@@ -321,11 +316,10 @@ describe("encrypt/decrypt", () => {
 
   it("decrypt: encrypted 7z → non-encrypted", async () => {
     const pw = "s3cret";
-    const src = await j7zCompressDir(
-      { "/x.txt": "secret-data" },
-      "/_enc2.7z",
-      [`-p${pw}`, "-mhe=on"],
-    );
+    const src = await j7zCompressDir({ "/x.txt": "secret-data" }, "/_enc2.7z", [
+      `-p${pw}`,
+      "-mhe=on",
+    ]);
     await expect(j7zDecompress(src)).rejects.toThrow(/7z exit/);
 
     const decrypted = await j7zDecompress(src, pw);
@@ -457,7 +451,6 @@ describe("encrypt/decrypt", () => {
 // Exclusion logic (uses direct import from src/utils/exclude)
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("delete from archive (7z d on tar)", () => {
   it("full tar.gz flow: decompress → 7z d → recompress does not hang", async () => {
     const files = {
@@ -488,14 +481,14 @@ describe("delete from archive (7z d on tar)", () => {
     await expect(
       Promise.race([
         run7z(j2, ["d", "/inner.tar", "-y", ...deletePaths]),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT: 7z d hung in full flow")), 10_000)),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("TIMEOUT: 7z d hung in full flow")), 10_000),
+        ),
       ]),
     ).resolves.toBeUndefined();
 
     // 4. Read modified tar
-    const modifiedTar = new Uint8Array(
-      j2.FS.readFile("/inner.tar", { encoding: "binary" }),
-    );
+    const modifiedTar = new Uint8Array(j2.FS.readFile("/inner.tar", { encoding: "binary" }));
 
     // 5. Recompress to gzip using a FRESH instance
     // Reusing the same js7z2 instance after 7z d HANGS on 7z a!
@@ -504,13 +497,13 @@ describe("delete from archive (7z d on tar)", () => {
     await expect(
       Promise.race([
         run7z(j2b, ["a", "/_re.tar.gz", "/_re.tar"]),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT: 7z a recompression hung")), 10_000)),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("TIMEOUT: 7z a recompression hung")), 10_000),
+        ),
       ]),
     ).resolves.toBeUndefined();
 
-    const compressedData = new Uint8Array(
-      j2b.FS.readFile("/_re.tar.gz", { encoding: "binary" }),
-    );
+    const compressedData = new Uint8Array(j2b.FS.readFile("/_re.tar.gz", { encoding: "binary" }));
     disposeJS7z(j2);
     disposeJS7z(j2b);
 
@@ -528,7 +521,9 @@ describe("delete from archive (7z d on tar)", () => {
     const j4 = await trackedJS7z();
     j4.FS.writeFile("/_t.tar", finalTarData);
     let finalStdout = "";
-    j4.print = (t: string) => { finalStdout += t + "\n"; };
+    j4.print = (t: string) => {
+      finalStdout += t + "\n";
+    };
     j4.printErr = () => {};
     await new Promise<void>((resolve, reject) => {
       j4.onExit = (c) => (c === 0 ? resolve() : reject(new Error(`l exit ${c}`)));

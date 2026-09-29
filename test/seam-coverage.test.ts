@@ -69,7 +69,9 @@ describe("seam coverage guard", () => {
     const covered = new Set(Object.keys(SEAM_COVERED));
     for (const [modulePath, reason] of Object.entries(SEAM_GAPS)) {
       expect(reason.trim(), `gap "${modulePath}" needs a reason`).not.toBe("");
-      expect(covered.has(modulePath), `gap "${modulePath}" is stale — module is now imported`).toBe(false);
+      expect(covered.has(modulePath), `gap "${modulePath}" is stale — module is now imported`).toBe(
+        false,
+      );
     }
   });
 

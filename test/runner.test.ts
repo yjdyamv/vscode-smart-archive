@@ -321,9 +321,7 @@ describe("WorkerThreadRunner", () => {
     const [req] = sentRequests(wkrs[0]);
 
     reconfigureArchiveWorker();
-    expect(
-      wkrs[0].posted.some((m) => (m as { type: string }).type === "reconfigure"),
-    ).toBe(true);
+    expect(wkrs[0].posted.some((m) => (m as { type: string }).type === "reconfigure")).toBe(true);
 
     wkrs[0].emitMessage({ type: "done", id: req.id });
     await promise;

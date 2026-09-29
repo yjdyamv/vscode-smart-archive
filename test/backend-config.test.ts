@@ -33,7 +33,6 @@ import type { EngineConfig } from "../src/engines/worker/types";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
 
-
 const RAR5_SIG = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]);
 
 const NOOP_WARN = { warn: () => {} };
@@ -99,52 +98,46 @@ describe("snappy backend selection", () => {
 });
 
 describe("backend integration", () => {
-  it.runIf(gate("snappyWasm"))(
-    "snappy WASM backend round-trips via the setting",
-    async () => {
-      applyBackends({ snappyBackend: "wasm" });
-      const data = Buffer.from("backend wasm ".repeat(64));
-      const compressed = await snappyCompress(data);
-      expect(compressed.length).toBeGreaterThan(0);
-      const restored = await snappyDecompress(compressed);
-      expect(Buffer.from(restored).equals(data)).toBe(true);
-    },
-  );
+  it.runIf(gate("snappyWasm"))("snappy WASM backend round-trips via the setting", async () => {
+    applyBackends({ snappyBackend: "wasm" });
+    const data = Buffer.from("backend wasm ".repeat(64));
+    const compressed = await snappyCompress(data);
+    expect(compressed.length).toBeGreaterThan(0);
+    const restored = await snappyDecompress(compressed);
+    expect(Buffer.from(restored).equals(data)).toBe(true);
+  });
 
-  it.runIf(gate("rar5Wasm"))(
-    "rar5 WASM backend creates an archive via the setting",
-    async () => {
-      applyBackends({ rar5Backend: "wasm" });
-      const td = tmpDir("sat_backend_");
-      try {
-        const src = path.join(td, "a.txt");
-        fs.writeFileSync(src, "backend wasm rar");
-        const out = path.join(td, "out.rar");
-        await compressWithRar5(
-          {
-            format: {
-              label: "rar",
-              description: "",
-              canCreate: true,
-              supportsEncryption: true,
-            },
-            outputPath: out,
-            targets: [{ fsPath: src }],
-            password: "",
-            level: 3,
+  it.runIf(gate("rar5Wasm"))("rar5 WASM backend creates an archive via the setting", async () => {
+    applyBackends({ rar5Backend: "wasm" });
+    const td = tmpDir("sat_backend_");
+    try {
+      const src = path.join(td, "a.txt");
+      fs.writeFileSync(src, "backend wasm rar");
+      const out = path.join(td, "out.rar");
+      await compressWithRar5(
+        {
+          format: {
+            label: "rar",
+            description: "",
+            canCreate: true,
+            supportsEncryption: true,
           },
-          undefined,
-          undefined,
-          [],
-        );
-        expect(fs.existsSync(out)).toBe(true);
-        const head = fs.readFileSync(out).subarray(0, RAR5_SIG.length);
-        expect(head.equals(RAR5_SIG)).toBe(true);
-      } finally {
-        fs.rmSync(td, { recursive: true, force: true });
-      }
-    },
-  );
+          outputPath: out,
+          targets: [{ fsPath: src }],
+          password: "",
+          level: 3,
+        },
+        undefined,
+        undefined,
+        [],
+      );
+      expect(fs.existsSync(out)).toBe(true);
+      const head = fs.readFileSync(out).subarray(0, RAR5_SIG.length);
+      expect(head.equals(RAR5_SIG)).toBe(true);
+    } finally {
+      fs.rmSync(td, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("unified backend settings (sevenZ/zstd/brotli/lz4)", () => {

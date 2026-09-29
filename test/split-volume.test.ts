@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 
-import { getSplitVolumeStem, detectVolumeSize, getSplitOutputPath } from "../src/providers/webview/router";
+import {
+  getSplitVolumeStem,
+  detectVolumeSize,
+  getSplitOutputPath,
+} from "../src/providers/webview/router";
 import { mergeOutputPath } from "../src/providers/webview/handlers/shared";
 import { tmpDir } from "./tmp";
 

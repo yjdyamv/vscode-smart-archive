@@ -7,7 +7,6 @@
  * implementations, never copies.
  */
 
-
 // ── Fixture oracle (test-side implementation, intentionally independent) ──
 
 export {
@@ -31,10 +30,7 @@ export { testCompress, testDecompress } from "./test-helpers";
 
 // ── Production logic under test (one implementation, no mirrors) ──
 
-export {
-  buildTreeRootOnly,
-  getDirChildren,
-} from "../src/providers/treeBuilder";
+export { buildTreeRootOnly, getDirChildren } from "../src/providers/treeBuilder";
 export type { TreeNode, FlatEntry } from "../src/providers/treeBuilder";
 
 export { fixArchiveEncoding } from "../src/utils/path";
@@ -59,10 +55,7 @@ export {
 import { wasmCompress, wasmDecompress } from "../src/engines/js7z-codec";
 
 export const zstd = {
-  compress: async (
-    data: Uint8Array,
-    opts?: { compressionLevel?: number },
-  ): Promise<Buffer> =>
+  compress: async (data: Uint8Array, opts?: { compressionLevel?: number }): Promise<Buffer> =>
     Buffer.from(await wasmCompress(data, "zst", opts?.compressionLevel ?? 3)),
   decompress: async (data: Uint8Array): Promise<Buffer> =>
     Buffer.from(await wasmDecompress(data, "zst")),
@@ -119,6 +112,5 @@ export async function decompressLz4Frames(data: Buffer): Promise<Uint8Array> {
 
 // ── Exclusion module (production) ──
 
-export const { prepareExclusions, isPathExcluded, isTargetExcluded } = await import(
-  "../src/utils/exclude"
-);
+export const { prepareExclusions, isPathExcluded, isTargetExcluded } =
+  await import("../src/utils/exclude");

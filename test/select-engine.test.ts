@@ -30,10 +30,7 @@ function systemAvailable(): void {
   mockedSystem7zCanDecompress.mockReturnValue(true);
 }
 
-function expectChoice(
-  request: Parameters<typeof selectEngine>[0],
-  engine: EngineChoice,
-): void {
+function expectChoice(request: Parameters<typeof selectEngine>[0], engine: EngineChoice): void {
   const sel = selectEngine(request);
   expect(sel.engine).toBe(engine);
   expect(sel.reason.length).toBeGreaterThan(0);
@@ -65,18 +62,12 @@ describe("selectEngine · decompress", () => {
   beforeEach(() => systemAvailable());
 
   it("uses system 7z when available and capable for the archive", () => {
-    expectChoice(
-      { op: "decompress", ext: ".7z", archivePath: "/tmp/a.7z" },
-      "system7z",
-    );
+    expectChoice({ op: "decompress", ext: ".7z", archivePath: "/tmp/a.7z" }, "system7z");
   });
 
   it("falls back to the worker when the archive uses unsupported methods", () => {
     mockedSystem7zCanDecompress.mockReturnValue(false);
-    expectChoice(
-      { op: "decompress", ext: ".7z", archivePath: "/tmp/a.7z" },
-      "worker",
-    );
+    expectChoice({ op: "decompress", ext: ".7z", archivePath: "/tmp/a.7z" }, "worker");
   });
 
   it("keeps system 7z for encrypted archives (password via stdin)", () => {

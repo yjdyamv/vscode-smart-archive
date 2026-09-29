@@ -120,7 +120,6 @@ describe("tree builder", () => {
 // Add-to-archive path preservation
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("format utilities", () => {
   it("fixArchiveEncoding passes ASCII through", () => {
     expect(fixArchiveEncoding("hello.txt")).toBe("hello.txt");
@@ -190,7 +189,6 @@ describe("format utilities", () => {
 // RAR utilities
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("CJK encoding", () => {
   it("virtual FS preserves Chinese filenames", async () => {
     const j = await trackedJS7z();
@@ -238,7 +236,6 @@ describe("CJK encoding", () => {
 // ════════════════════════════════════════════════════════════════════
 // Encryption detection
 // ════════════════════════════════════════════════════════════════════
-
 
 describe("RAR utilities", () => {
   it("isRarExt", () => {

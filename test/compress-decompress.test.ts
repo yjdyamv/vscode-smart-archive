@@ -22,7 +22,10 @@ import {
   disposeJS7z,
 } from "./shared-setup";
 import { testCompress, testDecompress } from "./test-helpers";
-import { compressWith7z as compressWasmCore, setTarBackend } from "../src/engines/js7z-compress-core";
+import {
+  compressWith7z as compressWasmCore,
+  setTarBackend,
+} from "../src/engines/js7z-compress-core";
 import { copyDirToFS, ensureDirSync } from "../src/utils/fs";
 import { createTarFile } from "../src/engines/tar-writer";
 import { tmpDir } from "./tmp";
@@ -39,7 +42,6 @@ afterEach(() => {
 
 const td = tmpDir("sat_");
 describe("js7z compress/decompress", () => {
-
   // ── 7z ──
 
   it("follows symlinked directories when copying into the WASM VFS", async () => {
@@ -204,9 +206,7 @@ describe("js7z compress/decompress", () => {
 // validatePassword, createTarFile, and codec compression.
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("production pipeline round-trips", () => {
-
   // ── 7z ──
 
   it("7z single file", async () => {
@@ -216,10 +216,7 @@ describe("production pipeline round-trips", () => {
   });
 
   it("7z multi file", async () => {
-    const b = await testCompress(
-      { "s/1.txt": "1", "s/2.txt": "2", "s/3.txt": "3" },
-      "7z",
-    );
+    const b = await testCompress({ "s/1.txt": "1", "s/2.txt": "2", "s/3.txt": "3" }, "7z");
     const f = await testDecompress(b);
     expect(Object.keys(f).length).toBe(3);
     expect(f["s/1.txt"]).toBe("1");
@@ -261,10 +258,7 @@ describe("production pipeline round-trips", () => {
   });
 
   it("ZIP nested folder", async () => {
-    const b = await testCompress(
-      { "app/index.html": "<h>", "app/js/main.js": "var x" },
-      "zip",
-    );
+    const b = await testCompress({ "app/index.html": "<h>", "app/js/main.js": "var x" }, "zip");
     const f = await testDecompress(b, { ext: "zip" });
     expect(f["app/index.html"]).toBe("<h>");
     expect(f["app/js/main.js"]).toBe("var x");
@@ -314,7 +308,6 @@ describe("production pipeline round-trips", () => {
 // production pipeline. Isolation tests for exclude.ts are below;
 // these test the INTEGRATION with compressWith7z.
 // ════════════════════════════════════════════════════════════════════
-
 
 describe("wrapped format round-trips", () => {
   for (const ext of ["tar.gz", "tar.bz2", "tar.xz"] as const) {
@@ -376,7 +369,12 @@ describe("wrapped format round-trips", () => {
 });
 
 describe("tar backend selection (smart-archiver.backend.tar)", () => {
-  const wrappedFormat = { label: "tar.gz", description: "", canCreate: true, supportsEncryption: false };
+  const wrappedFormat = {
+    label: "tar.gz",
+    description: "",
+    canCreate: true,
+    supportsEncryption: false,
+  };
 
   async function decompressToMap(archivePath: string): Promise<Record<string, string>> {
     const j = await trackedJS7z();
@@ -624,7 +622,6 @@ describe("xz method mapping (flzma2 → HC4 fast LZMA2)", () => {
 // Stream-to-VFS for large files
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("stream-to-VFS large files", () => {
   it("7z round-trip with dirs", async () => {
     const root = path.join(td, "src");
@@ -677,7 +674,6 @@ describe("stream-to-VFS large files", () => {
 // Split volumes
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("split volumes", () => {
   it("7z round-trip", async () => {
     const j = await trackedJS7z();
@@ -688,9 +684,7 @@ describe("split volumes", () => {
     const parts = j.FS.readdir("/").filter((e) => e.startsWith("x.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(1);
 
-    const partsData = parts.map((p) =>
-      Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })),
-    );
+    const partsData = parts.map((p) => Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })));
     const j2 = await trackedJS7z();
     for (const [idx, p] of parts.entries()) {
       j2.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
@@ -712,9 +706,7 @@ describe("split volumes", () => {
     const parts = j.FS.readdir("/").filter((e) => e.startsWith("x.zip."));
     expect(parts.length).toBeGreaterThanOrEqual(1);
 
-    const partsData = parts.map((p) =>
-      Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })),
-    );
+    const partsData = parts.map((p) => Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })));
     const j2 = await trackedJS7z();
     for (const [idx, p] of parts.entries()) {
       j2.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
@@ -736,9 +728,7 @@ describe("split volumes", () => {
     const count = parts.length;
     expect(count).toBeGreaterThanOrEqual(2);
 
-    const partsData = parts.map((p) =>
-      Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })),
-    );
+    const partsData = parts.map((p) => Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })));
     const j2 = await trackedJS7z();
     for (const [idx, p] of parts.entries()) {
       j2.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
@@ -759,9 +749,7 @@ describe("split volumes", () => {
     const parts = j.FS.readdir("/").filter((e) => e.startsWith("s.7z."));
     expect(parts.length).toBeGreaterThanOrEqual(1);
 
-    const partsData = parts.map((p) =>
-      Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })),
-    );
+    const partsData = parts.map((p) => Buffer.from(j.FS.readFile("/" + p, { encoding: "binary" })));
     const j2 = await trackedJS7z();
     for (const [idx, p] of parts.entries()) {
       j2.FS.writeFile("/" + p, new Uint8Array(partsData[idx]));
@@ -872,7 +860,6 @@ describe("split volumes", () => {
 // ════════════════════════════════════════════════════════════════════
 // Format conversion
 // ════════════════════════════════════════════════════════════════════
-
 
 describe("tar writer (node-tar backend)", () => {
   it("creates a tar with long paths that the WASM 7zz lists and extracts", async () => {

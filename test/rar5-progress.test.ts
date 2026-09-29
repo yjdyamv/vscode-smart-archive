@@ -24,16 +24,13 @@ const RAR5_FORMAT = {
   supportsEncryption: true,
 };
 
-
 interface Report {
   message?: string;
   increment?: number;
 }
 
 function pctReports(reports: Report[]): number[] {
-  return reports
-    .filter((r) => r.message?.match(/^\d+%$/))
-    .map((r) => parseInt(r.message!, 10));
+  return reports.filter((r) => r.message?.match(/^\d+%$/)).map((r) => parseInt(r.message!, 10));
 }
 
 function expectMonotonic(pcts: number[]): void {

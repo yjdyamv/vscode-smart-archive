@@ -110,9 +110,7 @@ describe.runIf(process.platform !== "win32")("walkers skip real FIFOs (POSIX)", 
     const walk = collectTarPaths(proj, prepareExclusions([]));
 
     expect(walk.files).toHaveLength(0);
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "tarWriter.specialSkip" }),
-    );
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: "tarWriter.specialSkip" }));
   });
 
   it("sumTreeBytes counts nothing for a FIFO and warns", () => {
@@ -126,9 +124,7 @@ describe.runIf(process.platform !== "win32")("walkers skip real FIFOs (POSIX)", 
     const total = sumTreeBytes([proj]);
 
     expect(total).toBe(0);
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "fs.sumTree.specialSkip" }),
-    );
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: "fs.sumTree.specialSkip" }));
   });
 
   it("a symlink pointing at a FIFO is skipped by collectTarPaths", () => {
@@ -143,8 +139,6 @@ describe.runIf(process.platform !== "win32")("walkers skip real FIFOs (POSIX)", 
     const walk = collectTarPaths(proj, prepareExclusions([]));
 
     expect(walk.files).toHaveLength(0);
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "tarWriter.specialSkip" }),
-    );
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: "tarWriter.specialSkip" }));
   });
 });

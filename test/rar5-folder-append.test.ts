@@ -7,11 +7,7 @@ import * as childProcess from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { describe, it, expect } from "vitest";
-import {
-  compressWithRar5,
-  appendWithRar5,
-  listRar5Entries,
-} from "../src/engines/rar5-engine";
+import { compressWithRar5, appendWithRar5, listRar5Entries } from "../src/engines/rar5-engine";
 import { rar5CliBinaries, gate } from "./gates";
 import { tmpDir } from "./tmp";
 

@@ -19,9 +19,17 @@ import { tmpDir } from "./tmp";
 
 /** Supported format labels for testCompress (all canCreate formats) */
 type TestFormat =
-  | "7z" | "zip" | "tar" | "wim"
-  | "tar.gz" | "tar.bz2" | "tar.xz"
-  | "tar.zst" | "tar.lz4" | "tar.br" | "tar.sz";
+  | "7z"
+  | "zip"
+  | "tar"
+  | "wim"
+  | "tar.gz"
+  | "tar.bz2"
+  | "tar.xz"
+  | "tar.zst"
+  | "tar.lz4"
+  | "tar.br"
+  | "tar.sz";
 
 export interface TestCompressOptions {
   password?: string;

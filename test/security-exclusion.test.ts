@@ -54,7 +54,6 @@ afterEach(() => {
 
 const td = tmpDir("sat_");
 describe("exclusion integration", () => {
-
   it("compression excludes node_modules by default pattern", async () => {
     // In production, user selects a project folder; node_modules is a child
     const buf = await testCompress(
@@ -98,11 +97,9 @@ describe("exclusion integration", () => {
   it("target named like an exclusion is NOT excluded (regression test for b5b16a1)", async () => {
     // This test verifies that a directory named 'output' (which is in the
     // default exclude list) is NOT excluded when it's the compression target.
-    const buf = await testCompress(
-      { "output/data.txt": "important" },
-      "7z",
-      { excludePatterns: ["output"] },
-    );
+    const buf = await testCompress({ "output/data.txt": "important" }, "7z", {
+      excludePatterns: ["output"],
+    });
     const f = await testDecompress(buf);
     // The target directory 'output' should still be included
     expect(f["output/data.txt"]).toBe("important");
@@ -145,7 +142,6 @@ describe("exclusion integration", () => {
 // ════════════════════════════════════════════════════════════════════
 // Security
 // ════════════════════════════════════════════════════════════════════
-
 
 describe("security", () => {
   it("path traversal blocked", () => {
@@ -258,7 +254,6 @@ describe("security", () => {
 // CJK encoding
 // ════════════════════════════════════════════════════════════════════
 
-
 describe("encryption detection", () => {
   it("detects encrypted 7z (listing fails without password)", async () => {
     const b = await j7zCompressDir({ "/f.txt": "secret" }, "/enc.7z", ["-pp4ss", "-mhe=on"]);
@@ -297,7 +292,6 @@ describe("encryption detection", () => {
 // ════════════════════════════════════════════════════════════════════
 // Tree builder
 // ════════════════════════════════════════════════════════════════════
-
 
 describe("exclusion logic", () => {
   let td2: string;
@@ -413,7 +407,9 @@ describe("exclusion logic", () => {
 
     const relPaths = result.map((f) => path.relative(base, f).replace(/\\/g, "/"));
     const excludedNames = ["node_modules", ".git", "dist"];
-    const leaked = relPaths.filter((r) => excludedNames.some((excl) => r.split("/").includes(excl)));
+    const leaked = relPaths.filter((r) =>
+      excludedNames.some((excl) => r.split("/").includes(excl)),
+    );
     expect(leaked.length).toBe(0);
     expect(relPaths.includes("src/index.js")).toBe(true);
     expect(relPaths.includes("package.json")).toBe(true);
@@ -458,7 +454,6 @@ describe("exclusion logic", () => {
 // ════════════════════════════════════════════════════════════════════
 // .smartarchive markers filtered during extraction
 // ════════════════════════════════════════════════════════════════════
-
 
 describe("smartarchive marker filtering", () => {
   it(".smartarchive markers are skipped in VFS-to-disk copy", async () => {
@@ -609,7 +604,9 @@ for (const c of codecs) {
       const j = await trackedJS7z();
       j.FS.writeFile("/_t.tar", innerTar);
       await run7z(j, ["a", "/_out.7z", "/_t.tar"]);
-      const conv = await j7zDecompress(Buffer.from(j.FS.readFile("/_out.7z", { encoding: "binary" })));
+      const conv = await j7zDecompress(
+        Buffer.from(j.FS.readFile("/_out.7z", { encoding: "binary" })),
+      );
       expect(Object.keys(conv).length).toBeGreaterThanOrEqual(1);
     });
 
@@ -642,70 +639,70 @@ for (const c of codecs) {
     });
 
     it("delete files: unwrap -> delete from tar -> recompress -> verify", async () => {
-        const wrapped = await createWrapped(stdFiles, c.ext);
-        const innerTar = await c.decompress(wrapped);
+      const wrapped = await createWrapped(stdFiles, c.ext);
+      const innerTar = await c.decompress(wrapped);
 
-        const j = await trackedJS7z();
-        j.FS.writeFile("/_t.tar", innerTar);
-        await run7z(j, ["d", "/_t.tar", "d/b.txt"]);
-        const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+      const j = await trackedJS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      await run7z(j, ["d", "/_t.tar", "d/b.txt"]);
+      const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
-        const recompressed = await c.compress(modifiedTar);
-        const finalTar = await c.decompress(Buffer.from(recompressed));
-        const j2 = await trackedJS7z();
-        j2.FS.writeFile("/_t.tar", finalTar);
-        j2.FS.mkdir("/_out3");
-        await run7z(j2, ["x", "/_t.tar", "-o/_out3", "-y"]);
-        const res: Record<string, string> = {};
-        copyFS(j2, "/_out3", "", res);
-        expect(res["d/a.txt"]).toBe("hello");
-        expect(res["d/b.txt"]).toBeUndefined();
-      });
+      const recompressed = await c.compress(modifiedTar);
+      const finalTar = await c.decompress(Buffer.from(recompressed));
+      const j2 = await trackedJS7z();
+      j2.FS.writeFile("/_t.tar", finalTar);
+      j2.FS.mkdir("/_out3");
+      await run7z(j2, ["x", "/_t.tar", "-o/_out3", "-y"]);
+      const res: Record<string, string> = {};
+      copyFS(j2, "/_out3", "", res);
+      expect(res["d/a.txt"]).toBe("hello");
+      expect(res["d/b.txt"]).toBeUndefined();
+    });
 
-      it("rename files: unwrap -> rename in tar -> recompress -> verify", async () => {
-        const wrapped = await createWrapped(stdFiles, c.ext);
-        const innerTar = await c.decompress(wrapped);
+    it("rename files: unwrap -> rename in tar -> recompress -> verify", async () => {
+      const wrapped = await createWrapped(stdFiles, c.ext);
+      const innerTar = await c.decompress(wrapped);
 
-        const j = await trackedJS7z();
-        j.FS.writeFile("/_t.tar", innerTar);
-        await run7z(j, ["rn", "/_t.tar", "d/a.txt", "d/renamed.txt"]);
-        const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+      const j = await trackedJS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      await run7z(j, ["rn", "/_t.tar", "d/a.txt", "d/renamed.txt"]);
+      const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
-        const recompressed = await c.compress(modifiedTar);
-        const finalTar = await c.decompress(Buffer.from(recompressed));
-        const j2 = await trackedJS7z();
-        j2.FS.writeFile("/_t.tar", finalTar);
-        j2.FS.mkdir("/_out4");
-        await run7z(j2, ["x", "/_t.tar", "-o/_out4", "-y"]);
-        const res: Record<string, string> = {};
-        copyFS(j2, "/_out4", "", res);
-        expect(res["d/renamed.txt"]).toBe("hello");
-        expect(res["d/a.txt"]).toBeUndefined();
-        expect(res["d/b.txt"]).toBe("world");
-      });
+      const recompressed = await c.compress(modifiedTar);
+      const finalTar = await c.decompress(Buffer.from(recompressed));
+      const j2 = await trackedJS7z();
+      j2.FS.writeFile("/_t.tar", finalTar);
+      j2.FS.mkdir("/_out4");
+      await run7z(j2, ["x", "/_t.tar", "-o/_out4", "-y"]);
+      const res: Record<string, string> = {};
+      copyFS(j2, "/_out4", "", res);
+      expect(res["d/renamed.txt"]).toBe("hello");
+      expect(res["d/a.txt"]).toBeUndefined();
+      expect(res["d/b.txt"]).toBe("world");
+    });
 
-      it("create folder: unwrap -> create dir in tar -> recompress -> verify", async () => {
-        const wrapped = await createWrapped(stdFiles, c.ext);
-        const innerTar = await c.decompress(wrapped);
+    it("create folder: unwrap -> create dir in tar -> recompress -> verify", async () => {
+      const wrapped = await createWrapped(stdFiles, c.ext);
+      const innerTar = await c.decompress(wrapped);
 
-        const j = await trackedJS7z();
-        j.FS.writeFile("/_t.tar", innerTar);
-        j.FS.mkdir("/newfolder");
-        j.FS.writeFile("/newfolder/.smartarchive", new Uint8Array(Buffer.from(".")));
-        await run7z(j, ["a", "/_t.tar", "/newfolder"]);
-        const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
+      const j = await trackedJS7z();
+      j.FS.writeFile("/_t.tar", innerTar);
+      j.FS.mkdir("/newfolder");
+      j.FS.writeFile("/newfolder/.smartarchive", new Uint8Array(Buffer.from(".")));
+      await run7z(j, ["a", "/_t.tar", "/newfolder"]);
+      const modifiedTar = Buffer.from(j.FS.readFile("/_t.tar", { encoding: "binary" }));
 
-        const recompressed = await c.compress(modifiedTar);
-        const finalTar = await c.decompress(Buffer.from(recompressed));
-        const j2 = await trackedJS7z();
-        j2.FS.writeFile("/_t.tar", finalTar);
-        j2.FS.mkdir("/_out5");
-        await run7z(j2, ["x", "/_t.tar", "-o/_out5", "-y"]);
-        const res: Record<string, string> = {};
-        copyFS(j2, "/_out5", "", res);
-        expect(res["d/a.txt"]).toBe("hello");
-        expect(res["newfolder/.smartarchive"]).toBe(".");
-      });
+      const recompressed = await c.compress(modifiedTar);
+      const finalTar = await c.decompress(Buffer.from(recompressed));
+      const j2 = await trackedJS7z();
+      j2.FS.writeFile("/_t.tar", finalTar);
+      j2.FS.mkdir("/_out5");
+      await run7z(j2, ["x", "/_t.tar", "-o/_out5", "-y"]);
+      const res: Record<string, string> = {};
+      copyFS(j2, "/_out5", "", res);
+      expect(res["d/a.txt"]).toBe("hello");
+      expect(res["newfolder/.smartarchive"]).toBe(".");
+    });
 
     it("encrypt unsupported: isEncryptableExt returns false", async () => {
       const { isEncryptableExt } = await import("../src/constants");

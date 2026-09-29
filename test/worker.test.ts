@@ -51,7 +51,10 @@ function initWorker(config?: Record<string, unknown>): void {
     type: "init",
     config: {
       locale: "en",
-      limits: { maxArchiveSize: 10 * 1024 * 1024 * 1024, maxExtractTotalSize: 20 * 1024 * 1024 * 1024 },
+      limits: {
+        maxArchiveSize: 10 * 1024 * 1024 * 1024,
+        maxExtractTotalSize: 20 * 1024 * 1024 * 1024,
+      },
       zstdBackend: "auto",
       ...config,
     },

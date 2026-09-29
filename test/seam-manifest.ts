@@ -16,26 +16,12 @@
  */
 
 export const SEAM_COVERED: Record<string, string[]> = {
-  "src/api/compress.ts": [
-    "api.test.ts",
-    "rar5-exclusion.test.ts"
-  ],
-  "src/api/decompress.ts": [
-    "api.test.ts"
-  ],
-  "src/commands/compress.ts": [
-    "commands-e2e.test.ts",
-    "wizard.test.ts"
-  ],
-  "src/commands/decompress.ts": [
-    "commands-e2e.test.ts"
-  ],
-  "src/commands/repair.ts": [
-    "commands-e2e.test.ts"
-  ],
-  "src/commands/rebuildVolumes.ts": [
-    "rebuild-volumes.test.ts"
-  ],
+  "src/api/compress.ts": ["api.test.ts", "rar5-exclusion.test.ts"],
+  "src/api/decompress.ts": ["api.test.ts"],
+  "src/commands/compress.ts": ["commands-e2e.test.ts", "wizard.test.ts"],
+  "src/commands/decompress.ts": ["commands-e2e.test.ts"],
+  "src/commands/repair.ts": ["commands-e2e.test.ts"],
+  "src/commands/rebuildVolumes.ts": ["rebuild-volumes.test.ts"],
   "src/constants.ts": [
     "defaults-consistency.test.ts",
     "package-json-sync.test.ts",
@@ -43,88 +29,61 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "rar5-exclusion.test.ts",
     "security-exclusion.test.ts",
     "shared-setup.ts",
-    "workspace.test.ts"
+    "workspace.test.ts",
   ],
   "src/engines/brotli-codec.ts": [
     "codec-progress.test.ts",
     "preview.test.ts",
     "security-exclusion.test.ts",
     "shared-setup.ts",
-    "wasm-codec.test.ts"
+    "wasm-codec.test.ts",
   ],
   "src/engines/bundled7z.ts": [
     "api.test.ts",
     "commands-e2e.test.ts",
     "gates.ts",
     "system7z-rar.test.ts",
-    "verify.ts"
+    "verify.ts",
   ],
-  "src/engines/compression-level.ts": [
-    "rar5-append-level.test.ts"
-  ],
+  "src/engines/compression-level.ts": ["rar5-append-level.test.ts"],
   "src/engines/engine-config.ts": [
     "backend-config.test.ts",
     "codec-progress.test.ts",
-    "defaults-consistency.test.ts"
+    "defaults-consistency.test.ts",
   ],
-  "src/engines/extract-core.ts": [
-    "extract-wrapped.test.ts"
-  ],
-  "src/engines/fileListing-core.ts": [
-    "wasm-codec-pipeline.test.ts"
-  ],
+  "src/engines/extract-core.ts": ["extract-wrapped.test.ts"],
+  "src/engines/fileListing-core.ts": ["wasm-codec-pipeline.test.ts"],
   "src/engines/js7z-codec.ts": [
     "codec-progress.test.ts",
     "helpers.ts",
     "preview.test.ts",
     "shared-setup.ts",
     "wasm-codec-pipeline.test.ts",
-    "wasm-codec.test.ts"
+    "wasm-codec.test.ts",
   ],
-  "src/engines/js7z-compress-core.ts": [
-    "wasm-codec-pipeline.test.ts"
-  ],
-  "src/engines/js7z-compress.ts": [
-    "pipeline-progress.test.ts",
-    "wizard.test.ts"
-  ],
-  "src/engines/js7z-decompress-core.ts": [
-    "wasm-codec-pipeline.test.ts"
-  ],
-  "src/engines/js7z-decompress.ts": [
-    "single-file-stream.test.ts"
-  ],
+  "src/engines/js7z-compress-core.ts": ["wasm-codec-pipeline.test.ts"],
+  "src/engines/js7z-compress.ts": ["pipeline-progress.test.ts", "wizard.test.ts"],
+  "src/engines/js7z-decompress-core.ts": ["wasm-codec-pipeline.test.ts"],
+  "src/engines/js7z-decompress.ts": ["single-file-stream.test.ts"],
   "src/engines/js7z-factory.ts": [
     "helpers.ts",
     "js7z-factory.test.ts",
     "preview.test.ts",
-    "workspace.test.ts"
+    "workspace.test.ts",
   ],
-  "src/engines/js7z-list-core.ts": [
-    "shared-setup.ts"
-  ],
-  "src/engines/lz4-codec.ts": [
-    "codec-progress.test.ts",
-    "wasm-codec.test.ts"
-  ],
-  "src/engines/modify-core.ts": [
-    "wasm-codec-pipeline.test.ts"
-  ],
+  "src/engines/js7z-list-core.ts": ["shared-setup.ts"],
+  "src/engines/lz4-codec.ts": ["codec-progress.test.ts", "wasm-codec.test.ts"],
+  "src/engines/modify-core.ts": ["wasm-codec-pipeline.test.ts"],
   "src/engines/rar5-engine.ts": [
     "backend-config.test.ts",
     "commands-e2e.test.ts",
     "rar5-modify.test.ts",
     "rar5-progress.test.ts",
     "rar5-rebuild-e2e.test.ts",
-    "rar5-wasm.test.ts"
+    "rar5-wasm.test.ts",
   ],
-  "src/engines/select-engine.ts": [
-    "select-engine.test.ts"
-  ],
-  "src/engines/snappy-codec.ts": [
-    "backend-config.test.ts",
-    "codec-progress.test.ts"
-  ],
+  "src/engines/select-engine.ts": ["select-engine.test.ts"],
+  "src/engines/snappy-codec.ts": ["backend-config.test.ts", "codec-progress.test.ts"],
   "src/engines/system7z.ts": [
     "api.test.ts",
     "delete-progress.test.ts",
@@ -133,134 +92,54 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "rar5-modify.test.ts",
     "select-engine.test.ts",
     "system7z-rar.test.ts",
-    "system7z.test.ts"
+    "system7z.test.ts",
   ],
-  "src/engines/tar-writer.ts": [
-    "compress-decompress.test.ts"
-  ],
-  "src/engines/wasi-dispose.ts": [
-    "wasi-dispose.test.ts"
-  ],
-  "src/engines/worker/handler.ts": [
-    "worker.test.ts"
-  ],
-  "src/engines/worker/runner.ts": [
-    "runner.test.ts",
-    "setupRunner.ts"
-  ],
-  "src/engines/worker/types.ts": [
-    "backend-config.test.ts",
-    "worker.test.ts"
-  ],
-  "src/engines/zstd-codec.ts": [
-    "codec-progress.test.ts"
-  ],
-  "src/i18n.ts": [
-    "i18n.test.ts"
-  ],
-  "src/providers/archive/modify.ts": [
-    "single-file-stream.test.ts"
-  ],
-  "src/providers/archive/rar5-modify.ts": [
-    "rar5-modify.test.ts",
-    "rar5-rebuild-e2e.test.ts"
-  ],
-  "src/providers/fileListing.ts": [
-    "single-file-stream.test.ts"
-  ],
-  "src/providers/listingCache.ts": [
-    "listing-cache.test.ts"
-  ],
-  "src/providers/passwordVault.ts": [
-    "password-vault.test.ts",
-    "setup-encrypted.test.ts"
-  ],
-  "src/providers/previewCache.ts": [
-    "preview-cache.test.ts",
-    "single-file-stream.test.ts"
-  ],
-  "src/providers/tempFiles.ts": [
-    "single-file-stream.test.ts"
-  ],
-  "src/providers/treeBuilder.ts": [
-    "preview.test.ts",
-    "shared-setup.ts"
-  ],
-  "src/services/archiveService.ts": [
-    "setup-split-rar.test.ts"
-  ],
-  "src/providers/webview/handlers/decrypt.ts": [
-    "webview-encrypt-decrypt.test.ts"
-  ],
-  "src/providers/webview/handlers/encrypt.ts": [
-    "webview-encrypt-decrypt.test.ts"
-  ],
-  "src/providers/webview/handlers/shared.ts": [
-    "rar5-rebuild-e2e.test.ts"
-  ],
-  "src/providers/webview/handlers/split.ts": [
-    "webview-split.test.ts"
-  ],
-  "src/providers/webview/setup.ts": [
-    "setup-encrypted.test.ts",
-    "setup-split-rar.test.ts"
-  ],
-  "src/providers/webview/helpers.ts": [
-    "workspace.test.ts"
-  ],
-  "src/providers/webview/router.ts": [
-    "router-burst.test.ts",
-    "split-volume.test.ts"
-  ],
-  "src/utils/errors.ts": [
-    "preview-oversize.test.ts"
-  ],
-  "src/utils/exclude.ts": [
-    "rar5-modify.test.ts"
-  ],
-  "src/utils/format.ts": [
-    "shared-setup.ts"
-  ],
-  "src/utils/fs.ts": [
-    "compress-decompress.test.ts"
-  ],
-  "src/utils/log-history.ts": [
-    "log-history.test.ts"
-  ],
-  "src/utils/logger-core.ts": [
-    "logger.test.ts"
-  ],
-  "src/utils/logger.ts": [
-    "logger.test.ts",
-    "router-burst.test.ts"
-  ],
-  "src/utils/noisy-patterns.ts": [
-    "preview.test.ts"
-  ],
+  "src/engines/tar-writer.ts": ["compress-decompress.test.ts"],
+  "src/engines/wasi-dispose.ts": ["wasi-dispose.test.ts"],
+  "src/engines/worker/handler.ts": ["worker.test.ts"],
+  "src/engines/worker/runner.ts": ["runner.test.ts", "setupRunner.ts"],
+  "src/engines/worker/types.ts": ["backend-config.test.ts", "worker.test.ts"],
+  "src/engines/zstd-codec.ts": ["codec-progress.test.ts"],
+  "src/i18n.ts": ["i18n.test.ts"],
+  "src/providers/archive/modify.ts": ["single-file-stream.test.ts"],
+  "src/providers/archive/rar5-modify.ts": ["rar5-modify.test.ts", "rar5-rebuild-e2e.test.ts"],
+  "src/providers/fileListing.ts": ["single-file-stream.test.ts"],
+  "src/providers/listingCache.ts": ["listing-cache.test.ts"],
+  "src/providers/passwordVault.ts": ["password-vault.test.ts", "setup-encrypted.test.ts"],
+  "src/providers/previewCache.ts": ["preview-cache.test.ts", "single-file-stream.test.ts"],
+  "src/providers/tempFiles.ts": ["single-file-stream.test.ts"],
+  "src/providers/treeBuilder.ts": ["preview.test.ts", "shared-setup.ts"],
+  "src/services/archiveService.ts": ["setup-split-rar.test.ts"],
+  "src/providers/webview/handlers/decrypt.ts": ["webview-encrypt-decrypt.test.ts"],
+  "src/providers/webview/handlers/encrypt.ts": ["webview-encrypt-decrypt.test.ts"],
+  "src/providers/webview/handlers/shared.ts": ["rar5-rebuild-e2e.test.ts"],
+  "src/providers/webview/handlers/split.ts": ["webview-split.test.ts"],
+  "src/providers/webview/setup.ts": ["setup-encrypted.test.ts", "setup-split-rar.test.ts"],
+  "src/providers/webview/helpers.ts": ["workspace.test.ts"],
+  "src/providers/webview/router.ts": ["router-burst.test.ts", "split-volume.test.ts"],
+  "src/utils/errors.ts": ["preview-oversize.test.ts"],
+  "src/utils/exclude.ts": ["rar5-modify.test.ts"],
+  "src/utils/format.ts": ["shared-setup.ts"],
+  "src/utils/fs.ts": ["compress-decompress.test.ts"],
+  "src/utils/log-history.ts": ["log-history.test.ts"],
+  "src/utils/logger-core.ts": ["logger.test.ts"],
+  "src/utils/logger.ts": ["logger.test.ts", "router-burst.test.ts"],
+  "src/utils/noisy-patterns.ts": ["preview.test.ts"],
   "src/utils/parse7z.ts": [
     "parse7z.test.ts",
     "preview.test.ts",
     "tree-format.test.ts",
-    "workspace.test.ts"
+    "workspace.test.ts",
   ],
-  "src/utils/path.ts": [
-    "encoding-recovery.test.ts",
-    "shared-setup.ts"
-  ],
-  "src/utils/rar.ts": [
-    "shared-setup.ts"
-  ],
+  "src/utils/path.ts": ["encoding-recovery.test.ts", "shared-setup.ts"],
+  "src/utils/rar.ts": ["shared-setup.ts"],
   "src/utils/security.ts": [
     "defaults-consistency.test.ts",
     "security-exclusion.test.ts",
-    "shared-setup.ts"
+    "shared-setup.ts",
   ],
-  "src/utils/volume-sizes.ts": [
-    "volume-sizes.test.ts"
-  ],
-  "src/extension.ts": [
-    "cache-lifecycle.test.ts"
-  ]
+  "src/utils/volume-sizes.ts": ["volume-sizes.test.ts"],
+  "src/extension.ts": ["cache-lifecycle.test.ts"],
 };
 
 export const SEAM_GAPS: Record<string, string> = {
@@ -270,7 +149,8 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/engines/js7z-list.ts": "host list dispatcher — exercised via decompress isEncrypted flow",
   "src/engines/native-codec.ts": "native 7zz codec fallback — needs staged 7zz with codecs",
   "src/engines/vfs-io.ts": "WASM VFS staging — exercised transitively by every WASM op",
-  "src/engines/worker/dispatch.ts": "op→core table — exercised via worker.test.ts + InProcessRunner",
+  "src/engines/worker/dispatch.ts":
+    "op→core table — exercised via worker.test.ts + InProcessRunner",
   "src/engines/worker/memory-guard.ts": "RSS limit enforcement untested",
   "src/engines/worker/worker.ts": "thread entry — protocol tested via FakePort (worker.test.ts)",
   "src/providers/archive/add.ts": "webview add-to-archive op — untested",
@@ -307,5 +187,5 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/utils/progress-scale.ts": "progress scaling — untested",
   "src/utils/promptOversize.ts": "oversize dialog — exercised via decompress command flow",
   "src/utils/sevenZipMethod.ts": "7z method strings — untested",
-  "src/utils/volume-sizes-core.ts": "volume size lists — split-volume tests use router path"
+  "src/utils/volume-sizes-core.ts": "volume size lists — split-volume tests use router path",
 };

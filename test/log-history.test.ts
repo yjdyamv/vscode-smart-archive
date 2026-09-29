@@ -74,10 +74,7 @@ describe("LogHistory", () => {
     expect(h.size).toBe(2);
     const all: string[] = [];
     h.replayAll(D, (l) => all.push(l));
-    expect(all).toEqual([
-      '{"level":40,"event":"cccccccccc"}',
-      '{"level":50,"event":"dddddddddd"}',
-    ]);
+    expect(all).toEqual(['{"level":40,"event":"cccccccccc"}', '{"level":50,"event":"dddddddddd"}']);
   });
 
   it("reset clears records", () => {

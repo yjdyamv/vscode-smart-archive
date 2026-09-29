@@ -41,18 +41,14 @@ const RAR5_WASM = path.join(__dirname, "..", "vendor", "rar5-wasm");
  * Round-trip decompress helper: the API tests assert the archive's own
  * layout.
  */
-function decompressPlain(
-  params: Parameters<typeof decompress>[0],
-): ReturnType<typeof decompress> {
+function decompressPlain(params: Parameters<typeof decompress>[0]): ReturnType<typeof decompress> {
   return decompress(params);
 }
 
 function rar5Staged(): boolean {
   if (fs.existsSync(RAR5_WASM)) return true;
   if (!fs.existsSync(RAR5_BIN)) return false;
-  return fs
-    .readdirSync(RAR5_BIN, { recursive: true })
-    .some((f) => String(f).endsWith(".node"));
+  return fs.readdirSync(RAR5_BIN, { recursive: true }).some((f) => String(f).endsWith(".node"));
 }
 
 // ── Pure helper tests ─────────────────────────────────────────────
@@ -411,7 +407,11 @@ describe("API compress round-trips", () => {
       decompressPlain({ inputPath: archivePath, password: "wrong", ext: "zip" }),
     ).rejects.toThrow();
 
-    const outDir = await decompressPlain({ inputPath: archivePath, password: "zip123", ext: "zip" });
+    const outDir = await decompressPlain({
+      inputPath: archivePath,
+      password: "zip123",
+      ext: "zip",
+    });
     expect(fs.readFileSync(path.join(outDir, "private.txt"), "utf-8")).toBe("top secret");
   });
 
@@ -487,10 +487,17 @@ describe("API compress round-trips", () => {
       fs.writeFileSync(path.join(rarTmp, "proj", "sub", "b.bin"), Buffer.alloc(5000, 3));
 
       const outPath = path.join(rarTmp, "out.rar");
-      await compress({ targets: [path.join(rarTmp, "proj")], format: "rar", level: 5, outputPath: outPath });
+      await compress({
+        targets: [path.join(rarTmp, "proj")],
+        format: "rar",
+        level: 5,
+        outputPath: outPath,
+      });
 
       const head = fs.readFileSync(outPath).subarray(0, 8);
-      expect(Buffer.from(head).equals(Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]))).toBe(true);
+      expect(
+        Buffer.from(head).equals(Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00])),
+      ).toBe(true);
       if (gate("bundled7zz")) {
         // Real behavior check: the produced RAR5 lists and extracts correctly.
         await verifyArchiveWith7zz(outPath, {
@@ -514,20 +521,18 @@ describe("API compress round-trips", () => {
         // with the password it must pass.
         let noPwOk = true;
         try {
-          childProcess.execFileSync(
-            bundled7zPath()!,
-            ["t", encPath],
-            { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-          );
+          childProcess.execFileSync(bundled7zPath()!, ["t", encPath], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+          });
         } catch {
           noPwOk = false;
         }
         expect(noPwOk, "password-less test of encrypted RAR must fail").toBe(false);
-        const withPw = childProcess.execFileSync(
-          bundled7zPath()!,
-          ["t", `-phunter2`, encPath],
-          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-        );
+        const withPw = childProcess.execFileSync(bundled7zPath()!, ["t", `-phunter2`, encPath], {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
         expect(withPw).toContain("Everything is Ok");
       }
     } finally {
@@ -538,15 +543,15 @@ describe("API compress round-trips", () => {
   it.runIf(detectSystem7z() !== null)(
     "nonexistent target handled by engine (may warn but not throw via system7z)",
     async () => {
-    // When system 7z encounters a missing input file, it may produce
-    // an empty archive with warning (code 1) instead of throwing.
-    // The command layer pre-validates targets before reaching compressWith7z.
-    const result = await compress({
-      targets: ["/nonexistent/path"],
-      format: "7z",
-      outputPath: path.join(tdir, "empty.7z"),
-    });
-    expect(fs.existsSync(result)).toBe(true);
+      // When system 7z encounters a missing input file, it may produce
+      // an empty archive with warning (code 1) instead of throwing.
+      // The command layer pre-validates targets before reaching compressWith7z.
+      const result = await compress({
+        targets: ["/nonexistent/path"],
+        format: "7z",
+        outputPath: path.join(tdir, "empty.7z"),
+      });
+      expect(fs.existsSync(result)).toBe(true);
     },
   );
 });
@@ -839,7 +844,9 @@ describe("API wrapped format round-trips", () => {
       await compress({ targets: [projDir], format: "tar.lz4", outputPath: archivePath });
 
       const outDir = await decompressPlain({ inputPath: archivePath });
-      expect(fs.readFileSync(path.join(outDir, "data", "log.txt"), "utf-8")).toBe("lz4-test-content");
+      expect(fs.readFileSync(path.join(outDir, "data", "log.txt"), "utf-8")).toBe(
+        "lz4-test-content",
+      );
     });
 
     it("tar.lz4 short alias (tlz4) round-trip", async () => {
@@ -887,7 +894,9 @@ describe("API wrapped format round-trips", () => {
       expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
       const outDir = await decompressPlain({ inputPath: archivePath });
-      expect(fs.readFileSync(path.join(outDir, "data", "log.txt"), "utf-8")).toBe("snappy-test-content");
+      expect(fs.readFileSync(path.join(outDir, "data", "log.txt"), "utf-8")).toBe(
+        "snappy-test-content",
+      );
     });
 
     it("tar.sz short alias (tsz) round-trip with directory", async () => {
@@ -926,7 +935,9 @@ describe("API wrapped format round-trips", () => {
         expect(fs.statSync(archivePath).size).toBeGreaterThan(0);
 
         const outDir = await decompressPlain({ inputPath: archivePath });
-        expect(fs.readFileSync(path.join(outDir, "data.txt"), "utf-8")).toBe("wrapped round-trip test");
+        expect(fs.readFileSync(path.join(outDir, "data.txt"), "utf-8")).toBe(
+          "wrapped round-trip test",
+        );
       });
 
       it(`multi-file directory round-trip for "${fmt.label}"`, async () => {
@@ -947,7 +958,9 @@ describe("API wrapped format round-trips", () => {
         const outDir = await decompressPlain({ inputPath: archivePath });
         expect(fs.existsSync(outDir)).toBe(true);
         expect(fs.readFileSync(path.join(outDir, "proj", "readme.md"), "utf-8")).toBe("hello");
-        expect(fs.readFileSync(path.join(outDir, "proj", "src", "app.ts"), "utf-8")).toBe("type X = 1;");
+        expect(fs.readFileSync(path.join(outDir, "proj", "src", "app.ts"), "utf-8")).toBe(
+          "type X = 1;",
+        );
       });
     });
   }

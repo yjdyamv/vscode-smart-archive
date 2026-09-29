@@ -66,8 +66,12 @@ function probeRar5Binding(): boolean {
 /** rar/unrar CLI built from the rar-rs companion repo. */
 function rar5CliPaths(): { rar: string; unrar: string } {
   return {
-    rar: process.env.SA_RAR_CLI ?? path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "rar"),
-    unrar: process.env.SA_UNRAR_CLI ?? path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "unrar"),
+    rar:
+      process.env.SA_RAR_CLI ??
+      path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "rar"),
+    unrar:
+      process.env.SA_UNRAR_CLI ??
+      path.join(os.homedir(), "桌面", "rar-rs", "target", "release", "unrar"),
   };
 }
 
@@ -113,7 +117,11 @@ function probeOutBuild(): boolean {
 
 function canSpawn(bin: string): boolean {
   try {
-    const r = childProcess.spawnSync(bin, ["--help"], { encoding: "utf8", timeout: 5000, windowsHide: true });
+    const r = childProcess.spawnSync(bin, ["--help"], {
+      encoding: "utf8",
+      timeout: 5000,
+      windowsHide: true,
+    });
     if (r.status === null || r.status === undefined) return false;
     return (r.stdout || "").length + (r.stderr || "").length > 0;
   } catch {
@@ -214,9 +222,9 @@ export function gateReportPath(): string {
     for (const name of fs.readdirSync(REPORT_DIR)) {
       if (!name.startsWith("gates.") || !name.endsWith(".json")) continue;
       try {
-        const shard = JSON.parse(
-          fs.readFileSync(path.join(REPORT_DIR, name), "utf8"),
-        ) as Partial<Record<TierName, GateRecord>>;
+        const shard = JSON.parse(fs.readFileSync(path.join(REPORT_DIR, name), "utf8")) as Partial<
+          Record<TierName, GateRecord>
+        >;
         for (const [tier, r] of Object.entries(shard)) {
           const t = tier as TierName;
           const prev = merged[t] ?? { checked: 0, available: 0 };
@@ -252,9 +260,7 @@ export function cleanupGateReportShards(): void {
 }
 
 /** Format a one-line human summary of the merged report. */
-export function formatGateReport(
-  report: Partial<Record<TierName, GateRecord>>,
-): string {
+export function formatGateReport(report: Partial<Record<TierName, GateRecord>>): string {
   return Object.entries(report)
     .map(([tier, rec]) => `${tier}: ${rec!.checked}/${rec!.available} available`)
     .join("\n");

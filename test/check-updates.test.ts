@@ -12,10 +12,7 @@ import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { checkUpdates, hasUpdate } from "../scripts/check-updates.mjs";
-import {
-  SEVEN_ZIP_ZSTD_TAG,
-  RAR5_VERSION,
-} from "../scripts/lib/releases.mjs";
+import { SEVEN_ZIP_ZSTD_TAG, RAR5_VERSION } from "../scripts/lib/releases.mjs";
 import { tmpDir } from "./tmp";
 
 /** Fetch stub: url prefix → value (or Error to simulate failure). */
@@ -38,10 +35,7 @@ const npmSnappy = `https://registry.npmjs.org/snappy/latest`;
 
 function snappyPkg(version: string): string {
   const dir = tmpDir("checkupd-");
-  fs.writeFileSync(
-    path.join(dir, "package.json"),
-    JSON.stringify({ name: "snappy", version }),
-  );
+  fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "snappy", version }));
   return path.join(dir, "package.json");
 }
 

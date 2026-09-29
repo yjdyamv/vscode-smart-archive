@@ -13,11 +13,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import {
-  __quickPicks,
-  __inputBoxes,
-  __setSaveDialogResult,
-} from "./__mocks__/vscode";
+import { __quickPicks, __inputBoxes, __setSaveDialogResult } from "./__mocks__/vscode";
 
 vi.mock("../src/engines/js7z-compress", () => ({
   compressWith7z: vi.fn(async () => {}),
@@ -53,7 +49,10 @@ function currentInputBox(nth: number): Ib {
 
 async function pickLabel(qp: Qp, label: string): Promise<void> {
   const item = qp.items.find((i) => i.label === label);
-  expect(item, `wizard option "${label}" not offered (got: ${qp.items.map((i) => i.label).join(", ")})`).toBeTruthy();
+  expect(
+    item,
+    `wizard option "${label}" not offered (got: ${qp.items.map((i) => i.label).join(", ")})`,
+  ).toBeTruthy();
   qp.accept(item!);
   await Promise.resolve();
   await Promise.resolve();
@@ -90,12 +89,18 @@ describe("compress wizard (RAR)", () => {
     await pickLabel(currentQuickPick(2), currentQuickPick(2).items[0].label);
     // 3. volume — custom 32k
     await vi.waitFor(() => expect(__quickPicks().length).toBe(3));
-    await pickLabel(currentQuickPick(3), currentQuickPick(3).items[currentQuickPick(3).items.length - 1].label); // Custom...
+    await pickLabel(
+      currentQuickPick(3),
+      currentQuickPick(3).items[currentQuickPick(3).items.length - 1].label,
+    ); // Custom...
     await vi.waitFor(() => expect(__inputBoxes().length).toBe(1));
     await typeValue(currentInputBox(1), "32k");
     // 4. encryption — yes (forces header encryption)
     await vi.waitFor(() => expect(__quickPicks().length).toBe(4));
-    await pickLabel(currentQuickPick(4), currentQuickPick(4).items.find((i) => i.value === true)!.label);
+    await pickLabel(
+      currentQuickPick(4),
+      currentQuickPick(4).items.find((i) => i.value === true)!.label,
+    );
     // 5. password
     await vi.waitFor(() => expect(__inputBoxes().length).toBe(2));
     await typeValue(currentInputBox(2), "pw");
@@ -103,13 +108,19 @@ describe("compress wizard (RAR)", () => {
     await vi.waitFor(() => expect(__quickPicks().length).toBe(5));
     const recordQp = currentQuickPick(5);
     const recordLabels = recordQp.items.map((i) => i.label);
-    expect(recordLabels.some((l) => /of each volume/.test(l)), `expected per-volume percent, got: ${recordLabels.join(", ")}`).toBe(true);
+    expect(
+      recordLabels.some((l) => /of each volume/.test(l)),
+      `expected per-volume percent, got: ${recordLabels.join(", ")}`,
+    ).toBe(true);
     await pickLabel(recordQp, recordQp.items.find((i) => i.value === 5)!.label);
     // 5.7 recovery volumes — percent ladder (WinRAR -rv<N%>), not a count list
     await vi.waitFor(() => expect(__quickPicks().length).toBe(6));
     const volumeQp = currentQuickPick(6);
     const volumeLabels = volumeQp.items.map((i) => i.label);
-    expect(volumeLabels.some((l) => /% of volumes/.test(l)), `expected percent options, got: ${volumeLabels.join(", ")}`).toBe(true);
+    expect(
+      volumeLabels.some((l) => /% of volumes/.test(l)),
+      `expected percent options, got: ${volumeLabels.join(", ")}`,
+    ).toBe(true);
     await pickLabel(volumeQp, volumeQp.items.find((i) => i.value === 10)!.label);
     // 6. save name
     await vi.waitFor(() => expect(__inputBoxes().length).toBe(3));
@@ -144,7 +155,10 @@ describe("compress wizard (RAR)", () => {
     await pickLabel(currentQuickPick(3), currentQuickPick(3).items[0].label);
     // encryption — no
     await vi.waitFor(() => expect(__quickPicks().length).toBe(4));
-    await pickLabel(currentQuickPick(4), currentQuickPick(4).items.find((i) => i.value === false)!.label);
+    await pickLabel(
+      currentQuickPick(4),
+      currentQuickPick(4).items.find((i) => i.value === false)!.label,
+    );
     // recovery record — percent options
     await vi.waitFor(() => expect(__quickPicks().length).toBe(5));
     const recoveryQp = currentQuickPick(5);
@@ -176,7 +190,10 @@ describe("compress wizard (RAR)", () => {
     await pickLabel(currentQuickPick(3), currentQuickPick(3).items[0].label);
     // encryption — no
     await vi.waitFor(() => expect(__quickPicks().length).toBe(4));
-    await pickLabel(currentQuickPick(4), currentQuickPick(4).items.find((i) => i.value === false)!.label);
+    await pickLabel(
+      currentQuickPick(4),
+      currentQuickPick(4).items.find((i) => i.value === false)!.label,
+    );
     // recovery record — custom percentage
     await vi.waitFor(() => expect(__quickPicks().length).toBe(5));
     const recordQp = currentQuickPick(5);
@@ -199,15 +216,24 @@ describe("compress wizard (RAR)", () => {
     await vi.waitFor(() => expect(__quickPicks().length).toBe(2));
     await pickLabel(currentQuickPick(2), currentQuickPick(2).items[0].label);
     await vi.waitFor(() => expect(__quickPicks().length).toBe(3));
-    await pickLabel(currentQuickPick(3), currentQuickPick(3).items[currentQuickPick(3).items.length - 1].label);
+    await pickLabel(
+      currentQuickPick(3),
+      currentQuickPick(3).items[currentQuickPick(3).items.length - 1].label,
+    );
     await vi.waitFor(() => expect(__inputBoxes().length).toBe(1));
     await typeValue(currentInputBox(1), volumeValue);
     // encryption — no
     await vi.waitFor(() => expect(__quickPicks().length).toBe(4));
-    await pickLabel(currentQuickPick(4), currentQuickPick(4).items.find((i) => i.value === false)!.label);
+    await pickLabel(
+      currentQuickPick(4),
+      currentQuickPick(4).items.find((i) => i.value === false)!.label,
+    );
     // inline recovery record — none
     await vi.waitFor(() => expect(__quickPicks().length).toBe(5));
-    await pickLabel(currentQuickPick(5), currentQuickPick(5).items.find((i) => i.value === 0)!.label);
+    await pickLabel(
+      currentQuickPick(5),
+      currentQuickPick(5).items.find((i) => i.value === 0)!.label,
+    );
     // .rev step
     await vi.waitFor(() => expect(__quickPicks().length).toBe(6));
     return currentQuickPick(6);
@@ -219,14 +245,30 @@ describe("compress wizard (RAR)", () => {
     // "1k" volumes → data.bin (50000 B) estimates to ≈49 volumes
     const volumeQp = await driveToSplitRecoveryVolumes("1k");
     const labels = volumeQp.items.map((i) => i.label);
-    expect(volumeQp.placeholder ?? "", "prompt shows the estimated volume count").toMatch(/about 49 data volumes/);
-    expect(labels.filter((l) => /% of volumes/.test(l)), `expected 4 percent rows, got: ${labels.join(", ")}`).toHaveLength(4);
-    expect(labels.some((l) => /Custom percentage/.test(l)), "custom percent entry").toBe(true);
-    expect(labels.some((l) => /Custom count/.test(l)), "custom count entry").toBe(true);
-    expect(labels.some((l) => /recommended/.test(l)), "one row is marked recommended").toBe(true);
+    expect(volumeQp.placeholder ?? "", "prompt shows the estimated volume count").toMatch(
+      /about 49 data volumes/,
+    );
+    expect(
+      labels.filter((l) => /% of volumes/.test(l)),
+      `expected 4 percent rows, got: ${labels.join(", ")}`,
+    ).toHaveLength(4);
+    expect(
+      labels.some((l) => /Custom percentage/.test(l)),
+      "custom percent entry",
+    ).toBe(true);
+    expect(
+      labels.some((l) => /Custom count/.test(l)),
+      "custom count entry",
+    ).toBe(true);
+    expect(
+      labels.some((l) => /recommended/.test(l)),
+      "one row is marked recommended",
+    ).toBe(true);
     // percent rows preview the count from the estimate: 5% of ≈49 → ceil = 3
     const pct5 = volumeQp.items.find((i) => i.value === 5)!;
-    expect(pct5.description ?? "", "percent rows preview the derived count").toMatch(/repairs up to 3 lost volume/);
+    expect(pct5.description ?? "", "percent rows preview the derived count").toMatch(
+      /repairs up to 3 lost volume/,
+    );
     await pickLabel(volumeQp, pct5.label);
     // save name
     await vi.waitFor(() => expect(__inputBoxes().length).toBe(2));

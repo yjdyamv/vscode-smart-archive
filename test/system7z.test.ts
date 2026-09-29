@@ -25,7 +25,11 @@ import { itIf } from "./gates";
 import { tmpDir } from "./tmp";
 
 const { spawnSync } = require("child_process") as {
-  spawnSync: (cmd: string, args: string[], opts?: Record<string, unknown>) => {
+  spawnSync: (
+    cmd: string,
+    args: string[],
+    opts?: Record<string, unknown>,
+  ) => {
     status: number | null;
     stdout: Buffer;
     stderr: Buffer;
@@ -186,11 +190,10 @@ describe("system 7-Zip", () => {
     const archive = path.join(tdir, "test.7z");
     const outDir = path.join(tdir, "out");
 
-    let r = spawnSync(
-      sz!,
-      ["a", "-t7z", "-mx5", archive, srcDir, path.join(tdir, "readme.md")],
-      { stdio: "pipe", timeout: 30_000 },
-    );
+    let r = spawnSync(sz!, ["a", "-t7z", "-mx5", archive, srcDir, path.join(tdir, "readme.md")], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
     expect(r.status).toBe(0);
     expect(fs.existsSync(archive)).toBe(true);
     expect(fs.statSync(archive).size).toBeGreaterThan(0);
@@ -257,13 +260,54 @@ describe("system 7-Zip", () => {
     // large LZMA2 dictionary can match across them — -mx9 (256MiB dict)
     // must beat -mx1 (256KiB) by a wide margin (measured ≈ 4:1).
     const words = [
-      "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf",
-      "hotel", "india", "juliet", "kilo", "lima", "mike", "november",
-      "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform",
-      "victor", "whiskey", "xray", "yankee", "zulu", "compress", "archive",
-      "dictionary", "fast", "level", "benchmark", "stream", "block",
-      "solid", "method", "engine", "worker", "thread", "memory", "ratio",
-      "speed", "seek", "match", "length", "search", "hash", "chain",
+      "alpha",
+      "bravo",
+      "charlie",
+      "delta",
+      "echo",
+      "foxtrot",
+      "golf",
+      "hotel",
+      "india",
+      "juliet",
+      "kilo",
+      "lima",
+      "mike",
+      "november",
+      "oscar",
+      "papa",
+      "quebec",
+      "romeo",
+      "sierra",
+      "tango",
+      "uniform",
+      "victor",
+      "whiskey",
+      "xray",
+      "yankee",
+      "zulu",
+      "compress",
+      "archive",
+      "dictionary",
+      "fast",
+      "level",
+      "benchmark",
+      "stream",
+      "block",
+      "solid",
+      "method",
+      "engine",
+      "worker",
+      "thread",
+      "memory",
+      "ratio",
+      "speed",
+      "seek",
+      "match",
+      "length",
+      "search",
+      "hash",
+      "chain",
     ];
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-.,";
     for (let d = 0; d < 4; d++) {
@@ -325,9 +369,27 @@ describe("system 7-Zip", () => {
     fs.mkdirSync(srcDir, { recursive: true });
     // Deterministic mixed corpus: repeated text so HC4 vs BT4 output differs.
     const words = [
-      "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf",
-      "hotel", "india", "juliet", "kilo", "lima", "mike", "november",
-      "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform",
+      "alpha",
+      "bravo",
+      "charlie",
+      "delta",
+      "echo",
+      "foxtrot",
+      "golf",
+      "hotel",
+      "india",
+      "juliet",
+      "kilo",
+      "lima",
+      "mike",
+      "november",
+      "oscar",
+      "papa",
+      "quebec",
+      "romeo",
+      "sierra",
+      "tango",
+      "uniform",
     ];
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-.,";
     let s = 123456789;
@@ -389,11 +451,10 @@ describe("system 7-Zip", () => {
       expect(r.status).toBe(0, `${label} extraction failed: ${r.stderr}`);
       const innerTar = fs.readdirSync(outDir).find((f) => (f as string).endsWith(".tar"));
       expect(innerTar, `${label} produced no inner tar`).toBeTruthy();
-      const r2 = spawnSync(
-        sz!,
-        ["x", `-o${outDir}`, "-y", path.join(outDir, innerTar as string)],
-        { stdio: "pipe", timeout: 60_000 },
-      );
+      const r2 = spawnSync(sz!, ["x", `-o${outDir}`, "-y", path.join(outDir, innerTar as string)], {
+        stdio: "pipe",
+        timeout: 60_000,
+      });
       expect(r2.status).toBe(0, `${label} inner tar extraction failed: ${r2.stderr}`);
       const extracted = fs
         .readdirSync(outDir, { recursive: true })
@@ -404,37 +465,41 @@ describe("system 7-Zip", () => {
     fs.rmSync(tdir, { recursive: true, force: true });
   });
 
-  itIf("system7z", "reports determinate progress (message + increment) while compressing", async () => {
-    let tdir = tmpDir("sat_sz_prog_");
-    const src = path.join(tdir, "data.bin");
-    // Random data: incompressible, so LZMA2 takes long enough for the
-    // size-based progress fallback to emit multiple percentage updates.
-    const chunk = Buffer.alloc(64 * 1024 * 1024);
-    for (let i = 0; i < chunk.length; i += 4) {
-      chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
-    }
-    fs.writeFileSync(src, chunk);
-    const archive = path.join(tdir, "progress.7z");
+  itIf(
+    "system7z",
+    "reports determinate progress (message + increment) while compressing",
+    async () => {
+      let tdir = tmpDir("sat_sz_prog_");
+      const src = path.join(tdir, "data.bin");
+      // Random data: incompressible, so LZMA2 takes long enough for the
+      // size-based progress fallback to emit multiple percentage updates.
+      const chunk = Buffer.alloc(64 * 1024 * 1024);
+      for (let i = 0; i < chunk.length; i += 4) {
+        chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
+      }
+      fs.writeFileSync(src, chunk);
+      const archive = path.join(tdir, "progress.7z");
 
-    const reports: { message?: string; increment?: number }[] = [];
-    await compressWithSystem7z(
-      {
-        targets: [{ fsPath: src }],
-        format: { label: "7z", description: "", canCreate: true, supportsEncryption: true },
-        outputPath: archive,
-        password: "",
-        level: 5,
-      },
-      { report: (r) => reports.push(r) },
-    );
+      const reports: { message?: string; increment?: number }[] = [];
+      await compressWithSystem7z(
+        {
+          targets: [{ fsPath: src }],
+          format: { label: "7z", description: "", canCreate: true, supportsEncryption: true },
+          outputPath: archive,
+          password: "",
+          level: 5,
+        },
+        { report: (r) => reports.push(r) },
+      );
 
-    expect(fs.existsSync(archive)).toBe(true);
-    const pctReports = reports.filter((r) => r.message?.match(/^\d+%$/));
-    expect(pctReports.length).toBeGreaterThan(0);
-    expect(pctReports.some((r) => (r.increment ?? 0) > 0)).toBe(true);
+      expect(fs.existsSync(archive)).toBe(true);
+      const pctReports = reports.filter((r) => r.message?.match(/^\d+%$/));
+      expect(pctReports.length).toBeGreaterThan(0);
+      expect(pctReports.some((r) => (r.increment ?? 0) > 0)).toBe(true);
 
-    fs.rmSync(tdir, { recursive: true, force: true });
-  });
+      fs.rmSync(tdir, { recursive: true, force: true });
+    },
+  );
 
   itIf("system7z", "reports determinate progress for multi-volume compression", async () => {
     let tdir = tmpDir("sat_sz_volprog_");
@@ -502,77 +567,85 @@ describe("system 7-Zip", () => {
     fs.rmSync(tdir, { recursive: true, force: true });
   });
 
-  itIf("system7z", "compresses, lists and decompresses an encrypted 7z via stdin password", async () => {
-    const tdir = tmpDir("sat_sz_pw_rt_");
-    const src = path.join(tdir, "secret.txt");
-    fs.writeFileSync(src, "classified");
-    const archive = path.join(tdir, "locked.7z");
-    const outDir = path.join(tdir, "out");
-    const format = { label: "7z", description: "", canCreate: true, supportsEncryption: true };
+  itIf(
+    "system7z",
+    "compresses, lists and decompresses an encrypted 7z via stdin password",
+    async () => {
+      const tdir = tmpDir("sat_sz_pw_rt_");
+      const src = path.join(tdir, "secret.txt");
+      fs.writeFileSync(src, "classified");
+      const archive = path.join(tdir, "locked.7z");
+      const outDir = path.join(tdir, "out");
+      const format = { label: "7z", description: "", canCreate: true, supportsEncryption: true };
 
-    await compressWithSystem7z({
-      targets: [{ fsPath: src }],
-      format,
-      outputPath: archive,
-      password: "p4ss-123",
-      level: 5,
-    });
+      await compressWithSystem7z({
+        targets: [{ fsPath: src }],
+        format,
+        outputPath: archive,
+        password: "p4ss-123",
+        level: 5,
+      });
 
-    const list = await listWithSystem7z(archive, "p4ss-123");
-    expect(list.some((e) => e.path.endsWith("secret.txt"))).toBe(true);
+      const list = await listWithSystem7z(archive, "p4ss-123");
+      expect(list.some((e) => e.path.endsWith("secret.txt"))).toBe(true);
 
-    await decompressWithSystem7z({
-      inputPath: archive,
-      outputDir: outDir,
-      password: "p4ss-123",
-    });
-    expect(fs.readFileSync(path.join(outDir, "secret.txt"), "utf8")).toBe("classified");
-
-    // Wrong password must fail loudly on the stdin-fed test/extract path.
-    await expect(
-      decompressWithSystem7z({
+      await decompressWithSystem7z({
         inputPath: archive,
-        outputDir: path.join(tdir, "bad"),
-        password: "wrong",
-      }),
-    ).rejects.toThrow();
+        outputDir: outDir,
+        password: "p4ss-123",
+      });
+      expect(fs.readFileSync(path.join(outDir, "secret.txt"), "utf8")).toBe("classified");
 
-    fs.rmSync(tdir, { recursive: true, force: true });
-  });
-
-  itIf("system7z", "allowOversize waives the extracted-total limit after user confirmation", async () => {
-    const tdir = tmpDir("sat_sz_ovs_");
-    const src = path.join(tdir, "big.bin");
-    fs.writeFileSync(src, "x".repeat(512));
-    const archive = path.join(tdir, "big.7z");
-
-    const r = spawnSync(sz!, ["a", "-t7z", archive, src], { stdio: "pipe", timeout: 30_000 });
-    expect(r.status).toBe(0);
-
-    setSecurityLimits({ maxExtractTotalSize: 128 });
-    try {
-      // No confirmation: the preflight total-size guard still aborts.
+      // Wrong password must fail loudly on the stdin-fed test/extract path.
       await expect(
         decompressWithSystem7z({
           inputPath: archive,
-          outputDir: path.join(tdir, "blocked"),
-          password: "",
+          outputDir: path.join(tdir, "bad"),
+          password: "wrong",
         }),
-      ).rejects.toThrow(/exceed/i);
+      ).rejects.toThrow();
 
-      // allowOversize (the host's "Extract anyway" answer) waives the cap.
-      await decompressWithSystem7z({
-        inputPath: archive,
-        outputDir: path.join(tdir, "allowed"),
-        password: "",
-        allowOversize: true,
-      });
-      expect(fs.readFileSync(path.join(tdir, "allowed", "big.bin")).length).toBe(512);
-    } finally {
-      setSecurityLimits({});
       fs.rmSync(tdir, { recursive: true, force: true });
-    }
-  });
+    },
+  );
+
+  itIf(
+    "system7z",
+    "allowOversize waives the extracted-total limit after user confirmation",
+    async () => {
+      const tdir = tmpDir("sat_sz_ovs_");
+      const src = path.join(tdir, "big.bin");
+      fs.writeFileSync(src, "x".repeat(512));
+      const archive = path.join(tdir, "big.7z");
+
+      const r = spawnSync(sz!, ["a", "-t7z", archive, src], { stdio: "pipe", timeout: 30_000 });
+      expect(r.status).toBe(0);
+
+      setSecurityLimits({ maxExtractTotalSize: 128 });
+      try {
+        // No confirmation: the preflight total-size guard still aborts.
+        await expect(
+          decompressWithSystem7z({
+            inputPath: archive,
+            outputDir: path.join(tdir, "blocked"),
+            password: "",
+          }),
+        ).rejects.toThrow(/exceed/i);
+
+        // allowOversize (the host's "Extract anyway" answer) waives the cap.
+        await decompressWithSystem7z({
+          inputPath: archive,
+          outputDir: path.join(tdir, "allowed"),
+          password: "",
+          allowOversize: true,
+        });
+        expect(fs.readFileSync(path.join(tdir, "allowed", "big.bin")).length).toBe(512);
+      } finally {
+        setSecurityLimits({});
+        fs.rmSync(tdir, { recursive: true, force: true });
+      }
+    },
+  );
 
   itIf("system7z", "selective extraction extracts only selected entries", async () => {
     const tdir = tmpDir("sat_sz_sel_");

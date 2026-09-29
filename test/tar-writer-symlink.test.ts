@@ -83,9 +83,9 @@ describe("tar-writer symlink handling", () => {
       expect(fs.readFileSync(path.join(out, "proj", ".claude", "config.json"), "utf8")).toBe(
         '{"a":1}',
       );
-      expect(
-        fs.readFileSync(path.join(out, "proj", ".claude", "skills", "skill.md"), "utf8"),
-      ).toBe("# skill");
+      expect(fs.readFileSync(path.join(out, "proj", ".claude", "skills", "skill.md"), "utf8")).toBe(
+        "# skill",
+      );
     },
   );
 

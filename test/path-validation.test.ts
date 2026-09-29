@@ -84,9 +84,7 @@ describe("isValidEntryName", () => {
 
 describe("isValidMsg (webview router)", () => {
   it("accepts legitimate messages", () => {
-    expect(
-      isValidMsg({ c: "extSel", paths: ["a.txt", "dir/b.txt"] } as never),
-    ).toBe(true);
+    expect(isValidMsg({ c: "extSel", paths: ["a.txt", "dir/b.txt"] } as never)).toBe(true);
     expect(isValidMsg({ c: "preview", path: "dir/file.txt" } as never)).toBe(true);
     expect(isValidMsg({ c: "delSel", paths: [] } as never)).toBe(true);
     expect(isValidMsg({ c: "expandDir", path: "dir" } as never)).toBe(true);

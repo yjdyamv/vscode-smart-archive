@@ -71,9 +71,10 @@ export async function verifyArchiveWith7zz(
     };
     walk(out, "");
 
-    expect(Object.keys(actual).sort(), `entry set mismatch (got: ${Object.keys(actual).join(", ")})`).toEqual(
-      Object.keys(expected).sort(),
-    );
+    expect(
+      Object.keys(actual).sort(),
+      `entry set mismatch (got: ${Object.keys(actual).join(", ")})`,
+    ).toEqual(Object.keys(expected).sort());
     for (const [entry, content] of Object.entries(expected)) {
       expect(actual[entry], `content mismatch for ${entry}`).toBe(content);
     }

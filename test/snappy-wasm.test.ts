@@ -17,13 +17,7 @@ import { gate } from "./gates";
 
 const require = createRequire(import.meta.url);
 
-const LOADER = path.join(
-  __dirname,
-  "..",
-  "node_modules",
-  "snappy",
-  "snappy.wasi.cjs",
-);
+const LOADER = path.join(__dirname, "..", "node_modules", "snappy", "snappy.wasi.cjs");
 
 interface SnappyLike {
   compressSync(data: Uint8Array): Buffer;
@@ -40,12 +34,9 @@ function assertRoundTrip(snappy: SnappyLike): void {
 }
 
 describe("snappy WASI fallback", () => {
-  it.runIf(gate("snappyWasm"))(
-    "round-trips raw blocks through the staged WASI loader",
-    () => {
-      assertRoundTrip(require(LOADER) as SnappyLike);
-    },
-  );
+  it.runIf(gate("snappyWasm"))("round-trips raw blocks through the staged WASI loader", () => {
+    assertRoundTrip(require(LOADER) as SnappyLike);
+  });
 
   it.runIf(gate("snappyWasm"))(
     "require('snappy') falls back to WASI when native is forced off",

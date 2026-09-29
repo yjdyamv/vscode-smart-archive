@@ -184,7 +184,11 @@ describe("sweepPreviewCache", () => {
     fs.writeFileSync(oldFile, "old");
     fs.writeFileSync(freshFile, "fresh");
     const now = Date.now();
-    fs.utimesSync(oldFile, new Date(now - 31 * 24 * 60 * 60 * 1000), new Date(now - 31 * 24 * 60 * 60 * 1000));
+    fs.utimesSync(
+      oldFile,
+      new Date(now - 31 * 24 * 60 * 60 * 1000),
+      new Date(now - 31 * 24 * 60 * 60 * 1000),
+    );
 
     expect(sweepPreviewCache(td, now)).toBe(1);
     expect(fs.existsSync(oldFile)).toBe(false);
@@ -318,8 +322,7 @@ describe("initPreviewCache", () => {
   it("accepts an injected config reader and applies it live", () => {
     const td = tmpDir("sat_pvc_cfg_");
     const cache = path.join(td, "cache");
-    const cacheFiles = () =>
-      fs.readdirSync(cache).filter((n) => n !== "index.json"); // the index is metadata
+    const cacheFiles = () => fs.readdirSync(cache).filter((n) => n !== "index.json"); // the index is metadata
     let maxFiles = 5;
     initPreviewCache(cache, () => ({ maxFiles }));
     for (let i = 0; i < 10; i++) {
@@ -436,7 +439,14 @@ describe("content-addressed dedup", () => {
         path.join(cache, "index.json"),
         JSON.stringify({
           v: 2,
-          entries: { "../../outside-target": { contentHash: sha256hex(data), archivePath: "", archiveMtimeMs: 0, archiveSize: 0 } },
+          entries: {
+            "../../outside-target": {
+              contentHash: sha256hex(data),
+              archivePath: "",
+              archiveMtimeMs: 0,
+              archiveSize: 0,
+            },
+          },
         }),
       );
       // Outside link target must not be used; plain write lands correctly.
@@ -817,7 +827,11 @@ describe("clearPreviewCache", () => {
     const arc2 = path.join(td, "a.7z");
     fs.mkdirSync(cacheDir2);
     fs.writeFileSync(arc2, "archive bytes");
-    initPreviewCache(cacheDir2, () => ({ maxFiles: 100, maxBytes: 1024 * 1024, ttlMs: 1000 * 1000 }));
+    initPreviewCache(cacheDir2, () => ({
+      maxFiles: 100,
+      maxBytes: 1024 * 1024,
+      ttlMs: 1000 * 1000,
+    }));
     try {
       const st = fs.statSync(arc2);
       const f = path.join(cacheDir2, "clear2.bin");

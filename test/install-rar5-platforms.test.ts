@@ -66,7 +66,8 @@ describe("rar5 platform config", () => {
     // byte-identical to the local dev build. Anything else that deviates
     // from the pinned hash fails the packaging gate.
     const devProject =
-      process.env.SA_RAR5_DEV_PROJECT ?? path.join(os.homedir(), "桌面", "rar-rs", "crates", "rar-napi");
+      process.env.SA_RAR5_DEV_PROJECT ??
+      path.join(os.homedir(), "桌面", "rar-rs", "crates", "rar-napi");
     for (const { triple, file } of staged) {
       const actual = crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
       if (actual === EXPECTED_HASHES[triple]) continue;
@@ -118,7 +119,9 @@ describe("rar5 release digest verification", () => {
     for (const { asset, pinKey } of assets) {
       const official = digestByAsset.get(asset);
       expect(official, `no digest for ${asset} in release v${version}`).toBeTruthy();
-      expect(EXPECTED_HASHES[pinKey], `pin for ${pinKey} differs from GitHub digest`).toBe(official);
+      expect(EXPECTED_HASHES[pinKey], `pin for ${pinKey} differs from GitHub digest`).toBe(
+        official,
+      );
     }
   });
 });

@@ -89,7 +89,13 @@ describe("rar5 direct append (no rebuild)", () => {
     fs.writeFileSync(path.join(proj, "a.txt"), "secret");
     const archive = path.join(dir, "out.rar");
     await compressWithRar5(
-      { format: RAR5_FORMAT, outputPath: archive, targets: [{ fsPath: proj }], password: "pw", level: 3 },
+      {
+        format: RAR5_FORMAT,
+        outputPath: archive,
+        targets: [{ fsPath: proj }],
+        password: "pw",
+        level: 3,
+      },
       undefined,
       undefined,
       [],
@@ -98,11 +104,9 @@ describe("rar5 direct append (no rebuild)", () => {
     fs.mkdirSync(extra, { recursive: true });
     fs.writeFileSync(path.join(extra, "b.txt"), "added");
     await appendWithRar5(archive, [extra], "", "pw", []);
-    const testOut = childProcess.execFileSync(
-      UNRAR_CLI,
-      ["t", "-ppw", archive],
-      { encoding: "utf8" },
-    );
+    const testOut = childProcess.execFileSync(UNRAR_CLI, ["t", "-ppw", archive], {
+      encoding: "utf8",
+    });
     expect(testOut).toContain("All");
     expect(testOut).toContain("OK");
   });
@@ -173,11 +177,7 @@ describe("rar5 direct delete (no rebuild)", () => {
 
   it("expands directory selections to exact member names", () => {
     const all = ["d/", "d/a.txt", "d/sub/b.txt", "f.txt"];
-    expect(expandRarSelection(all, ["d"]).sort()).toEqual([
-      "d/",
-      "d/a.txt",
-      "d/sub/b.txt",
-    ]);
+    expect(expandRarSelection(all, ["d"]).sort()).toEqual(["d/", "d/a.txt", "d/sub/b.txt"]);
     expect(expandRarSelection(all, ["f.txt"])).toEqual(["f.txt"]);
     expect(expandRarSelection(all, ["missing"])).toEqual(["missing"]);
     expect(expandRarSelection(all, ["d\\a.txt"])).toEqual(["d/a.txt"]);

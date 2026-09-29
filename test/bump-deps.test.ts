@@ -13,10 +13,7 @@ import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { planUpdates, updateVersionConstant, stripCaret } from "../scripts/bump-deps.mjs";
-import {
-  SEVEN_ZIP_ZSTD_TAG,
-  RAR5_VERSION,
-} from "../scripts/lib/releases.mjs";
+import { SEVEN_ZIP_ZSTD_TAG, RAR5_VERSION } from "../scripts/lib/releases.mjs";
 import { tmpDir } from "./tmp";
 
 function makeFetchJson(stubs: Record<string, unknown>) {

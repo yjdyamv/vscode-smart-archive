@@ -59,25 +59,22 @@ describe("WASM copy-path cycle guards", () => {
     },
   );
 
-  it.runIf(process.platform === "win32")(
-    "copyDirToFS enters a circular junction only once",
-    () => {
-      const td = tmpDir("sat_fscopy2_");
-      dirs.push(td);
-      const proj = path.join(td, "proj");
-      const a = path.join(proj, "a");
-      fs.mkdirSync(a, { recursive: true });
-      fs.writeFileSync(path.join(a, "file.txt"), "hello");
-      mkJunction(a, path.join(a, "loop"), proj);
+  it.runIf(process.platform === "win32")("copyDirToFS enters a circular junction only once", () => {
+    const td = tmpDir("sat_fscopy2_");
+    dirs.push(td);
+    const proj = path.join(td, "proj");
+    const a = path.join(proj, "a");
+    fs.mkdirSync(a, { recursive: true });
+    fs.writeFileSync(path.join(a, "file.txt"), "hello");
+    mkJunction(a, path.join(a, "loop"), proj);
 
-      const written = new Map<string, string>();
-      const copied = copyDirToFS(mockJs7z(written), proj, "/in/proj");
+    const written = new Map<string, string>();
+    const copied = copyDirToFS(mockJs7z(written), proj, "/in/proj");
 
-      expect(written.get("/in/proj/a/file.txt")).toBe("hello");
-      expect(copied).toBe("hello".length);
-      expect([...written.keys()].filter((k) => k.includes("loop"))).toHaveLength(0);
-    },
-  );
+    expect(written.get("/in/proj/a/file.txt")).toBe("hello");
+    expect(copied).toBe("hello".length);
+    expect([...written.keys()].filter((k) => k.includes("loop"))).toHaveLength(0);
+  });
 
   it.runIf(process.platform === "win32")(
     "sumTreeBytes counts junction contents and stops at a cycle",
@@ -97,29 +94,26 @@ describe("WASM copy-path cycle guards", () => {
     },
   );
 
-  it.runIf(process.platform === "win32")(
-    "sumTreeBytes stops at a multi-node junction ring",
-    () => {
-      const td = tmpDir("sat_fscopy4_");
-      dirs.push(td);
-      const a = path.join(td, "a");
-      const b = path.join(td, "b");
-      const c = path.join(td, "c");
-      fs.mkdirSync(a, { recursive: true });
-      fs.mkdirSync(b, { recursive: true });
-      fs.mkdirSync(c, { recursive: true });
-      fs.writeFileSync(path.join(a, "file.txt"), "A");
-      fs.writeFileSync(path.join(b, "file.txt"), "B");
-      fs.writeFileSync(path.join(c, "file.txt"), "C");
-      // Ring: a/loop → b, b/loop → c, c/loop → a.
-      mkJunction(a, path.join(a, "loop"), b);
-      mkJunction(b, path.join(b, "loop"), c);
-      mkJunction(c, path.join(c, "loop"), a);
+  it.runIf(process.platform === "win32")("sumTreeBytes stops at a multi-node junction ring", () => {
+    const td = tmpDir("sat_fscopy4_");
+    dirs.push(td);
+    const a = path.join(td, "a");
+    const b = path.join(td, "b");
+    const c = path.join(td, "c");
+    fs.mkdirSync(a, { recursive: true });
+    fs.mkdirSync(b, { recursive: true });
+    fs.mkdirSync(c, { recursive: true });
+    fs.writeFileSync(path.join(a, "file.txt"), "A");
+    fs.writeFileSync(path.join(b, "file.txt"), "B");
+    fs.writeFileSync(path.join(c, "file.txt"), "C");
+    // Ring: a/loop → b, b/loop → c, c/loop → a.
+    mkJunction(a, path.join(a, "loop"), b);
+    mkJunction(b, path.join(b, "loop"), c);
+    mkJunction(c, path.join(c, "loop"), a);
 
-      const total = sumTreeBytes([a]);
-      expect(total).toBe("A".length + "B".length + "C".length);
-    },
-  );
+    const total = sumTreeBytes([a]);
+    expect(total).toBe("A".length + "B".length + "C".length);
+  });
 
   it.runIf(process.platform === "win32")(
     "copyDirToFS enters each node of a multi-node junction ring once",
@@ -165,9 +159,7 @@ describe("WASM copy-path cycle guards", () => {
       const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
       try {
         copyDirToFS(mockJs7z(new Map()), proj, "/in/proj");
-        expect(warn).toHaveBeenCalledWith(
-          expect.objectContaining({ event: "fs.copy.cycleSkip" }),
-        );
+        expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: "fs.copy.cycleSkip" }));
       } finally {
         warn.mockRestore();
       }

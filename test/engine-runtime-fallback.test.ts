@@ -40,7 +40,13 @@ const runArchiveOpMock = vi.mocked(runArchiveOp);
 
 const compressOptions = {
   targets: [{ fsPath: "/a/b" }],
-  format: { label: "7z", exts: [".7z"], canCreate: true, supportsEncryption: true, category: "archive" },
+  format: {
+    label: "7z",
+    exts: [".7z"],
+    canCreate: true,
+    supportsEncryption: true,
+    category: "archive",
+  },
   outputPath: "/out/a.7z",
   password: "",
   level: 5,

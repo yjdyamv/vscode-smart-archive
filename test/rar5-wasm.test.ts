@@ -31,9 +31,7 @@ const RAR5_FORMAT = {
 
 const RAR5_SIG = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]);
 
-
-const UNRAR =
-  process.env.SA_OFFICIAL_UNRAR || path.join(os.homedir(), "下载", "rar", "unrar");
+const UNRAR = process.env.SA_OFFICIAL_UNRAR || path.join(os.homedir(), "下载", "rar", "unrar");
 
 /** Run official unrar; null when unavailable or blocked (sandbox/CI). */
 function unrarOutput(args: string[]): string | null {

@@ -19,7 +19,13 @@ import {
   wasmDecompress,
   wasmDecompressFile,
 } from "../src/engines/js7z-codec";
-import { brotliCompress, brotliDecompress, brotliCompressFile, brotliDecompressFile, setBrotliConfig } from "../src/engines/brotli-codec";
+import {
+  brotliCompress,
+  brotliDecompress,
+  brotliCompressFile,
+  brotliDecompressFile,
+  setBrotliConfig,
+} from "../src/engines/brotli-codec";
 import { lz4DecompressFile } from "../src/engines/lz4-codec";
 import { tmpDir } from "./tmp";
 
@@ -148,9 +154,7 @@ describe("7zz-wasm codec fallback", () => {
     const data = makeData(300 * 1024);
     const frames: Buffer[] = [];
     for (let pos = 0; pos < data.length; pos += 64 * 1024) {
-      frames.push(
-        Buffer.from(await wasmCompress(data.subarray(pos, pos + 64 * 1024), "zst", 3)),
-      );
+      frames.push(Buffer.from(await wasmCompress(data.subarray(pos, pos + 64 * 1024), "zst", 3)));
     }
     const restored = await wasmDecompress(Buffer.concat(frames), "zst");
     expect(Buffer.from(restored)).toEqual(data);
@@ -160,14 +164,11 @@ describe("7zz-wasm codec fallback", () => {
     const data = makeData(300 * 1024);
     const frames: Buffer[] = [];
     for (let pos = 0; pos < data.length; pos += 64 * 1024) {
-      frames.push(
-        Buffer.from(await wasmCompress(data.subarray(pos, pos + 64 * 1024), "lz4", 5)),
-      );
+      frames.push(Buffer.from(await wasmCompress(data.subarray(pos, pos + 64 * 1024), "lz4", 5)));
     }
     const restored = await wasmDecompress(Buffer.concat(frames), "lz4");
     expect(Buffer.from(restored)).toEqual(data);
   });
-
 });
 
 describe("bundled-7z brotli backend", () => {

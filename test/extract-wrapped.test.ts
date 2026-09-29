@@ -77,7 +77,14 @@ describe("extractSelectedCore wrapped", () => {
     const archive = await buildWrappedArchive(td, "tar.gz");
     const out = path.join(td, "out");
 
-    await extractSelectedCore(archive, ["pkg/a.txt", "pkg/sub/b.txt"], undefined, true, out, undefined);
+    await extractSelectedCore(
+      archive,
+      ["pkg/a.txt", "pkg/sub/b.txt"],
+      undefined,
+      true,
+      out,
+      undefined,
+    );
 
     const files = collectFiles(out);
     expect(files.get("a.txt")).toBe("hello a\n");
@@ -194,7 +201,14 @@ describe("extractSelectedCore non-wrapped", () => {
     const archive = await buildPlainArchive(td);
     const out = path.join(td, "out");
 
-    await extractSelectedCore(archive, ["pkg/a.txt", "pkg/sub/b.txt"], undefined, true, out, undefined);
+    await extractSelectedCore(
+      archive,
+      ["pkg/a.txt", "pkg/sub/b.txt"],
+      undefined,
+      true,
+      out,
+      undefined,
+    );
 
     const files = collectFiles(out);
     expect(files.get("a.txt")).toBe("hello a\n");

@@ -21,9 +21,7 @@ import {
 } from "../src/constants";
 import { parseSize } from "../src/utils/security";
 
-const pkg = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
-) as {
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")) as {
   contributes: { configuration: { properties: Record<string, { default?: unknown }> } };
 };
 
@@ -45,14 +43,14 @@ describe("package.json defaults match code defaults", () => {
   });
 
   it("limits.maxArchiveSize / maxExtractTotalSize", () => {
-    expect(parseSize(String(settingDefault("limits.maxArchiveSize")), -1)).toBe(DEFAULT_MAX_ARCHIVE_SIZE);
+    expect(parseSize(String(settingDefault("limits.maxArchiveSize")), -1)).toBe(
+      DEFAULT_MAX_ARCHIVE_SIZE,
+    );
     expect(parseSize(String(settingDefault("limits.maxExtractTotalSize")), -1)).toBe(
       DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
     );
     expect(DEFAULT_ENGINE_CONFIG.limits.maxArchiveSize).toBe(DEFAULT_MAX_ARCHIVE_SIZE);
-    expect(DEFAULT_ENGINE_CONFIG.limits.maxExtractTotalSize).toBe(
-      DEFAULT_MAX_EXTRACT_TOTAL_SIZE,
-    );
+    expect(DEFAULT_ENGINE_CONFIG.limits.maxExtractTotalSize).toBe(DEFAULT_MAX_EXTRACT_TOTAL_SIZE);
   });
 
   it("log.level", () => {

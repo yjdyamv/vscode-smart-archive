@@ -70,13 +70,10 @@ describe("hasRarSupport (POSIX spawn integration)", () => {
 describe("system7zForExt (RAR)", () => {
   const bundled = bundled7zPath();
 
-  it.runIf(gate("bundled7zz"))(
-    "routes RAR to the bundled full-format 7zz on this machine",
-    () => {
-      const resolved = system7zForExt(".rar");
-      expect(resolved).toBeTruthy();
-      expect(path.basename(resolved!)).toBe(path.basename(bundled));
-      expect(hasRarSupport(resolved!)).toBe(true);
-    },
-  );
+  it.runIf(gate("bundled7zz"))("routes RAR to the bundled full-format 7zz on this machine", () => {
+    const resolved = system7zForExt(".rar");
+    expect(resolved).toBeTruthy();
+    expect(path.basename(resolved!)).toBe(path.basename(bundled));
+    expect(hasRarSupport(resolved!)).toBe(true);
+  });
 });

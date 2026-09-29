@@ -24,18 +24,20 @@ const BUNDLED_7ZZ = bundled7zPath()!;
 
 function listArchive(rarPath: string): string[] {
   const out = childProcess.execFileSync(BUNDLED_7ZZ, ["l", rarPath], { encoding: "utf8" });
-  return out
-    .split("\n")
-    .map((l) => l.trim())
-    // Windows 7zz lists entries with backslashes; the tests assert on
-    // forward-slash paths.
-    .map((l) => l.replace(/\\/g, "/"))
-    .filter(
-      (l) =>
-        l &&
-        !l.startsWith("-") &&
-        !/^Size|^----|file\(s\)|Dir\(s\)|Packed|Ratio|Method|Name/i.test(l),
-    );
+  return (
+    out
+      .split("\n")
+      .map((l) => l.trim())
+      // Windows 7zz lists entries with backslashes; the tests assert on
+      // forward-slash paths.
+      .map((l) => l.replace(/\\/g, "/"))
+      .filter(
+        (l) =>
+          l &&
+          !l.startsWith("-") &&
+          !/^Size|^----|file\(s\)|Dir\(s\)|Packed|Ratio|Method|Name/i.test(l),
+      )
+  );
 }
 
 describe("rar5 exclusion pipeline", () => {

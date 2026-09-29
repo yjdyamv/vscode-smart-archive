@@ -74,8 +74,17 @@ describe("VOLUME_SIZES", () => {
   it("contains all expected preset labels", () => {
     const labels = VOLUME_SIZES.map((v) => v.label);
     expect(labels).toEqual([
-      "1.44M", "10M", "25M", "50M", "100M", "200M",
-      "650M", "700M", "1G", "2G", "4.7G",
+      "1.44M",
+      "10M",
+      "25M",
+      "50M",
+      "100M",
+      "200M",
+      "650M",
+      "700M",
+      "1G",
+      "2G",
+      "4.7G",
     ]);
   });
 

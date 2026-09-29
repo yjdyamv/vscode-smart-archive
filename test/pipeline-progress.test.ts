@@ -11,7 +11,10 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "node:crypto";
 import { compressWith7z } from "../src/engines/js7z-compress";
-import { compressWith7z as compressWasmCore, setTarBackend } from "../src/engines/js7z-compress-core";
+import {
+  compressWith7z as compressWasmCore,
+  setTarBackend,
+} from "../src/engines/js7z-compress-core";
 import { compressWithSystem7z } from "../src/engines/system7z";
 
 import { itIf } from "./gates";
@@ -104,7 +107,6 @@ describe("full-pipeline compress progress", () => {
     fs.rmSync(td, { recursive: true, force: true });
   });
 
-
   it("plain tar reports a pack stage, not compress (tar does no compression)", async () => {
     const td = tmpDir("sat_tar_");
     const src = path.join(td, "data.bin");
@@ -162,36 +164,40 @@ describe("full-pipeline compress progress", () => {
     }
   });
 
-  itIf("system7z", "system-7z wrapped pipeline (tar.gz) scales progress across tar + gzip", async () => {
-    const td = tmpDir("sat_full2_");
-    const src = path.join(td, "data.bin");
-    // Incompressible data so the gzip step takes long enough to emit
-    // multiple size-monitor reports.
-    const chunk = Buffer.alloc(64 * 1024 * 1024);
-    for (let i = 0; i < chunk.length; i += 4) {
-      chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
-    }
-    fs.writeFileSync(src, chunk);
-    const out = path.join(td, "data.tar.gz");
+  itIf(
+    "system7z",
+    "system-7z wrapped pipeline (tar.gz) scales progress across tar + gzip",
+    async () => {
+      const td = tmpDir("sat_full2_");
+      const src = path.join(td, "data.bin");
+      // Incompressible data so the gzip step takes long enough to emit
+      // multiple size-monitor reports.
+      const chunk = Buffer.alloc(64 * 1024 * 1024);
+      for (let i = 0; i < chunk.length; i += 4) {
+        chunk.writeUInt32LE((i * 2654435761) >>> 0, i);
+      }
+      fs.writeFileSync(src, chunk);
+      const out = path.join(td, "data.tar.gz");
 
-    const reports: Report[] = [];
-    await compressWithSystem7z(
-      {
-        targets: [{ fsPath: src }],
-        format: { label: "tar.gz", description: "", canCreate: true, supportsEncryption: true },
-        outputPath: out,
-        password: "",
-        level: 5,
-      },
-      { report: (r) => reports.push(r) } as never,
-    );
+      const reports: Report[] = [];
+      await compressWithSystem7z(
+        {
+          targets: [{ fsPath: src }],
+          format: { label: "tar.gz", description: "", canCreate: true, supportsEncryption: true },
+          outputPath: out,
+          password: "",
+          level: 5,
+        },
+        { report: (r) => reports.push(r) } as never,
+      );
 
-    expect(fs.existsSync(out)).toBe(true);
-    // The native tar backend emits 7z's own -bsp1 percents: a fast tar
-    // step reports a single 100% (the old JS writer chunked its own
-    // progress), large packs emit the usual 2%-stepped line.
-    expectStageProgress(stagePcts(reports, "pack"), 1);
-    expectStageProgress(stagePcts(reports, "compress"));
-    fs.rmSync(td, { recursive: true, force: true });
-  });
+      expect(fs.existsSync(out)).toBe(true);
+      // The native tar backend emits 7z's own -bsp1 percents: a fast tar
+      // step reports a single 100% (the old JS writer chunked its own
+      // progress), large packs emit the usual 2%-stepped line.
+      expectStageProgress(stagePcts(reports, "pack"), 1);
+      expectStageProgress(stagePcts(reports, "compress"));
+      fs.rmSync(td, { recursive: true, force: true });
+    },
+  );
 });

@@ -13,10 +13,7 @@ import * as crypto from "node:crypto";
 import { lz4CompressFile } from "../src/engines/lz4-codec";
 import { snappyCompressFile } from "../src/engines/snappy-codec";
 import { brotliCompressFile } from "../src/engines/brotli-codec";
-import {
-  zstdCompressFile,
-  setSystemZstdPathForTest,
-} from "../src/engines/zstd-codec";
+import { zstdCompressFile, setSystemZstdPathForTest } from "../src/engines/zstd-codec";
 import { applyEngineConfig, DEFAULT_ENGINE_CONFIG } from "../src/engines/engine-config";
 import { setForceWasmCodec } from "../src/engines/js7z-codec";
 import { tmpDir } from "./tmp";

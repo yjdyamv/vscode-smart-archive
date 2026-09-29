@@ -20,15 +20,7 @@ const EVENT_LITERAL = /event:\s*"([^"]+)"/g;
 
 const FORBIDDEN_RESULT = new Set(["error", "complete", "success", "enter", "exit"]);
 
-const VALID_RESULT = new Set([
-  "start",
-  "done",
-  "ok",
-  "failed",
-  "cancelled",
-  "skip",
-  "warn",
-]);
+const VALID_RESULT = new Set(["start", "done", "ok", "failed", "cancelled", "skip", "warn"]);
 
 const SEGMENT = /^[a-zA-Z0-9]+$/;
 
@@ -60,7 +52,12 @@ describe("log event naming convention", () => {
       const event = match[1];
       // Skip non-log usages: the worker port API (on(event: "message", …))
       // and doc-comment placeholders like "<namespace>.<action>".
-      if (content.slice(Math.max(0, match.index - 12), match.index).trimEnd().endsWith("on(")) {
+      if (
+        content
+          .slice(Math.max(0, match.index - 12), match.index)
+          .trimEnd()
+          .endsWith("on(")
+      ) {
         continue;
       }
       if (/[<>]/.test(event)) continue;

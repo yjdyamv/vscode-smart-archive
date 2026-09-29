@@ -51,9 +51,7 @@ describe.runIf(gate("bundled7zz"))("deleteFromArchiveSystem7z", () => {
 
     // The archive still exists; the entry is gone; no .tmp residue.
     expect(fs.existsSync(archive)).toBe(true);
-    expect(fs.readdirSync(td).filter((e) => e.endsWith(".tmp") || e.endsWith(".tmp1"))).toEqual(
-      [],
-    );
+    expect(fs.readdirSync(td).filter((e) => e.endsWith(".tmp") || e.endsWith(".tmp1"))).toEqual([]);
 
     const listing = execFileSync(BUNDLED_7Z, ["l", archive]).toString();
     expect(listing).toContain("b-rebuild.7z.txt");

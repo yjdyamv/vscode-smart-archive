@@ -24,11 +24,15 @@ import { buildTreeRootOnly, getDirChildren } from "../src/providers/treeBuilder"
 import { markNoisyDirs } from "../src/utils/noisy-patterns";
 import { parse7zListing } from "../src/utils/parse7z";
 import { getFormatByExt, getFullExt, getWrapExtension, isWrappedFormat } from "../src/constants";
-import { brotliCompressFile, brotliDecompressFile, brotliCompress, brotliDecompress } from "../src/engines/brotli-codec";
+import {
+  brotliCompressFile,
+  brotliDecompressFile,
+  brotliCompress,
+  brotliDecompress,
+} from "../src/engines/brotli-codec";
 import { JS7z } from "../src/engines/js7z-factory";
 import { wasmCompress, wasmDecompress } from "../src/engines/js7z-codec";
 import { tmpDir } from "./tmp";
-
 
 // ── Format matrix (mirrors FORMAT_TABLE from constants.ts) ──
 
@@ -83,7 +87,7 @@ function randPad512(buf: Buffer): Buffer {
   const rem = buf.length % 512;
   if (rem === 0) return buf;
   const pad = Buffer.alloc(512 - rem);
-  for (let i = 0; i < pad.length; i++) pad[i] = (i * 7 + 13) % 251 + 1;
+  for (let i = 0; i < pad.length; i++) pad[i] = ((i * 7 + 13) % 251) + 1;
   return Buffer.concat([buf, pad]);
 }
 
@@ -131,7 +135,9 @@ describe("selective extraction", () => {
           const r = await j7zSelective(b, ["d/a.txt", "d/b.txt"]);
           expect(r["d/a.txt"]).toBe("a");
           expect(r["d/b.txt"]).toBe("b");
-          expect(Object.keys(r).filter((k) => !(k in { "d/a.txt": 1, "d/b.txt": 1 })).length).toBe(0);
+          expect(Object.keys(r).filter((k) => !(k in { "d/a.txt": 1, "d/b.txt": 1 })).length).toBe(
+            0,
+          );
         });
 
         it(`7z selective: .${f.ext} dir`, async () => {
@@ -297,10 +303,7 @@ describe("selective extraction", () => {
   it("lz4 roundtrip: tar.lz4 -> self-decompress -> 7z extract", async () => {
     // Build a minimal tar
     const content = Buffer.from("hello from lz4 test\n");
-    const entry = Buffer.concat([
-      tarHeader("hello.txt", content.length),
-      randPad512(content),
-    ]);
+    const entry = Buffer.concat([tarHeader("hello.txt", content.length), randPad512(content)]);
     const tarBuf = Buffer.concat([entry, Buffer.alloc(1024, 0)]);
     expect(tarBuf.length).toBe(2048);
 
@@ -357,7 +360,10 @@ describe("selective extraction", () => {
     const MAGIC = 0x184d2204; // LZ4 frame magic in LE memory order
     while (offset < buf.length) {
       if (offset + 4 > buf.length) break;
-      if (buf.readUInt32LE(offset) !== MAGIC) { offset++; continue; }
+      if (buf.readUInt32LE(offset) !== MAGIC) {
+        offset++;
+        continue;
+      }
       let end = offset + 4;
       while (end + 4 <= buf.length && buf.readUInt32LE(end) !== MAGIC) end++;
       if (end + 4 > buf.length) end = buf.length;
@@ -473,7 +479,9 @@ describe("brotli", () => {
       expect(decBuf.length).toBe(SIZE);
       expect(decBuf.equals(buf)).toBe(true);
     } finally {
-      try { fs.rmSync(tdir, { recursive: true, force: true }); } catch {}
+      try {
+        fs.rmSync(tdir, { recursive: true, force: true });
+      } catch {}
     }
   });
 
@@ -512,7 +520,7 @@ describe("brotli", () => {
       try {
         const bufA = Buffer.alloc(4096);
         const bufB = Buffer.alloc(4096);
-        for (const pos of [0, SIZE / 4, SIZE / 2, SIZE * 3 / 4, SIZE - 4096]) {
+        for (const pos of [0, SIZE / 4, SIZE / 2, (SIZE * 3) / 4, SIZE - 4096]) {
           fs.readSync(srcFd, bufA, 0, 4096, Math.floor(pos));
           fs.readSync(decFd, bufB, 0, 4096, Math.floor(pos));
           expect(bufA.equals(bufB)).toBe(true);
@@ -522,7 +530,9 @@ describe("brotli", () => {
         fs.closeSync(decFd);
       }
     } finally {
-      try { fs.rmSync(tdir, { recursive: true, force: true }); } catch {}
+      try {
+        fs.rmSync(tdir, { recursive: true, force: true });
+      } catch {}
     }
   }, 120_000);
 });
@@ -565,7 +575,8 @@ describe("parse7zListing", () => {
   });
 
   it("skips archive self-reference", () => {
-    const stdout2 = "Path = archive.7z\nSize = 200\nAttributes = A\n\nPath = readme.md\nSize = 30\nAttributes = A\n\n";
+    const stdout2 =
+      "Path = archive.7z\nSize = 200\nAttributes = A\n\nPath = readme.md\nSize = 30\nAttributes = A\n\n";
     const r = parse7zListing(stdout2, "archive.7z");
     expect(r.length).toBe(1);
     expect(r[0].path).toBe("readme.md");
@@ -697,9 +708,7 @@ describe("markNoisyDirs", () => {
   });
 
   it("empty patterns does nothing", () => {
-    const entries: FlatEntry[] = [
-      { path: "node_modules/lib.js", size: 10, type: "REGULAR_FILE" },
-    ];
+    const entries: FlatEntry[] = [{ path: "node_modules/lib.js", size: 10, type: "REGULAR_FILE" }];
     const tree = buildFullTree(entries);
     markNoisyDirs(tree, []);
     expect(tree[0].collapsed).toBeUndefined();

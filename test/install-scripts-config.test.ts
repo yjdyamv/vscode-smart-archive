@@ -30,10 +30,7 @@ import {
   RAR5_REPO,
   RAR5_VERSION,
 } from "../scripts/lib/releases.mjs";
-import {
-  REPO as REPO_RAR5,
-  resolveVersion,
-} from "../scripts/install-rar5-platforms.mjs";
+import { REPO as REPO_RAR5, resolveVersion } from "../scripts/install-rar5-platforms.mjs";
 
 const HASH_RE = /^[0-9a-f]{64}$/;
 const PLATFORMS = ["linux", "darwin", "win32"];

@@ -13,7 +13,13 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as childProcess from "child_process";
 import * as vscode from "vscode";
-import { __quickPicks, __setSaveDialogResult, __setOpenDialogResult, __setConfig, __dialogs } from "./__mocks__/vscode";
+import {
+  __quickPicks,
+  __setSaveDialogResult,
+  __setOpenDialogResult,
+  __setConfig,
+  __dialogs,
+} from "./__mocks__/vscode";
 
 import { j7zDecompress, j7zCompressDir } from "./helpers";
 import { gate } from "./gates";
@@ -42,7 +48,10 @@ async function pickItem(p: Qp, item: { label: string; value?: unknown }): Promis
 
 async function pickByLabel(p: Qp, label: string): Promise<void> {
   const item = p.items.find((i) => i.label === label);
-  expect(item, `option "${label}" not offered (got: ${p.items.map((i) => i.label).join(", ")})`).toBeTruthy();
+  expect(
+    item,
+    `option "${label}" not offered (got: ${p.items.map((i) => i.label).join(", ")})`,
+  ).toBeTruthy();
   await pickItem(p, item!);
 }
 
@@ -68,7 +77,10 @@ describe("compress command (real engine)", () => {
     await vi.waitFor(() => expect(__quickPicks().length).toBe(3));
     await pickItem(qp(3), qp(3).items[0]); // volume — don't split
     await vi.waitFor(() => expect(__quickPicks().length).toBe(4));
-    await pickItem(qp(4), qp(4).items.find((i) => i.value === false)!); // encryption — no
+    await pickItem(
+      qp(4),
+      qp(4).items.find((i) => i.value === false)!,
+    ); // encryption — no
 
     await p;
     expect(fs.existsSync(outArchive)).toBe(true);
@@ -103,10 +115,7 @@ describe("decompress command (real engine)", () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   it("extracts an archive to <name>.extracted through the command", async () => {
-    const buf = await j7zCompressDir(
-      { "/a.txt": "decompress me", "/sub/c.txt": "deep" },
-      "/x.7z",
-    );
+    const buf = await j7zCompressDir({ "/a.txt": "decompress me", "/sub/c.txt": "deep" }, "/x.7z");
     const archive = path.join(dir, "input.7z");
     fs.writeFileSync(archive, buf);
 
