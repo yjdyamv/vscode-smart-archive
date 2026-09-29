@@ -14,5 +14,6 @@ vendor/
 
 .agents/
 .claude/
+.commandcode/
 skills-lock.json
 test-results/
