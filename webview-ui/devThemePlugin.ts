@@ -13,7 +13,6 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import * as path from "path";
-import * as vscodePath from "path";
 import { parse } from "jsonc-parser";
 import type { Plugin } from "vite";
 
@@ -44,29 +43,20 @@ function readJsonc(file: string): unknown {
   }
 }
 
-function userSettingsDir(): string {
-  const home = homedir();
-  for (const rel of USER_SETTINGS_CANDIDATES) {
-    const p = path.join(home, rel);
-    if (existsSync(p)) return path.dirname(p);
-  }
-  return "";
-}
-
 /** Collect every theme id → file map from a directory of extensions. */
 function collectThemes(extensionsDir: string): Map<string, string> {
   const map = new Map<string, string>();
   if (!existsSync(extensionsDir)) return map;
   for (const entry of readdirSync(extensionsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const pkgPath = vscodePath.join(extensionsDir, entry.name, "package.json");
+    const pkgPath = path.join(extensionsDir, entry.name, "package.json");
     if (!existsSync(pkgPath)) continue;
     const pkg = readJsonc(pkgPath) as {
       contributes?: { themes?: { id?: string; label?: string; path?: string }[] };
     };
     for (const theme of pkg?.contributes?.themes ?? []) {
       if (!theme.path) continue;
-      const file = vscodePath.join(extensionsDir, entry.name, theme.path);
+      const file = path.join(extensionsDir, entry.name, theme.path);
       // VS Code stores the theme id when present, else the label — index both.
       if (theme.id) map.set(theme.id, file);
       if (theme.label) map.set(theme.label, file);
@@ -79,7 +69,7 @@ function themeSources(): string[] {
   const sources: string[] = [...INSTALL_EXT_DIRS];
   const home = homedir();
   for (const rel of [".vscode/extensions", ".vscode-insiders/extensions"]) {
-    sources.push(vscodePath.join(home, rel));
+    sources.push(path.join(home, rel));
   }
   return sources;
 }
@@ -94,8 +84,8 @@ function resolveThemeFile(themeId: string): string | undefined {
 
 function currentThemeId(): string {
   const candidates = [
-    vscodePath.join(process.cwd(), ".vscode", "settings.json"),
-    ...USER_SETTINGS_CANDIDATES.map((rel) => vscodePath.join(homedir(), rel)),
+    path.join(process.cwd(), ".vscode", "settings.json"),
+    ...USER_SETTINGS_CANDIDATES.map((rel) => path.join(homedir(), rel)),
   ];
   for (const file of candidates) {
     if (!existsSync(file)) continue;

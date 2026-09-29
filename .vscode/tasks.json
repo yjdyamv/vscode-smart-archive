@@ -4,32 +4,33 @@
     {
       "type": "npm",
       "script": "compile:dev",
-      "problemMatcher": "$tsc",
-      "label": "npm: compile"
+      "problemMatcher": [],
+      "label": "npm: compile:dev"
     },
     {
       "type": "npm",
       "script": "build:webview:dev",
       "problemMatcher": [],
-      "label": "npm: build webview"
+      "label": "npm: build:webview:dev"
     },
     {
       "type": "npm",
       "script": "watch",
       "problemMatcher": [],
       "isBackground": true,
-      "label": "npm: watch (extension)"
+      "label": "npm: watch"
     },
     {
       "type": "npm",
+      "path": "webview-ui",
       "script": "build:watch",
       "problemMatcher": [],
       "isBackground": true,
-      "label": "npm: build webview (watch)"
+      "label": "npm: build:watch (webview-ui)"
     },
     {
       "label": "watch",
-      "dependsOn": ["npm: watch (extension)", "npm: build webview (watch)"],
+      "dependsOn": ["npm: watch", "npm: build:watch (webview-ui)"],
       "group": "build",
       "problemMatcher": []
     },
@@ -41,7 +42,7 @@
     },
     {
       "label": "build",
-      "dependsOn": ["npm: build webview", "npm: compile"],
+      "dependsOn": ["npm: build:webview:dev", "npm: compile:dev"],
       "group": {
         "kind": "build",
         "isDefault": true

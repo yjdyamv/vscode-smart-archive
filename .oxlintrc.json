@@ -1,10 +1,16 @@
 {
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
   "rules": {
-    "no-control-regex": "off",
     "new-cap": "off",
+    "no-control-regex": "off",
     "no-underscore-dangle": "off",
-    "unicorn/require-post-message-target-origin": "off",
-    "unicorn/no-array-sort": "off"
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/require-post-message-target-origin": "off"
   },
   "overrides": [
     {
