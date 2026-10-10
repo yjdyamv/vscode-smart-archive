@@ -94,7 +94,7 @@ describe("exclusion integration", () => {
     expect(f["proj/dist/bundle.js"]).toBeUndefined();
   });
 
-  it("target named like an exclusion is NOT excluded (regression test for b5b16a1)", async () => {
+  it("target named like an exclusion is NOT excluded (regression test for 8f4f84e)", async () => {
     // This test verifies that a directory named 'output' (which is in the
     // default exclude list) is NOT excluded when it's the compression target.
     const buf = await testCompress({ "output/data.txt": "important" }, "7z", {
