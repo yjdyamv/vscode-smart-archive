@@ -132,6 +132,7 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "workspace.test.ts",
   ],
   "src/utils/path.ts": ["encoding-recovery.test.ts", "shared-setup.ts"],
+  "src/utils/platform.ts": ["platform.test.ts"],
   "src/utils/rar.ts": ["shared-setup.ts"],
   "src/utils/security.ts": [
     "defaults-consistency.test.ts",
@@ -183,7 +184,6 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/utils/cancellation.ts": "TokenLike/ProgressLike structural types",
   "src/utils/config.ts": "host config reads — partially via commands-e2e",
   "src/utils/errorClassifier.ts": "error classification — untested",
-  "src/utils/platform.ts": "platform helpers — untested",
   "src/utils/progress-scale.ts": "progress scaling — untested",
   "src/utils/promptOversize.ts": "oversize dialog — exercised via decompress command flow",
   "src/utils/sevenZipMethod.ts": "7z method strings — untested",

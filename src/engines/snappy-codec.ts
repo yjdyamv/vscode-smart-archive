@@ -4,7 +4,7 @@ import type { ProgressLike } from "../utils/cancellation";
 import * as fs from "fs";
 import * as path from "path";
 import { CODEC_CHUNK } from "../constants";
-import { isMusl } from "../utils/platform";
+import { glibcVersion, isMusl } from "../utils/platform";
 import { disposeWasiBinding } from "./wasi-dispose";
 
 const OPTS = { copyOutputData: true };
@@ -64,35 +64,40 @@ export async function resetSnappyBindingCache(): Promise<void> {
 function loadNativeSnappy(): SnappyLike {
   if (nativeSnappy) return nativeSnappy;
   if (nativeSnappyError) throw nativeSnappyError;
-  // Snappy's napi-rs loader has a broken isMusl(): when glibcVersionRuntime is
-  // absent (Electron/VM environments) it assumes musl with no fallback, causing
-  // it to load linux-x64-musl.node on glibc systems. We patch getReport() to
-  // inject glibcVersionRuntime when we know the system is glibc.
+  // napi-rs picks the gnu or musl binary from the runtime report:
+  //   node_modules/snappy/index.js:43
+  //   if (report.header && report.header.glibcVersionRuntime) return false  // → gnu
+  // Only *truthiness* is tested; every other branch of that probe is a
+  // fallback, so in hosts where the report is missing or lacks the field
+  // (Electron, bare VMs, hardened containers) the loader can conclude musl
+  // and require ./snappy.linux-x64-musl.node on a glibc host, which then
+  // fails to load. Our own `ldd` probe is authoritative, so for the duration
+  // of require() we answer getReport() with a glibc header carrying the real
+  // version — `ldd --version` supplies it, and when it cannot be parsed the
+  // non-version sentinel "unknown" still satisfies the truthiness test.
+  // Revisit if a dependency bump starts *comparing* that version instead of
+  // testing it: the sentinel is not a semver, so the loader fails loudly on
+  // the native path and the normal WASM fallback takes over (never a silent
+  // mis-load of the wrong libc build).
   const _getReport = process.report?.getReport;
-  if (process.platform === "linux" && typeof _getReport === "function" && !isMusl()) {
+  const patchReport = process.platform === "linux" && typeof _getReport === "function" && !isMusl();
+  if (patchReport) {
+    const glibc = glibcVersion() ?? "unknown";
     process.report.getReport = function () {
-      const r = _getReport.call(process.report) as Record<string, unknown> | undefined;
-      const header = r && typeof r === "object" ? (r as Record<string, unknown>).header : undefined;
-      if (
-        header &&
-        typeof header === "object" &&
-        (header as Record<string, unknown>).glibcVersionRuntime
-      )
+      const r = _getReport.call(process.report) as { header?: Record<string, unknown> } | undefined;
+      if (r?.header && typeof r.header === "object" && r.header.glibcVersionRuntime)
         return r as object;
-      return { header: { glibcVersionRuntime: process.versions?.node ?? "unknown" } };
+      return { header: { glibcVersionRuntime: glibc } };
     };
   }
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     nativeSnappy = require("snappy") as SnappyLike;
     return nativeSnappy;
   } catch (err) {
     nativeSnappyError = err instanceof Error ? err : new Error(String(err));
     throw nativeSnappyError;
   } finally {
-    if (process.platform === "linux" && typeof _getReport === "function") {
-      process.report.getReport = _getReport;
-    }
+    if (patchReport) process.report.getReport = _getReport;
   }
 }
 
@@ -105,9 +110,7 @@ function loadWasmSnappy(): SnappyLike {
     // the upstream index.js native-first logic. Resolve through the package
     // main's directory: snappy 7.3+ restricts "exports", so the subpath
     // "snappy/snappy.wasi.cjs" is not importable directly.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const wasiLoader = path.join(path.dirname(require.resolve("snappy")), "snappy.wasi.cjs");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     wasmSnappy = require(wasiLoader) as SnappyLike;
     return wasmSnappy;
   } catch (err) {
