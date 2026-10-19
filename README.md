@@ -30,6 +30,15 @@ Create, extract, and browse archives in VS Code — powered by a **bundled nativ
 
 Browser keys: `↑↓`/`PgUp`/`PgDn`/`Home`/`End` move · `Space` toggle · `Enter` extract · `Delete` remove · `F2` rename · `Ctrl+A` select all · `Ctrl+C` copy · `Esc` clear.
 
+## Packaging
+
+Node 24 (what CI uses); `npm ci` in the repo root also installs `webview-ui`. Both commands below restore `.vscodeignore` when they finish.
+
+- `npm run package:cross` — one universal `.vsix` bundling every platform's native 7zz/rar5/snappy binaries (~27 MB). This is what CI builds and attaches to each GitHub release.
+- `npm run package:targets` — one `.vsix` per VS Code target (`win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `darwin-arm64`, `darwin-x64`), each keeping only its own native binaries (~6-9 MB; `darwin-x64` is WASM-only). Append target names to build a subset: `node scripts/package-target.mjs win32-x64 darwin-arm64`.
+
+Target builds are not wired into CI: a platform-trimmed package only saves download size if the Marketplace carries a variant for that same version, and the Marketplace has no scriptable publish path without an Azure DevOps token. The universal package stays the fallback for every platform that has no variant.
+
 ## License
 
 PolyForm Noncommercial 1.0.0. See [LICENSE](LICENSE).
