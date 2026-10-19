@@ -129,6 +129,10 @@ interface Rar5Binding {
       mtime: number;
     }>
   >;
+  // rar-rs-napi >= 0.13.0 inserted `onProgress` before `signal`: a signal
+  // passed third would be coerced into a threadsafe function and the call
+  // fails with "Create threadsafe function in ThreadsafeFunction::create
+  // failed". The result also reports per-member outcomes now.
   extractArchive(
     archivePath: string,
     opts: {
@@ -137,8 +141,9 @@ interface Rar5Binding {
       flat?: boolean;
       maxDictSize?: number;
     },
+    onProgress?: (err: Error | null, p: { done: number; total: number }) => void,
     signal?: AbortSignal,
-  ): Promise<void>;
+  ): Promise<{ written: string[]; skipped: string[]; refused: string[]; corrected: string[] }>;
   repairArchive(inputPath: string, outputPath: string): Promise<boolean>;
   rebuildMissingVolumes(firstVolume: string): Promise<string[]>;
 }
@@ -588,6 +593,10 @@ export async function extractWithRar5(
         flat: opts.flat ?? undefined,
         maxDictSize: opts.maxDictSize ?? undefined,
       },
+      // rar-rs-napi >= 0.13.0: `onProgress` sits between the options and the
+      // signal — keep it explicitly undefined so the AbortSignal lands in the
+      // signal slot (see the `extractArchive` declaration above).
+      undefined,
       controller.signal,
     );
   } finally {
