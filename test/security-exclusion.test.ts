@@ -42,8 +42,6 @@ import { brotliCompress } from "../src/engines/brotli-codec";
 import { tmpDir } from "./tmp";
 import { snappy, decompressSnappyFrames } from "./shared-setup";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 beforeEach(() => {
   resetActiveInstances();
 });

@@ -204,7 +204,6 @@ export async function decompress(params: DecompressParams): Promise<string> {
     password: params.password ?? "",
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await decompressWith7z(decompressOpts, progress, token as any);
 
   logger.info({

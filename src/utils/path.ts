@@ -98,7 +98,6 @@ export function fixArchiveEncoding(raw: string): string {
   if (!raw) return raw;
 
   // Fast path: pure ASCII needs no correction
-  // eslint-disable-next-line no-control-regex
   if (/^[ -~]*$/.test(raw)) return raw;
 
   // Fast path: already valid UTF-8 CJK

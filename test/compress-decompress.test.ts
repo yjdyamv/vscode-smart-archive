@@ -30,8 +30,6 @@ import { copyDirToFS, ensureDirSync } from "../src/utils/fs";
 import { createTarFile } from "../src/engines/tar-writer";
 import { tmpDir } from "./tmp";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 beforeEach(() => {
   resetActiveInstances();
 });

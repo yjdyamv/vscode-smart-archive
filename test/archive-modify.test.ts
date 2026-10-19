@@ -24,8 +24,6 @@ import {
   disposeAllTracked,
 } from "./shared-setup";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 beforeEach(() => {
   resetActiveInstances();
 });

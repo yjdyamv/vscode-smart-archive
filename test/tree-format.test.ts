@@ -24,8 +24,6 @@ import { parse7zListing } from "../src/utils/parse7z";
 import type { FlatEntry } from "./shared-setup";
 import { tmpDir } from "./tmp";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 beforeEach(() => {
   resetActiveInstances();
 });

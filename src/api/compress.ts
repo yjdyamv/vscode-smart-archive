@@ -158,7 +158,6 @@ export async function compress(params: CompressParams): Promise<string> {
     outputPath: compressOpts.outputPath,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await compressWith7z(compressOpts, progress, token as any, excludePatterns);
 
   logger.info({

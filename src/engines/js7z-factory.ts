@@ -75,7 +75,6 @@ let initPromise: Promise<CachedEngine> | null = null;
  */
 function loadCreate7zz(): Create7zz {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require("../../vendor/7zz-wasm/7zz.js") as Create7zz;
   } catch (err) {
     throw new Error(

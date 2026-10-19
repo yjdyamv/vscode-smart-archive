@@ -242,7 +242,6 @@ function loadNativeBinding(): Rar5Binding {
         "`SA_RAR5_DEV=1 node scripts/install-rar5-platforms.js` or publish prebuilds",
     );
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   try {
     nativeBinding = require(nodePath) as Rar5Binding;
     logger.info({ event: "rar5.bindingLoaded", triple, path: nodePath });
@@ -273,7 +272,6 @@ function loadWasmBinding(): Rar5Binding {
       typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
     process.env.SA_RAR5_WASM_WORKERS = String(Math.max(1, cores));
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   try {
     wasmBinding = require(loaderPath) as Rar5Binding;
     logger.info({
