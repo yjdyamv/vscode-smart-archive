@@ -18,6 +18,9 @@ ROADMAP.md
 CONTEXT.md
 .agents/**
 .claude/**
+# 代理/协作者说明与本地代理状态：仓库内的开发文档，不属于运行时产物
+AGENTS.md
+.commandcode/**
 skills-lock.json
 
 

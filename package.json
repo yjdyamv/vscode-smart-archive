@@ -53,6 +53,8 @@
     "verify:downloads": "node scripts/verify-downloads.mjs",
     "prepackage:cross": "node scripts/clear-native-locks.mjs",
     "package:cross": "node scripts/npm-ci-safe.mjs && node scripts/npm-ci-safe.mjs --prefix webview-ui && node scripts/package-native.mjs",
+    "prepackage:targets": "node scripts/clear-native-locks.mjs",
+    "package:targets": "node scripts/npm-ci-safe.mjs && node scripts/npm-ci-safe.mjs --prefix webview-ui && node scripts/package-target.mjs",
     "prepackage:wasm": "node scripts/clear-native-locks.mjs",
     "package:wasm": "node scripts/package-wasm.mjs",
     "vscode:prepublish": "npm run stage:natives && npm run build"
