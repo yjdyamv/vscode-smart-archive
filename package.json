@@ -41,6 +41,7 @@
     "build": "cross-env SOURCEMAP=false npm run build:webview && cross-env SOURCEMAP=false npm run compile",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:webview": "npm --prefix webview-ui test",
     "format": "oxfmt --write src/ test/ webview-ui/src/ scripts/",
     "format:check": "oxfmt --check src/ test/ webview-ui/src/ scripts/",
     "lint": "oxlint",

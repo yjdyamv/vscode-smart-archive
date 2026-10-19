@@ -53,6 +53,11 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      # The webview is a separate vitest project (jsdom + @vue/test-utils) with
+      # its own lockfile, so the root run never reaches it. Keep it in this job:
+      # it needs the same node_modules the root postinstall already installed,
+      # and a 5-second suite that nobody runs is a suite that rots.
+      - run: npm run test:webview
 
   # Run the platform-sensitive pure-fs tests on real Windows — the same
   # rename-over-existing / O_EXCL / hardlink (nlink, ino) / path semantics
