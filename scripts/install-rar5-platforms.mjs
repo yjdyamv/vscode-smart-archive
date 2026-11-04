@@ -50,26 +50,29 @@ async function resolveVersion() {
 }
 
 // SHA-256 of each platform .node release asset plus the WASI fallback bundle
-// (rar-rs-napi 0.13.0: additive `allowIncompatibleNames`/`fileVersionSuffix`
-// options, library error categories carried to JS, per-member extraction
-// failures + progress reporting, tsc-gated public types); fail-closed. Verify
+// (rar-rs-napi 0.14.0: WinRAR-aligned RAR5 container output — per-volume
+// quick-open catalogs, locator/quick-open width rules, reserved member
+// size-field widths, official solid member order; recovery shard parity split
+// into 64 KiB blocks like WinRAR; pre-3.0 archive comments readable/writable;
+// faster RAR5 decode and DP encode. The napi surface is byte-identical to
+// 0.13.0, so the JS side needs no changes); fail-closed. Verify
 // against the official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test)
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "285be09cac9528ace0d10f4615b38fa22d99afc604dd6ff79fb2c5ab986d9e9e",
-  "linux-x64-musl": "31b4f459d4a38ae1cf5f3bd99ccb67c73277ff09d0b4d276f37c4fc120ba6577",
-  "linux-arm64-gnu": "891edfdc7e63f03605785397a3fb5df82de184bb56af5668c81f24cfba17905f",
-  "linux-arm64-musl": "7c6fb18defa52a8f0900bfa3571f3262b15bf45c75c8f18e998b39c4b07a4414",
-  "linux-arm-gnueabihf": "7ebc6e8b83f293d0227a19e21eee42e3d4104dc64046771336fec1c2fb3afc17",
-  "darwin-arm64": "adbf70efab7cc493972738001d1b5d5cd5e4bb33c866eff5acea758a249e53b0",
-  "win32-x64-msvc": "a3998142d5d7f1a0a29e9b56618675f2d458d4d1aa5c9952d3c8b49049550ec0",
-  "win32-arm64-msvc": "2f774582b46b452b5e518e98a0ae76f1779f8ab89eb5f053f61d7cb966e527f1",
+  "linux-x64-gnu": "9a1286325eb3f6214d5506b73c841e4cbe0253444ea7e656630df04f3cdfa31a",
+  "linux-x64-musl": "57c916454ef70a7abbd0e067972db3b7e81b2fc2ad3cea79a9e9040e3b0c8303",
+  "linux-arm64-gnu": "476c77950205c2d91142ef6c20ed1c7f435756ec4afb0709b02e618a8702f2db",
+  "linux-arm64-musl": "deb364def18d0d23ed91e5b2b9ac83803c803bb1e9b9f8f2b4ff7dd928d86f6d",
+  "linux-arm-gnueabihf": "727dc44de1887947f2a38c36c33e75cba93f1ab0cdb6a85d350d30be812d58fe",
+  "darwin-arm64": "8b154e1e775db3b1c54aca8bb869c511cfb344f307ef4a1cbe47f60963a6badd",
+  "win32-x64-msvc": "2bc9815f610fcffc4765e3b8781144504f7fddce60c4fcde3dbb56db29b8fd58",
+  "win32-arm64-msvc": "a2aa0881c1d00d2734991d159796c349a29ac9a6b2d7b8b95efd56a02bd2aff7",
   // WASI fallback bundle (rar-rs-napi >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
   "rar-rs-napi.wasm32-wasi.wasm":
-    "e99a8050da266adace46dd195002b6b6aca6789a5791ea053e8f997a14b987c5",
+    "2e8ed313cae9af391120b5f6012eb295f34b6a0c7ac56b18e43cbb45b7844432",
   "rar-rs-napi.wasi.cjs": "b3b51f941b9ffa159c99f7b82bb136f2beffd67d63ac634938c83b77f7c2587a",
   "wasi-path-map.cjs": "c8c0abf7cd9f9eb3ec2ec5c32620def974e33ae521f9c2bf372576ee915d1546",
   "wasi-worker.mjs": "04baa257151d017504cebc916d439001edfaf9e0f3e84619790ecaf010fa68c7",
