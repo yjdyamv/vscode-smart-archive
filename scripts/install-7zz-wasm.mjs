@@ -45,8 +45,8 @@ const VER = TAG.replace(/^v/, "").split("-")[0];
 // pinned hash the install refuses unless SA_HASH_BOOTSTRAP=1.
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-7zz-wasm.mjs
 const EXPECTED_HASHES = {
-  "7zz.js": "a22596301fea5c3733d1da86c305a457453e872073d784ae9853b97fe046675f",
-  "7zz.wasm": "1ce935e1dab25155186a7d25652fe178d923640bab6c3536e6d9b7fe8a966e67",
+  "7zz.js": "21c977b1a956132ac9b54165027e7a467674a08b39a78475d511f08f95d03822",
+  "7zz.wasm": "1cddab6cf849bae7e7f721bb03d54763fa04a72e6c409fef3234b9154666a778",
   LICENSE: "efd01ecf087d0345468c57f7146879952c39c8daf4c461876a95de1c0d1722f3",
 };
 
@@ -68,13 +68,20 @@ export function getWasmPackageVersion() {
 
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
+  // Bootstrap mode (SA_HASH_BOOTSTRAP=1): download WITHOUT the pinned hash so
+  // a release bump cannot "skip" on the previous release's staged files. They
+  // match the old pin, so a plain lookup leaves the old engine in vendor/
+  // while package.json already claims the new version. Mirrors the rar5 and
+  // 7z-platforms installers.
+  const bootstrapping = process.env.SA_HASH_BOOTSTRAP === "1";
   for (const name of FILES) {
+    const pin = bootstrapping ? undefined : EXPECTED_HASHES[name];
     const destPath = path.join(OUT, name);
     const result = await downloadWithCache({
       cacheDir,
       cacheKey: `${TAG}-${name}`,
       destPath,
-      expectedSha256: EXPECTED_HASHES[name],
+      expectedSha256: pin,
       requireHash: true,
       label: name,
       fetch: () =>
@@ -82,7 +89,7 @@ async function main() {
           repo: REPO,
           tag: TAG,
           assetName: name,
-          expectedSha256: EXPECTED_HASHES[name],
+          expectedSha256: pin,
         }),
     });
     console.log(`[7zz-wasm ${name}] ${result.status}`);
