@@ -39,6 +39,23 @@ Node 24 (what CI uses); `npm ci` in the repo root also installs `webview-ui`. Bo
 
 Target builds are not wired into CI: a platform-trimmed package only saves download size if the Marketplace carries a variant for that same version, and the Marketplace has no scriptable publish path without an Azure DevOps token. The universal package stays the fallback for every platform that has no variant.
 
+## Contributing
+
+Bug reports and pull requests are welcome. Contributions are accepted under
+the project license via the [CLA](CLA.md); human contributors sign their own
+commits (see [AGENTS.md](AGENTS.md) for the trailer rules).
+
 ## License
 
-PolyForm Noncommercial 1.0.0. See [LICENSE](LICENSE).
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). Bundled
+libraries and binaries keep their own licenses (see
+[ThirdPartyNotices.md](ThirdPartyNotices.md)); in particular the 7-Zip ZS
+builds are LGPL-2.1+ with the unRAR restriction, and their source is published
+at [yjdyamv/7-Zip-zstd-native](https://github.com/yjdyamv/7-Zip-zstd-native)
+and [yjdyamv/7-Zip-zstd-wasm](https://github.com/yjdyamv/7-Zip-zstd-wasm).
+
+Versions published before this change (up to and including 2.7.1) remain under
+the license they shipped with; the terms above apply from the next release on.
+
+This is an independent project, unaffiliated with any similarly named product;
+only builds published from this repository are official releases.
