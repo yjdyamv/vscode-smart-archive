@@ -785,8 +785,5 @@
   "icon": "icon_128x128.png",
   "engines": {
     "vscode": "^1.85.0"
-  },
-  "allowScripts": {
-    "snappy@7.3.3": true
   }
 }
