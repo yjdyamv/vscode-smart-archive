@@ -59,20 +59,20 @@ const WASM_ASSETS = ["snappy.wasi.cjs", "snappy.wasm32-wasi.wasm", "wasi-worker.
 // refuses any binary lacking a pinned hash. To (re)generate after bump:
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-snappy-platforms.mjs
 const EXPECTED_HASHES = {
-  "linux-x64-gnu": "6d4de54bb2233e2199abe0e8fd299f01436501d135afe09b6ff50b0fdf184fa3",
-  "linux-x64-musl": "cce9e75e7cef317db6b9870a523cb46bcb744816c6300ab79040e1fec35dd775",
-  "linux-arm64-gnu": "c8b9330b842422d9e895ca6358c481b023afe69943c0e5ed8f31321eae78d71c",
-  "linux-arm64-musl": "4b661cc383e60b0f5a517a4dbb4bd7bf5150db540c4f727dbc4010c115632296",
-  "linux-arm-gnueabihf": "380c14efda6b0eebdf7ddabdfc6cdcf0bf1022267c5ff7fec04968b5b9b7d639",
-  "darwin-x64": "34eb09686d42246fec0772954eb7aaf438fdcf94e6ec27cd3f6a5d2aee6cc839",
-  "darwin-arm64": "4df10dd30850e04d02663729aa177153ee3c8546e8bb701bb0e324a5d51c42cb",
-  "win32-x64-msvc": "b9870a043571b729b7e6b945f7dee2359aa028c45a2be7b5bcd66546814aac8b",
-  "win32-arm64-msvc": "77c28362232d0b59696c632b6ef95c270dfe79504a603694752390196c61c028",
+  "linux-x64-gnu": "dbb886eaa194ed6acc961afe8f37a6079d91c4d36f0ccdbc1ade0dd3a24c357d",
+  "linux-x64-musl": "c3ff155cd6d07f68f5216f58641d12a7ee1bd5c3ec1f2e55519fa9f99c77f9c5",
+  "linux-arm64-gnu": "df4ef575e78e4aeccf42f4024196e50864089102a8d589e3f6ce6f3d40f5e960",
+  "linux-arm64-musl": "fdd2c1f61da4832a99356a1316ac432a291711c95b8cf53c1c23852395a62cc3",
+  "linux-arm-gnueabihf": "eaed46c603ddc2cbde69c1c07e727ab0bc60701c6d70ccda7d838dc596b3371e",
+  "darwin-x64": "1f68d4c9079017dd4a74509baf70c252781a2475dfb18d91edf0236cb7cf9000",
+  "darwin-arm64": "a878e1708a61966cf09f9ebe37296aa6c340882d82c42a825705edc3cb418f41",
+  "win32-x64-msvc": "2df0aae3495dd633084b8076cb68ff2e9def9cbab965f4689ab9de9b0210b659",
+  "win32-arm64-msvc": "e4120c5c2e8cd82422bc866fa5700182245ad11f3e1456d091b2dfd31458468c",
   // WASI fallback bundle (snappy >= 7.3.1). Placeholder pins are regenerated
   // with SA_HASH_BOOTSTRAP=1 after the dependency bump.
-  "snappy.wasi.cjs": "c99c41f788cf56647b138fdbd85d7ec9e9108af22a2ce72861552e59089657ed",
-  "snappy.wasm32-wasi.wasm": "fb82aad244bf89464fd2b57606efaa2a345fb3467c2db41498ecdcaad5653c47",
-  "wasi-worker.mjs": "fcba42b35462dc3f402b9626d8a2f30e9e7f73e9783e41d74c0003e02adc6ca1",
+  "snappy.wasi.cjs": "2adcd6dbf79398edcdf5a741d8bd37d3d1b6e8be032f32dc28aa4e1a6f45db91",
+  "snappy.wasm32-wasi.wasm": "846c8dd07b4e7c12397b8c6a65109e41b32f375be7add8a9121f0744f80d89ac",
+  "wasi-worker.mjs": "f1a1a998d9d253108e44a5ecff3d1eff27d38d1de02f1772ce3d37473dbc4b35",
 };
 
 const destDir = path.join(import.meta.dirname, "..", "node_modules", "snappy");
