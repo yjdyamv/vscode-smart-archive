@@ -12,6 +12,7 @@
  */
 
 import { Worker } from "worker_threads";
+import type { WorkerOptions } from "worker_threads";
 import * as path from "path";
 import * as vscode from "vscode";
 import type { ArchiveOp, EngineConfig, RequestPayload, WorkerMessage } from "./types";
@@ -130,6 +131,28 @@ interface WorkerSlot {
 }
 
 /**
+ * Options for the archive worker thread.
+ *
+ * `execArgv` is deliberately cleared. Node's Worker inherits
+ * `process.execArgv` by default, and under the VS Code debugger the extension
+ * host carries an inspector flag (js-debug launches it with
+ * `--inspect-brk-extensions=<port>`). An inherited `--inspect-brk` makes the
+ * new thread pause for a debugger that never attaches to it, so it never
+ * posts `ready` and every worker-backed operation dies with a 30 s "did not
+ * become ready in time" and no further diagnostic. The worker needs no Node
+ * CLI options of its own — heap sizing arrives via `resourceLimits`.
+ */
+export function archiveWorkerOptions(): WorkerOptions {
+  return {
+    execArgv: [],
+    // Wide JS-heap cap as a backstop against JS-level leaks. The WASM
+    // memory (VFS) is a WebAssembly.Memory, not part of this heap —
+    // it is guarded by the worker-side RSS check (workerMemoryMb).
+    resourceLimits: { maxOldGenerationSizeMb: WORKER_JS_HEAP_CAP_MB },
+  };
+}
+
+/**
  * Worker-thread runner — a FIFO queue over a pool of worker_threads
  * workers (default pool size 1 = serialized). Each request runs on the
  * first free worker; a crashed worker is replaced on the next use.
@@ -142,12 +165,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
 
   constructor(
     private readonly createWorker: (workerPath: string) => Worker = (p) =>
-      new Worker(p, {
-        // Wide JS-heap cap as a backstop against JS-level leaks. The WASM
-        // memory (VFS) is a WebAssembly.Memory, not part of this heap —
-        // it is guarded by the worker-side RSS check (workerMemoryMb).
-        resourceLimits: { maxOldGenerationSizeMb: WORKER_JS_HEAP_CAP_MB },
-      }),
+      new Worker(p, archiveWorkerOptions()),
     private readonly poolSize = WORKER_POOL_SIZE_DEFAULT,
   ) {}
 
@@ -398,6 +416,7 @@ export class WorkerThreadRunner implements ArchiveRunner {
         clearTimeout(timer);
         worker.off("message", check);
         worker.off("error", onError);
+        worker.off("exit", onExit);
       };
       const check = (message: WorkerMessage) => {
         if (message.type === "ready") {
@@ -414,8 +433,16 @@ export class WorkerThreadRunner implements ArchiveRunner {
         cleanup();
         reject(err instanceof Error ? err : new Error(String(err)));
       };
+      const onExit = (code: number) => {
+        // Died before it could report ready (bad bundle, inherited inspector
+        // flag, …) — reject at once so the failure is reported instead of
+        // surfacing as a bare 30 s timeout.
+        cleanup();
+        reject(new Error(`Archive worker exited with code ${code} before becoming ready`));
+      };
       worker.on("message", check);
       worker.on("error", onError);
+      worker.on("exit", onExit);
     });
   }
 

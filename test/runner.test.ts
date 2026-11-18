@@ -281,6 +281,17 @@ describe("WorkerThreadRunner", () => {
     await p2;
   });
 
+  it("reports a worker that exits before becoming ready instead of hanging", async () => {
+    // An early exit used to be swallowed by the ready promise, so the op
+    // died with a bare 30 s "did not become ready in time" (no diagnostic).
+    const { runner, workers } = makeRunner();
+    const p1 = runner.run("decompress", payload);
+    await sleep(0);
+    expect(workers).toHaveLength(1);
+    workers[0].emitExit(1);
+    await expect(p1).rejects.toThrow(/exited with code 1 before becoming ready/);
+  });
+
   it("dispose rejects pending requests and shuts the worker down", async () => {
     const { runner, workers } = makeRunner();
     const p1 = runner.run("decompress", payload);
