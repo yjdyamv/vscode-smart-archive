@@ -7,11 +7,33 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--disable-extension=oven.bun-vscode"
+        // Dev-host conflicts on this machine (both abort/error the extension
+        // host before it finishes starting):
+        //  - oven.bun-vscode binds a fixed diagnostics port (64471), so a
+        //    second window fails activation with EADDRINUSE.
+        //  - ms-vscode.js-debug-nightly re-registers every command, view and
+        //    setting of the built-in JavaScript Debugger and floods the host
+        //    with "already registered" errors.
+        "--disable-extension=oven.bun-vscode",
+        "--disable-extension=ms-vscode.js-debug-nightly"
       ],
-      "outFiles": [
-        "${workspaceFolder}/out/**/*.js"
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "build"
+    },
+    {
+      // Isolation run: VS Code disables the installed extensions and still
+      // loads the one passed to --extensionDevelopmentPath. Use it when the
+      // dev host dies on its own — if it survives here, an installed
+      // extension aborted the host; if it dies here too, the cause is on our
+      // side or in the debug setup.
+      "name": "Run Extension (isolated)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--disable-extensions"
       ],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "build"
     }
   ]
