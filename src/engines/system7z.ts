@@ -107,11 +107,24 @@ export function detectSystem7z(): string | null {
     return system;
   }
 
-  // "auto": bundled 7-Zip ZS is the reference. Platforms without a bundled
-  // binary (macOS x64, linux arm, Windows ia32) go straight to the WASM
-  // engine. A system install is used only when it is at least as capable as
-  // the bundled fork (stock 7-Zip lacks FLZMA2/ZSTD/BROTLI → bundled wins).
+  // "auto": the bundled 7-Zip ZS is the reference. When no bundle is staged
+  // (WASM-only package, a bundle that cannot run here, a platform with no
+  // prebuild), the WASM engine is the fallback of record — so a system
+  // install earns the fast path only by carrying everything the WASM engine
+  // carries. A stock 7-Zip lacks FLZMA2/ZSTD/BROTLI/LZ4/Lizard (those
+  // archives would break), while a system 7-Zip ZS is a drop-in replacement
+  // and far faster than WASM on large archives.
   if (!bundled) {
+    if (system && isForkCapable(system)) {
+      _cachedPath = system;
+      logger.info({
+        event: "system7z.detected",
+        path: system,
+        method: "system-fork",
+        platform: process.platform,
+      });
+      return system;
+    }
     _cachedPath = null;
     logger.info({
       event: "system7z.notFound",
@@ -142,26 +155,44 @@ export function detectSystem7z(): string | null {
   return system;
 }
 
-/** Find a system-installed 7-Zip binary: known paths first, then PATH. */
-function findSystem7z(): string | null {
-  const candidates: string[] = [];
-
+/**
+ * Known install locations of a system 7-Zip for this platform — data only,
+ * exported so the list is testable without touching the filesystem. The
+ * bundled 7-Zip ZS is preferred elsewhere (see `detectSystem7z`); a WASM-only
+ * install has no bundle, so a locally installed 7-Zip is the only way to
+ * reach the fast child-process path at all.
+ */
+export function system7zKnownPaths(): string[] {
   if (process.platform === "win32") {
-    candidates.push("C:\\Program Files\\7-Zip\\7z.exe", "C:\\Program Files (x86)\\7-Zip\\7z.exe");
+    const paths = [
+      "C:\\Program Files\\7-Zip\\7z.exe",
+      "C:\\Program Files (x86)\\7-Zip\\7z.exe",
+      // 7-Zip ZS — the fork this project bundles and recommends. Its
+      // installer uses its own directory name, so a stock-path-only search
+      // never finds it.
+      "C:\\Program Files\\7-Zip-Zstandard\\7z.exe",
+      "C:\\Program Files (x86)\\7-Zip-Zstandard\\7z.exe",
+    ];
     const localAppData = process.env.LOCALAPPDATA;
     if (localAppData) {
-      candidates.push(path.join(localAppData, "Programs", "7-Zip", "7z.exe"));
+      paths.push(path.join(localAppData, "Programs", "7-Zip", "7z.exe"));
     }
-  } else if (process.platform === "darwin") {
-    candidates.push(
+    return paths;
+  }
+  if (process.platform === "darwin") {
+    return [
       "/usr/local/bin/7z",
       "/usr/local/bin/7zz",
       "/opt/homebrew/bin/7z",
       "/opt/homebrew/bin/7zz",
-    );
-  } else {
-    candidates.push("/usr/bin/7z", "/usr/local/bin/7z", "/usr/bin/7zz", "/usr/local/bin/7zz");
+    ];
   }
+  return ["/usr/bin/7z", "/usr/local/bin/7z", "/usr/bin/7zz", "/usr/local/bin/7zz"];
+}
+
+/** Find a system-installed 7-Zip binary: known paths first, then PATH. */
+function findSystem7z(): string | null {
+  const candidates = system7zKnownPaths();
 
   for (const c of candidates) {
     if (fs.existsSync(c) && testBinary(c)) return c;
@@ -174,26 +205,6 @@ function findSystem7z(): string | null {
     if (found && testBinary(found)) return found;
   }
   return null;
-}
-
-export function hasSystem7z(): boolean {
-  const config = vscode.workspace.getConfiguration("smart-archiver");
-  const setting = config.get<string>("backend.7z", "auto");
-
-  if (setting === "wasm") {
-    logger.debug({ event: "system7z.disabledBySetting" });
-    return false;
-  }
-
-  const sz = detectSystem7z();
-  if (!sz) {
-    if (setting === "native") {
-      vscode.window.showWarningMessage(t("system7z.notInstalled"));
-    }
-    return false;
-  }
-
-  return true;
 }
 
 interface SevenZipCapabilities {
@@ -222,6 +233,9 @@ const _probeCache = new Map<string, SevenZipCapabilities | null>();
 export function resetDetectionCache(): void {
   _cachedPath = undefined;
   _probeCache.clear();
+  // Per-binary RAR capability is cached too: a re-detect (setting change,
+  // staged/unstaged bundle) must re-probe instead of reusing a stale answer.
+  _rarSupportCache.clear();
   resetBundledMacPrep();
 }
 
@@ -323,6 +337,9 @@ export function system7zCanDecompress(inputPath: string): boolean {
   return true;
 }
 
+/** Codecs the bundled 7-Zip ZS fork carries beyond stock 7-Zip. */
+const FORK_CODECS = ["FLZMA2", "ZSTD", "BROTLI", "LZ4", "LIZARD"];
+
 /**
  * True when `candidate` exposes at least the codecs of `reference`. Version
  * is deliberately not compared: any accepted binary is a modern 7-Zip, and
@@ -334,10 +351,21 @@ function isAtLeastAsCapable(candidate: string, reference: string): boolean {
   const b = probe7z(reference);
   if (!a || !b) return false;
   // The bundled fork's extra codecs are the ones stock 7-Zip lacks.
-  for (const codec of ["FLZMA2", "ZSTD", "BROTLI", "LZ4", "LIZARD"]) {
+  for (const codec of FORK_CODECS) {
     if (hasCodec(b, codec) && !hasCodec(a, codec)) return false;
   }
   return true;
+}
+
+/**
+ * True when a binary carries every codec the bundled/WASM fork provides —
+ * i.e. it is a 7-Zip ZS build and can stand in for the WASM engine without
+ * any format regressing.
+ */
+function isForkCapable(binary: string): boolean {
+  const caps = probe7z(binary);
+  if (!caps) return false;
+  return FORK_CODECS.every((codec) => hasCodec(caps, codec));
 }
 
 /** Pick the best supported method for a binary via the fallback chain. */
@@ -550,23 +578,46 @@ export function outputHasRarSupport(out: string): boolean {
 }
 
 /**
+ * Verdict of a RAR-capability probe. A binary that actually answered (exit 0)
+ * gives a definitive answer; a spawn failure or a timeout does not — and an
+ * inconclusive probe must stay uncached, or one cold-start timeout (Windows
+ * Defender scanning a freshly unpacked 7zz, a momentarily busy machine) would
+ * demote RAR to the WASM engine for the rest of the session: slow listings
+ * and, when the format-capable binary is then missing, a bogus "encrypted"
+ * detection.
+ */
+export type RarProbeVerdict = "supported" | "unsupported" | "unknown";
+
+export function rarProbeVerdict(status: number | null, out: string): RarProbeVerdict {
+  if (status !== 0) return "unknown";
+  return outputHasRarSupport(out) ? "supported" : "unsupported";
+}
+
+/**
  * Does this 7-Zip binary include RAR (RAR4/RAR5) read support? Some distro
  * builds strip RAR for licensing reasons (e.g. Fedora's 7zip package), in
- * which case they cannot open RAR archives at all.
+ * which case they cannot open RAR archives at all. Only definitive answers
+ * are cached (see {@link rarProbeVerdict}).
  */
 export function hasRarSupport(binary: string): boolean {
   const cached = _rarSupportCache.get(binary);
   if (cached !== undefined) return cached;
-  let supported = false;
+  let verdict: RarProbeVerdict = "unknown";
   try {
     const r = spawnSync(binary, ["i"], { stdio: "pipe", timeout: BINARY_DETECT_TIMEOUT });
-    if (r.status === 0) {
-      const out = `${r.stdout.toString("utf8")}\n${r.stderr.toString("utf8")}`;
-      supported = outputHasRarSupport(out);
-    }
+    const out = `${r.stdout?.toString("utf8") ?? ""}\n${r.stderr?.toString("utf8") ?? ""}`;
+    verdict = rarProbeVerdict(r.status, out);
   } catch {
-    supported = false;
+    verdict = "unknown";
   }
+  if (verdict === "unknown") {
+    logger.warn(
+      { event: "system7z.rarProbe.inconclusive", binary },
+      "RAR capability probe did not complete — not caching the answer",
+    );
+    return false;
+  }
+  const supported = verdict === "supported";
   _rarSupportCache.set(binary, supported);
   return supported;
 }

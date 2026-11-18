@@ -305,18 +305,40 @@ export function sanitizeTargetDir(dir: string): string {
  * depth — a crafted message must not drive filesystem operations with
  * "", ".", "..", absolute, or native-separator paths).
  *
- * Entry paths use "/" separators and are relative. Tolerated shapes:
+ * Entry paths use "/" separators. Tolerated shapes:
  *   - a leading "./" prefix (7z listings may emit it),
- *   - a single trailing "/" (directory entries in some listings).
- * Rejected: empty string, absolute paths (leading "/" or drive letter),
- * backslashes, any ".." segment, "." segments except the leading "./"
- * prefix, empty segments elsewhere ("a//b"), and overlong paths.
+ *   - a single trailing "/" (directory entries in some listings),
+ *   - a Windows drive prefix ("C:/dir/file"), including the bare "C:" /
+ *     "C:/" root it can appear as: archives may store entry names absolute
+ *     (WinRAR `-ep2`, some ZIP writers), and such a member must stay
+ *     expandable/previewable in the viewer instead of being dropped here.
+ * Rejected: empty string, relative Unix-absolute paths (leading "/"),
+ * backslashes, drive-relative names ("C:file"), any ".." segment, "."
+ * segments except the leading "./" prefix, empty segments elsewhere
+ * ("a//b"), and overlong paths.
+ *
+ * Handing a drive prefix to the sinks is safe: every entry path that
+ * reaches a filesystem write is confined there — 7-Zip sanitizes the drive
+ * on extraction ("C:" → "C_"), and the host joins (`archiveJoin`,
+ * `safeJoinPath`) verify containment and throw on escape.
  */
 export function isValidArchivePath(p: string): boolean {
   if (typeof p !== "string" || p.length === 0 || p.length > 4096) return false;
-  if (p.startsWith("/") || /^[a-zA-Z]:/.test(p)) return false;
   if (p.includes("\\")) return false;
-  const segments = p.split("/");
+
+  // Strip a drive prefix before the relative checks below. "C:" alone is
+  // the archive's top-level directory entry, "C:/" its root.
+  const drive = /^[a-zA-Z]:/.test(p);
+  let rel = drive ? p.slice(2) : p;
+  if (drive) {
+    if (rel !== "" && !rel.startsWith("/")) return false;
+    rel = rel.replace(/^\//, "");
+    if (rel === "") return true;
+  } else if (rel.startsWith("/")) {
+    return false;
+  }
+
+  const segments = rel.split("/");
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
     if (seg === "..") return false;

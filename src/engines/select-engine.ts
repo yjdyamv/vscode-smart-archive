@@ -14,7 +14,7 @@
  * @module engines/select-engine
  */
 
-import { hasSystem7z, hasSystem7zForFormat, system7zCanDecompress } from "./system7z";
+import { hasSystem7zForFormat, system7zCanDecompress } from "./system7z";
 import { isWrappedFormat } from "../constants";
 import { isRarExt } from "../utils/rar";
 
@@ -91,16 +91,24 @@ export function selectEngine(request: SelectEngineRequest): EngineSelection {
 
     case "list":
       // Wrapped formats always need WASM extraction-based listing (7z l does
-      // not traverse the inner tar); in-memory data has no file for 7z.
-      if (!isWrappedFormat(ext) && hasSystem7z() && !request.hasData) {
+      // not traverse the inner tar); in-memory data has no file for 7z. The
+      // binary must also be capable of the format: a 7-Zip without RAR
+      // support cannot list a RAR, and dispatching to it throws — which the
+      // viewer shows as an archive that failed to open.
+      if (!isWrappedFormat(ext) && hasSystem7zForFormat(ext, true) && !request.hasData) {
         return { engine: "system7z", reason: "system7z-available" };
       }
-      return { engine: "worker", reason: "wrapped-or-in-memory" };
+      return { engine: "worker", reason: "wrapped-in-memory-or-unsupported" };
 
     case "isEncrypted":
-      return hasSystem7z()
+      // Format-aware like every other op: for RAR the probe needs a
+      // RAR-capable binary, and dispatching to a handler that cannot resolve
+      // one throws — which the viewer turns into a password prompt for an
+      // archive that is not encrypted at all. Without a capable binary the
+      // WASM probe answers correctly (just slower).
+      return hasSystem7zForFormat(ext, true)
         ? { engine: "system7z", reason: "system7z-available" }
-        : { engine: "worker", reason: "no-system7z" };
+        : { engine: "worker", reason: "system7z-unsupported-format" };
 
     // Mutating an existing archive.
     case "add":

@@ -5,7 +5,7 @@
  * These tests require a system 7-Zip installation and are skipped otherwise.
  */
 
-import { afterEach, describe, expect } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import {
@@ -16,6 +16,7 @@ import {
   listWithSystem7z,
   resetDetectionCache,
   spawnCapture,
+  system7zKnownPaths,
   testArchiveWithSystem7z,
   unwrapInnerTarsWithSystem7z,
 } from "../src/engines/system7z";
@@ -44,6 +45,21 @@ const sz = detectSystem7z();
 
 afterEach(() => {
   resetDetectionCache();
+});
+
+describe("system7zKnownPaths", () => {
+  it("offers absolute candidates for this platform", () => {
+    const paths = system7zKnownPaths();
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((p) => path.isAbsolute(p))).toBe(true);
+  });
+
+  it.runIf(process.platform === "win32")(
+    "probes the 7-Zip ZS install directory (the fork this project bundles)",
+    () => {
+      expect(system7zKnownPaths()).toContain("C:\\Program Files\\7-Zip-Zstandard\\7z.exe");
+    },
+  );
 });
 
 describe("system 7-Zip", () => {

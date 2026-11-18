@@ -71,6 +71,7 @@ export const SEAM_COVERED: Record<string, string[]> = {
     "preview.test.ts",
     "workspace.test.ts",
   ],
+  "src/engines/js7z-list.ts": ["engine-runtime-fallback.test.ts"],
   "src/engines/js7z-list-core.ts": ["shared-setup.ts"],
   "src/engines/lz4-codec.ts": ["codec-progress.test.ts", "wasm-codec.test.ts"],
   "src/engines/modify-core.ts": ["wasm-codec-pipeline.test.ts"],
@@ -116,7 +117,11 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/providers/webview/handlers/split.ts": ["webview-split.test.ts"],
   "src/providers/webview/setup.ts": ["setup-encrypted.test.ts", "setup-split-rar.test.ts"],
   "src/providers/webview/helpers.ts": ["workspace.test.ts"],
-  "src/providers/webview/router.ts": ["router-burst.test.ts", "split-volume.test.ts"],
+  "src/providers/webview/router.ts": [
+    "router-burst.test.ts",
+    "split-volume.test.ts",
+    "path-validation.test.ts",
+  ],
   "src/utils/errors.ts": ["preview-oversize.test.ts"],
   "src/utils/exclude.ts": ["rar5-modify.test.ts"],
   "src/utils/format.ts": ["shared-setup.ts"],
@@ -136,6 +141,7 @@ export const SEAM_COVERED: Record<string, string[]> = {
   "src/utils/rar.ts": ["shared-setup.ts"],
   "src/utils/security.ts": [
     "defaults-consistency.test.ts",
+    "path-validation.test.ts",
     "security-exclusion.test.ts",
     "shared-setup.ts",
   ],
@@ -147,7 +153,6 @@ export const SEAM_GAPS: Record<string, string> = {
   "src/api/index.ts": "re-export barrel — api/compress.ts + api/decompress.ts covered",
   "src/engines/js7z-helpers.ts": "WASM primitives — exercised transitively by every WASM op",
   "src/engines/js7z-lifecycle.ts": "dispose lifecycle — exercised via helpers.disposeJS7z path",
-  "src/engines/js7z-list.ts": "host list dispatcher — exercised via decompress isEncrypted flow",
   "src/engines/native-codec.ts": "native 7zz codec fallback — needs staged 7zz with codecs",
   "src/engines/vfs-io.ts": "WASM VFS staging — exercised transitively by every WASM op",
   "src/engines/worker/dispatch.ts":

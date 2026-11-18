@@ -15,6 +15,7 @@ vi.mock("../src/engines/system7z", () => ({
   compressWithSystem7z: vi.fn(),
   decompressWithSystem7z: vi.fn(),
   unwrapInnerTarsWithSystem7z: vi.fn(),
+  isEncryptedSystem7z: vi.fn(),
 }));
 vi.mock("../src/engines/select-engine", () => ({
   selectEngine: vi.fn(() => ({ engine: "system7z", reason: "test-mock" })),
@@ -25,17 +26,20 @@ vi.mock("../src/engines/worker/runner", () => ({
 
 import { compressWith7z } from "../src/engines/js7z-compress";
 import { decompressWith7z } from "../src/engines/js7z-decompress";
+import { isEncrypted } from "../src/engines/js7z-list";
 import { CancelledError, isCancellationError } from "../src/utils/cancellation";
 import {
   compressWithSystem7z,
   decompressWithSystem7z,
   unwrapInnerTarsWithSystem7z,
+  isEncryptedSystem7z,
 } from "../src/engines/system7z";
 import { runArchiveOp } from "../src/engines/worker/runner";
 
 const compressWithSystem7zMock = vi.mocked(compressWithSystem7z);
 const decompressWithSystem7zMock = vi.mocked(decompressWithSystem7z);
 const unwrapInnerTarsWithSystem7zMock = vi.mocked(unwrapInnerTarsWithSystem7z);
+const isEncryptedSystem7zMock = vi.mocked(isEncryptedSystem7z);
 const runArchiveOpMock = vi.mocked(runArchiveOp);
 
 const compressOptions = {
@@ -179,6 +183,31 @@ describe("decompress runtime fallback", () => {
     );
 
     await expect(decompressWith7z(decompressOptions)).rejects.toThrow("boom");
+    expect(runArchiveOpMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("encryption detection runtime fallback", () => {
+  // A system probe that cannot run (no format-capable binary resolved) must
+  // not surface as an error: the viewer turns a throw here into a password
+  // prompt for an archive that is not encrypted at all.
+  it("answers via the WASM probe when the system probe cannot run", async () => {
+    (vscode as never as { __setConfig: (s: string, k: string, v: unknown) => void }).__setConfig(
+      "smart-archiver",
+      "backend.7z",
+      "auto",
+    );
+    isEncryptedSystem7zMock.mockRejectedValue(new Error("System 7-Zip not available"));
+    runArchiveOpMock.mockResolvedValue(false);
+
+    await expect(isEncrypted("/in/a.rar")).resolves.toBe(false);
+    expect(runArchiveOpMock).toHaveBeenCalledTimes(1);
+    expect(runArchiveOpMock).toHaveBeenCalledWith("isEncrypted", { inputPath: "/in/a.rar" });
+  });
+
+  it("keeps the system answer and never touches the worker when the probe runs", async () => {
+    isEncryptedSystem7zMock.mockResolvedValue(true);
+    await expect(isEncrypted("/in/a.rar")).resolves.toBe(true);
     expect(runArchiveOpMock).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { hasRarSupport, outputHasRarSupport, system7zForExt } from "../src/engines/system7z";
+import {
+  hasRarSupport,
+  outputHasRarSupport,
+  rarProbeVerdict,
+  system7zForExt,
+} from "../src/engines/system7z";
 import { bundled7zPath } from "../src/engines/bundled7z";
 import { gate } from "./gates";
 import { tmpDir } from "./tmp";
@@ -30,6 +35,20 @@ describe("outputHasRarSupport", () => {
   });
 });
 
+describe("rarProbeVerdict", () => {
+  it("treats a binary that answered as definitive", () => {
+    expect(rarProbeVerdict(0, "Formats:\n  Rar5\n  Rar\n  Zip")).toBe("supported");
+    expect(rarProbeVerdict(0, "Formats:\n  Zip\n  7z\n  Xz")).toBe("unsupported");
+  });
+
+  it("treats a timeout or spawn failure as inconclusive", () => {
+    // spawnSync reports a timeout as signal-killed with a null status.
+    expect(rarProbeVerdict(null, "Formats:\n  Rar5")).toBe("unknown");
+    expect(rarProbeVerdict(1, "Formats:\n  Rar5")).toBe("unknown");
+    expect(rarProbeVerdict(null, "")).toBe("unknown");
+  });
+});
+
 // The spawn integration path needs an executable fake; POSIX shell scripts
 // cannot run on Windows, so the fakes are POSIX-only (the parser above
 // still covers the logic everywhere).
@@ -41,6 +60,32 @@ function fake7z(dir: string, name: string, rar: boolean): string {
   fs.writeFileSync(p, `#!/bin/sh\nprintf '%s\\n' ${formats.map((f) => `'${f}'`).join(" ")}\n`);
   fs.chmodSync(p, 0o755);
   return p;
+}
+
+/**
+ * A fake that records every invocation, then either answers (exit 0, with or
+ * without RAR in the list) or bails out without an answer (exit 1).
+ */
+function fake7zCounting(
+  dir: string,
+  name: string,
+  opts: { rar: boolean; exit: number },
+): { bin: string; runs: () => number } {
+  const bin = path.join(dir, name);
+  const counter = path.join(dir, `${name}.runs`);
+  const formats = opts.rar
+    ? ["Formats:", "  Rar5", "  Rar", "  Zip"]
+    : ["Formats:", "  Zip", "  7z"];
+  fs.writeFileSync(
+    bin,
+    `#!/bin/sh\necho x >> "${counter}"\nprintf '%s\\n' ${formats.map((f) => `'${f}'`).join(" ")}\nexit ${opts.exit}\n`,
+  );
+  fs.chmodSync(bin, 0o755);
+  return {
+    bin,
+    runs: () =>
+      fs.existsSync(counter) ? fs.readFileSync(counter, "utf8").trim().split("\n").length : 0,
+  };
 }
 
 describe("hasRarSupport (POSIX spawn integration)", () => {
@@ -63,6 +108,24 @@ describe("hasRarSupport (POSIX spawn integration)", () => {
     () => {
       const p = fake7z(dir, "stripped7z", false);
       expect(hasRarSupport(p)).toBe(false);
+    },
+  );
+
+  it.runIf(process.platform !== "win32")("caches a definitive answer (the probe runs once)", () => {
+    const fake = fake7zCounting(dir, "cached7z", { rar: true, exit: 0 });
+    expect(hasRarSupport(fake.bin)).toBe(true);
+    expect(hasRarSupport(fake.bin)).toBe(true);
+    expect(fake.runs()).toBe(1);
+  });
+
+  it.runIf(process.platform !== "win32")(
+    "re-probes after an inconclusive run instead of caching 'no RAR'",
+    () => {
+      // A cold-start timeout must not demote RAR to WASM for the session.
+      const fake = fake7zCounting(dir, "timeout7z", { rar: true, exit: 1 });
+      expect(hasRarSupport(fake.bin)).toBe(false);
+      expect(hasRarSupport(fake.bin)).toBe(false);
+      expect(fake.runs()).toBe(2);
     },
   );
 });

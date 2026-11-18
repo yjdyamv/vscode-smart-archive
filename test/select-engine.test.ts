@@ -11,21 +11,18 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { EngineChoice } from "../src/engines/select-engine";
 
 vi.mock("../src/engines/system7z", () => ({
-  hasSystem7z: vi.fn(() => true),
   hasSystem7zForFormat: vi.fn(() => true),
   system7zCanDecompress: vi.fn(() => true),
 }));
 
 import { selectEngine } from "../src/engines/select-engine";
-import { hasSystem7z, hasSystem7zForFormat, system7zCanDecompress } from "../src/engines/system7z";
+import { hasSystem7zForFormat, system7zCanDecompress } from "../src/engines/system7z";
 
-const mockedHasSystem7z = vi.mocked(hasSystem7z);
 const mockedHasSystem7zForFormat = vi.mocked(hasSystem7zForFormat);
 const mockedSystem7zCanDecompress = vi.mocked(system7zCanDecompress);
 
 /** Restore every mock to the "system 7z fully available" default. */
 function systemAvailable(): void {
-  mockedHasSystem7z.mockReturnValue(true);
   mockedHasSystem7zForFormat.mockReturnValue(true);
   mockedSystem7zCanDecompress.mockReturnValue(true);
 }
@@ -89,14 +86,29 @@ describe("selectEngine · list / isEncrypted", () => {
     expectChoice({ op: "list", ext: ".zip" }, "system7z");
   });
 
+  it("routes RAR listing to the worker when no RAR-capable binary resolves", () => {
+    // A 7-Zip without RAR support cannot list a RAR — dispatching to it
+    // throws instead, and the viewer shows a failed open.
+    mockedHasSystem7zForFormat.mockReturnValue(false);
+    expectChoice({ op: "list", ext: ".rar" }, "worker");
+  });
+
   it("routes in-memory data to the worker (no file to read)", () => {
     expectChoice({ op: "list", ext: ".zip", hasData: true }, "worker");
   });
 
-  it("routes isEncrypted to system 7z when available", () => {
+  it("routes isEncrypted to system 7z when a capable binary is available", () => {
     expectChoice({ op: "isEncrypted", ext: ".7z" }, "system7z");
-    mockedHasSystem7z.mockReturnValue(false);
+    mockedHasSystem7zForFormat.mockReturnValue(false);
     expectChoice({ op: "isEncrypted", ext: ".7z" }, "worker");
+  });
+
+  it("routes RAR isEncrypted to the worker when no RAR-capable binary resolves", () => {
+    // A 7-Zip that cannot read RAR must not receive the probe: it used to
+    // throw, and the viewer turned that into a password prompt for an
+    // unencrypted archive.
+    mockedHasSystem7zForFormat.mockReturnValue(false);
+    expectChoice({ op: "isEncrypted", ext: ".rar" }, "worker");
   });
 });
 
