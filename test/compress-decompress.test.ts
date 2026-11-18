@@ -454,7 +454,9 @@ describe("tar backend selection (smart-archiver.backend.tar)", () => {
       fs.mkdirSync(path.join(proj, "src"), { recursive: true });
       fs.writeFileSync(path.join(proj, "src", "main.ts"), "export {}");
       // .claude → .agent junction (same as tar-writer-symlink test).
-      execSync(`cmd /c mklink /J "${path.join(proj, ".claude")}" "${agent}"`);
+      execSync(
+        `"${process.env.ComSpec ?? "cmd"}" /c mklink /J "${path.join(proj, ".claude")}" "${agent}"`,
+      );
 
       setTarBackend("wasm");
       try {

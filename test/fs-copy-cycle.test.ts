@@ -24,7 +24,9 @@ afterEach(() => {
 });
 
 function mkJunction(root: string, link: string, target: string): void {
-  execSync(`cmd /c mklink /J "${link}" "${target}"`);
+  // Invoke the interpreter by absolute path: a plain `cmd` can resolve to a
+  // same-named npm bin shim earlier on PATH instead of the Windows shell.
+  execSync(`"${process.env.ComSpec ?? "cmd"}" /c mklink /J "${link}" "${target}"`);
 }
 
 /** Minimal virtual-FS stub: small files land in `written`, dirs are no-ops. */
