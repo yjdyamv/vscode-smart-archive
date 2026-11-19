@@ -164,6 +164,55 @@ jobs:
           # false) — so re-running a release never accumulates notes.
           overwrite_files: true
 
+  # Publish the exact VSIX that `build` produced to the Visual Studio
+  # Marketplace using OIDC trusted publishing — no VSCE_PAT secret.
+  #
+  # Requirements (outside this file): a trusted publishing policy for this
+  # repo + the `build.yml` workflow on https://marketplace.visualstudio.com
+  # (Manage publisher → Trusted publishing). OIDC publishing is supported by
+  # GitHub Actions only, and requests the `marketplace.visualstudio.com`
+  # audience — hence `id-token: write` below. There is no PAT fallback: if the
+  # token exchange fails, the job fails loudly.
+  #
+  # `--skip-duplicate` makes this idempotent: re-running the workflow for an
+  # already-published tag logs "Version X is already published" and exits 0
+  # instead of failing. Tag pushes and manual dispatches (release_tag) run it;
+  # plain builds and PRs do not.
+  publish-marketplace:
+    name: Publish to VS Code Marketplace
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for the GitHub Actions OIDC token
+    steps:
+      # Only needed so `vsce` runs from the repo root (package.json publisher
+      # name, .vscodeignore-aware manifest handling); the published bytes come
+      # from the artifact, not from this checkout.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v7
+        with:
+          name: vsix
+      # Pinned to the major that supports `--oidc` (added in @vscode/vsce 4.x).
+      # npx instead of `npm ci`: the publish job must not re-run the repo's
+      # postinstall, which downloads/stages the native binaries — those are
+      # already inside the VSIX built by `build`.
+      - name: Publish VSIX with OIDC trusted publishing
+        run: |
+          set -euo pipefail
+          VSIX="$(ls -1 ./*.vsix | head -1)"
+          echo "Publishing ${VSIX} from ${GITHUB_REF_NAME}"
+          npx --yes @vscode/vsce@4 publish \
+            --oidc \
+            --skip-duplicate \
+            --packagePath "${VSIX}"
+
   # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
   # Downloads the same 7-Zip ZS arm64 binary the install script stages from
   # yjdyamv/7-Zip-zstd-native, replicates the extension's runtime prep
