@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml/badge.svg)](https://github.com/yjdyamv/vscode-smart-archive/actions/workflows/build.yml)
 
-Create, extract, and browse archives in VS Code — powered by a **bundled native 7-Zip** (WASM fallback) plus native **zstd/lz4/brotli** codecs. Works out of the box, nothing to install.
+Create, extract, and browse archives in VS Code — powered by a **bundled native 7-Zip zstd** (WASM fallback). Works out of the box, nothing to install.
 
 > RAR and WinRAR are registered trademarks of RARLAB; this extension is not affiliated with or endorsed by RARLAB.
 >
@@ -16,7 +16,7 @@ Create, extract, and browse archives in VS Code — powered by a **bundled nativ
 - **Multi-volume** — RAR `.r00`/`.partN`, split 7z/zip `.001`
 - **Big files** — archives beyond 2 GiB
 - **Secure** — zip-slip, size-limit, and decompression-bomb protection
-- **Smart exclude** (skips `node_modules`, `.git`, …); **GBK filename recovery** for old CJK archives
+- **Smart exclude** (skips `node_modules`, `.git`, …)
 - **Trilingual UI** — English / 简体中文 / 繁體中文; right-click anywhere
 
 ## Usage
