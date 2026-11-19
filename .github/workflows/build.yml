@@ -213,6 +213,49 @@ jobs:
             --skip-duplicate \
             --packagePath "${VSIX}"
 
+  # Same VSIX, other registry: Open VSX supports OIDC trusted publishing too,
+  # so there is no OVSX_PAT secret either.
+  # https://github.com/eclipse-openvsx/openvsx/wiki/Trusted-Publishing
+  #
+  # One-time setup outside this file: register a trusted publisher for
+  # namespace `yjdyamv`, repository `yjdyamv/vscode-smart-archive` and workflow
+  # `build.yml` at https://open-vsx.org/user-settings/trusted-publishers.
+  # A registration is not tied to a branch or tag — any ref running the
+  # registered workflow file is trusted — but the extension must already have
+  # an active version (2.8.0 is live). The registry compares `publisher` from
+  # the VSIX manifest against the namespace case-sensitively, and both are the
+  # all-lowercase `yjdyamv`.
+  #
+  # `--skip-duplicate` mirrors the vsce job: an already-published version
+  # prints "... is already published. Skipping publish." and exits 0, so
+  # re-running a release stays green.
+  publish-openvsx:
+    name: Publish to Open VSX
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for the GitHub Actions OIDC token
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v7
+        with:
+          name: vsix
+      # No checkout: ovsx takes publisher, name and version from the VSIX
+      # manifest, and the VSIX is the artifact `build` produced.
+      - name: Publish VSIX with OIDC trusted publishing
+        run: |
+          set -euo pipefail
+          VSIX="$(ls -1 ./*.vsix | head -1)"
+          echo "Publishing ${VSIX} from ${GITHUB_REF_NAME}"
+          npx --yes ovsx@1 publish \
+            -i "${VSIX}" \
+            --trusted-publishing \
+            --skip-duplicate
+
   # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
   # Downloads the same 7-Zip ZS arm64 binary the install script stages from
   # yjdyamv/7-Zip-zstd-native, replicates the extension's runtime prep

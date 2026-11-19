@@ -10,7 +10,7 @@ Publish to where users actually install from. **Highest leverage — everything 
 
 | # | Item | Pri | Effort |
 |---|------|-----|--------|
-| 1.1 | Open VSX publish in CI on `v*` tags (`ovsx publish` + `OVSX_PAT` secret — Open VSX has no trusted publishing). *Marketplace half done: `vsce publish --oidc` in `build.yml`, no PAT needed.* | 🔴 | S |
+| 1.1 | ✅ Marketplace + Open VSX publish in CI on `v*` tags — both via OIDC trusted publishing (`vsce publish --oidc`, `ovsx publish --trusted-publishing`), no PAT secrets | — | — |
 | 1.2 | `CHANGELOG.md` (Keep-a-Changelog), backfilled from git history | 🔴 | S |
 | 1.3 | Release script: bump version + changelog heading + tag + push (removes manual drift) | 🟡 | S |
 | 1.4 | README polish for Marketplace: hero GIF, browser screenshots, badges | 🟡 | M |
