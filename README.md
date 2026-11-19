@@ -34,7 +34,7 @@ Browser keys: `↑↓`/`PgUp`/`PgDn`/`Home`/`End` move · `Space` toggle · `Ent
 
 Node 24 (what CI uses); `npm ci` in the repo root also installs `webview-ui`. Both commands below restore `.vscodeignore` when they finish.
 
-- `npm run package:cross` — one universal `.vsix` bundling every platform's native 7zz/rar5/snappy binaries (~27 MB). This is what CI builds, attaches to each GitHub release, and publishes to both the VS Code Marketplace and Open VSX.
+- `npm run package:cross` — one universal `.vsix` bundling every platform's native 7zz/rar5/snappy binaries (~27 MB). This is what CI builds, attaches to each GitHub release, and publishes to the VS Code Marketplace — plus Open VSX once the `OPENVSX_TRUSTED_PUBLISHING` repo variable is turned on.
 - `npm run package:targets` — one `.vsix` per VS Code target (`win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `darwin-arm64`, `darwin-x64`), each keeping only its own native binaries (~6-9 MB; `darwin-x64` is WASM-only). Append target names to build a subset: `node scripts/package-target.mjs win32-x64 darwin-arm64`.
 
 Target builds are not wired into CI yet: a platform-trimmed package only pays off if the Marketplace carries a variant for that *same* version, so shipping one costs an extra publish per target on every release (`vsce publish --oidc --target <target> --packagePath <vsix>` — trusted publishing makes this possible without a PAT). Until that per-target release matrix exists, the universal package is what CI publishes and the only variant either marketplace offers.
