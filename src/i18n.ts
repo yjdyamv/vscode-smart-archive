@@ -804,15 +804,15 @@ const messages: Record<string, Record<Locale, string>> = {
   },
 
   // ---- Password UI ----
-  "password.show": {
-    en: "Show password",
-    "zh-cn": "显示密码",
-    "zh-tw": "顯示密碼",
+  "password.showHint": {
+    en: "Show password (Ctrl+H)",
+    "zh-cn": "显示密码（Ctrl+H）",
+    "zh-tw": "顯示密碼（Ctrl+H）",
   },
-  "password.hide": {
-    en: "Hide password",
-    "zh-cn": "隐藏密码",
-    "zh-tw": "隱藏密碼",
+  "password.hideHint": {
+    en: "Hide password (Ctrl+H)",
+    "zh-cn": "隐藏密码（Ctrl+H）",
+    "zh-tw": "隱藏密碼（Ctrl+H）",
   },
   "input.clear": {
     en: "Clear",

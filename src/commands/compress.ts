@@ -28,6 +28,7 @@ import {
   parseVolumeSizeInput,
   promptSavePath,
   promptValuePick,
+  registerPasswordToggle,
 } from "../ui/prompts";
 import type { StepResult, ValuePickRow } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
@@ -102,9 +103,6 @@ function promptInputBox(opts: {
   prompt: string;
   placeholder: string;
   password?: boolean;
-  /** Show the eye toggle. Off for the confirmation box: seeing it lets you copy
-   *  a typo instead of catching it, which is the whole point of asking twice. */
-  reveal?: boolean;
   value?: string;
   validate?: (v: string) => string | undefined;
 }): Promise<StepResult<string>> {
@@ -114,26 +112,38 @@ function promptInputBox(opts: {
     let shown = false;
     const eyeBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye"),
-      tooltip: t("password.show"),
+      tooltip: t("password.showHint"),
     };
     const eyeOffBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye-closed"),
-      tooltip: t("password.hide"),
+      tooltip: t("password.hideHint"),
     };
     const clearBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("close"),
       tooltip: t("input.clear"),
     };
     const isPw = !!opts.password;
-    const withEye = isPw && opts.reveal !== false;
+    const paintButtons = (): void => {
+      ib.buttons = shown
+        ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
+        : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+    };
+    const toggle = (): void => {
+      shown = !shown;
+      ib.password = !shown;
+      paintButtons();
+    };
     ib.prompt = opts.prompt;
     ib.placeholder = opts.placeholder;
     ib.value = opts.value ?? "";
     ib.password = isPw;
     ib.ignoreFocusOut = true;
-    ib.buttons = withEye
+    // Both password boxes get the eye: during a long hand-typed password the
+    // confirmation field is exactly where you want to see what you typed.
+    ib.buttons = isPw
       ? [eyeBtn, clearBtn, vscode.QuickInputButtons.Back]
       : [clearBtn, vscode.QuickInputButtons.Back];
+    const own = isPw ? registerPasswordToggle(toggle) : undefined;
     if (opts.validate) {
       ib.onDidChangeValue((v) => {
         ib.validationMessage = opts.validate!(v) ?? "";
@@ -147,18 +157,15 @@ function promptInputBox(opts: {
     ib.onDidTriggerButton((b) => {
       if (b === clearBtn) {
         ib.value = "";
-      } else if (withEye && (b === eyeBtn || b === eyeOffBtn)) {
-        shown = !shown;
-        ib.password = !shown;
-        ib.buttons = shown
-          ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
-          : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+      } else if (isPw && (b === eyeBtn || b === eyeOffBtn)) {
+        toggle();
       } else if (b === vscode.QuickInputButtons.Back) {
         result = "back";
         ib.hide();
       }
     });
     ib.onDidHide(() => {
+      if (own) own();
       if (result === "accept") {
         resolve({ kind: "ok", value: ib.value });
       } else if (result === "back") {
@@ -274,7 +281,6 @@ async function promptPasswordWizard(): Promise<StepResult<string>> {
       prompt: t("password.confirmPrompt"),
       placeholder: t("password.confirmHint"),
       password: true,
-      reveal: false,
       validate: (v) => (v.length > 0 ? undefined : t("password.empty")),
     });
     // Back from the confirmation re-opens the first box: the typo may be in

@@ -25,6 +25,7 @@ vi.mock("../src/engines/js7z-compress", () => ({
 }));
 
 import { compressCommand } from "../src/commands/compress";
+import { togglePasswordVisible } from "../src/ui/prompts";
 import { compressWith7z } from "../src/engines/js7z-compress";
 import { tmpDir } from "./tmp";
 
@@ -44,7 +45,10 @@ interface Qp {
 }
 interface Ib {
   value: string;
+  password: boolean;
+  buttons: unknown[];
   accept: (value?: string) => void;
+  triggerButton: (button: unknown) => void;
 }
 
 function currentQuickPick(nth: number): Qp {
@@ -253,6 +257,57 @@ describe("compress wizard (RAR)", () => {
     // An empty password is how this layer spells "no encryption".
     expect(options.password).toBe("");
     expect(options.encryptHeaders).toBe(false);
+  });
+
+  it("Ctrl+H shows and re-hides the password, and the eye button does the same", async () => {
+    const p = compressCommand(vscode.Uri.file(dir), []);
+    await vi.waitFor(() => expect(__quickPicks().length).toBe(1));
+    await pickLabel(currentQuickPick(1), "rar");
+    await vi.waitFor(() => expect(__quickPicks().length).toBe(2));
+    await pickLabel(currentQuickPick(2), currentQuickPick(2).items[0].label);
+    await vi.waitFor(() => expect(__quickPicks().length).toBe(3));
+    await pickLabel(currentQuickPick(3), currentQuickPick(3).items[0].label);
+    await vi.waitFor(() => expect(__inputBoxes().length).toBe(1));
+    const box = currentInputBox(1);
+    expect(box.password, "the password starts masked").toBe(true);
+
+    // Ctrl+H arrives as a command — a QuickInput has no key events of its own.
+    togglePasswordVisible();
+    expect(box.password, "Ctrl+H reveals the password").toBe(false);
+    togglePasswordVisible();
+    expect(box.password, "Ctrl+H masks it again").toBe(true);
+
+    // The eye is the mouse path to the same toggle, and it swaps its own icon.
+    box.triggerButton(box.buttons[0]);
+    expect(box.password, "the eye reveals the password").toBe(false);
+
+    await typeValue(box, "");
+    await vi.waitFor(() => expect(__quickPicks().length).toBe(4));
+    await pickLabel(currentQuickPick(4), currentQuickPick(4).items[0].label);
+    await vi.waitFor(() => expect(compressWith7zMock).toHaveBeenCalledTimes(1));
+    await p;
+    // Once the box is gone the shortcut is a no-op instead of targeting a dead box.
+    expect(() => togglePasswordVisible()).not.toThrow();
+  });
+
+  it("the shortcut is contributed inside quick inputs, and hidden from the palette", async () => {
+    const pkg = (await import("../package.json")) as unknown as {
+      contributes: {
+        keybindings?: { command: string; key: string; when?: string }[];
+        menus: { commandPalette: { command: string; when?: string }[] };
+      };
+    };
+    const binding = pkg.contributes.keybindings?.find(
+      (k) => k.command === "yjdyamv.smart-archiver.togglePasswordVisibility",
+    );
+    expect(binding?.key, "Ctrl+H is what the tooltip promises").toBe("ctrl+h");
+    expect(binding?.when, "only while a quick input has focus").toBe("inQuickInput");
+    expect(
+      pkg.contributes.menus.commandPalette.some(
+        (m) => m.command === "yjdyamv.smart-archiver.togglePasswordVisibility",
+      ),
+      "an internal toggle does not belong in the palette",
+    ).toBe(true);
   });
 
   it("non-split RAR offers the inline recovery record percent", async () => {

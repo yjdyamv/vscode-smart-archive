@@ -294,6 +294,17 @@
         "title": "Smart Archiver: Rebuild Missing Volumes",
         "shortTitle": "Rebuild Volumes",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "yjdyamv.smart-archiver.togglePasswordVisibility",
+        "title": "Smart Archiver: Show/Hide Password"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "yjdyamv.smart-archiver.togglePasswordVisibility",
+        "key": "ctrl+h",
+        "when": "inQuickInput"
       }
     ],
     "menus": {
@@ -328,6 +339,10 @@
         },
         {
           "command": "yjdyamv.smart-archiver.rebuildVolumes",
+          "when": "false"
+        },
+        {
+          "command": "yjdyamv.smart-archiver.togglePasswordVisibility",
           "when": "false"
         }
       ],

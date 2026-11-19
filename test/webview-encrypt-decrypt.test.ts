@@ -16,6 +16,8 @@ import type { HandlerState } from "../src/providers/webview/state";
 import type { HandlerContext } from "../src/providers/webview/handlers/types";
 import { handleEncrypt } from "../src/providers/webview/handlers/encrypt";
 import { handleDecrypt } from "../src/providers/webview/handlers/decrypt";
+import { pwInputBox } from "../src/providers/webview/handlers/shared";
+import { togglePasswordVisible } from "../src/ui/prompts";
 import { convertArchive } from "../src/services/archiveService";
 
 vi.mock("../src/services/archiveService", () => ({
@@ -116,5 +118,29 @@ describe("webview decrypt handler", () => {
       { c: "ok", t: expect.any(String) },
       { c: "loading", t: false },
     ]);
+  });
+});
+
+describe("webview password box (shared pwInputBox)", () => {
+  it("Ctrl+H reveals the password, and the eye advertises the shortcut", async () => {
+    const p = pwInputBox("Enter password");
+    await vi.waitFor(() => expect(__inputBoxes().length).toBe(1));
+    const box = __inputBoxes()[0] as unknown as {
+      password: boolean;
+      buttons: { tooltip?: string }[];
+    };
+    expect(box.password, "the password starts masked").toBe(true);
+    expect(box.buttons[0]?.tooltip, "the eye names the shortcut").toContain("Ctrl+H");
+
+    togglePasswordVisible();
+    expect(box.password, "Ctrl+H reveals the password").toBe(false);
+
+    togglePasswordVisible();
+    expect(box.password, "Ctrl+H masks it again").toBe(true);
+
+    __inputBoxes()[0].accept("pw");
+    await expect(p).resolves.toBe("pw");
+    // On hide the box releases the shortcut: it is a no-op, not a dead target.
+    expect(() => togglePasswordVisible()).not.toThrow();
   });
 });

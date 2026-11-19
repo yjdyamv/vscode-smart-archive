@@ -131,6 +131,29 @@ export function promptValuePick<T>(opts: {
 }
 
 /**
+ * The password box currently on screen, if any.
+ *
+ * A native QuickInput exposes no keyboard events, and its buttons can only be
+ * clicked, so a shortcut cannot live inside the box. It comes from outside:
+ * package.json binds Ctrl+H while a quick input is focused, and that command
+ * lands here.
+ */
+let activePasswordToggle: (() => void) | undefined;
+
+/** Hand Ctrl+H the live password box; call the returned function when it hides. */
+export function registerPasswordToggle(toggle: () => void): () => void {
+  activePasswordToggle = toggle;
+  return () => {
+    if (activePasswordToggle === toggle) activePasswordToggle = undefined;
+  };
+}
+
+/** Flip the live password box between masked and plain text (Ctrl+H). */
+export function togglePasswordVisible(): void {
+  activePasswordToggle?.();
+}
+
+/**
  * Show a masked password input box.
  * Empty input = skip password.
  *
@@ -143,11 +166,11 @@ export async function promptPassword(hint: string): Promise<PasswordResult> {
     let shown = false;
     const eyeBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye"),
-      tooltip: t("password.show"),
+      tooltip: t("password.showHint"),
     };
     const eyeOffBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye-closed"),
-      tooltip: t("password.hide"),
+      tooltip: t("password.hideHint"),
     };
     const clearBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("close"),
@@ -158,6 +181,14 @@ export async function promptPassword(hint: string): Promise<PasswordResult> {
     ib.password = true;
     ib.ignoreFocusOut = true;
     ib.buttons = [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+    const toggle = (): void => {
+      shown = !shown;
+      ib.password = !shown;
+      ib.buttons = shown
+        ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
+        : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+    };
+    const release = registerPasswordToggle(toggle);
     ib.onDidAccept(() => {
       const val = ib.value;
       ib.hide();
@@ -174,17 +205,16 @@ export async function promptPassword(hint: string): Promise<PasswordResult> {
       if (b === clearBtn) {
         ib.value = "";
       } else if (b === eyeBtn || b === eyeOffBtn) {
-        shown = !shown;
-        ib.password = !shown;
-        ib.buttons = shown
-          ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
-          : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+        toggle();
       } else {
         ib.hide();
         resolve(null);
       }
     });
-    ib.onDidHide(() => resolve(null));
+    ib.onDidHide(() => {
+      release();
+      resolve(null);
+    });
     ib.show();
   });
 }

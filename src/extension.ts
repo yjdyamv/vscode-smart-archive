@@ -41,6 +41,7 @@ import { applyHostConfig } from "./utils/config";
 import { disposeBurstLoggers } from "./providers/webview/router";
 import { resetArchiveRunner, reconfigureArchiveWorker } from "./engines/worker/runner";
 import { t } from "./i18n";
+import { togglePasswordVisible } from "./ui/prompts";
 import {
   CACHE_TEARDOWN_DELAY_MS,
   CACHE_VERSION_KEY,
@@ -142,6 +143,16 @@ export function activate(context: vscode.ExtensionContext): void {
       reconfigureArchiveWorker();
       if (e.affectsConfiguration("smart-archiver.backend.7z")) resetDetectionCache();
     }),
+  );
+
+  // Ctrl+H inside a quick input: QuickInput has no keyboard events, so the
+  // shortcut arrives as a command bound in package.json while a quick input is
+  // focused, and lands in the box that registered itself as the live password
+  // field. Outside a password box the command is a no-op.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("yjdyamv.smart-archiver.togglePasswordVisibility", () =>
+      togglePasswordVisible(),
+    ),
   );
 
   // Register compress command

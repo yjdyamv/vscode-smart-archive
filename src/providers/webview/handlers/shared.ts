@@ -22,6 +22,7 @@ import { JS7z } from "../../../engines/js7z-factory";
 import { disposeJS7z } from "../../../engines/js7z-lifecycle";
 import { streamToVFS } from "../../../engines/vfs-io";
 import { uniquePath } from "../helpers";
+import { registerPasswordToggle } from "../../../ui/prompts";
 
 export function pwInputBox(
   prompt: string,
@@ -33,11 +34,11 @@ export function pwInputBox(
     let accepted = false;
     const eyeBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye"),
-      tooltip: t("password.show"),
+      tooltip: t("password.showHint"),
     };
     const eyeOffBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("eye-closed"),
-      tooltip: t("password.hide"),
+      tooltip: t("password.hideHint"),
     };
     const clearBtn: vscode.QuickInputButton = {
       iconPath: new vscode.ThemeIcon("close"),
@@ -47,6 +48,14 @@ export function pwInputBox(
     ib.password = true;
     ib.ignoreFocusOut = true;
     ib.buttons = [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+    const toggle = (): void => {
+      shown = !shown;
+      ib.password = !shown;
+      ib.buttons = shown
+        ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
+        : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+    };
+    const release = registerPasswordToggle(toggle);
     if (validate) {
       ib.onDidChangeValue((v) => {
         ib.validationMessage = validate(v) ?? "";
@@ -63,17 +72,14 @@ export function pwInputBox(
       if (b === clearBtn) {
         ib.value = "";
       } else if (b === eyeBtn || b === eyeOffBtn) {
-        shown = !shown;
-        ib.password = !shown;
-        ib.buttons = shown
-          ? [eyeOffBtn, clearBtn, vscode.QuickInputButtons.Back]
-          : [eyeBtn, clearBtn, vscode.QuickInputButtons.Back];
+        toggle();
       } else {
         ib.hide();
         resolve(undefined);
       }
     });
     ib.onDidHide(() => {
+      release();
       // Only cancel when the box closed without an accept. The accept path
       // already resolved with the value (hide() may fire this event before
       // the rest of the accept handler runs — resolving here would silently
