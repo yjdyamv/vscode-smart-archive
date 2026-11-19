@@ -24,7 +24,7 @@
   "config.extractTo.enabled.description": "显示“Extract to…”命令（选择目标文件夹）。默认关闭——解压到任意文件夹可能把文件散落到各处。",
   "config.patterns.collapsedDirs.description": "在归档预览中默认保持折叠的目录名称模式。",
   "config.patterns.compressExclude.description": "压缩时排除的文件/目录 Glob 模式（gitignore 语法）。",
-  "config.volumes.sizes.description": "自定义分卷大小预设（标签 → 值）。值必须为正整数加单位（`k`/`m`/`g`），如 `\"650M\"`、`\"100m\"`。留空 `{}` 使用内置预设。",
+  "config.volumes.sizes.description": "分卷大小预设（标签 → 值）。留空则使用内置的 100M、700M、1G、2G、4700M；一旦填写就用你的尺寸整体替换，选项卡里不会再混入内置项。大小输入框本身始终可以直接填写（如 “1.1m”，会换算为精确字节数）。值为精确二进制大小：k = KiB、m = MiB、g = GiB。",
   "config.backend.7z.description": "压缩/解压使用的 7-Zip 引擎：默认内置原生 7-Zip ZS；可选系统安装版或 WASM。原生比 WASM 更快、更省内存。",
   "config.backend.7z.auto": "优先内置 7-Zip ZS；仅当系统版能力不低于内置时才用系统版；否则 WASM。",
   "config.backend.7z.native": "始终用系统 7-Zip（未安装或过旧则报错）。",

@@ -177,67 +177,22 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "選取轉換目標格式",
   },
   "compress.selectVolume": {
-    en: "Split into volumes? (optional)",
-    "zh-cn": "分卷压缩？(可选)",
-    "zh-tw": "分卷壓縮？(可選)",
+    en: "Volume size — type 100m, 1.5g, 700k…",
+    "zh-cn": "分卷大小 — 直接输入 100m、1.5g、700k…",
+    "zh-tw": "分卷大小 — 直接輸入 100m、1.5g、700k…",
+  },
+  "compress.volume.hint": {
+    en: "Volume size — type 100m, 1.5g, 700k… (Enter on “Don't split” keeps one file)",
+    "zh-cn": "分卷大小 — 直接输入 100m、1.5g、700k…（在“不分卷”上回车则打成单个文件）",
+    "zh-tw": "分卷大小 — 直接輸入 100m、1.5g、700k…（在“不分卷”上按 Enter 則打成單一檔案）",
   },
   "compress.volume.none": {
     en: "Don't split",
     "zh-cn": "不分卷",
     "zh-tw": "不分卷",
   },
-  "compress.volume.custom": {
-    en: "Custom...",
-    "zh-cn": "自定义...",
-    "zh-tw": "自訂...",
-  },
-  "compress.volume.prompt": {
-    en: "Volume size (number + k/m/g suffix, e.g. 100m, 1g, 650m)",
-    "zh-cn": "分卷大小 (数字 + k/m/g 后缀，如 100m, 1g, 650m)",
-    "zh-tw": "分卷大小 (數字 + k/m/g 後綴，如 100m, 1g, 650m)",
-  },
-  "compress.volume.invalid": {
-    en: "Invalid format. Use a number followed by k, m, or g (e.g. 100m, 1g)",
-    "zh-cn": "格式无效。请使用数字加 k/m/g 后缀 (如 100m, 1g)",
-    "zh-tw": "格式無效。請使用數字加 k/m/g 後綴 (如 100m, 1g)",
-  },
 
   // ---- Encrypt flow ----
-  "encrypt.title": {
-    en: "Encrypt archive with AES-256?",
-    "zh-cn": "是否使用 AES-256 加密？",
-    "zh-tw": "是否使用 AES-256 加密？",
-  },
-  "encrypt.no": {
-    en: "No encryption",
-    "zh-cn": "不加密",
-    "zh-tw": "不加密",
-  },
-  "encrypt.yes": {
-    en: "Encrypt with AES-256",
-    "zh-cn": "使用 AES-256 加密保护内容",
-    "zh-tw": "使用 AES-256 加密保護內容",
-  },
-  "encrypt.setPassword": {
-    en: "Set encryption password",
-    "zh-cn": "设置加密密码",
-    "zh-tw": "設定加密密碼",
-  },
-  "encrypt.noPassword": {
-    en: "No password entered. Skipping encryption.",
-    "zh-cn": "未输入密码，将跳过加密。",
-    "zh-tw": "未輸入密碼，將跳過加密。",
-  },
-  "encrypt.headersTitle": {
-    en: "Encrypt file names and structure (RAR5)?",
-    "zh-cn": "是否加密文件名和目录结构（RAR5）？",
-    "zh-tw": "是否加密檔名和目錄結構（RAR5）？",
-  },
-  "encrypt.headersYes": {
-    en: "Encrypt file names too",
-    "zh-cn": "同时加密文件名",
-    "zh-tw": "同時加密檔名",
-  },
   "recovery.title": {
     en: "Add a recovery record (repair damaged archives)?",
     "zh-cn": "添加恢复记录（可修复损坏的归档）？",
@@ -268,40 +223,15 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "每卷约 +{0}",
     "zh-tw": "每卷約 +{0}",
   },
-  "recovery.percentCustom": {
-    en: "Custom percentage...",
-    "zh-cn": "自定义百分比...",
-    "zh-tw": "自訂百分比...",
-  },
-  "recovery.percentCustomPrompt": {
-    en: "Recovery record size as a percent of the archive (1-100)",
-    "zh-cn": "恢复记录大小，占归档的百分比（1–100）",
-    "zh-tw": "恢復記錄大小，佔歸檔的百分比（1–100）",
-  },
-  "recovery.percentInvalid": {
-    en: "Enter a whole number between 1 and 100",
-    "zh-cn": "请输入 1 到 100 之间的整数",
-    "zh-tw": "請輸入 1 到 100 之間的整數",
-  },
   "recovery.volumesTitle": {
     en: "Recovery volumes (.rev) — about {0} data volumes, capped at the final count",
     "zh-cn": "恢复卷（.rev）— 预计约 {0} 个数据分卷，按最终分卷数封顶",
     "zh-tw": "恢復卷（.rev）— 預計約 {0} 個資料分卷，按最終分卷數封頂",
   },
-  "recovery.volumesPercent": {
-    en: "{0}% of volumes",
-    "zh-cn": "分卷数的 {0}%",
-    "zh-tw": "分卷數的 {0}%",
-  },
-  "recovery.volumesPercentPrompt": {
-    en: "Recovery volumes as a percent of the volume count (1-100)",
-    "zh-cn": "恢复卷数量，占分卷数的百分比（1–100）",
-    "zh-tw": "恢復卷數量，佔分卷數的百分比（1–100）",
-  },
-  "recovery.recommendedSuffix": {
-    en: "recommended",
-    "zh-cn": "推荐",
-    "zh-tw": "推薦",
+  "recovery.volumesCount": {
+    en: "{0} recovery volume(s)",
+    "zh-cn": "{0} 个修复卷",
+    "zh-tw": "{0} 個修復卷",
   },
   "recovery.volumesRepairs": {
     en: "repairs up to {0} lost volume(s)",
@@ -313,20 +243,15 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "约增加 {0}",
     "zh-tw": "約增加 {0}",
   },
-  "recovery.volumesCustom": {
-    en: "Custom count...",
-    "zh-cn": "自定义个数...",
-    "zh-tw": "自訂個數...",
+  "recovery.volumesUseCount": {
+    en: "Use {0} recovery volume(s)",
+    "zh-cn": "使用 {0} 个修复卷",
+    "zh-tw": "使用 {0} 個修復卷",
   },
-  "recovery.volumesCustomPrompt": {
-    en: "Recovery volume count — up to {0} (capped automatically)",
-    "zh-cn": "恢复卷个数——最多 {0} 个（超出自动取分卷数）",
-    "zh-tw": "恢復卷個數——最多 {0} 個（超出自動取分卷數）",
-  },
-  "recovery.volumesInvalid": {
-    en: "Enter a whole number between 1 and 1000",
-    "zh-cn": "请输入 1 到 1000 之间的整数",
-    "zh-tw": "請輸入 1 到 1000 之間的整數",
+  "recovery.volumesUseCountCapped": {
+    en: "Use {0} recovery volume(s) — capped at the {1} data volume(s)",
+    "zh-cn": "使用 {0} 个修复卷 — 已按 {1} 个数据分卷封顶",
+    "zh-tw": "使用 {0} 個修復卷 — 已按 {1} 個資料分卷封頂",
   },
   "repair.title": {
     en: "Repair archive",
@@ -696,14 +621,39 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-tw": "解密密碼（未加密請留空）",
   },
   "password.encryptHint": {
-    en: "Set encryption password",
-    "zh-cn": "设置加密密码",
-    "zh-tw": "設定加密密碼",
+    en: "Password (leave blank for no encryption)",
+    "zh-cn": "密码（留空则不加密）",
+    "zh-tw": "密碼（留空則不加密）",
   },
   "password.prompt": {
-    en: "Enter AES-256 encryption/decryption password (leave blank to skip)",
-    "zh-cn": "输入 AES-256 加密/解密密码（留空跳过）",
-    "zh-tw": "輸入 AES-256 加密/解密密碼（留空跳過）",
+    en: "Enter the password (leave blank if not encrypted)",
+    "zh-cn": "输入密码（未加密则留空）",
+    "zh-tw": "輸入密碼（未加密則留空）",
+  },
+  "password.setPrompt": {
+    en: "Enter a password — or leave blank to skip encryption",
+    "zh-cn": "输入密码（留空则不加密）",
+    "zh-tw": "輸入密碼（留空則不加密）",
+  },
+  "password.confirmPrompt": {
+    en: "Re-enter the password (a typo here cannot be undone)",
+    "zh-cn": "再次输入密码（输错将无法解开归档）",
+    "zh-tw": "再次輸入密碼（輸錯將無法解開歸檔）",
+  },
+  "password.confirmHint": {
+    en: "Same password again",
+    "zh-cn": "再次输入同一密码",
+    "zh-tw": "再次輸入同一密碼",
+  },
+  "password.empty": {
+    en: "Password cannot be empty — type it again (Esc cancels)",
+    "zh-cn": "密码不能为空 — 请重新输入（按 Esc 取消）",
+    "zh-tw": "密碼不能為空 — 請重新輸入（按 Esc 取消）",
+  },
+  "password.mismatch": {
+    en: "Passwords don't match — please enter them again",
+    "zh-cn": "两次输入的密码不一致，请重新输入",
+    "zh-tw": "兩次輸入的密碼不一致，請重新輸入",
   },
   "password.wrongPassword": {
     en: "Wrong password",
@@ -890,6 +840,41 @@ const messages: Record<string, Record<Locale, string>> = {
     en: "Step 4: Encryption",
     "zh-cn": "第 4 步：加密",
     "zh-tw": "第 4 步：加密",
+  },
+  "wizard.inputInvalid": {
+    en: "“{0}” is not a value here — type one, or pick a row",
+    "zh-cn": "“{0}” 不是有效取值 — 请重新输入，或从列表中选择",
+    "zh-tw": "“{0}” 不是有效取值 — 請重新輸入，或從清單中選擇",
+  },
+  "wizard.inputUseLevel": {
+    en: "Use level {0}",
+    "zh-cn": "使用级别 {0}",
+    "zh-tw": "使用等級 {0}",
+  },
+  "wizard.inputInvalidLevel": {
+    en: "“{0}” is not a level — type 0 (store) through 9 (ultra)",
+    "zh-cn": "“{0}” 不是有效级别 — 请输入 0（仅存储）至 9（极限压缩）",
+    "zh-tw": "“{0}” 不是有效等級 — 請輸入 0（僅儲存）至 9（極限壓縮）",
+  },
+  "wizard.inputUseSize": {
+    en: "Use {0} ({1}) per volume",
+    "zh-cn": "每卷使用 {0}（{1}）",
+    "zh-tw": "每卷使用 {0}（{1}）",
+  },
+  "wizard.inputInvalidSize": {
+    en: "“{0}” is not a size — put the unit right after the number: 100m, 1.5g, 700k",
+    "zh-cn": "“{0}” 不是有效大小 — 请在数字后直接写单位：100m、1.5g、700k",
+    "zh-tw": "“{0}” 不是有效大小 — 請在數字後直接寫單位：100m、1.5g、700k",
+  },
+  "wizard.inputInvalidPercent": {
+    en: "“{0}” is not a percentage — type a whole number from 1 to 100",
+    "zh-cn": "“{0}” 不是有效百分比 — 请输入 1 至 100 的整数",
+    "zh-tw": "“{0}” 不是有效百分比 — 請輸入 1 至 100 的整數",
+  },
+  "wizard.inputInvalidRevCount": {
+    en: "“{0}” is not a recovery-volume count — type a whole number from 1 to {1}",
+    "zh-cn": "“{0}” 不是有效修复卷数量 — 请输入 1 至 {1} 的整数",
+    "zh-tw": "“{0}” 不是有效修復卷數量 — 請輸入 1 至 {1} 的整數",
   },
 
   // ---- Archive operations ----

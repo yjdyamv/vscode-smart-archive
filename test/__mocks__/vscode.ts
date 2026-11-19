@@ -135,6 +135,11 @@ class FakeQuickPick {
 
   // ── Test driver ──
 
+  /** Simulate typing into the picker's filter field (fires onDidChangeValue). */
+  type(text: string): void {
+    this.value = text;
+    this.fire("value", text);
+  }
   accept(item?: { label: string; value?: unknown }): void {
     if (item) this.selectedItems = [item];
     this.fire("selection", undefined);

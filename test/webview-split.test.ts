@@ -13,6 +13,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { HandlerState } from "../src/providers/webview/state";
 import { handleSplit } from "../src/providers/webview/handlers/split";
+import { __quickPicks } from "./__mocks__/vscode";
 import { compressWithRar5 } from "../src/engines/rar5-engine";
 import { verifyArchivePassword } from "../src/providers/webview/handlers/shared";
 import { gate } from "./gates";
@@ -58,15 +59,25 @@ describe("webview split handler", () => {
         cancelSource: null,
       };
 
-      // 1. volume size, 2. recovery volume count
+      // 1. volume size (free-text picker), 2. recovery volume count (QuickPick)
       const qpSpy = vi
         .spyOn(vscode.window, "showQuickPick")
-        .mockResolvedValueOnce({ label: "32k", value: "32k" } as never)
         .mockResolvedValueOnce({ label: "2", value: 2 } as never);
 
-      await handleSplit({ webview, state, msg: { c: "split" } });
+      const run = handleSplit({ webview, state, msg: { c: "split" } });
+      // Volume size is typed into the picker itself — no "Custom…" row.
+      await vi.waitFor(() => expect(__quickPicks().length).toBe(1));
+      const volQp = __quickPicks()[0] as unknown as {
+        type: (text: string) => void;
+        accept: (item?: { label: string; value?: unknown }) => void;
+      };
+      volQp.type("32k");
+      volQp.accept();
+      await run;
 
-      expect(qpSpy).toHaveBeenCalledTimes(2);
+      expect(qpSpy, "only the .rev count still asks through showQuickPick").toHaveBeenCalledTimes(
+        1,
+      );
       const outDir = path.join(td, "src");
       const vols = fs.readdirSync(outDir).filter((n) => /\.part\d+\.rar$/i.test(n));
       const revs = fs.readdirSync(outDir).filter((n) => /\.part\d+\.rev$/i.test(n));

@@ -24,7 +24,7 @@
   "config.extractTo.enabled.description": "Show the 'Extract to…' command (pick a destination folder). Off by default — extracting into an arbitrary folder can scatter files.",
   "config.patterns.collapsedDirs.description": "Directory name patterns kept collapsed by default in the archive preview.",
   "config.patterns.compressExclude.description": "Glob patterns (gitignore syntax) excluded when compressing.",
-  "config.volumes.sizes.description": "Custom split-volume size presets (label → value). Values: positive integer + unit (`k`/`m`/`g`), e.g. `\"650M\"`, `\"100m\"`. Empty `{}` uses the built-in presets.",
+  "config.volumes.sizes.description": "Split-volume size presets (label → value). Leave empty to use the built-in ladder (100M, 700M, 1G, 2G, 4700M); anything you put here replaces it, so the picker shows your sizes and nothing else. The size field always accepts a typed size too (e.g. `\"1.1m\"`, converted to exact bytes). Values are exact binary sizes: `k` = KiB, `m` = MiB, `g` = GiB.",
   "config.backend.7z.description": "7-Zip engine for compress/decompress: bundled native 7-Zip ZS by default; system install or WASM selectable. Native is faster and uses less memory than WASM.",
   "config.backend.7z.auto": "Bundled 7-Zip ZS; system 7-Zip only when at least as capable; otherwise WASM.",
   "config.backend.7z.native": "Always system 7-Zip (error if missing or too old).",

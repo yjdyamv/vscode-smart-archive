@@ -2,7 +2,7 @@
  * Compress command handler — Smart Archiver VSCode Extension
  *
  * Orchestrates the compression workflow:
- *   format → level → volume → encrypt → password → save → execute
+ *   format → level → volume → password → save → execute
  *
  * Each prompt step (except Save) shows a Back button so the user can
  * navigate to the previous step and correct a wrong selection.
@@ -23,7 +23,13 @@ import {
 import { resolveSaveName } from "../utils/path";
 import { getVolumeSizes } from "../utils/volume-sizes";
 import { parseSize } from "../utils/security";
-import { promptSavePath } from "../ui/prompts";
+import {
+  normalizeNumericInput,
+  parseVolumeSizeInput,
+  promptSavePath,
+  promptValuePick,
+} from "../ui/prompts";
+import type { StepResult, ValuePickRow } from "../ui/prompts";
 import type { CompressOptions, FormatInfo } from "../types";
 import { normalizeSevenZipMethod } from "../utils/sevenZipMethod";
 import { t, compressLevels, formatDuration, formatCompactSize } from "../i18n";
@@ -32,8 +38,6 @@ import { isCancellationError } from "../utils/cancellation";
 import { StageProgress, type ProgressStage, type StageDuration } from "../ui/stage-progress";
 
 // ── Shared helpers for back-navigable QuickPick / InputBox ──
-
-type StepResult<T> = { kind: "ok"; value: T } | { kind: "back" } | { kind: "cancel" };
 
 function formatStageSummary(durations: StageDuration[]): string {
   if (durations.length < 2) return "";
@@ -98,6 +102,9 @@ function promptInputBox(opts: {
   prompt: string;
   placeholder: string;
   password?: boolean;
+  /** Show the eye toggle. Off for the confirmation box: seeing it lets you copy
+   *  a typo instead of catching it, which is the whole point of asking twice. */
+  reveal?: boolean;
   value?: string;
   validate?: (v: string) => string | undefined;
 }): Promise<StepResult<string>> {
@@ -118,12 +125,13 @@ function promptInputBox(opts: {
       tooltip: t("input.clear"),
     };
     const isPw = !!opts.password;
+    const withEye = isPw && opts.reveal !== false;
     ib.prompt = opts.prompt;
     ib.placeholder = opts.placeholder;
     ib.value = opts.value ?? "";
     ib.password = isPw;
     ib.ignoreFocusOut = true;
-    ib.buttons = isPw
+    ib.buttons = withEye
       ? [eyeBtn, clearBtn, vscode.QuickInputButtons.Back]
       : [clearBtn, vscode.QuickInputButtons.Back];
     if (opts.validate) {
@@ -139,7 +147,7 @@ function promptInputBox(opts: {
     ib.onDidTriggerButton((b) => {
       if (b === clearBtn) {
         ib.value = "";
-      } else if (isPw && (b === eyeBtn || b === eyeOffBtn)) {
+      } else if (withEye && (b === eyeBtn || b === eyeOffBtn)) {
         shown = !shown;
         ib.password = !shown;
         ib.buttons = shown
@@ -194,72 +202,88 @@ async function promptLevelWizard(): Promise<StepResult<number>> {
   const defaultIdx = LEVEL_VALUES.indexOf(defaultLevel);
   const order = LEVEL_VALUES.map((_, i) => i);
   if (defaultIdx >= 0) {
+    // Default first, so an empty Enter is "take the default".
     order.splice(defaultIdx, 1);
     order.unshift(defaultIdx);
   }
-  const items = order.map((i) => ({ label: labels[i], level: LEVEL_VALUES[i] }));
-  const res = await promptQuickPick(items, {
+  return promptValuePick<number>({
+    items: order.map((i) => ({ label: labels[i], value: LEVEL_VALUES[i] })),
     placeHolder: t("compress.selectLevel"),
     title: t("wizard.step.level"),
+    // Any level 0-9, not only the six presets: 2/4/6/8 are otherwise
+    // unreachable, and they are exactly what "a bit faster than Normal" means.
+    parse: (raw) => {
+      const s = normalizeNumericInput(raw);
+      if (!/^\d{1,2}$/.test(s)) return undefined;
+      const n = Number(s);
+      return n <= 9 ? n : undefined;
+    },
+    describe: (v) => t("wizard.inputUseLevel", String(v)),
+    invalid: (raw) => t("wizard.inputInvalidLevel", raw),
   });
-  if (res.kind !== "ok") return res;
-  const idx = labels.indexOf(res.value.label);
-  return { kind: "ok", value: idx >= 0 ? LEVEL_VALUES[idx] : defaultLevel };
 }
 
 async function promptVolumeWizard(): Promise<StepResult<string | undefined>> {
-  const items: { label: string; value: string | undefined; description?: string }[] = [
-    { label: t("compress.volume.none"), value: undefined },
-    ...getVolumeSizes().map((v) => ({
-      label: v.label,
-      value: v.value,
-      description: v.description,
-    })),
-    { label: t("compress.volume.custom"), value: "__custom__" },
-  ];
-  const res = await promptQuickPick(items, {
-    placeHolder: t("compress.selectVolume"),
-    title: t("wizard.step.volume"),
-  });
-  if (res.kind !== "ok") return res;
-  if (res.value.value === "__custom__") {
-    const ibRes = await promptInputBox({
-      prompt: t("compress.volume.prompt"),
-      placeholder: "100m",
-      validate: (v) => {
-        const trimmed = v.trim();
-        if (!/^\d+[kmg]?$/i.test(trimmed)) return t("compress.volume.invalid");
-        const num = parseInt(trimmed, 10);
-        if (num <= 0) return t("compress.volume.invalid");
-        return undefined;
-      },
-    });
-    if (ibRes.kind !== "ok") return ibRes;
-    return { kind: "ok", value: ibRes.value };
-  }
-  return { kind: "ok", value: res.value.value };
-}
-
-async function promptEncryptWizard(): Promise<StepResult<boolean>> {
-  const res = await promptQuickPick(
-    [
-      { label: t("encrypt.no"), value: false },
-      { label: t("encrypt.yes"), value: true },
+  // "" is this step's spelling of "don't split": the picker's first row. Keeping
+  // the value type `string` means the typed-value row never has to explain an
+  // undefined, and the wizard state below maps "" back to "no volumes".
+  const res = await promptValuePick<string>({
+    items: [
+      // First row = empty Enter = don't split.
+      { label: t("compress.volume.none"), value: "" },
+      ...getVolumeSizes().map((v) => ({
+        label: v.label,
+        value: v.value,
+        description: v.description,
+      })),
     ],
-    { placeHolder: t("encrypt.title"), title: t("wizard.step.encrypt") },
-  );
-  if (res.kind !== "ok") return res;
-  return { kind: "ok", value: res.value.value };
-}
-
-async function promptPasswordWizard(): Promise<StepResult<string>> {
-  const res = await promptInputBox({
-    prompt: t("password.prompt"),
-    placeholder: t("password.encryptHint"),
-    password: true,
+    placeHolder: t("compress.volume.hint"),
+    title: t("wizard.step.volume"),
+    parse: parseVolumeSizeInput,
+    // Show the size the typed value actually resolves to, so "1.1m" and
+    // "1.5 GB" are confirmed in the unit the archiver uses.
+    describe: (v) => t("wizard.inputUseSize", v, formatCompactSize(parseSize(v, 0))),
+    invalid: (raw) => t("wizard.inputInvalidSize", raw),
   });
   if (res.kind !== "ok") return res;
-  return { kind: "ok", value: res.value };
+  return { kind: "ok", value: res.value === "" ? undefined : res.value };
+}
+
+/**
+ * The encryption step is the password box itself — there is no yes/no question
+ * in front of it. Typing a password encrypts, leaving it empty (a bare Enter)
+ * skips encryption, so the ordinary "I don't want encryption" path is one
+ * keystroke and never a menu.
+ *
+ * A non-empty password is asked twice: one box is a trap, because a single
+ * typo produces an archive nobody can open and nothing in the flow ever shows
+ * what was typed. A mismatch goes back to the first box instead of failing
+ * the step.
+ */
+async function promptPasswordWizard(): Promise<StepResult<string>> {
+  for (;;) {
+    const first = await promptInputBox({
+      prompt: t("password.setPrompt"),
+      placeholder: t("password.encryptHint"),
+      password: true,
+    });
+    if (first.kind !== "ok") return first;
+    // Blank = no encryption. Return early so nobody is asked to confirm it.
+    if (first.value.length === 0) return { kind: "ok", value: "" };
+    const again = await promptInputBox({
+      prompt: t("password.confirmPrompt"),
+      placeholder: t("password.confirmHint"),
+      password: true,
+      reveal: false,
+      validate: (v) => (v.length > 0 ? undefined : t("password.empty")),
+    });
+    // Back from the confirmation re-opens the first box: the typo may be in
+    // either one, so neither is assumed correct.
+    if (again.kind === "back") continue;
+    if (again.kind !== "ok") return again;
+    if (again.value === first.value) return { kind: "ok", value: first.value };
+    vscode.window.showWarningMessage(t("password.mismatch"));
+  }
 }
 
 async function promptSaveNameWizard(defaultName: string, ext: string): Promise<StepResult<string>> {
@@ -303,18 +327,6 @@ function estimateVolumeCount(targets: readonly { fsPath: string }[], volumeSize:
   const size = parseSize(volumeSize, 0);
   if (size <= 0) return 1;
   return Math.max(1, Math.ceil(total / size));
-}
-
-/**
- * Number of `.rev` files for `volumes` data volumes at `percent` (1-100),
- * mirroring rar-rs's `plan_recovery_volume_count`:
- * `max(1, ceil(percent * volumes / 100))`, capped at the volume count.
- * (Must stay in sync with the encoder, which applies the same formula to the
- * actual volume count when given a percent.)
- */
-function planRecoveryVolumeCount(volumes: number, percent: number): number {
-  const pct = Math.min(percent, 100);
-  return Math.min(volumes, Math.max(1, Math.ceil((pct * volumes) / 100)));
 }
 
 export async function compressCommand(
@@ -375,9 +387,8 @@ export async function compressCommand(
   let encryptHeaders = false;
   let recoveryPercent = 0;
   let recoveryVolumeCount = 0;
-  let recoveryVolumesPercent = 0;
 
-  let step = 1; // 1=format, 2=level, 3=volume, 4=encrypt, 5=password, 56=recovery record, 57=recovery volumes, 6=save
+  let step = 1; // 1=format, 2=level, 3=volume, 4=password, 56=recovery record, 57=recovery volumes, 6=save
 
   while (true) {
     switch (step) {
@@ -424,14 +435,14 @@ export async function compressCommand(
         continue;
       }
 
-      // ── 4. Encryption (if format supports it) ──
+      // ── 4. Password (this *is* the encryption step) ──
       case 4: {
         if (!format!.supportsEncryption) {
           // RAR still supports a recovery record without encryption.
           step = format!.label === "rar" ? 56 : 6;
           continue;
         }
-        const r = await promptEncryptWizard();
+        const r = await promptPasswordWizard();
         if (r.kind !== "ok") {
           if (r.kind === "back") {
             step = ["7z", "zip", "rar"].includes(format!.label) ? 3 : 2;
@@ -439,32 +450,11 @@ export async function compressCommand(
           }
           return;
         }
-        doEncrypt = r.value;
-        if (doEncrypt) {
-          // RAR header encryption is forced: hiding contents while leaving
-          // the file names visible defeats the purpose.
-          encryptHeaders = true;
-          step = 5;
-        } else {
-          step = format!.label === "rar" ? 56 : 6;
-        }
-        continue;
-      }
-
-      // ── 5. Password ──
-      case 5: {
-        const r = await promptPasswordWizard();
-        if (r.kind !== "ok") {
-          if (r.kind === "back") {
-            step = 4;
-            continue;
-          }
-          return;
-        }
         password = r.value;
-        if (!password) {
-          vscode.window.showWarningMessage(t("encrypt.noPassword"));
-        }
+        doEncrypt = password.length > 0;
+        // RAR header encryption is forced: hiding contents while leaving
+        // the file names visible defeats the purpose.
+        encryptHeaders = doEncrypt;
         step = format!.label === "rar" ? 56 : 6;
         continue;
       }
@@ -487,41 +477,29 @@ export async function compressCommand(
             ? t("recovery.percentCost", formatCompactSize((perVolumeSize * p) / 100))
             : undefined,
         });
-        const items: { label: string; value: number; description?: string }[] = [
-          { label: t("recovery.none"), value: 0 },
-          ...[1, 3, 5, 10, 20].map(percentItem),
-          { label: t("recovery.percentCustom"), value: -1 },
-        ];
-        const res = await promptQuickPick(items, { placeHolder: title, title });
+        const items = [{ label: t("recovery.none"), value: 0 }, ...[1, 3, 5, 10].map(percentItem)];
+        // "7" and "7%" both mean 7; 0 means no record, like the first row.
+        const res = await promptValuePick<number>({
+          items,
+          placeHolder: title,
+          title,
+          parse: (raw) => {
+            const s = normalizeNumericInput(raw);
+            if (!/^\d{1,3}%?$/.test(s)) return undefined;
+            const n = Number(s.replace("%", ""));
+            return n <= 100 ? n : undefined;
+          },
+          describe: (p) => percentItem(p).label,
+          invalid: (raw) => t("wizard.inputInvalidPercent", raw),
+        });
         if (res.kind !== "ok") {
           if (res.kind === "back") {
-            step = password ? 5 : 4;
+            step = 4;
             continue;
           }
           return;
         }
-        if (res.value.value === -1) {
-          const ibRes = await promptInputBox({
-            prompt: t("recovery.percentCustomPrompt"),
-            placeholder: "3",
-            validate: (v) => {
-              const num = parseInt(v.trim(), 10);
-              if (!/^\d+$/.test(v.trim()) || num < 1 || num > 100) {
-                return t("recovery.percentInvalid");
-              }
-              return undefined;
-            },
-          });
-          if (ibRes.kind !== "ok") {
-            if (ibRes.kind === "back") {
-              continue; // re-ask the percent list
-            }
-            return;
-          }
-          recoveryPercent = parseInt(ibRes.value, 10);
-        } else {
-          recoveryPercent = res.value.value;
-        }
+        recoveryPercent = res.value;
         step = volumeSize ? 57 : 6;
         continue;
       }
@@ -532,43 +510,46 @@ export async function compressCommand(
           step = 6;
           continue;
         }
-        // .rev recovery volumes. Offered as a percent of the data-volume count
-        // (WinRAR -rv<N%>, the same ceil formula rar-rs uses), so the list is a
-        // fixed ladder and never enumerates 1..N; the encoder applies the
-        // percent to the actual volume count. An exact count can also be typed,
-        // like WinRAR's -rv<N>.
+        // .rev volumes: an exact count, like WinRAR -rv<N>. Percent-based
+        // sizing (-rv<N%>) is gone — a count is what people reason about
+        // ("one spare volume"), and it does not silently rescale when the
+        // input compresses better or worse than estimated.
+        //
+        // The ceiling is the data-volume count, not a round number: a .rev set
+        // bigger than the volumes it protects cannot be used for anything, and
+        // a typed 1000 next to 3 data volumes is a typo, not a plan.
         const estimatedVolumes = estimateVolumeCount(targets, volumeSize);
-        const recommended = planRecoveryVolumeCount(estimatedVolumes, 5);
         const perVolumeSize = parseSize(volumeSize, 0);
-        const percentItem = (p: number) => {
-          const n = planRecoveryVolumeCount(estimatedVolumes, p);
-          return {
-            label:
-              p === 5
-                ? `${t("recovery.volumesPercent", String(p))} (${t("recovery.recommendedSuffix")})`
-                : t("recovery.volumesPercent", String(p)),
-            value: p,
-            mode: "percent" as const,
-            description: [
-              t("recovery.volumesRepairs", String(n)),
-              t("recovery.volumesCost", formatCompactSize(perVolumeSize * n)),
-            ].join(" · "),
-          };
-        };
-        const items: {
-          label: string;
-          value: number;
-          mode: "none" | "percent" | "customPercent" | "customCount";
-          description?: string;
-        }[] = [
-          { label: t("recovery.none"), value: 0, mode: "none" },
-          ...[1, 3, 5, 10].map(percentItem),
-          { label: t("recovery.percentCustom"), value: 0, mode: "customPercent" },
-          { label: t("recovery.volumesCustom"), value: 0, mode: "customCount" },
+        const maxCount = Math.max(1, estimatedVolumes);
+        const countItem = (n: number): ValuePickRow<number> => ({
+          label: t("recovery.volumesCount", String(n)),
+          value: n,
+          description: [
+            t("recovery.volumesRepairs", String(n)),
+            t("recovery.volumesCost", formatCompactSize(perVolumeSize * n)),
+          ].join(" · "),
+        });
+        const items: ValuePickRow<number>[] = [
+          { label: t("recovery.none"), value: 0 },
+          ...[1, 2, 3, 5, 10].filter((n) => n <= maxCount).map(countItem),
         ];
-        const res = await promptQuickPick(items, {
+        const res = await promptValuePick<number>({
+          items,
           placeHolder: t("recovery.volumesTitle", String(estimatedVolumes)),
           title: t("recovery.volumesTitle", String(estimatedVolumes)),
+          parse: (raw) => {
+            const s = normalizeNumericInput(raw);
+            if (!/^\d+$/.test(s)) return undefined;
+            const n = Number(s);
+            return n === 0 ? 0 : Math.min(n, maxCount);
+          },
+          describe: (n, raw) =>
+            n === 0
+              ? t("recovery.none")
+              : Number(normalizeNumericInput(raw)) > n
+                ? t("recovery.volumesUseCountCapped", String(n), String(maxCount))
+                : t("recovery.volumesUseCount", String(n)),
+          invalid: (raw) => t("wizard.inputInvalidRevCount", raw, String(maxCount)),
         });
         if (res.kind !== "ok") {
           if (res.kind === "back") {
@@ -577,39 +558,7 @@ export async function compressCommand(
           }
           return;
         }
-        const picked = res.value;
-        if (picked.mode === "customPercent" || picked.mode === "customCount") {
-          const isPercent = picked.mode === "customPercent";
-          const ibRes = await promptInputBox({
-            prompt: isPercent
-              ? t("recovery.volumesPercentPrompt")
-              : t("recovery.volumesCustomPrompt", String(estimatedVolumes)),
-            placeholder: isPercent ? "5" : String(recommended),
-            validate: (v) => {
-              const num = parseInt(v.trim(), 10);
-              const max = isPercent ? 100 : 1000;
-              if (!/^\d+$/.test(v.trim()) || num < 1 || num > max) {
-                return isPercent ? t("recovery.percentInvalid") : t("recovery.volumesInvalid");
-              }
-              return undefined;
-            },
-          });
-          if (ibRes.kind !== "ok") {
-            if (ibRes.kind === "back") {
-              continue; // re-ask the list
-            }
-            return;
-          }
-          const value = parseInt(ibRes.value, 10);
-          recoveryVolumesPercent = isPercent ? value : 0;
-          recoveryVolumeCount = isPercent ? 0 : value;
-        } else if (picked.mode === "percent") {
-          recoveryVolumesPercent = picked.value;
-          recoveryVolumeCount = 0;
-        } else {
-          recoveryVolumesPercent = 0;
-          recoveryVolumeCount = 0;
-        }
+        recoveryVolumeCount = res.value;
         step = 6;
         continue;
       }
@@ -631,11 +580,9 @@ export async function compressCommand(
                   ? volumeSize
                     ? 57
                     : 56
-                  : doEncrypt
-                    ? 5
-                    : format!.supportsEncryption
-                      ? 4
-                      : 3;
+                  : format!.supportsEncryption
+                    ? 4
+                    : 3;
               continue;
             }
             return;
@@ -690,7 +637,6 @@ export async function compressCommand(
           encryptHeaders,
           recoveryPercent,
           recoveryVolumeCount,
-          recoveryVolumesPercent,
           sevenZipMethod: normalizeSevenZipMethod(
             vscode.workspace
               .getConfiguration("smart-archiver")

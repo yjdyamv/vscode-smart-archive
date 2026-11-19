@@ -452,7 +452,9 @@ export async function compressWithRar5(
     volumes: Boolean(options.volumeSize),
   });
 
-  const volumeSize = options.volumeSize ? parseSize(options.volumeSize, 0) : undefined;
+  // rar-rs takes a byte count, and a typed fractional size ("1.1m") parses to
+  // a fractional number — floor it, the binding takes an integer.
+  const volumeSize = options.volumeSize ? Math.floor(parseSize(options.volumeSize, 0)) : undefined;
 
   const controller = new AbortController();
   let disposable: { dispose(): void } | undefined;

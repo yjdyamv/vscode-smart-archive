@@ -8,45 +8,55 @@
  * @module utils/volume-sizes-core
  */
 
-/** Built-in volume size presets */
+/**
+ * Built-in volume size presets — a short ladder, not a catalogue.
+ *
+ * These live here rather than in package.json's settings default on purpose: a
+ * non-empty object default gets merged with the user's own keys in the settings
+ * editor, so the list would read `100M … 4700M` followed by the user's sizes.
+ * Keeping the default empty means the setting only ever shows what you wrote.
+ *
+ * Sizes are binary — `m` is MiB, `g` is GiB — which is what 7z's `-v` and the
+ * RAR binding both mean, so a label is the value and what you pick is exactly
+ * what lands on disk.
+ */
 export const VOLUME_SIZES = [
-  { label: "1.44M", value: "1440k" },
-  { label: "10M", value: "10m" },
-  { label: "25M", value: "25m" },
-  { label: "50M", value: "50m" },
   { label: "100M", value: "100m" },
-  { label: "200M", value: "200m" },
-  { label: "650M", value: "650m" },
   { label: "700M", value: "700m" },
   { label: "1G", value: "1g" },
   { label: "2G", value: "2g" },
-  { label: "4.7G", value: "4700m" },
+  { label: "4700M", value: "4700m" },
 ];
 
 /**
- * Convert a volume size from decimal-advertised units to safe binary units
- * for use with 7z `-v`. Storage media (CD-R, DVD-R, HDD) use 1 MB = 1,000,000
- * bytes while 7z uses 1 m = 1 MiB = 1,048,576 bytes.  Rounds down (floor) so
- * the archive always fits inside the advertised media capacity.
+ * Normalize a volume size into the form 7z's `-v` accepts.
  *
- * - `"1440k"` → `"1440k"` (k is identical in both systems)
- * - `"650m"`  → `"619m"`  (650 MB decimal ≈ 619 MiB binary)
- * - `"1g"`    → `"953m"`  (1 GB decimal ≈ 953 MiB binary, not an integer GiB)
+ * 7z takes an integer plus one of `b`/`k`/`m`/`g`, so a fractional size ("1.1m",
+ * typed into the wizard) cannot stay in `m`: it goes out as exact binary bytes
+ * ("1153433b"). Passing `-v1.1m` through makes 7z reject the whole command and
+ * write nothing at all.
+ *
+ * Sizes are binary throughout — `m` is MiB, `g` is GiB — which is what 7z's `-v`
+ * and the RAR binding both mean, so what the user types is what lands on disk.
+ *
+ * - `"1440k"` → `"1440k"` (already a whole number)
+ * - `"700m"`  → `"700m"`  (integer sizes are literal: m is MiB)
+ * - `"1.1m"`  → `"1153433b"` (fractional → exact bytes)
  */
 export function toBinaryVolumeSize(value: string): string {
-  const m = value.match(/^(\d+)(k|m|g)$/i);
+  const m = value.match(/^(\d+(?:\.\d+)?)(k|m|g)$/i);
   if (!m) return value;
-  if (m[2].toLowerCase() === "k") return value;
-  const num = parseInt(m[1], 10);
-  const decimalBytes = m[2].toLowerCase() === "g" ? num * 1_000_000_000 : num * 1_000_000;
-  const binaryMib = Math.floor(decimalBytes / 1_048_576);
-  return binaryMib > 0 ? `${binaryMib}m` : value;
+  const num = parseFloat(m[1]);
+  if (!Number.isFinite(num) || num <= 0) return value;
+  if (Number.isInteger(num)) return value;
+  const mult =
+    m[2].toLowerCase() === "g" ? 1_073_741_824 : m[2].toLowerCase() === "m" ? 1_048_576 : 1024;
+  return `${Math.floor(num * mult)}b`;
 }
 
-export function describeVolume(label: string, value: string): string | undefined {
+export function describeVolume(_label: string, value: string): string | undefined {
   const actual = toBinaryVolumeSize(value);
-  if (actual === value) return undefined;
-  return `actual: ${actual}`;
+  return actual === value ? undefined : `actual: ${actual}`;
 }
 
 export type VolumeSizeItem = { label: string; value: string; description?: string };

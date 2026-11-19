@@ -15,6 +15,7 @@ import * as childProcess from "child_process";
 import * as vscode from "vscode";
 import {
   __quickPicks,
+  __inputBoxes,
   __setSaveDialogResult,
   __setOpenDialogResult,
   __setConfig,
@@ -38,6 +39,13 @@ function qp(nth: number): Qp {
   const pick = __quickPicks()[nth - 1] as unknown as Qp;
   expect(pick, `quick pick #${nth} not created`).toBeTruthy();
   return pick;
+}
+
+/** Answer an input box (the password/save-name prompts). */
+function acceptInputBox(nth: number, value: string): void {
+  const box = __inputBoxes()[nth - 1] as unknown as { accept: (v?: string) => void };
+  expect(box, `input box #${nth} not created`).toBeTruthy();
+  box.accept(value);
 }
 
 async function pickItem(p: Qp, item: { label: string; value?: unknown }): Promise<void> {
@@ -76,11 +84,9 @@ describe("compress command (real engine)", () => {
     await pickItem(qp(2), qp(2).items[0]); // level — default
     await vi.waitFor(() => expect(__quickPicks().length).toBe(3));
     await pickItem(qp(3), qp(3).items[0]); // volume — don't split
-    await vi.waitFor(() => expect(__quickPicks().length).toBe(4));
-    await pickItem(
-      qp(4),
-      qp(4).items.find((i) => i.value === false)!,
-    ); // encryption — no
+    // step 4 is the password box itself — a blank Enter means no encryption
+    await vi.waitFor(() => expect(__inputBoxes().length).toBe(1));
+    acceptInputBox(1, "");
 
     await p;
     expect(fs.existsSync(outArchive)).toBe(true);

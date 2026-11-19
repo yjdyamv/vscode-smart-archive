@@ -15,26 +15,22 @@ export { VOLUME_SIZES, toBinaryVolumeSize, describeVolume };
 export type { VolumeSizeItem };
 
 /**
- * Returns the user-configured volume size presets, falling back to the
- * built-in VOLUME_SIZES when no explicit user config is set.
+ * Returns the volume size presets shown in the pickers: your own map if you set
+ * one, otherwise the built-in ladder.
  *
- * Uses `inspect` so we only return values the user explicitly wrote,
- * avoiding unwanted merging with the package.json default.
+ * Replacing rather than merging is deliberate — two tables stitched together
+ * (built-ins then yours) is exactly the list nobody can read.
  */
 export function getVolumeSizes(): VolumeSizeItem[] {
   const config = vscode.workspace.getConfiguration("smart-archiver");
-  const inspected = config.inspect<Record<string, string>>("volumes.sizes");
-  const userValue =
-    inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
-  if (userValue && Object.keys(userValue).length > 0) {
-    return Object.entries(userValue).map(([label, value]) => ({
-      label,
-      value,
-      description: describeVolume(label, value),
-    }));
+  const map = config.get<Record<string, string>>("volumes.sizes", {});
+  const entries = Object.entries(map);
+  if (entries.length === 0) {
+    return VOLUME_SIZES.map((v) => ({ ...v, description: describeVolume(v.label, v.value) }));
   }
-  return VOLUME_SIZES.map((v) => ({
-    ...v,
-    description: describeVolume(v.label, v.value),
+  return entries.map(([label, value]) => ({
+    label,
+    value,
+    description: describeVolume(label, value),
   }));
 }

@@ -719,6 +719,38 @@ describe("split volumes", () => {
     expect(res["b.txt"]).toBe("world");
   });
 
+  it("production path: a typed fractional size still produces volumes (1.1m)", async () => {
+    // Regression: "1.1m" reached 7z as `-v1.1m`, which the CLI rejects — the
+    // command failed and wrote no archive at all. It has to leave as integer
+    // bytes (`-v1153433b`, 1.1 MiB).
+    const srcDir = tmpDir("sa_frac_");
+    const outDir = tmpDir("sa_fracout_");
+    try {
+      fs.writeFileSync(path.join(srcDir, "big.bin"), require("crypto").randomBytes(3_000_000));
+      const out = path.join(outDir, "out.7z");
+      await compressWasmCore({
+        targets: [{ fsPath: srcDir }],
+        format: { label: "7z", description: "", canCreate: true, supportsEncryption: false },
+        outputPath: out,
+        password: "",
+        level: 1,
+        volumeSize: "1.1m",
+      });
+
+      const parts = fs.readdirSync(outDir).filter((f) => f.startsWith("out.7z."));
+      expect(parts.length, "volumes were written").toBeGreaterThanOrEqual(3);
+      for (const p of parts) {
+        expect(
+          fs.statSync(path.join(outDir, p)).size,
+          `${p} respects the typed 1.1 MiB limit`,
+        ).toBeLessThanOrEqual(1_153_433);
+      }
+    } finally {
+      fs.rmSync(srcDir, { recursive: true, force: true });
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
   it("multi-part 7z forces multiple parts", async () => {
     const j = await trackedJS7z();
     j.FS.writeFile("/big.txt", new Uint8Array(Buffer.from("x".repeat(16384))));
