@@ -22,9 +22,9 @@ import {
   buildDescendantCounts,
 } from "../../treeBuilder";
 import { contentHtml, escapeJsonForScript } from "../../htmlRenderer";
+import { verifyArchivePassword, pickPasswordProbe } from "./shared";
 import { loadExpandedPaths } from "../expandedState";
 import { getWebviewUris, getNoisyPatterns } from "../helpers";
-import { verifyArchivePassword } from "./shared";
 import { startOperation, endOperation } from "../state";
 
 export const handlePassword: MessageHandler = async (ctx) => {
@@ -44,17 +44,23 @@ export const handlePassword: MessageHandler = async (ctx) => {
     logger.info({ event: "webview.password.ok", count: pwEntries.length });
     s.password = msg.pw;
 
-    const resolvedExt = getFullExt(s.filePath);
-    if (resolvedExt !== ".7z") {
-      const valid = await verifyArchivePassword(s.filePath, msg.pw);
-      if (!valid) {
-        webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
-        return;
-      }
+    // Prove the password by decrypting a few KB of one member. Listing alone
+    // cannot do it: for archives we create the headers are encrypted, so a
+    // wrong password yields an empty listing (caught above), but a third-party
+    // archive with unencrypted headers lists fine under any password.
+    //
+    // The probe reads only the first block, so unlike the old whole-archive
+    // `7z t` (22 s for 139 MB, past its 15 s timeout — it rejected *correct*
+    // passwords) its cost does not grow with the archive or with the size of
+    // the smallest member. A full integrity test is still a user action: the
+    // ✓ button in the status bar, which runs with progress and no timeout.
+    if (!(await verifyArchivePassword(s.filePath, msg.pw, pickPasswordProbe(pwEntries)))) {
+      webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
+      return;
     }
 
-    // Verified — remember the password for this session (OS keychain), so
-    // re-opening the archive after closing the tab skips the prompt.
+    // Remember the password for this session (OS keychain), so re-opening the
+    // archive after closing the tab skips the prompt.
     await saveArchivePassword(s.filePath, msg.pw);
 
     if (token.isCancellationRequested) throw new vscode.CancellationError();

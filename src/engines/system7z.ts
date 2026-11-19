@@ -1419,6 +1419,16 @@ interface SpawnCaptureOpts {
    * operations pass an empty `-p` switch to trigger the prompt.
    */
   password?: string;
+  /**
+   * Resolve as soon as this many stdout bytes have arrived, killing the child
+   * and reporting `code: 0`.
+   *
+   * Used by the password probe: `7z x -so` streams decrypted data, so the
+   * first block already proves the password opens the archive. Reading the
+   * whole member would cost its full size, which is unbounded — a 200 MB
+   * member takes ~1.7 s, while its first 8 KB take ~0.15 s.
+   */
+  stopAfterStdoutBytes?: number;
 }
 
 export function spawnCapture(
@@ -1428,7 +1438,7 @@ export function spawnCapture(
 ): Promise<CaptureResult> {
   const normalized: SpawnCaptureOpts =
     typeof opts === "number" ? { timeoutMs: opts } : { timeoutMs: SPAWN_CAPTURE_TIMEOUT, ...opts };
-  const { cwd, timeoutMs, password } = normalized;
+  const { cwd, timeoutMs, password, stopAfterStdoutBytes } = normalized;
 
   return new Promise((resolve, reject) => {
     const stdoutChunks: Buffer[] = [];
@@ -1467,6 +1477,19 @@ export function spawnCapture(
     proc.stdout?.on("data", (d: Buffer) => {
       stdoutChunks.push(d);
       totalCaptured += d.length;
+      if (stopAfterStdoutBytes !== undefined && !settled && totalCaptured >= stopAfterStdoutBytes) {
+        // Enough evidence: 7z is emitting decrypted bytes, so the password is
+        // correct. Stop instead of reading the rest of the member.
+        settled = true;
+        clearTimeout(timer);
+        proc.kill();
+        resolve({
+          stdout: decodeBuffer(Buffer.concat(stdoutChunks)),
+          stderr: decodeBuffer(Buffer.concat(stderrChunks)),
+          code: 0,
+        });
+        return;
+      }
       if (totalCaptured > MAX_CAPTURE_BYTES) {
         proc.kill();
         settled = true;
