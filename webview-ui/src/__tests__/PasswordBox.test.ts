@@ -70,6 +70,23 @@ describe("PasswordBox", () => {
     expect(wrapper.find('input[type="password"]').exists()).toBe(true);
   });
 
+  it("toggles password visibility with Ctrl+H", async () => {
+    const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
+    const input = wrapper.find("input");
+    expect(wrapper.find('input[type="password"]').exists()).toBe(true);
+
+    // A bare "h" is ordinary typing, not the shortcut.
+    await input.trigger("keydown", { key: "h" });
+    expect(wrapper.find('input[type="password"]').exists()).toBe(true);
+
+    await input.trigger("keydown", { key: "h", ctrlKey: true });
+    expect(wrapper.find('input[type="text"]').exists()).toBe(true);
+    expect(wrapper.find("button[title]").attributes("title")).toContain("Ctrl+H");
+
+    await input.trigger("keydown", { key: "h", ctrlKey: true });
+    expect(wrapper.find('input[type="password"]').exists()).toBe(true);
+  });
+
   it("has error state hidden by default", () => {
     const wrapper = mount(PasswordBox, { props: { archiveName: "test.7z" } });
     const errDiv = wrapper.find(".text-sa-error");

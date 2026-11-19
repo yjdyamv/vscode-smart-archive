@@ -29,6 +29,13 @@ function submit() {
   }
 }
 function onKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey && e.key.toLowerCase() === "h") {
+    // Ctrl+H mirrors the shortcut of the native password prompts. Cmd+H is
+    // left alone: macOS reserves it for hiding the window.
+    e.preventDefault();
+    showPassword.value = !showPassword.value;
+    return;
+  }
   if (e.key === "Enter") submit();
 }
 </script>
@@ -55,7 +62,11 @@ function onKeydown(e: KeyboardEvent) {
         <button v-if="password" class="pw-btn" @click="password = ''">
           <span class="codicon codicon-close"></span>
         </button>
-        <button class="pw-btn" @click="showPassword = !showPassword">
+        <button
+          class="pw-btn"
+          :title="ui(showPassword ? 'ui.hidePassword' : 'ui.showPassword')"
+          @click="showPassword = !showPassword"
+        >
           <span class="codicon" :class="showPassword ? 'codicon-eye-closed' : 'codicon-eye'"></span>
         </button>
       </div>

@@ -62,6 +62,8 @@ const FALLBACKS: Record<string, string> = {
   "ui.password": "Password",
   "ui.unlock": "Unlock",
   "ui.wrongPassword": "Wrong password — please try again",
+  "ui.showPassword": "Show password (Ctrl+H)",
+  "ui.hidePassword": "Hide password (Ctrl+H)",
   "ui.select": "Select ",
   "ui.collapse": "Collapse ",
   "ui.expand": "Expand ",

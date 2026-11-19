@@ -526,6 +526,16 @@ const messages: Record<string, Record<Locale, string>> = {
     "zh-cn": "密码错误——请重试",
     "zh-tw": "密碼錯誤——請重試",
   },
+  "ui.showPassword": {
+    en: "Show password (Ctrl+H)",
+    "zh-cn": "显示密码（Ctrl+H）",
+    "zh-tw": "顯示密碼（Ctrl+H）",
+  },
+  "ui.hidePassword": {
+    en: "Hide password (Ctrl+H)",
+    "zh-cn": "隐藏密码（Ctrl+H）",
+    "zh-tw": "隱藏密碼（Ctrl+H）",
+  },
   "ui.select": { en: "Select ", "zh-cn": "选择 ", "zh-tw": "選擇 " },
   "ui.collapse": { en: "Collapse ", "zh-cn": "折叠 ", "zh-tw": "摺疊 " },
   "ui.expand": { en: "Expand ", "zh-cn": "展开 ", "zh-tw": "展開 " },

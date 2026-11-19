@@ -55,6 +55,8 @@ const UI_STRING_KEYS = [
   "ui.password",
   "ui.unlock",
   "ui.wrongPassword",
+  "ui.showPassword",
+  "ui.hidePassword",
   "ui.select",
   "ui.collapse",
   "ui.expand",
