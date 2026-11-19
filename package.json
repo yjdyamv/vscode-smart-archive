@@ -71,7 +71,7 @@
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/vscode": "~1.85.0",
-    "@vscode/vsce": "^4.0.0",
+    "@vscode/vsce": "^4.1.1",
     "cross-env": "^10.1.0",
     "https-proxy-agent": "^9.1.0",
     "oxfmt": "^0.64.0",
