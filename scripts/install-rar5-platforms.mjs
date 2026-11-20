@@ -65,6 +65,12 @@ async function resolveVersion() {
 // against the official GitHub digest (SA_VERIFY_RAR5_HASHES=1 npm test)
 // after a new release, then regenerate here (bootstrap prints and persists):
 //   SA_HASH_BOOTSTRAP=1 node scripts/install-rar5-platforms.mjs
+//
+// 2026-11-20: the v0.15.0 release was re-uploaded (same sources, rebuilt on
+// the same runners). Every Linux and macOS asset came out byte-identical; the
+// two Windows ones did not, so only those pins moved. Both values below are
+// taken from the release's own SHA-256SUMS and cross-checked against the
+// GitHub API `digest` field, not from a bootstrap run.
 const EXPECTED_HASHES = {
   "linux-x64-gnu": "7fcaddaa79e6c1213b07601dd77876bbefc6bd7bc6bee7b1139a9245dba0641a",
   "linux-x64-musl": "344a9be8d074a4f82cbee41226f772786fb68f316e3f6e88cca3a60d01a9acc2",
@@ -72,8 +78,8 @@ const EXPECTED_HASHES = {
   "linux-arm64-musl": "082218e86c4cbf817b9e98398a5e1599587ba70c3b9b386cf970fcdf1650f651",
   "linux-arm-gnueabihf": "54ddc1212ed88f59608a83274d3daed868d76927a3ad043175b9ef1f37037a56",
   "darwin-arm64": "090632f9029c247dc0de8298507bc4f73ac1dac498b33462835df7083782f57a",
-  "win32-x64-msvc": "fffeb68b172d4dbc4024cf407bb7d0e0570354e42d690096d2b40fadf5c7401b",
-  "win32-arm64-msvc": "572341726615abd89c33dc3412b715e771621c3fc32db6cbf7efcc0dba3eb8db",
+  "win32-x64-msvc": "d6785d2875ebba8d5d9ba2016b7ae822794a120ecbdeaf0be25a53b90fc15314",
+  "win32-arm64-msvc": "c20c331b368351e741e9552a6046ffae411e8ffdc5185cacc273fad9d4500ed3",
   // WASI fallback bundle (rar-rs-napi >= 0.3.0), staged under
   // vendor/rar5-wasm/. Placeholder pins are regenerated with
   // SA_HASH_BOOTSTRAP=1 once the release assets exist.
