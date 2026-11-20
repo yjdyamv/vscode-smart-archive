@@ -228,13 +228,11 @@ jobs:
   # the VSIX manifest against the namespace case-sensitively, and both are the
   # all-lowercase `yjdyamv`.
   #
-  # Gated on the repo variable `OPENVSX_TRUSTED_PUBLISHING` because the
-  # namespace claim is still open: without a registration every run would die on
-  # "No trusted publisher matches the presented token" and paint every release
-  # red for a reason that is not about the release. Set the variable to `true`
-  # once the claim is approved and the registration exists; until then Open VSX
-  # keeps getting whatever a manual `ovsx publish --pat` pushes. Skipping is
-  # silent by design — the job simply does not appear in the run.
+  # Both one-time steps are done: the namespace claim was granted
+  # (EclipseFdn/open-vsx.org#15983, closed) and the trusted publisher is
+  # registered. So the job runs on every release like the Marketplace one —
+  # no flag to remember, and a broken registration now fails loudly instead of
+  # being skipped.
   #
   # `--skip-duplicate` mirrors the vsce job: an already-published version
   # prints "... is already published. Skipping publish." and exits 0, so
@@ -242,9 +240,7 @@ jobs:
   publish-openvsx:
     name: Publish to Open VSX
     needs: build
-    if: >-
-      (startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != '') &&
-      vars.OPENVSX_TRUSTED_PUBLISHING == 'true'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read

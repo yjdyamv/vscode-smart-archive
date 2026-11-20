@@ -10,7 +10,7 @@ Publish to where users actually install from. **Highest leverage — everything 
 
 | # | Item | Pri | Effort |
 |---|------|-----|--------|
-| 1.1 | Marketplace publish in CI on `v*` tags — ✅ via OIDC trusted publishing (`vsce publish --oidc`), no PAT secret. Open VSX job is written and waiting on the namespace claim ([#15983](https://github.com/EclipseFdn/open-vsx.org/issues/15983)): flip the `OPENVSX_TRUSTED_PUBLISHING` repo variable on once the trusted publisher is registered | 🟡 | S |
+| 1.1 | Marketplace + Open VSX publish in CI on `v*` tags — ✅ both via OIDC trusted publishing (`vsce publish --oidc`, `ovsx publish --trusted-publishing`), no PAT secrets; the `yjdyamv` namespace claim ([#15983](https://github.com/EclipseFdn/open-vsx.org/issues/15983)) was granted and the trusted publisher is registered, so both jobs run unconditionally on a release | ✅ | S |
 | 1.2 | `CHANGELOG.md` (Keep-a-Changelog), backfilled from git history | 🔴 | S |
 | 1.3 | Release script: bump version + changelog heading + tag + push (removes manual drift) | 🟡 | S |
 | 1.4 | README polish for Marketplace: hero GIF, browser screenshots, badges | 🟡 | M |
