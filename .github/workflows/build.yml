@@ -19,6 +19,18 @@ on:
 permissions:
   contents: read
 
+# One run per target at a time. `release_tag` joins the group on purpose: a
+# dispatch that releases an existing tag has `github.ref` = refs/heads/main,
+# so grouping by ref alone would put it in the same group as ordinary main
+# pushes, and a later push could cancel a release mid-publish. With
+# `ref_name`, the tag push and its dispatch share one group and never race.
+# PR runs cancel their predecessor (free to lose); main and release runs queue
+# instead, because a cancelled publish leaves one registry updated and the
+# other not.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.release_tag || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
