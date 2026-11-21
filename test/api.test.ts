@@ -34,8 +34,7 @@ import { verifyArchiveWith7zz } from "./verify";
 import { bundled7zPath } from "../src/engines/bundled7z";
 import { tmpDir } from "./tmp";
 
-const RAR5_BIN = path.join(__dirname, "..", "vendor", "rar5-bin");
-const RAR5_WASM = path.join(__dirname, "..", "vendor", "rar5-wasm");
+const RAR_RS_PKG = path.join(__dirname, "..", "node_modules", "@yjdyamv", "rar-rs");
 
 /**
  * Round-trip decompress helper: the API tests assert the archive's own
@@ -45,10 +44,11 @@ function decompressPlain(params: Parameters<typeof decompress>[0]): ReturnType<t
   return decompress(params);
 }
 
+/** Both rar5 backends ship in the @yjdyamv/rar-rs dependency (native + WASI). */
 function rar5Staged(): boolean {
-  if (fs.existsSync(RAR5_WASM)) return true;
-  if (!fs.existsSync(RAR5_BIN)) return false;
-  return fs.readdirSync(RAR5_BIN, { recursive: true }).some((f) => String(f).endsWith(".node"));
+  if (!fs.existsSync(RAR_RS_PKG)) return false;
+  const entries = fs.readdirSync(RAR_RS_PKG);
+  return entries.some((f) => f.startsWith("rar-rs-napi.") && f.endsWith(".node"));
 }
 
 // ── Pure helper tests ─────────────────────────────────────────────

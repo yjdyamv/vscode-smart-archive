@@ -10,39 +10,51 @@
  *
  *   node scripts/package-wasm.mjs
  *
- * Generates a wasm-only .vscodeignore for the packaging run: the
- * snappy *.node re-include is dropped (ignore rules cannot be undone by
- * a later exclusion — the re-include always wins) and the native
- * binary dirs are excluded. The original ignore list is restored
- * afterwards.
+ * Generates a wasm-only .vscodeignore for the packaging run: the blanket
+ * snappy/rar-rs package re-includes are replaced by generated per-file
+ * re-includes that skip every `*.node` (ignore rules cannot be undone by a
+ * later exclusion — the re-include always wins), and vendor/7z-bin/ is
+ * excluded. The original ignore list is restored afterwards.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { bindingAllowlist } from "./lib/package-files.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ignorePath = path.join(root, ".vscodeignore");
 const backupPath = path.join(os.tmpdir(), `vscodeignore-bak-${process.pid}`);
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
-// Native binaries excluded from the pure-WASM package. The WASI loaders
-// (vendor/rar5-wasm, node_modules/snappy/*.wasi.*) and the WASM 7-Zip
-// (vendor/7zz-wasm) stay — the runtime auto-falls back to them.
-const WASM_ONLY_EXCLUDES = `# ── pure-WASM package: drop native binaries (engines fall back to WASI/WASM) ──
-vendor/rar5-bin/**
-vendor/7z-bin/**
-`;
+/** Re-includes that survive in the pure-WASM build: everything but natives. */
+const KEPT_BINDINGS = [
+  bindingAllowlist(path.join(root, "node_modules", "snappy"), /^snappy\./, []),
+  bindingAllowlist(path.join(root, "node_modules", "@yjdyamv", "rar-rs"), /^rar-rs-napi\./, []),
+].flat();
 
 function buildWasmIgnore(original) {
-  // The snappy *.node re-include would override any later exclusion, so
-  // remove it for the wasm-only build (node_modules/ already excludes
-  // everything not re-included).
+  // The blanket package re-includes would override any later exclusion, so
+  // they are dropped for the wasm-only build and replaced with the generated
+  // per-file list above (which keeps the WASI loaders, .wasm modules, JS
+  // entry chains and licences).
   const lines = original
     .split("\n")
-    .filter((l) => l.trim() !== "!node_modules/snappy/snappy.*.node");
-  return lines.join("\n") + "\n" + WASM_ONLY_EXCLUDES;
+    .filter((l) => l.trim() !== "!node_modules/snappy/**")
+    .filter((l) => l.trim() !== "!node_modules/@yjdyamv/rar-rs/**")
+    .filter((l) => l.trim() !== "node_modules/snappy/snappy.win32-ia32-msvc.node");
+
+  return (
+    lines.join("\n") +
+    "\n" +
+    [
+      "# ── pure-WASM package: drop native binaries (engines fall back to WASI/WASM) ──",
+      "vendor/7z-bin/**",
+      ...KEPT_BINDINGS,
+      "",
+    ].join("\n")
+  );
 }
 
 fs.copyFileSync(ignorePath, backupPath);

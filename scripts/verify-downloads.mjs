@@ -4,21 +4,19 @@ import path from "path";
 /**
  * Verify the download scripts with fresh downloads only.
  *
- * Runs every installer exactly as `npm run stage:natives` would, but with
- * SA_FORCE_DOWNLOAD=1 (ignores .cache/ and already-staged binaries, forcing
- * a real network download with SHA-256 verification) and rar5 in fail-closed
- * mode (SA_RAR5_REQUIRE=1). No manual cache cleanup needed.
+ * Runs every remaining installer exactly as `npm run stage:natives` would, but
+ * with SA_FORCE_DOWNLOAD=1 (ignores .cache/ and already-staged binaries,
+ * forcing a real network download with SHA-256 verification). The WASM engines
+ * (7zz, rar5) are npm dependencies and are verified by `npm ci` instead.
  *
  * Usage:
- *   node scripts/verify-downloads.mjs              # all four installers
- *   node scripts/verify-downloads.mjs 7zz snappy   # only the named ones
+ *   node scripts/verify-downloads.mjs              # every installer
+ *   node scripts/verify-downloads.mjs 7z snappy    # only the named ones
  */
 
 const STEPS = [
-  ["7zz", "install-7zz-wasm.mjs", {}],
   ["snappy", "install-snappy-platforms.mjs", {}],
   ["7z", "install-7z-platforms.mjs", {}],
-  ["rar5", "install-rar5-platforms.mjs", { SA_RAR5_REQUIRE: "1" }],
 ];
 
 const args = process.argv.slice(2);

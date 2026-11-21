@@ -88,9 +88,10 @@ jobs:
       - run: npm ci
       - run: npx vitest run test/listing-cache.test.ts test/preview-cache.test.ts test/atomic-output.test.ts
 
-  # Exercise the RAR5 WASI fallback (wasm32-wasip1-threads): stages only the
-  # wasm bundle from the smart-archive-rar release and forces the extension's
-  # rar5 engine onto it (SA_RAR5_FORCE_WASM is set inside the test file).
+  # Exercise the RAR5 WASI fallback (wasm32-wasip1-threads): the bundle is
+  # shipped inside the @yjdyamv/rar-rs dependency, so `npm ci` is all the
+  # staging it needs. The test file forces the extension's rar5 engine onto
+  # the WASI binding (SA_RAR5_FORCE_WASM).
   test-rar5-wasm:
     name: Test RAR5 WASI fallback
     runs-on: ubuntu-latest
@@ -100,13 +101,8 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      - name: Stage RAR5 WASI bundle
-        env:
-          SA_RAR5_PLATFORMS: ""
-          SA_RAR5_REQUIRE: "1"
-        run: node scripts/install-rar5-platforms.mjs
       # js7z-rar is the pure-WASM package gate (RAR5 extraction without a
-      # native 7zz) — runs here where the WASI engine is staged.
+      # native 7zz) — runs here where the WASI engine is the only rar5 backend.
       - run: npx vitest run test/rar5-wasm.test.ts test/js7z-rar.test.ts
 
   test-snappy-wasm:

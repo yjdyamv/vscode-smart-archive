@@ -39,6 +39,14 @@ node_modules/
 !node_modules/snappy/**
 # ia32 (32 位 x86 Windows) 已无 VS Code 支持（1.77 起停止发布）
 node_modules/snappy/snappy.win32-ia32-msvc.node
+# rar5 (RAR 读写)：@yjdyamv/rar-rs 把 9 个平台 .node 与 WASI 包
+# (rar-rs-napi.wasi.cjs + .wasm + wasi-worker.mjs + wasi-path-map.cjs) 平铺在包根，
+# 运行时用绝对路径 require（exports 只暴露入口），因此整包保留；
+# 逐文件枚举会随上游新增文件静默断链（snappy 2.6.3 的老教训）。
+!node_modules/@yjdyamv/rar-rs/**
+# 7-Zip ZS WASM：7zz.cjs 通过自身 __dirname 找 7zz.wasm 与 pthread worker，
+# 入口 index.mjs 是 ESM（Node 18 宿主不能 require），所以只有 CJS 工厂被打包使用。
+!node_modules/7zip-zstd-wasm/**
 # napi-rs wasm runtime: 只保留 CommonJS require 链（runtime.cjs →
 # dist/emnapi-plugins.cjs + dist/fs-proxy.cjs → @emnapi/core/@emnapi/runtime）。
 # ESM 变体（runtime.js / dist/fs.js / dist/emnapi-plugins.js / fs-proxy.js）

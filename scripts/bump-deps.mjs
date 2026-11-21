@@ -3,16 +3,21 @@
  * Apply engine dependency updates detected by check-updates.mjs.
  *
  * For each dependency with a newer release this script:
- *   1. bumps the in-repo version constant (scripts/lib/releases.mjs) or the
- *      npm dependency (snappy),
+ *   1. bumps the in-repo version constant (scripts/lib/releases.mjs) for the
+ *      native 7-Zip ZS release, or `npm install <pkg>@<version>` for the npm
+ *      engines (7zip-zstd-wasm, @yjdyamv/rar-rs, snappy),
  *   2. re-runs the affected installer with SA_HASH_BOOTSTRAP=1 so the pinned
  *      SHA-256 hashes are regenerated in place (fail-closed otherwise),
  *   3. verifies every installer end-to-end with fresh downloads
  *      (scripts/verify-downloads.mjs, fail-closed).
  *
+ * The WASM engines have no installer to re-run: package.json plus the lockfile
+ * IS the pin, so bumping them is just the npm install (reviewed in the same
+ * PR as the tag bumps).
+ *
  * Usage:
  *   node scripts/bump-deps.mjs                # bump everything available
- *   node scripts/bump-deps.mjs 7z rar5        # only the named deps
+ *   node scripts/bump-deps.mjs 7z rar5        # only the named deps (7z 7zz rar5 snappy)
  *   node scripts/bump-deps.mjs --dry-run      # report the plan, change nothing
  *   node scripts/bump-deps.mjs --skip-verify  # skip the fresh-download verify
  *
@@ -30,12 +35,7 @@ import path from "path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { normalizeTag, defaultFetchJson, SNAPPY_BLOCKED_VERSIONS } from "./check-updates.mjs";
-import {
-  SEVEN_ZIP_ZSTD_REPO,
-  SEVEN_ZIP_ZSTD_TAG,
-  RAR5_REPO,
-  RAR5_VERSION,
-} from "./lib/releases.mjs";
+import { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } from "./lib/releases.mjs";
 
 const SCRIPTS_DIR = import.meta.dirname;
 const ROOT_DIR = path.join(SCRIPTS_DIR, "..");
@@ -75,31 +75,32 @@ export function stripCaret(v) {
 
 /**
  * One planned update:
- *   key        — "7z" | "rar5" | "snappy"
+ *   key        — "7z" | "7zz" | "rar5" | "snappy"
  *   name       — human-readable label
  *   current    — pinned/declared version today
  *   latest     — version to bump to
  *   kind       — "tag" (version constant in releases.mjs) | "npm"
+ *   pkg        — (npm) package name to `npm install <pkg>@<latest>`
  *   installers — installer scripts to re-run with SA_HASH_BOOTSTRAP=1
  *   file       — (tag) script containing the version constant
  *   constant   — (tag) constant name to rewrite
  *
  * @typedef {{key: string, name: string, current: string, latest: string,
- *   kind: "tag"|"npm", installers: string[], file?: string,
+ *   kind: "tag"|"npm", pkg?: string, installers: string[], file?: string,
  *   constant?: string}} BumpPlan
  */
 
 /**
  * Compute which dependencies have a newer release. Read-only; injectable
- * fetchJson for tests; snappyRootPkg points at a package.json whose
- * dependencies.snappy is the current declaration.
+ * fetchJson for tests; rootPkg points at a package.json whose dependencies are
+ * the current declarations of the npm engines.
  *
- * @param {{fetchJson?: Function, snappyRootPkg?: string}} [opts]
+ * @param {{fetchJson?: Function, rootPkg?: string}} [opts]
  * @returns {Promise<BumpPlan[]>}
  */
 export async function planUpdates({
   fetchJson = defaultFetchJson,
-  snappyRootPkg = ROOT_PACKAGE_JSON,
+  rootPkg = ROOT_PACKAGE_JSON,
 } = {}) {
   const updates = [];
 
@@ -107,55 +108,70 @@ export async function planUpdates({
   if (normalizeTag(mirrorTag) !== normalizeTag(SEVEN_ZIP_ZSTD_TAG)) {
     updates.push({
       key: "7z",
-      name: "7-Zip ZS (native+wasm)",
+      name: "7-Zip ZS (native)",
       current: SEVEN_ZIP_ZSTD_TAG,
       latest: mirrorTag,
       kind: "tag",
       file: RELEASES_PATH,
       constant: "SEVEN_ZIP_ZSTD_TAG",
-      installers: ["install-7z-platforms.mjs", "install-7zz-wasm.mjs"],
+      installers: ["install-7z-platforms.mjs"],
     });
   }
 
-  const rar5Tag = await latestGithubTag(RAR5_REPO, fetchJson);
-  if (normalizeTag(rar5Tag) !== RAR5_VERSION) {
-    updates.push({
+  const declared = readDeclaredDeps(rootPkg);
+
+  // npm engines: package.json is the only pin, so a newer registry version is
+  // the whole plan. snappy additionally stages prebuilds via its installer and
+  // has a known-broken release that must never be offered.
+  for (const engine of [
+    {
+      key: "7zz",
+      name: "7-Zip ZS WASM (npm)",
+      pkg: "7zip-zstd-wasm",
+      installers: [],
+    },
+    {
       key: "rar5",
-      name: "rar5 binding (rar-rs-napi)",
-      current: RAR5_VERSION,
-      latest: normalizeTag(rar5Tag),
-      kind: "tag",
-      file: RELEASES_PATH,
-      constant: "RAR5_VERSION",
-      installers: ["install-rar5-platforms.mjs"],
-    });
-  }
-
-  const snappyLatest = await npmLatestVersion("snappy", fetchJson);
-  let declared = "unknown";
-  if (fs.existsSync(snappyRootPkg)) {
-    declared = String(
-      JSON.parse(fs.readFileSync(snappyRootPkg, "utf8")).dependencies?.snappy ?? "unknown",
-    );
-  }
-  const snappyBlockedReason = SNAPPY_BLOCKED_VERSIONS.get(snappyLatest);
-  if (snappyBlockedReason) {
-    // Known-broken release (see SNAPPY_BLOCKED_VERSIONS): do NOT plan a bump.
-    console.warn(
-      `[bump-deps] snappy ${snappyLatest} is blocked from bumping: ${snappyBlockedReason}`,
-    );
-  } else if (declared !== "unknown" && stripCaret(declared) !== snappyLatest) {
-    updates.push({
+      name: "rar-rs (npm)",
+      pkg: "@yjdyamv/rar-rs",
+      installers: [],
+    },
+    {
       key: "snappy",
       name: "snappy (npm)",
-      current: declared,
-      latest: snappyLatest,
-      kind: "npm",
+      pkg: "snappy",
       installers: ["install-snappy-platforms.mjs"],
+      blocked: SNAPPY_BLOCKED_VERSIONS,
+    },
+  ]) {
+    const latest = await npmLatestVersion(engine.pkg, fetchJson);
+    const current = declared[engine.pkg];
+    if (current === undefined) continue; // not a declared dependency
+    const blockedReason = engine.blocked?.get(latest);
+    if (blockedReason) {
+      // Known-broken release: do NOT plan a bump.
+      console.warn(`[bump-deps] ${engine.pkg} ${latest} is blocked from bumping: ${blockedReason}`);
+      continue;
+    }
+    if (stripCaret(current) === latest) continue;
+    updates.push({
+      key: engine.key,
+      name: engine.name,
+      current,
+      latest,
+      kind: "npm",
+      pkg: engine.pkg,
+      installers: engine.installers,
     });
   }
 
   return updates;
+}
+
+/** `dependencies` map of the root package.json, or {} when it is missing. */
+function readDeclaredDeps(rootPkg) {
+  if (!fs.existsSync(rootPkg)) return {};
+  return JSON.parse(fs.readFileSync(rootPkg, "utf8")).dependencies ?? {};
 }
 
 /**
@@ -167,7 +183,7 @@ export async function applyUpdates(updates, { runInstallers = true } = {}) {
   const results = [];
   for (const u of updates) {
     if (u.kind === "npm") {
-      execFileSync("npm", ["install", `snappy@${u.latest}`], {
+      execFileSync("npm", ["install", `${u.pkg}@${u.latest}`], {
         stdio: "inherit",
         cwd: ROOT_DIR,
       });
@@ -204,7 +220,7 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
   const skipVerify = args.includes("--skip-verify");
-  const only = args.filter((a) => a === "7z" || a === "rar5" || a === "snappy");
+  const only = args.filter((a) => ["7z", "7zz", "rar5", "snappy"].includes(a));
 
   const updates = await planUpdates();
   const selected = only.length > 0 ? updates.filter((u) => only.includes(u.key)) : updates;

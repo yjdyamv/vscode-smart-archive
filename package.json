@@ -31,7 +31,7 @@
   "publisher": "yjdyamv",
   "main": "./out/extension.js",
   "scripts": {
-    "postinstall": "node scripts/install-7zz-wasm.mjs && npm --prefix webview-ui install",
+    "postinstall": "npm --prefix webview-ui install",
     "compile": "vite build --config vite.extension.config.mts",
     "compile:dev": "cross-env SOURCEMAP=true vite build --config vite.extension.config.mts",
     "watch": "vite build --config vite.extension.config.mts --watch",
@@ -49,7 +49,7 @@
     "typecheck": "tsc -p . --noEmit",
     "check": "npm run format:check && npm run lint && npm run typecheck",
     "release": "npm run check && npm run package:cross",
-    "stage:natives": "node scripts/install-7zz-wasm.mjs && cross-env SA_RAR5_REQUIRE=1 node scripts/install-rar5-platforms.mjs && node scripts/install-snappy-platforms.mjs && node scripts/install-7z-platforms.mjs",
+    "stage:natives": "node scripts/install-snappy-platforms.mjs && node scripts/install-7z-platforms.mjs",
     "verify:downloads": "node scripts/verify-downloads.mjs",
     "prepackage:cross": "node scripts/clear-native-locks.mjs",
     "package:cross": "node scripts/npm-ci-safe.mjs && node scripts/npm-ci-safe.mjs --prefix webview-ui && node scripts/package-native.mjs",
@@ -60,8 +60,12 @@
     "vscode:prepublish": "npm run stage:natives && npm run build"
   },
   "dependencies": {
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
     "@napi-rs/wasm-runtime": "^1.2.3",
     "@vscode/codicons": "^0.0.46-24",
+    "@yjdyamv/rar-rs": "^0.15.3",
+    "7zip-zstd-wasm": "^26.5.0",
     "iconv-lite": "^0.7.3",
     "minimatch": "^11.0.9",
     "pino": "^10.3.1",

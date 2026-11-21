@@ -3,15 +3,21 @@
  * Check for newer releases of the bundled engine dependencies.
  *
  * Read-only: never modifies files, never downloads binaries. Compares the
- * in-repo pins (scripts/lib/releases.mjs) against the live upstreams:
+ * in-repo pins (scripts/lib/releases.mjs, package.json via the installed tree)
+ * against the live upstreams:
  *
- *   1. 7-Zip ZS native + WASM  — yjdyamv/7-Zip-zstd-native latest release tag
+ *   1. 7-Zip ZS native  — yjdyamv/7-Zip-zstd-native latest release tag
  *      vs SEVEN_ZIP_ZSTD_TAG (also warns when the mirror repo lags behind
  *      upstream mcmilk/7-Zip-zstd — a security-relevant staleness signal).
- *   2. rar5 binding             — yjdyamv/rar-rs latest release tag
- *      vs RAR5_VERSION.
- *   3. snappy (npm)             — registry latest vs the installed
+ *   2. 7-Zip ZS WASM (npm: 7zip-zstd-wasm) — registry latest vs installed.
+ *   3. rar-rs (npm: @yjdyamv/rar-rs, native + WASI) — registry latest vs
+ *      installed.
+ *   4. snappy (npm)             — registry latest vs the installed
  *      node_modules/snappy version (what install-snappy-platforms stages).
+ *
+ * The npm engines are read from the installed tree rather than from a pin:
+ * package.json is the single source of truth for their versions now that no
+ * installer stages them.
  *
  * Usage:
  *   node scripts/check-updates.mjs            # human-readable report
@@ -29,12 +35,7 @@
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "node:url";
-import {
-  SEVEN_ZIP_ZSTD_REPO,
-  SEVEN_ZIP_ZSTD_TAG,
-  RAR5_REPO,
-  RAR5_VERSION,
-} from "./lib/releases.mjs";
+import { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } from "./lib/releases.mjs";
 
 const UPSTREAM_7Z_REPO = "mcmilk/7-Zip-zstd";
 
@@ -63,7 +64,7 @@ async function latestGithubTag(repo, fetchJson) {
 async function checkSevenZip(fetchJson) {
   const mirrorTag = await latestGithubTag(SEVEN_ZIP_ZSTD_REPO, fetchJson);
   const result = {
-    name: "7-Zip ZS (native+wasm)",
+    name: "7-Zip ZS (native)",
     current: SEVEN_ZIP_ZSTD_TAG,
     latest: mirrorTag,
     status: "up-to-date",
@@ -87,17 +88,6 @@ async function checkSevenZip(fetchJson) {
   return result;
 }
 
-async function checkRar5(fetchJson) {
-  const latest = await latestGithubTag(RAR5_REPO, fetchJson);
-  return {
-    name: "rar5 binding (rar-rs-napi)",
-    current: RAR5_VERSION,
-    latest,
-    status: normalizeTag(latest) === normalizeTag(RAR5_VERSION) ? "up-to-date" : "update-available",
-    url: `https://github.com/${RAR5_REPO}/releases/tag/v${normalizeTag(latest)}`,
-  };
-}
-
 /**
  * snappy releases that must NOT be offered as updates. snappy 7.4.0's
  * generated index.js unconditionally `import * as s from
@@ -115,16 +105,16 @@ export const SNAPPY_BLOCKED_VERSIONS = new Map([
   ],
 ]);
 
-async function checkSnappy(
-  fetchJson,
-  pkgPath = path.join(import.meta.dirname, "..", "node_modules", "snappy", "package.json"),
-) {
+async function loadInstalledVersion(nodeModulesDir, pkg) {
+  const pkgPath = path.join(nodeModulesDir, ...pkg.split("/"), "package.json");
+  if (!fs.existsSync(pkgPath)) return "unknown";
+  return String(JSON.parse(fs.readFileSync(pkgPath, "utf8")).version);
+}
+
+async function checkSnappy(fetchJson, nodeModulesDir) {
   const latestBody = await fetchJson("https://registry.npmjs.org/snappy/latest");
   const latest = String(latestBody.version);
-  let current = "unknown";
-  if (fs.existsSync(pkgPath)) {
-    current = String(JSON.parse(fs.readFileSync(pkgPath, "utf8")).version);
-  }
+  const current = await loadInstalledVersion(nodeModulesDir, "snappy");
   const blockedReason = SNAPPY_BLOCKED_VERSIONS.get(latest);
   return {
     name: "snappy (npm)",
@@ -144,16 +134,50 @@ async function checkSnappy(
 }
 
 /**
+ * npm-hosted engines whose version pin lives in package.json alone. Both are
+ * read from the installed tree (what actually ships in the .vsix), so an
+ * out-of-sync node_modules is reported instead of a stale in-repo constant.
+ */
+const NPM_ENGINES = [
+  { key: "7zz", name: "7-Zip ZS WASM (npm)", pkg: "7zip-zstd-wasm" },
+  { key: "rar5", name: "rar-rs (npm)", pkg: "@yjdyamv/rar-rs" },
+];
+
+async function checkNpmEngine(fetchJson, engine, nodeModulesDir) {
+  const latestBody = await fetchJson(`https://registry.npmjs.org/${engine.pkg}/latest`);
+  const latest = String(latestBody.version);
+  const current = await loadInstalledVersion(nodeModulesDir, engine.pkg);
+  return {
+    name: engine.name,
+    current,
+    latest,
+    status:
+      current === "unknown"
+        ? "unavailable"
+        : current === latest
+          ? "up-to-date"
+          : "update-available",
+    url: `https://www.npmjs.com/package/${engine.pkg}`,
+  };
+}
+
+/**
  * Run all checks. Every check failure is caught and reported as
  * `status: "unavailable"` so one dead endpoint cannot fail the batch.
- * `snappyPkgPath` is injectable for tests (defaults to the installed
- * node_modules/snappy/package.json).
+ * `nodeModulesDir` is injectable for tests (defaults to the repo's installed
+ * tree); the npm engines read `<nodeModulesDir>/<pkg>/package.json` from it.
  */
-export async function checkUpdates({ fetchJson = defaultFetchJson, snappyPkgPath } = {}) {
+export async function checkUpdates({
+  fetchJson = defaultFetchJson,
+  nodeModulesDir = path.join(import.meta.dirname, "..", "node_modules"),
+} = {}) {
   const checks = [
     ["7-Zip ZS", () => checkSevenZip(fetchJson)],
-    ["rar5", () => checkRar5(fetchJson)],
-    ["snappy", () => checkSnappy(fetchJson, snappyPkgPath)],
+    ...NPM_ENGINES.map((engine) => [
+      engine.key,
+      () => checkNpmEngine(fetchJson, engine, nodeModulesDir),
+    ]),
+    ["snappy", () => checkSnappy(fetchJson, nodeModulesDir)],
   ];
   const results = [];
   for (const [key, fn] of checks) {

@@ -1,9 +1,9 @@
 /**
  * js7z factory — Smart Archiver VSCode Extension
  *
- * Provides the `JS7z` factory over the bundled 7-Zip ZS 26.02 WebAssembly
- * engine (vendor/7zz-wasm, see scripts/install-7zz-wasm.js), replacing the
- * old js7z-tools (7-Zip 25.01) WASM build. Same call contract as before:
+ * Provides the `JS7z` factory over the bundled 7-Zip ZS 26.05 WebAssembly
+ * engine (the `7zip-zstd-wasm` npm dependency), replacing the old
+ * js7z-tools (7-Zip 25.01) WASM build. Same call contract as before:
  *
  *   const js7z = await JS7z({ print, printErr });
  *   js7z.FS.writeFile("/in/x", data);        // emscripten virtual FS
@@ -50,6 +50,7 @@
  * @module engines/js7z-factory
  */
 
+import * as path from "path";
 import type { JS7zFactory, JS7zInstance } from "../types";
 
 type Create7zz = (opts?: Record<string, unknown>) => Promise<JS7zInstance>;
@@ -67,19 +68,25 @@ let cached: CachedEngine | null = null;
 let initPromise: Promise<CachedEngine> | null = null;
 
 /**
- * Load the bundled 7-Zip ZS wasm engine (staged by
- * scripts/install-7zz-wasm.js). Kept external from the vite bundle so 7zz.js
- * can resolve 7zz.wasm via its own __dirname at runtime
- * (see vite.extension.config.ts). The require is lazy so a missing download
- * only fails WASM operations, never extension startup or system-7z paths.
+ * Load the 7-Zip ZS wasm engine from the `7zip-zstd-wasm` dependency.
+ *
+ * The package entry is ESM-only (`index.mjs`), which a CommonJS extension
+ * host on Node 18 cannot `require`; `7zz.cjs` is the same Emscripten
+ * MODULARIZE factory in CJS form. It is loaded by absolute path (the
+ * `exports` map exposes only `.` and `./7zz.wasm`) and stays external from the
+ * vite bundle so it resolves 7zz.wasm and its pthread worker next to itself
+ * via `__dirname` (see vite.extension.config.ts). The require is lazy so a
+ * packaging mistake only fails WASM operations, never extension startup or
+ * system-7z paths.
  */
 function loadCreate7zz(): Create7zz {
   try {
-    return require("../../vendor/7zz-wasm/7zz.js") as Create7zz;
+    const pkgDir = path.dirname(require.resolve("7zip-zstd-wasm/package.json"));
+    return require(path.join(pkgDir, "7zz.cjs")) as Create7zz;
   } catch (err) {
     throw new Error(
-      "Bundled 7zz WASM engine not found (vendor/7zz-wasm/7zz.js). " +
-        "Run `node scripts/install-7zz-wasm.js` to stage it.",
+      "The bundled 7zz WASM engine (7zip-zstd-wasm) could not be loaded — " +
+        "reinstall the extension's dependencies (`npm ci`) so node_modules/ holds it.",
       { cause: err },
     );
   }

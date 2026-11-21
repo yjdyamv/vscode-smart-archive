@@ -28,9 +28,11 @@ export default defineConfig({
         "vscode",
         "snappy",
         "@vscode/codicons",
-        // vendored wasm engine — loaded at runtime via relative require so
-        // 7zz.js can resolve 7zz.wasm next to itself (__dirname)
-        /\/vendor\/7zz-wasm\//,
+        // Wasm/native engines loaded at runtime from node_modules by absolute
+        // path: 7zz.cjs resolves 7zz.wasm and its pthread worker next to
+        // itself, the rar-rs loader its .wasm — keep both trees unbundled.
+        /7zip-zstd-wasm/,
+        /@yjdyamv\/rar-rs/,
         ...builtinModules,
         ...builtinModules.map((m) => `node:${m}`),
       ],

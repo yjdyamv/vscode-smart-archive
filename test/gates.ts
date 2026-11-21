@@ -2,9 +2,9 @@
  * Environment gates — Smart Archiver VSCode Extension
  *
  * One module owns "what is available in this test run". Every environment
- * decision in the suite (system 7z, bundled 7zz, staged rar5 binding, …)
- * goes through a named tier here — single detection implementation, no
- * bespoke predicates, no machine-specific paths.
+ * decision in the suite (system 7z, bundled 7zz, rar-rs binding, …) goes
+ * through a named tier here — single detection implementation, no bespoke
+ * predicates, no machine-specific paths.
  *
  * Every probe is recorded; a merged report is written to
  * test-results/gates.json so CI can see which tiers ran and which were
@@ -21,6 +21,7 @@ import * as childProcess from "child_process";
 import { it } from "vitest";
 import { detectSystem7z } from "../src/engines/system7z";
 import { bundled7zPath, testBinary } from "../src/engines/bundled7z";
+import { resolveRarTriple } from "../src/engines/rar5-engine";
 
 export type TierName =
   | "system7z"
@@ -52,14 +53,24 @@ function probeBundled7zz(): boolean {
 }
 
 function probeRar5Binding(): boolean {
-  // Mirrors the staging layout used by scripts/install-rar5-platforms.js:
-  // vendor/rar5-bin/<platform>/<arch>/rar-rs-napi.<triple>.node
+  // The bindings ship inside the @yjdyamv/rar-rs dependency, one .node per
+  // triple: node_modules/@yjdyamv/rar-rs/rar-rs-napi.<triple>.node
+  const dir = rarRsPackageDir();
+  if (dir === null) return false;
   try {
-    const dir = path.join(ROOT, "vendor", "rar5-bin", process.platform, process.arch);
-    if (!fs.existsSync(dir)) return false;
-    return fs.readdirSync(dir).some((f) => f.endsWith(".node"));
+    return fs.existsSync(path.join(dir, `rar-rs-napi.${resolveRarTriple()}.node`));
   } catch {
+    // Unsupported platform/arch — the WASI tier still covers this host.
     return false;
+  }
+}
+
+/** Installed @yjdyamv/rar-rs package dir, or null when the dep is missing. */
+function rarRsPackageDir(): string | null {
+  try {
+    return path.dirname(require.resolve("@yjdyamv/rar-rs/package.json"));
+  } catch {
+    return null;
   }
 }
 
@@ -86,7 +97,8 @@ function probeRar5Cli(): boolean {
 }
 
 function probeRar5Wasm(): boolean {
-  return fs.existsSync(path.join(ROOT, "vendor", "rar5-wasm", "rar-rs-napi.wasm32-wasi.wasm"));
+  const dir = rarRsPackageDir();
+  return dir !== null && fs.existsSync(path.join(dir, "rar-rs-napi.wasm32-wasi.wasm"));
 }
 
 function probeSystemZstd(): boolean {

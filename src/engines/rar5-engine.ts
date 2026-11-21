@@ -8,9 +8,11 @@
  * progress reporting — no external binary required, and passwords never
  * touch the command line.
  *
- * The platform .node binary is staged under vendor/rar5-bin/<platform>/<arch>/
- * by scripts/install-rar5-platforms.js; the WASI bundle lives under
- * vendor/rar5-wasm/ (rar-rs-napi.wasi.cjs + wasm modules + worker).
+ * Both artifacts come from the `@yjdyamv/rar-rs` npm dependency, which ships
+ * every platform's `rar-rs-napi.<triple>.node` plus the WASI bundle
+ * (rar-rs-napi.wasi.cjs + wasm module + worker) in the package root — the
+ * same layout the extension used to stage by hand under vendor/, minus the
+ * download step.
  *
  * @module engines/rar5-engine
  */
@@ -198,6 +200,9 @@ export function resolveRar5Backend(): Rar5Backend {
   return backend === "native" || backend === "wasm" ? backend : "auto";
 }
 
+/** npm package that ships the rar5 bindings (native per-platform + WASI). */
+const RAR_RS_PACKAGE = "@yjdyamv/rar-rs";
+
 let nativeBinding: Rar5Binding | undefined;
 let wasmBinding: Rar5Binding | undefined;
 let nativeBindingError: Error | undefined;
@@ -221,25 +226,36 @@ export async function resetRar5BindingCache(): Promise<void> {
   await disposeWasiBinding(wasm);
 }
 
+/**
+ * Resolve the installed binding package. The two loaders below require files
+ * inside it by absolute path (napi-rs ships them in the package root and the
+ * `exports` map only exposes the entry), so a missing dependency has to fail
+ * with an actionable message rather than a bare MODULE_NOT_FOUND.
+ */
+function rarRsPackageDir(): string {
+  try {
+    return path.dirname(require.resolve(`${RAR_RS_PACKAGE}/package.json`));
+  } catch (err) {
+    throw new Error(
+      `rar5 engine package ${RAR_RS_PACKAGE} is not installed — ` +
+        "reinstall the extension's dependencies (`npm ci`) so node_modules/ holds it",
+      { cause: err },
+    );
+  }
+}
+
 function loadNativeBinding(): Rar5Binding {
   if (nativeBinding) return nativeBinding;
   if (nativeBindingError) throw nativeBindingError;
   const triple = resolveRarTriple();
-  const rel = path.join(
-    "vendor",
-    "rar5-bin",
-    process.platform,
-    process.arch,
-    `rar-rs-napi.${triple}.node`,
-  );
-  // Compiled bundle: out/extension.js → <root>/vendor/rar5-bin. Vitest/dev
-  // (source modules): src/engines/... → <root>/vendor/rar5-bin. Try both.
-  const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
-  const nodePath = candidates.find((c) => fs.existsSync(c));
-  if (!nodePath) {
+  // napi-rs naming: one binding per triple, all of them side by side in the
+  // package root, so the triple is the only platform-dependent part.
+  const nodePath = path.join(rarRsPackageDir(), `rar-rs-napi.${triple}.node`);
+  if (!fs.existsSync(nodePath)) {
     throw new Error(
-      `rar5 native module not found (tried: ${candidates.join(", ")}) — run ` +
-        "`SA_RAR5_DEV=1 node scripts/install-rar5-platforms.js` or publish prebuilds",
+      `rar5 native binding missing for ${process.platform}/${process.arch} ` +
+        `(${RAR_RS_PACKAGE} ships no rar-rs-napi.${triple}.node) — ` +
+        "the WASI fallback still covers this host",
     );
   }
   try {
@@ -255,13 +271,16 @@ function loadNativeBinding(): Rar5Binding {
 function loadWasmBinding(): Rar5Binding {
   if (wasmBinding) return wasmBinding;
   if (wasmBindingError) throw wasmBindingError;
-  const rel = path.join("vendor", "rar5-wasm", "rar-rs-napi.wasi.cjs");
-  const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
-  const loaderPath = candidates.find((c) => fs.existsSync(c));
-  if (!loaderPath) {
+  // Requiring the WASI loader by path (rather than the package entry) keeps
+  // the native and WASI bindings as two independent module instances, which
+  // is what the backend setting switches between. It also sidesteps the
+  // package's native-first entry logic; `__dirname` inside the loader finds
+  // its .wasm and worker next to itself.
+  const loaderPath = path.join(rarRsPackageDir(), "rar-rs-napi.wasi.cjs");
+  if (!fs.existsSync(loaderPath)) {
     throw new Error(
-      `rar5 wasm loader not found (tried: ${candidates.join(", ")}) — run ` +
-        "`SA_RAR5_DEV=1 node scripts/install-rar5-platforms.js` after building the WASI target",
+      `rar5 WASI loader missing from ${RAR_RS_PACKAGE} (no rar-rs-napi.wasi.cjs) — ` +
+        "reinstall the extension's dependencies (`npm ci`)",
     );
   }
   // WASI cannot see the host CPU count; the generated loader forwards
