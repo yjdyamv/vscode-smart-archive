@@ -13,7 +13,13 @@ import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
 import { createTarFile } from "../src/engines/tar-writer";
+import { bundled7zPath } from "../src/engines/bundled7z";
+import { gate } from "./gates";
 import { tmpDir } from "./tmp";
+
+// Same resolution as the bundled7zz gate (never a hand-rolled vendor path);
+// every use is inside it.runIf(gate("bundled7zz")), so non-null there.
+const BUNDLED_7ZZ = bundled7zPath()!;
 
 const dirs: string[] = [];
 
@@ -47,7 +53,7 @@ function readDirRecursive(root: string): string[] {
 }
 
 describe("tar-writer symlink handling", () => {
-  it.runIf(process.platform === "win32")(
+  it.runIf(process.platform === "win32" && gate("bundled7zz"))(
     "follows a directory junction and stores its contents",
     async () => {
       const td = tmpDir("sat_tarsym_");
@@ -66,16 +72,7 @@ describe("tar-writer symlink handling", () => {
       // Extract with system 7z (bundled 7zz) into a scratch dir.
       const out = path.join(td, "out");
       fs.mkdirSync(out, { recursive: true });
-      const bin = path.join(
-        __dirname,
-        "..",
-        "vendor",
-        "7z-bin",
-        process.platform,
-        process.arch,
-        "7zz.exe",
-      );
-      execSync(`"${bin}" x -y -o"${out}" "${tarPath}" >NUL 2>NUL`, { stdio: "pipe" });
+      execSync(`"${BUNDLED_7ZZ}" x -y -o"${out}" "${tarPath}" >NUL 2>NUL`, { stdio: "pipe" });
 
       const extracted = readDirRecursive(out);
       expect(extracted).toContain("proj/.claude/");
@@ -91,7 +88,7 @@ describe("tar-writer symlink handling", () => {
     },
   );
 
-  it.runIf(process.platform === "win32")(
+  it.runIf(process.platform === "win32" && gate("bundled7zz"))(
     "skips circular directory junctions without infinite recursion",
     async () => {
       const td = tmpDir("sat_tarsym2_");
@@ -107,16 +104,7 @@ describe("tar-writer symlink handling", () => {
 
       const out = path.join(td, "out");
       fs.mkdirSync(out, { recursive: true });
-      const bin = path.join(
-        __dirname,
-        "..",
-        "vendor",
-        "7z-bin",
-        process.platform,
-        process.arch,
-        "7zz.exe",
-      );
-      execSync(`"${bin}" x -y -o"${out}" "${tarPath}" >NUL 2>NUL`, { stdio: "pipe" });
+      execSync(`"${BUNDLED_7ZZ}" x -y -o"${out}" "${tarPath}" >NUL 2>NUL`, { stdio: "pipe" });
 
       const extracted = readDirRecursive(out);
       expect(extracted).toContain("proj/a/file.txt");

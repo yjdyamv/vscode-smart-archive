@@ -2,11 +2,11 @@
 /**
  * Package per-target (platform-arch) builds — Smart Archiver
  *
- * The universal package ships every platform's binaries: `vendor/` alone is
- * ~19 MB (5 native 7zz) and the `@yjdyamv/rar-rs` dependency adds 9 rar5
- * bindings (~26 MB with the WASI bundle), while every `.node` snappy binding
- * weighs ~1 MB, so the single .vsix is ~27 MB compressed and each user pays
- * for four platforms they will never run. This script emits one .vsix per
+ * The universal package ships every platform's binaries: the 7-Zip ZS native
+ * package is ~19 MB (6 native 7zz) and the `@yjdyamv/rar-rs` dependency adds 9
+ * rar5 bindings (~26 MB with the WASI bundle), while every `.node` snappy
+ * binding weighs ~1 MB, so the single .vsix is ~27 MB compressed and each user
+ * pays for four platforms they will never run. This script emits one .vsix per
  * VS Code target instead, letting the Marketplace serve the matching build.
  *
  *   node scripts/package-target.mjs                     # every target
@@ -18,114 +18,107 @@
  * target build is a payload trim, not a behaviour change. Only the
  * per-platform native files differ.
  *
- * darwin-x64 gets no native binaries on purpose: there is no prebuilt 7zz
- * for Intel macOS (scripts/install-7z-platforms.mjs) and `@yjdyamv/rar-rs`
- * ships no darwin-x64 binding, so that target ships the WASM engines —
- * slower, but it is exactly what the universal package does on the same
- * machine today.
+ * All six desktop targets have a native 7zz now — 7zip-zstd-native ships an
+ * Intel macOS build too. `@yjdyamv/rar-rs` still ships no darwin-x64 binding,
+ * so that target is native 7zz + WASI rar5/snappy, not WASM-only.
  *
  * Implementation note: `.vscodeignore` cannot narrow the blanket
- * `!node_modules/snappy/**` / `!node_modules/@yjdyamv/rar-rs/**` re-includes
- * — vsce applies re-includes last, so a later exclusion for an unwanted
- * `*.node` is silently ignored (verified by packaging with such an
- * exclusion in place: all 9 bindings still shipped). Both allowlists are
- * therefore *generated* from the installed package tree with only the
- * `.node` files filtered, so a dependency bump that adds a file cannot break
- * `require("snappy")` the way the hand-written list did in 2.6.3.
+ * `!node_modules/snappy/**` / `!node_modules/@yjdyamv/rar-rs/**` /
+ * `!node_modules/7zip-zstd-native/**` re-includes — vsce applies re-includes
+ * last, so a later exclusion for an unwanted file is silently ignored
+ * (verified by packaging with such an exclusion in place: all 9 bindings
+ * still shipped). All three allowlists are therefore *generated* from the
+ * installed package tree with only the unwanted platform files filtered, so a
+ * dependency bump that adds a file cannot break `require("snappy")` the way
+ * the hand-written list did in 2.6.3.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { bindingAllowlist } from "./lib/package-files.mjs";
+import { binAllowlist, bindingAllowlist } from "./lib/package-files.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ignorePath = path.join(root, ".vscodeignore");
 const backupPath = path.join(os.tmpdir(), `vscodeignore-bak-targets-${process.pid}`);
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+const sevenZipDir = path.join(root, "node_modules", "7zip-zstd-native");
 const snappyDir = path.join(root, "node_modules", "snappy");
 const rarRsDir = path.join(root, "node_modules", "@yjdyamv", "rar-rs");
 
 /**
  * Native files per VS Code target. `sevenZip` is the
- * `vendor/<name>/<platform>/<arch>` directory to keep; `rar5` and `snappy`
- * list the binding triples/suffixes that may be kept. `null` = no prebuilt
- * natives exist, so the package is WASM-only.
+ * `node_modules/7zip-zstd-native/bin/<dir>/` directory to keep (`null` = no
+ * native 7zz for this target); `rar5` and `snappy` list the binding
+ * triples/suffixes that may be kept.
  *
  * Linux keeps both the gnu and the musl binding: VS Code has one linux-x64
  * target and Alpine hosts install that same package.
  */
 const TARGETS = {
   "win32-x64": {
-    sevenZip: ["win32", "x64"],
+    sevenZip: "win32-x64",
     rar5: ["win32-x64-msvc"],
     snappy: ["win32-x64-msvc"],
   },
   "win32-arm64": {
-    sevenZip: ["win32", "arm64"],
+    sevenZip: "win32-arm64",
     rar5: ["win32-arm64-msvc"],
     snappy: ["win32-arm64-msvc"],
   },
   "linux-x64": {
-    sevenZip: ["linux", "x64"],
+    sevenZip: "linux-x64",
     rar5: ["linux-x64-gnu", "linux-x64-musl"],
     snappy: ["linux-x64-gnu", "linux-x64-musl"],
   },
   "linux-arm64": {
-    sevenZip: ["linux", "arm64"],
+    sevenZip: "linux-arm64",
     rar5: ["linux-arm64-gnu", "linux-arm64-musl"],
     snappy: ["linux-arm64-gnu", "linux-arm64-musl"],
   },
   "darwin-arm64": {
-    sevenZip: ["darwin", "arm64"],
+    sevenZip: "darwin-arm64",
     rar5: ["darwin-arm64"],
     snappy: ["darwin-arm64"],
   },
-  "darwin-x64": null,
+  "darwin-x64": {
+    // 7zip-zstd-native ships a native Intel 7zz; rar-rs has no darwin-x64
+    // binding, so this target keeps the WASI rar5/snappy.
+    sevenZip: "darwin-x64",
+    rar5: [],
+    snappy: [],
+  },
 };
 
-/** `vendor/<name>/<platform>/<arch>` plus the two licence files. */
-function sevenZipExcludes(target) {
-  const [platform, arch] = target?.sevenZip ?? [null, null];
-  const lines = ["vendor/7z-bin/**"];
-  if (platform) lines.push(`!vendor/7z-bin/${platform}/${arch}/**`);
-  lines.push("!vendor/7z-bin/License.txt", "!vendor/7z-bin/VERSION-native");
-  return lines;
-}
-
 function buildTargetIgnore(original, target) {
-  // darwin-x64 has no prebuilt natives: every vendor/** subtree is excluded
-  // and both binding allowlists keep only their WASI/WASM files.
-  const keep = target ?? { sevenZip: [null, null], rar5: [], snappy: [] };
   const lines = original
     .split("\n")
     // Superseded by the generated allowlists below.
     .filter((l) => l.trim() !== "!node_modules/snappy/**")
     .filter((l) => l.trim() !== "!node_modules/@yjdyamv/rar-rs/**")
+    .filter((l) => l.trim() !== "!node_modules/7zip-zstd-native/**")
     .filter((l) => l.trim() !== "node_modules/snappy/snappy.win32-ia32-msvc.node");
-
-  const excludes = [
-    "",
-    `# ── per-target build: ${targetLabel(target)} ──`,
-    ...sevenZipExcludes(target),
-  ];
 
   return (
     lines.join("\n") +
     "\n" +
-    excludes.join("\n") +
+    [
+      "",
+      `# ── per-target build: ${targetLabel(target)} ──`,
+      ...binAllowlist(sevenZipDir, target.sevenZip ? [target.sevenZip] : []),
+      "",
+    ].join("\n") +
     "\n" +
-    bindingAllowlist(snappyDir, /^snappy\./, keep.snappy).join("\n") +
+    bindingAllowlist(snappyDir, /^snappy\./, target.snappy).join("\n") +
     "\n" +
-    bindingAllowlist(rarRsDir, /^rar-rs-napi\./, keep.rar5).join("\n") +
+    bindingAllowlist(rarRsDir, /^rar-rs-napi\./, target.rar5).join("\n") +
     "\n"
   );
 }
 
 function targetLabel(target) {
-  if (!target) return "WASM-only (no prebuilt natives)";
-  return `${target.sevenZip[0]}/${target.sevenZip[1]}`;
+  return target.sevenZip ? `${target.sevenZip} 7zz` : "WASM-only (no native 7zz)";
 }
 
 const requested = process.argv.slice(2);

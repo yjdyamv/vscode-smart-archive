@@ -11,10 +11,10 @@
  *   node scripts/package-wasm.mjs
  *
  * Generates a wasm-only .vscodeignore for the packaging run: the blanket
- * snappy/rar-rs package re-includes are replaced by generated per-file
- * re-includes that skip every `*.node` (ignore rules cannot be undone by a
- * later exclusion — the re-include always wins), and vendor/7z-bin/ is
- * excluded. The original ignore list is restored afterwards.
+ * snappy/rar-rs/7zip-zstd-native package re-includes are replaced by generated
+ * per-file re-includes that skip every `*.node` and every native 7zz (ignore
+ * rules cannot be undone by a later exclusion — the re-include always wins).
+ * The original ignore list is restored afterwards.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -43,6 +43,7 @@ function buildWasmIgnore(original) {
     .split("\n")
     .filter((l) => l.trim() !== "!node_modules/snappy/**")
     .filter((l) => l.trim() !== "!node_modules/@yjdyamv/rar-rs/**")
+    .filter((l) => l.trim() !== "!node_modules/7zip-zstd-native/**")
     .filter((l) => l.trim() !== "node_modules/snappy/snappy.win32-ia32-msvc.node");
 
   return (
@@ -50,7 +51,6 @@ function buildWasmIgnore(original) {
     "\n" +
     [
       "# ── pure-WASM package: drop native binaries (engines fall back to WASI/WASM) ──",
-      "vendor/7z-bin/**",
       ...KEPT_BINDINGS,
       "",
     ].join("\n")

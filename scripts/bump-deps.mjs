@@ -2,70 +2,43 @@
 /**
  * Apply engine dependency updates detected by check-updates.mjs.
  *
- * For each dependency with a newer release this script:
- *   1. bumps the in-repo version constant (scripts/lib/releases.mjs) for the
- *      native 7-Zip ZS release, or `npm install <pkg>@<version>` for the npm
- *      engines (7zip-zstd-wasm, @yjdyamv/rar-rs, snappy),
- *   2. re-runs the affected installer with SA_HASH_BOOTSTRAP=1 so the pinned
- *      SHA-256 hashes are regenerated in place (fail-closed otherwise),
- *   3. verifies every installer end-to-end with fresh downloads
- *      (scripts/verify-downloads.mjs, fail-closed).
- *
- * The WASM engines have no installer to re-run: package.json plus the lockfile
- * IS the pin, so bumping them is just the npm install (reviewed in the same
- * PR as the tag bumps).
+ * Every engine is an npm dependency now, so for each update this script:
+ *   1. runs `npm install <pkg>@<version>` — package.json plus the lockfile are
+ *      the pin (there is no in-repo version constant any more),
+ *   2. re-runs the affected installer so the staged artifacts follow the bump
+ *      (snappy regenerates its node_modules prebuilds; the 7-Zip and WASM
+ *      engines have no installer — the installed package IS the pin),
+ *   3. verifies the installers end-to-end (scripts/verify-downloads.mjs,
+ *      fail-closed).
  *
  * Usage:
  *   node scripts/bump-deps.mjs                # bump everything available
  *   node scripts/bump-deps.mjs 7z rar5        # only the named deps (7z 7zz rar5 snappy)
  *   node scripts/bump-deps.mjs --dry-run      # report the plan, change nothing
- *   node scripts/bump-deps.mjs --skip-verify  # skip the fresh-download verify
+ *   node scripts/bump-deps.mjs --skip-verify  # skip the verify step
  *
  * Intended for local runs and the scheduled update-deps CI workflow: the
- * resulting diff (version constants + regenerated hashes) is reviewed as a
- * pull request — the hash diff IS the supply-chain review.
+ * resulting diff (package.json + lockfile + staged binaries) is reviewed as a
+ * pull request.
  *
  * The planning logic is exported and unit-tested with an injected fetchJson;
- * applyUpdates runs real installers (network + downloads) and is exercised
- * by the CI workflow, not by unit tests.
+ * applyUpdates runs real installers (network) and is exercised by the CI
+ * workflow, not by unit tests.
  */
 
 import fs from "fs";
 import path from "path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { normalizeTag, defaultFetchJson, SNAPPY_BLOCKED_VERSIONS } from "./check-updates.mjs";
-import { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } from "./lib/releases.mjs";
+import { defaultFetchJson, SNAPPY_BLOCKED_VERSIONS } from "./check-updates.mjs";
 
 const SCRIPTS_DIR = import.meta.dirname;
 const ROOT_DIR = path.join(SCRIPTS_DIR, "..");
-const RELEASES_PATH = path.join(SCRIPTS_DIR, "lib", "releases.mjs");
 const ROOT_PACKAGE_JSON = path.join(ROOT_DIR, "package.json");
-
-async function latestGithubTag(repo, fetchJson) {
-  const body = await fetchJson(`https://api.github.com/repos/${repo}/releases/latest`);
-  return String(body.tag_name);
-}
 
 async function npmLatestVersion(pkgName, fetchJson) {
   const body = await fetchJson(`https://registry.npmjs.org/${pkgName}/latest`);
   return String(body.version);
-}
-
-/**
- * Rewrite one version constant inside a script (e.g.
- * `export const SEVEN_ZIP_ZSTD_TAG = "v26.02-..."`), single or double
- * quoted. Returns true when the file was updated.
- */
-export function updateVersionConstant(scriptPath, constantName, newValue) {
-  const text = fs.readFileSync(scriptPath, "utf8");
-  const re = new RegExp(`(export\\s+const\\s+${constantName}\\s*=\\s*["'])[^"']*(["'])`);
-  if (!re.test(text)) return false;
-  const next = text.replace(re, `$1${newValue}$2`);
-  const mode = fs.statSync(scriptPath).mode;
-  fs.writeFileSync(scriptPath, next);
-  fs.chmodSync(scriptPath, mode);
-  return true;
 }
 
 /** Strip a leading "^" (npm caret range) for comparison. */
@@ -77,17 +50,13 @@ export function stripCaret(v) {
  * One planned update:
  *   key        — "7z" | "7zz" | "rar5" | "snappy"
  *   name       — human-readable label
- *   current    — pinned/declared version today
+ *   current    — declared version range today (e.g. "^26.5.0")
  *   latest     — version to bump to
- *   kind       — "tag" (version constant in releases.mjs) | "npm"
- *   pkg        — (npm) package name to `npm install <pkg>@<latest>`
- *   installers — installer scripts to re-run with SA_HASH_BOOTSTRAP=1
- *   file       — (tag) script containing the version constant
- *   constant   — (tag) constant name to rewrite
+ *   pkg        — package name to `npm install <pkg>@<latest>`
+ *   installers — installer scripts to re-run so staged artifacts follow
  *
  * @typedef {{key: string, name: string, current: string, latest: string,
- *   kind: "tag"|"npm", pkg?: string, installers: string[], file?: string,
- *   constant?: string}} BumpPlan
+ *   pkg: string, installers: string[]}} BumpPlan
  */
 
 /**
@@ -103,27 +72,18 @@ export async function planUpdates({
   rootPkg = ROOT_PACKAGE_JSON,
 } = {}) {
   const updates = [];
-
-  const mirrorTag = await latestGithubTag(SEVEN_ZIP_ZSTD_REPO, fetchJson);
-  if (normalizeTag(mirrorTag) !== normalizeTag(SEVEN_ZIP_ZSTD_TAG)) {
-    updates.push({
-      key: "7z",
-      name: "7-Zip ZS (native)",
-      current: SEVEN_ZIP_ZSTD_TAG,
-      latest: mirrorTag,
-      kind: "tag",
-      file: RELEASES_PATH,
-      constant: "SEVEN_ZIP_ZSTD_TAG",
-      installers: ["install-7z-platforms.mjs"],
-    });
-  }
-
   const declared = readDeclaredDeps(rootPkg);
 
-  // npm engines: package.json is the only pin, so a newer registry version is
-  // the whole plan. snappy additionally stages prebuilds via its installer and
-  // has a known-broken release that must never be offered.
+  // npm engines: package.json + lockfile are the only pin, so a newer registry
+  // version is the whole plan. snappy additionally stages prebuilds via its
+  // installer and has a known-broken release that must never be offered.
   for (const engine of [
+    {
+      key: "7z",
+      name: "7-Zip ZS native (npm)",
+      pkg: "7zip-zstd-native",
+      installers: [],
+    },
     {
       key: "7zz",
       name: "7-Zip ZS WASM (npm)",
@@ -159,7 +119,6 @@ export async function planUpdates({
       name: engine.name,
       current,
       latest,
-      kind: "npm",
       pkg: engine.pkg,
       installers: engine.installers,
     });
@@ -175,29 +134,26 @@ function readDeclaredDeps(rootPkg) {
 }
 
 /**
- * Apply the planned updates: rewrite constants / run `npm install` for the
- * npm dep, then re-run the affected installers with SA_HASH_BOOTSTRAP=1 to
- * regenerate the pinned hashes in place. Returns a per-dep summary.
+ * Apply the planned updates: `npm install <pkg>@<version>`, then re-run the
+ * affected installers so the staged artifacts follow the bump. Returns a
+ * per-dep summary.
  */
 export async function applyUpdates(updates, { runInstallers = true } = {}) {
   const results = [];
   for (const u of updates) {
-    if (u.kind === "npm") {
-      execFileSync("npm", ["install", `${u.pkg}@${u.latest}`], {
-        stdio: "inherit",
-        cwd: ROOT_DIR,
-      });
-    } else {
-      const ok = updateVersionConstant(u.file, u.constant, u.latest);
-      if (!ok) throw new Error(`failed to bump ${u.constant} in ${u.file}`);
-    }
+    execFileSync("npm", ["install", `${u.pkg}@${u.latest}`], {
+      stdio: "inherit",
+      cwd: ROOT_DIR,
+    });
     if (runInstallers) {
       for (const inst of u.installers) {
-        console.log(`[bump-deps] ${u.key}: staging via ${inst} (SA_HASH_BOOTSTRAP=1)`);
+        console.log(`[bump-deps] ${u.key}: staging via ${inst}`);
         execFileSync(process.execPath, [path.join(SCRIPTS_DIR, inst)], {
           stdio: "inherit",
           env: {
             ...process.env,
+            // snappy regenerates its pinned hashes in place; the other
+            // installers ignore this.
             SA_HASH_BOOTSTRAP: "1",
             ...(u.key === "rar5" ? { SA_RAR5_REQUIRE: "1" } : {}),
           },
@@ -232,7 +188,7 @@ async function main() {
 
   console.log("[bump-deps] updates available:");
   for (const u of selected) {
-    console.log(`  ${u.name}: ${u.current} -> ${u.latest} (${u.kind})`);
+    console.log(`  ${u.name}: ${u.current} -> ${u.latest}`);
   }
 
   if (dryRun) {

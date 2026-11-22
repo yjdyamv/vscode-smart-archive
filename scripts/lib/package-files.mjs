@@ -67,3 +67,22 @@ export function bindingAllowlist(pkgDir, nodePrefix, keep) {
     })
     .map((rel) => `!${ignoreDir}/${rel}`);
 }
+
+/**
+ * Per-file re-includes for a package whose per-platform payload lives under
+ * `bin/<dir>/…` (7zip-zstd-native: `bin/linux-x64/7zz`, …). Everything outside
+ * `bin/` is always kept (the JS entry chain, the licence, the manifest); under
+ * `bin/` only `keepDirs` are kept, so a per-target build never ships four
+ * platforms it cannot run. An empty list keeps no native binary at all (the
+ * pure-WASM build).
+ */
+export function binAllowlist(pkgDir, keepDirs) {
+  const ignoreDir = packageIgnoreDir(pkgDir);
+  return listPackageFiles(pkgDir)
+    .filter((rel) => {
+      const m = rel.match(/^bin\/([^/]+)\//);
+      if (!m) return true; // not a per-platform payload — always keep
+      return keepDirs.includes(m[1]);
+    })
+    .map((rel) => `!${ignoreDir}/${rel}`);
+}

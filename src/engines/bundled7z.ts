@@ -15,21 +15,26 @@ import { BINARY_DETECT_TIMEOUT } from "../constants";
 import { logger } from "../utils/logger-core";
 
 /**
- * Resolve the full-format 7-Zip console binary bundled under vendor/7z-bin/ for the
- * current platform/arch (staged by scripts/install-7z-platforms.js). On Unix
- * the file may lose its execute bit when the VSIX is unpacked, so restore it.
- * Returns null when no binary is bundled for this platform (→ WASM fallback).
+ * Resolve the full-format 7-Zip console binary shipped inside the
+ * `7zip-zstd-native` dependency (node_modules/7zip-zstd-native/bin/
+ * <platform>-<arch>/) for the current platform/arch. On Unix the file may lose
+ * its execute bit when the VSIX is unpacked, so restore it. Returns null when
+ * no binary matches this platform (→ WASM fallback).
  */
 export function bundled7zPath(): string | null {
+  // The package lays its binaries out as bin/<platform>-<arch>/7zz(.exe),
+  // which is exactly node's process.platform / process.arch — no mapping.
   // Compiled bundle (out/extension.js) resolves from <root>/out; source
   // modules (src/engines, vitest) resolve from <root>/src/engines. Try both.
-  // All platforms use the same `7zz` name (Windows: 7zz.exe); the 7z.exe
-  // fallback only covers stale vendor dirs from older staging runs.
-  const names = process.platform === "win32" ? ["7zz.exe", "7z.exe"] : ["7zz"];
-  const candidates = names.flatMap((bin) => {
-    const rel = path.join("vendor", "7z-bin", process.platform, process.arch, bin);
-    return [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
-  });
+  const bin = process.platform === "win32" ? "7zz.exe" : "7zz";
+  const rel = path.join(
+    "node_modules",
+    "7zip-zstd-native",
+    "bin",
+    `${process.platform}-${process.arch}`,
+    bin,
+  );
+  const candidates = [path.join(__dirname, "..", rel), path.join(__dirname, "..", "..", rel)];
   const p = candidates.find((c) => fs.existsSync(c)) ?? null;
   if (!p) return null;
   if (process.platform !== "win32") {

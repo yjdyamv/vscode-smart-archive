@@ -7,14 +7,14 @@ Smart Archiver uses the following third-party libraries, each under its own lice
 
 ## Native Modules (distributed as separate binaries)
 
-All four are npm dependencies now; earlier releases staged them under
-`vendor/` with download scripts, which is why old notices name paths.
+All four are npm dependencies; earlier releases staged some under `vendor/`
+with download scripts, which is why old notices name paths.
 
 | Package | License | Source |
 | --------- | --------- | -------- |
 | @vscode/codicons | CC-BY-4.0 | <https://github.com/microsoft/vscode-codicons> |
 | 7-Zip ZS WASM (npm: 7zip-zstd-wasm) | LGPL-2.1+ with unRAR restriction | <https://github.com/yjdyamv/7-Zip-zstd-wasm> |
-| 7-Zip ZS native (vendor/7z-bin/) | LGPL-2.1+ with unRAR restriction | <https://github.com/yjdyamv/7-Zip-zstd-native> |
+| 7-Zip ZS native (npm: 7zip-zstd-native) | LGPL-2.1+ with unRAR restriction | <https://github.com/yjdyamv/7-Zip-zstd-native> |
 | rar-rs (npm: @yjdyamv/rar-rs — native + WASI) | BSD-2-Clause | <https://github.com/yjdyamv/rar-rs> |
 
 Both 7-Zip ZS builds are compiled from 7-Zip sources, whose license adds a

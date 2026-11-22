@@ -5,11 +5,6 @@ test/out/
 *.vsix
 .vscode/settings.json
 media/vue/
-# vendored native binaries — staged by the install scripts
-# (install-7z-platforms.mjs / install-snappy-platforms.mjs), including
-# vendor/7z-bin/package.json. The WASM engines are npm dependencies now
-# (7zip-zstd-wasm, @yjdyamv/rar-rs), so nothing rar5/7zz lands here anymore.
-vendor/
 **/*.tsbuildinfo
 .cache/
 

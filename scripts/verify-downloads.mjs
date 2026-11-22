@@ -4,20 +4,23 @@ import path from "path";
 /**
  * Verify the download scripts with fresh downloads only.
  *
- * Runs every remaining installer exactly as `npm run stage:natives` would, but
- * with SA_FORCE_DOWNLOAD=1 (ignores .cache/ and already-staged binaries,
- * forcing a real network download with SHA-256 verification). The WASM engines
- * (7zz, rar5) are npm dependencies and are verified by `npm ci` instead.
+ * Runs every installer that still downloads, exactly as `npm run
+ * stage:natives` would, but with SA_FORCE_DOWNLOAD=1 (ignores .cache/ and
+ * already-staged binaries, forcing a real network download with SHA-256
+ * verification).
+ *
+ * The 7-Zip engines no longer download: 7-Zip ZS native comes from the
+ * `7zip-zstd-native` npm package (re-included into the .vsix and resolved at
+ * runtime by src/engines/bundled7z.ts; `npm ci` + the declared/installed checks
+ * in test/install-scripts-config.test.ts cover it) and 7-Zip ZS WASM / rar-rs
+ * are npm dependencies too.
  *
  * Usage:
- *   node scripts/verify-downloads.mjs              # every installer
- *   node scripts/verify-downloads.mjs 7z snappy    # only the named ones
+ *   node scripts/verify-downloads.mjs            # every downloading installer
+ *   node scripts/verify-downloads.mjs snappy     # only the named ones
  */
 
-const STEPS = [
-  ["snappy", "install-snappy-platforms.mjs", {}],
-  ["7z", "install-7z-platforms.mjs", {}],
-];
+const STEPS = [["snappy", "install-snappy-platforms.mjs", {}]];
 
 const args = process.argv.slice(2);
 const selected = args.length === 0 ? STEPS : STEPS.filter(([name]) => args.includes(name));

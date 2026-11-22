@@ -5,9 +5,10 @@
  * network is touched: a registry/API outage must never make these tests
  * flaky, and the "unavailable" degradation is itself asserted.
  *
- * The npm engines (snappy, 7zip-zstd-wasm, @yjdyamv/rar-rs) are read from the
- * installed tree, which the fixtures below materialise in a temp dir — the
- * same `<nodeModulesDir>/<pkg>/package.json` layout the real run uses.
+ * The npm engines (7zip-zstd-native, snappy, 7zip-zstd-wasm, @yjdyamv/rar-rs)
+ * are read from the installed tree, which the fixtures below materialise in a
+ * temp dir — the same `<nodeModulesDir>/<pkg>/package.json` layout the real run
+ * uses.
  *
  * @module test/check-updates
  */
@@ -16,7 +17,6 @@ import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { checkUpdates, hasUpdate } from "../scripts/check-updates.mjs";
-import { SEVEN_ZIP_ZSTD_TAG } from "../scripts/lib/releases.mjs";
 import { tmpDir } from "./tmp";
 
 /** Fetch stub: url prefix → value (or Error to simulate failure). */
@@ -32,14 +32,18 @@ function makeFetchJson(stubs: Record<string, unknown>) {
   };
 }
 
-const github7z = `https://api.github.com/repos/yjdyamv/7-Zip-zstd-native/releases/latest`;
 const githubUpstream = `https://api.github.com/repos/mcmilk/7-Zip-zstd/releases/latest`;
+const npm7zNative = `https://registry.npmjs.org/7zip-zstd-native/latest`;
 const npmSnappy = `https://registry.npmjs.org/snappy/latest`;
 const npm7zz = `https://registry.npmjs.org/7zip-zstd-wasm/latest`;
 const npmRar = `https://registry.npmjs.org/@yjdyamv/rar-rs/latest`;
 
+/** Upstream 7-Zip ZS tag the fixture package records in its `7zip` field. */
+const UPSTREAM_TAG = "v26.05-v1.5.7-R1";
+
 /** Versions the fixtures install unless a test overrides them. */
 const INSTALLED = {
+  "7zip-zstd-native": "26.5.0",
   snappy: "7.3.3",
   "7zip-zstd-wasm": "26.5.0",
   "@yjdyamv/rar-rs": "0.15.3",
@@ -51,14 +55,23 @@ function installedTree(versions: Record<string, string> = INSTALLED): string {
   for (const [pkg, version] of Object.entries(versions)) {
     const pkgDir = path.join(dir, ...pkg.split("/"));
     fs.mkdirSync(pkgDir, { recursive: true });
-    fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({ name: pkg, version }));
+    const manifest: Record<string, unknown> = { name: pkg, version };
+    // 7zip-zstd-native records the upstream source it was built from.
+    if (pkg === "7zip-zstd-native") manifest["7zip"] = { upstreamTag: UPSTREAM_TAG };
+    fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify(manifest));
   }
   return dir;
 }
 
 /** Every npm engine reports the fixture versions. */
-function registryStubs({ snappy = "7.3.3", sevenZipWasm = "26.5.0", rar = "0.15.3" } = {}) {
+function registryStubs({
+  sevenZipNative = "26.5.0",
+  snappy = "7.3.3",
+  sevenZipWasm = "26.5.0",
+  rar = "0.15.3",
+} = {}) {
   return {
+    [npm7zNative]: { version: sevenZipNative },
     [npmSnappy]: { version: snappy },
     [npm7zz]: { version: sevenZipWasm },
     [npmRar]: { version: rar },
@@ -68,8 +81,7 @@ function registryStubs({ snappy = "7.3.3", sevenZipWasm = "26.5.0", rar = "0.15.
 describe("checkUpdates", () => {
   it("reports up-to-date when every pin matches its upstream", async () => {
     const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      [githubUpstream]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
+      [githubUpstream]: { tag_name: UPSTREAM_TAG },
       ...registryStubs(),
     });
     const results = await checkUpdates({ fetchJson, nodeModulesDir: installedTree() });
@@ -78,21 +90,19 @@ describe("checkUpdates", () => {
     expect(hasUpdate(results)).toBe(false);
   });
 
-  it("flags a newer 7-Zip ZS mirror release", async () => {
-    const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: "v26.03-v1.6.0-R1" },
-      ...registryStubs(),
-    });
+  it("flags a newer 7-Zip ZS native package", async () => {
+    const fetchJson = makeFetchJson({ ...registryStubs({ sevenZipNative: "26.6.0" }) });
     const results = await checkUpdates({ fetchJson, nodeModulesDir: installedTree() });
     const seven = results.find((r) => r.key === "7-Zip ZS")!;
     expect(seven.status).toBe("update-available");
-    expect(seven.latest).toBe("v26.03-v1.6.0-R1");
+    expect(seven.current).toBe("26.5.0");
+    expect(seven.latest).toBe("26.6.0");
+    expect(seven.url).toBe("https://www.npmjs.com/package/7zip-zstd-native");
     expect(hasUpdate(results)).toBe(true);
   });
 
-  it("warns when the 7-Zip mirror lags behind upstream", async () => {
+  it("warns when the native build's upstream source lags mcmilk/7-Zip-zstd", async () => {
     const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
       [githubUpstream]: { tag_name: "v26.99" },
       ...registryStubs(),
     });
@@ -102,11 +112,17 @@ describe("checkUpdates", () => {
     expect(hasUpdate(results)).toBe(true);
   });
 
-  it("flags a newer 7-Zip ZS WASM package", async () => {
+  it("stays up-to-date when the upstream lag check is unreachable", async () => {
     const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      ...registryStubs({ sevenZipWasm: "26.6.0" }),
+      [githubUpstream]: new Error("network down"),
+      ...registryStubs(),
     });
+    const results = await checkUpdates({ fetchJson, nodeModulesDir: installedTree() });
+    expect(results.find((r) => r.key === "7-Zip ZS")!.status).toBe("up-to-date");
+  });
+
+  it("flags a newer 7-Zip ZS WASM package", async () => {
+    const fetchJson = makeFetchJson({ ...registryStubs({ sevenZipWasm: "26.6.0" }) });
     const results = await checkUpdates({ fetchJson, nodeModulesDir: installedTree() });
     const wasm = results.find((r) => r.key === "7zz")!;
     expect(wasm.status).toBe("update-available");
@@ -116,10 +132,7 @@ describe("checkUpdates", () => {
   });
 
   it("flags a newer rar-rs package", async () => {
-    const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      ...registryStubs({ rar: "0.16.0" }),
-    });
+    const fetchJson = makeFetchJson({ ...registryStubs({ rar: "0.16.0" }) });
     const results = await checkUpdates({ fetchJson, nodeModulesDir: installedTree() });
     const rar5 = results.find((r) => r.key === "rar5")!;
     expect(rar5.status).toBe("update-available");
@@ -128,10 +141,7 @@ describe("checkUpdates", () => {
   });
 
   it("flags a newer snappy release against the installed version", async () => {
-    const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      ...registryStubs({ snappy: "7.5.0" }),
-    });
+    const fetchJson = makeFetchJson({ ...registryStubs({ snappy: "7.5.0" }) });
     const results = await checkUpdates({ fetchJson, nodeModulesDir: installedTree() });
     const snappy = results.find((r) => r.key === "snappy")!;
     expect(snappy.status).toBe("update-available");
@@ -140,10 +150,7 @@ describe("checkUpdates", () => {
   });
 
   it("reports a blocked snappy release (7.4.0) as blocked, not an update", async () => {
-    const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      ...registryStubs({ snappy: "7.4.0" }),
-    });
+    const fetchJson = makeFetchJson({ ...registryStubs({ snappy: "7.4.0" }) });
     const results = await checkUpdates({ fetchJson, nodeModulesDir: installedTree() });
     const snappy = results.find((r) => r.key === "snappy")!;
     expect(snappy.status).toBe("blocked");
@@ -154,7 +161,7 @@ describe("checkUpdates", () => {
 
   it("degrades to unavailable per-check on network errors, without throwing", async () => {
     const fetchJson = makeFetchJson({
-      [github7z]: new Error("network down"),
+      [npm7zNative]: new Error("network down"),
       [npmSnappy]: new Error("network down"),
       [npm7zz]: new Error("network down"),
       [npmRar]: new Error("network down"),
@@ -166,17 +173,13 @@ describe("checkUpdates", () => {
   });
 
   it("tolerates a missing installed tree (npm engines report unavailable)", async () => {
-    const fetchJson = makeFetchJson({
-      [github7z]: { tag_name: SEVEN_ZIP_ZSTD_TAG },
-      ...registryStubs(),
-    });
+    const fetchJson = makeFetchJson({ ...registryStubs() });
     const results = await checkUpdates({
       fetchJson,
       nodeModulesDir: path.join(tmpDir("checkupd-"), "does-not-exist"),
     });
-    for (const key of ["7zz", "rar5", "snappy"]) {
+    for (const key of ["7-Zip ZS", "7zz", "rar5", "snappy"]) {
       expect(results.find((r) => r.key === key)!.status, key).toBe("unavailable");
     }
-    expect(results.find((r) => r.key === "7-Zip ZS")!.status).toBe("up-to-date");
   });
 });

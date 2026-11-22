@@ -3,12 +3,13 @@
  * Check for newer releases of the bundled engine dependencies.
  *
  * Read-only: never modifies files, never downloads binaries. Compares the
- * in-repo pins (scripts/lib/releases.mjs, package.json via the installed tree)
- * against the live upstreams:
+ * in-repo pins (package.json via the installed tree) against the live
+ * upstreams:
  *
- *   1. 7-Zip ZS native  — yjdyamv/7-Zip-zstd-native latest release tag
- *      vs SEVEN_ZIP_ZSTD_TAG (also warns when the mirror repo lags behind
- *      upstream mcmilk/7-Zip-zstd — a security-relevant staleness signal).
+ *   1. 7-Zip ZS native (npm: 7zip-zstd-native) — registry latest vs the
+ *      installed version; when current, also warns when the build lags
+ *      upstream mcmilk/7-Zip-zstd (a security-relevant staleness signal, read
+ *      from the package's `7zip.upstreamTag`).
  *   2. 7-Zip ZS WASM (npm: 7zip-zstd-wasm) — registry latest vs installed.
  *   3. rar-rs (npm: @yjdyamv/rar-rs, native + WASI) — registry latest vs
  *      installed.
@@ -35,9 +36,9 @@
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "node:url";
-import { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } from "./lib/releases.mjs";
 
 const UPSTREAM_7Z_REPO = "mcmilk/7-Zip-zstd";
+const SEVEN_ZIP_ZSTD_NPM = "7zip-zstd-native";
 
 /** "v26.02-v1.5.7-R2" → "26.02-v1.5.7-R2" (and "0.3.2" stays "0.3.2"). */
 export function normalizeTag(tag) {
@@ -61,26 +62,40 @@ async function latestGithubTag(repo, fetchJson) {
   return String(body.tag_name);
 }
 
-async function checkSevenZip(fetchJson) {
-  const mirrorTag = await latestGithubTag(SEVEN_ZIP_ZSTD_REPO, fetchJson);
+/** The upstream 7-Zip ZS tag the installed npm package was built from. */
+function installedSevenZipUpstreamTag(nodeModulesDir) {
+  const pkgPath = path.join(nodeModulesDir, ...SEVEN_ZIP_ZSTD_NPM.split("/"), "package.json");
+  if (!fs.existsSync(pkgPath)) return undefined;
+  const meta = JSON.parse(fs.readFileSync(pkgPath, "utf8"))["7zip"];
+  return meta?.upstreamTag;
+}
+
+async function checkSevenZip(fetchJson, nodeModulesDir) {
+  const latestBody = await fetchJson(`https://registry.npmjs.org/${SEVEN_ZIP_ZSTD_NPM}/latest`);
+  const latest = String(latestBody.version);
+  const current = await loadInstalledVersion(nodeModulesDir, SEVEN_ZIP_ZSTD_NPM);
   const result = {
     name: "7-Zip ZS (native)",
-    current: SEVEN_ZIP_ZSTD_TAG,
-    latest: mirrorTag,
-    status: "up-to-date",
-    url: `https://github.com/${SEVEN_ZIP_ZSTD_REPO}/releases/tag/${mirrorTag}`,
+    current,
+    latest,
+    status:
+      current === "unknown"
+        ? "unavailable"
+        : current === latest
+          ? "up-to-date"
+          : "update-available",
+    url: `https://www.npmjs.com/package/${SEVEN_ZIP_ZSTD_NPM}`,
   };
-  if (normalizeTag(mirrorTag) !== normalizeTag(SEVEN_ZIP_ZSTD_TAG)) {
-    result.status = "update-available";
-    return result;
-  }
-  // Mirror is current — but is the mirror itself behind upstream 7-Zip ZS?
+  if (result.status !== "up-to-date") return result;
+  // Our package is current — but is the upstream source it was built from?
+  const upstreamTag = installedSevenZipUpstreamTag(nodeModulesDir);
+  if (!upstreamTag) return result;
   try {
-    const upstreamTag = await latestGithubTag(UPSTREAM_7Z_REPO, fetchJson);
-    if (normalizeTag(upstreamTag) !== normalizeTag(mirrorTag)) {
+    const latestUpstream = await latestGithubTag(UPSTREAM_7Z_REPO, fetchJson);
+    if (normalizeTag(latestUpstream) !== normalizeTag(upstreamTag)) {
       result.status = "mirror-behind-upstream";
-      result.latest = `${mirrorTag} (upstream ${UPSTREAM_7Z_REPO}: ${upstreamTag})`;
-      result.url = `https://github.com/${UPSTREAM_7Z_REPO}/releases/tag/${upstreamTag}`;
+      result.latest = `${upstreamTag} (upstream ${UPSTREAM_7Z_REPO}: ${latestUpstream})`;
+      result.url = `https://github.com/${UPSTREAM_7Z_REPO}/releases/tag/${latestUpstream}`;
     }
   } catch {
     // Upstream check is informational — ignore failures.
@@ -134,9 +149,11 @@ async function checkSnappy(fetchJson, nodeModulesDir) {
 }
 
 /**
- * npm-hosted engines whose version pin lives in package.json alone. Both are
+ * npm-hosted engines whose version pin lives in package.json alone. All are
  * read from the installed tree (what actually ships in the .vsix), so an
  * out-of-sync node_modules is reported instead of a stale in-repo constant.
+ * The native 7-Zip ZS is checked separately (checkSevenZip) because it also
+ * carries the upstream-lag signal.
  */
 const NPM_ENGINES = [
   { key: "7zz", name: "7-Zip ZS WASM (npm)", pkg: "7zip-zstd-wasm" },
@@ -172,7 +189,7 @@ export async function checkUpdates({
   nodeModulesDir = path.join(import.meta.dirname, "..", "node_modules"),
 } = {}) {
   const checks = [
-    ["7-Zip ZS", () => checkSevenZip(fetchJson)],
+    ["7-Zip ZS", () => checkSevenZip(fetchJson, nodeModulesDir)],
     ...NPM_ENGINES.map((engine) => [
       engine.key,
       () => checkNpmEngine(fetchJson, engine, nodeModulesDir),

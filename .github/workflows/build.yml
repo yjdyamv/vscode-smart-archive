@@ -273,15 +273,15 @@ jobs:
             --skip-duplicate
 
   # Validate the bundled macOS 7zz on real Apple hardware (no Mac needed locally).
-  # Downloads the same 7-Zip ZS arm64 binary the install script stages from
-  # yjdyamv/7-Zip-zstd-native, replicates the extension's runtime prep
-  # (quarantine strip + ad-hoc sign fallback), and does a compress/extract
-  # round-trip — i.e. the exact execve the extension performs via spawn.
+  # Uses the same 7-Zip ZS arm64 binary the extension bundles — taken from the
+  # `7zip-zstd-native` dependency (the arm64 slice the installer stages) —
+  # replicates the extension's runtime prep (quarantine strip + ad-hoc sign
+  # fallback), and does a compress/extract round-trip — i.e. the exact execve
+  # the extension performs via spawn.
   #
   # macos-15 (arm64) is free for public repos and is the higher-risk arch
-  # (unsigned arm64 is SIGKILLed). The ZS fork publishes arm64-only mac builds,
-  # so there is no free Intel runner to cover — add the billable larger runner
-  # if Intel coverage is ever needed:
+  # (unsigned arm64 is SIGKILLed). The universal .vsix bundles no Intel macOS
+  # binary (that target is WASM-only), so there is nothing to cover on Intel:
   #     matrix: { os: [macos-15, macos-15-large] }   # macos-15-large = Intel, costs minutes
   test-macos-7z:
     name: Validate bundled mac 7zz
@@ -292,20 +292,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - name: Download & validate macOS 7zz
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate macOS 7zz
         shell: bash
         run: |
           set -euo pipefail
-          REPO=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_REPO")
-          TAG=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_TAG")
-          VER=${TAG#v}; VER=${VER%%-*}
-          echo "Testing 7-Zip $VER on $(uname -m) — macOS $(sw_vers -productVersion)"
-
-          curl -fsSL -o 7zz-macos-arm64.tar.gz "https://github.com/${REPO}/releases/download/${TAG}/7zz-macos-arm64.tar.gz"
-          mkdir -p extract && tar -xf 7zz-macos-arm64.tar.gz -C extract
-          BIN="$(find extract -type f -name 7zz | head -1)"
-          test -n "$BIN" || { echo "::error::7zz not found in mac tarball"; exit 1; }
+          BIN="node_modules/7zip-zstd-native/bin/darwin-arm64/7zz"
+          test -f "$BIN" || { echo "::error::$BIN not found (is 7zip-zstd-native installed?)"; exit 1; }
           chmod +x "$BIN"
+          echo "Testing 7-Zip ZS on $(uname -m) — macOS $(sw_vers -productVersion)"
 
           echo "── simulate a quarantined file (as if unpacked from a downloaded VSIX) ──"
           xattr -w com.apple.quarantine "0081;00000000;ci-test;" "$BIN"
@@ -339,29 +338,26 @@ jobs:
           echo "✅ mac 7zz executed and round-tripped OK on $(uname -m)"
 
   # Validate the bundled Windows 7zz.exe on real Windows. The ZS fork ships a
-  # single static 7zz.exe (all codecs included, no adjacent 7z.dll), so this
-  # downloads the same archive the install script stages from
-  # yjdyamv/7-Zip-zstd-native, confirms the RAR codec is present, and runs a
-  # compress/extract round-trip. windows-latest is free for public repos.
+  # single static 7zz.exe (all codecs included, no adjacent 7z.dll); this uses
+  # the same binary the extension bundles — the win32-x64 slice of the
+  # `7zip-zstd-native` dependency — confirms the RAR codec is present, and runs
+  # a compress/extract round-trip. windows-latest is free for public repos.
   test-windows-7z:
     name: Validate bundled Windows 7zz.exe
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Download & validate Windows 7zz.exe
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate Windows 7zz.exe
         shell: bash
         run: |
           set -euo pipefail
-          REPO=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_REPO")
-          TAG=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_TAG")
-          VER=${TAG#v}; VER=${VER%%-*}
-          echo "Testing 7-Zip $VER on Windows"
-          curl -fsSL -o 7zz-windows-x64.zip "https://github.com/${REPO}/releases/download/${TAG}/7zz-windows-x64.zip"
-          # Git Bash's GNU tar cannot read zip archives; Windows' built-in
-          # Expand-Archive handles the GitHub release zip reliably.
-          mkdir -p bin && powershell -NoProfile -Command "Expand-Archive -Force -Path 7zz-windows-x64.zip -DestinationPath bin"
-          BIN="$(find bin -type f -name 7zz.exe | head -1)"
-          test -n "$BIN" || { echo "::error::7zz.exe not found in windows zip"; exit 1; }
+          BIN="node_modules/7zip-zstd-native/bin/win32-x64/7zz.exe"
+          test -f "$BIN" || { echo "::error::$BIN not found (is 7zip-zstd-native installed?)"; exit 1; }
           ls -l "$BIN"
           # The ZS fork statically links its codecs — confirm RAR is in the exe.
           "$BIN" i | grep -q 'Rar5' || { echo "::error::RAR5 codec missing from 7zz.exe"; exit 1; }
@@ -390,26 +386,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - name: Download & extract 7zz
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Resolve bundled 7zz
         shell: bash
         run: |
           set -euo pipefail
-          REPO=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_REPO")
-          TAG=$(node -p "require('./scripts/lib/releases.mjs').SEVEN_ZIP_ZSTD_TAG")
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            ASSET=7zz-windows-x64.zip
+            BIN="node_modules/7zip-zstd-native/bin/win32-x64/7zz.exe"
           else
-            ASSET=7zz-linux-x64.tar.gz
+            BIN="node_modules/7zip-zstd-native/bin/linux-x64/7zz"
           fi
-          curl -fsSL -o "$ASSET" "https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
-          mkdir -p bin
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            powershell -NoProfile -Command "Expand-Archive -Force -Path '$ASSET' -DestinationPath bin"
-          else
-            tar -xf "$ASSET" -C bin
-          fi
-          BIN="$(find bin -type f \( -name 7zz -o -name 7zz.exe \) | head -1)"
-          test -n "$BIN"
+          test -f "$BIN" || { echo "::error::$BIN not found (is 7zip-zstd-native installed?)"; exit 1; }
           echo "BIN=$BIN" >> "$GITHUB_ENV"
       - name: Verify stdin password (create / list / extract / wrong-password)
         shell: bash

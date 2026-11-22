@@ -1,75 +1,27 @@
 /**
- * Config sanity for the engine dependencies: every staged target must have a
- * pinned SHA-256, hashes must be well-formed, and the remaining installer must
- * share its release tag with scripts/lib/releases.mjs.
+ * Config sanity for the engine dependencies: the download installer's pinned
+ * hashes must be well-formed, and every npm-hosted engine (7-Zip ZS native,
+ * 7-Zip ZS WASM, rar-rs) must be declared and installed with the files the
+ * runtime actually loads.
  *
- * The WASM engines (7zip-zstd-wasm, @yjdyamv/rar-rs) have no installer — they
- * are npm dependencies — so they are covered by the declared/installed pair
- * checks below instead.
+ * 7-Zip ZS native has no installer any more — it ships straight from
+ * `node_modules/7zip-zstd-native` (bundled7z.ts resolves
+ * bin/<platform>-<arch>/7zz) — so the declared/installed pair checks below
+ * cover it, including the per-platform bins and the LGPL licence text.
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import {
-  EXPECTED_HASHES as H7Z,
-  REPO as REPO7Z,
-  TAG as TAG7Z,
-  TARGETS,
-} from "../scripts/install-7z-platforms.mjs";
-import {
   EXPECTED_HASHES as HSN,
   PACKAGES,
   WASM_ASSETS,
 } from "../scripts/install-snappy-platforms.mjs";
-import { SEVEN_ZIP_ZSTD_REPO, SEVEN_ZIP_ZSTD_TAG } from "../scripts/lib/releases.mjs";
-import { listPackageFiles, packageIgnoreDir } from "../scripts/lib/package-files.mjs";
+import { binAllowlist, listPackageFiles, packageIgnoreDir } from "../scripts/lib/package-files.mjs";
 
 const HASH_RE = /^[0-9a-f]{64}$/;
-const PLATFORMS = ["linux", "darwin", "win32"];
-const ARCHES = ["x64", "arm64", "arm"];
 const ROOT = path.join(__dirname, "..");
 const ROOT_PKG = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
-
-describe("7z native installer config", () => {
-  it("pins exactly the staged assets", () => {
-    const assets = TARGETS.map((t) => t.asset).sort();
-    expect(Object.keys(H7Z).sort()).toEqual(assets);
-  });
-
-  it("hashes are 64-char lowercase hex", () => {
-    for (const [asset, hash] of Object.entries(H7Z)) {
-      expect(hash, `hash for ${asset}`).toMatch(HASH_RE);
-    }
-  });
-
-  it("targets are well-formed", () => {
-    for (const t of TARGETS) {
-      expect(["tgz", "zip"], `kind for ${t.asset}`).toContain(t.kind);
-      expect(t.dests.length, `dests for ${t.asset}`).toBeGreaterThan(0);
-      expect(Object.keys(t.pick).length, `pick for ${t.asset}`).toBeGreaterThan(0);
-      for (const [platform, arch] of t.dests) {
-        expect(PLATFORMS, `platform for ${t.asset}`).toContain(platform);
-        expect(ARCHES, `arch for ${t.asset}`).toContain(arch);
-      }
-    }
-  });
-
-  it("has no duplicate destination dirs", () => {
-    const seen = new Set<string>();
-    for (const t of TARGETS) {
-      for (const [platform, arch] of t.dests) {
-        const key = `${platform}/${arch}`;
-        expect(seen.has(key), `duplicate dest ${key}`).toBe(false);
-        seen.add(key);
-      }
-    }
-  });
-
-  it("uses the shared release tag and repo", () => {
-    expect(TAG7Z).toBe(SEVEN_ZIP_ZSTD_TAG);
-    expect(REPO7Z).toBe(SEVEN_ZIP_ZSTD_REPO);
-  });
-});
 
 describe("snappy installer config", () => {
   it("pins exactly the staged packages and WASI assets", () => {
@@ -85,20 +37,40 @@ describe("snappy installer config", () => {
 
 /**
  * The engines that used to be staged by hand are npm dependencies now. If one
- * is dropped from package.json the runtime loader fails at archive time (a
- * lazy require), so this pair of checks keeps the dependency and the loader
- * in sync before packaging does.
+ * is dropped from package.json its runtime loader fails at archive time (a
+ * lazy require / spawn), so this pair of checks keeps the dependency and the
+ * loader in sync before packaging does.
  */
 describe("npm-hosted engines", () => {
   const declared = ROOT_PKG.dependencies ?? {};
 
-  for (const pkg of ["7zip-zstd-wasm", "@yjdyamv/rar-rs"]) {
+  for (const pkg of ["7zip-zstd-native", "7zip-zstd-wasm", "@yjdyamv/rar-rs"]) {
     it(`${pkg} is a declared dependency and installed`, () => {
       expect(declared[pkg], `dependencies.${pkg}`).toBeTruthy();
       const installed = path.join(ROOT, "node_modules", ...pkg.split("/"), "package.json");
       expect(fs.existsSync(installed), `installed at ${installed}`).toBe(true);
     });
   }
+
+  it("7zip-zstd-native ships a native 7zz for every desktop target", () => {
+    const dir = path.join(ROOT, "node_modules", "7zip-zstd-native");
+    // bundled7z.ts resolves bin/<process.platform>-<process.arch>/7zz(.exe).
+    // The universal .vsix re-includes the whole package, so all six must exist.
+    const expected = [
+      "bin/linux-x64/7zz",
+      "bin/linux-arm64/7zz",
+      "bin/darwin-arm64/7zz",
+      "bin/darwin-x64/7zz",
+      "bin/win32-x64/7zz.exe",
+      "bin/win32-arm64/7zz.exe",
+    ];
+    const files = listPackageFiles(dir);
+    for (const rel of expected) {
+      expect(files, `missing ${rel}`).toContain(rel);
+    }
+    // The LGPL licence text of the bundled binary ships with the package.
+    expect(files).toContain("COPYING");
+  });
 
   it("rar-rs ships the native bindings and the WASI bundle the loader requires", () => {
     const dir = path.join(ROOT, "node_modules", "@yjdyamv", "rar-rs");
@@ -125,5 +97,17 @@ describe("package-files helpers", () => {
     const files = listPackageFiles(dir);
     expect(files).toContain("7zz.cjs");
     for (const f of files) expect(f).not.toContain("\\");
+  });
+
+  it("binAllowlist keeps only the requested platform bin dir", () => {
+    const dir = path.join(ROOT, "node_modules", "7zip-zstd-native");
+    const lines = binAllowlist(dir, ["linux-x64"]);
+    expect(lines).toContain("!node_modules/7zip-zstd-native/bin/linux-x64/7zz");
+    // other platforms' bins are never re-included (a later exclusion cannot
+    // undo a re-include, so they must simply never appear)
+    expect(lines.some((l) => l.includes("/bin/win32-x64/"))).toBe(false);
+    expect(lines.some((l) => l.includes("/bin/darwin-x64/"))).toBe(false);
+    // non-bin payload (licence, manifest) is always kept
+    expect(lines).toContain("!node_modules/7zip-zstd-native/COPYING");
   });
 });
