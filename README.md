@@ -60,3 +60,8 @@ the license they shipped with; the terms above apply from the next release on.
 
 This is an independent project, unaffiliated with any similarly named product;
 only builds published from this repository are official releases.
+
+## Acknowledge
+
+Thanks for [7-Zip](https://www.7-zip.org/index.html), [7-Zip-zstd](https://github.com/mcmilk/7-Zip-zstd), [rars](https://github.com/bitplane/rars) and so on
+Thanks for [Linux.do](https://linux.do), friendly community.
