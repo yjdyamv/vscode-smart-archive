@@ -22,9 +22,8 @@ import {
   VFS_TMP_X1,
   VFS_TMP_X2,
 } from "../constants";
-import { t } from "../i18n";
-import { copyDirFromFS } from "../utils/fs";
-import { validatePassword, sanitizeCliPath } from "../utils/security";
+import { copyDirFromFS, MAX_DIR_DEPTH } from "../utils/fs";
+import { validatePassword, sanitizeCliPath, checkTotalSize } from "../utils/security";
 import { logger } from "../utils/logger-core";
 import { CancelledError } from "../utils/cancellation";
 import type { TokenLike } from "../utils/cancellation";
@@ -52,7 +51,15 @@ function copyFromFSWithStrip(
     strips.set(sp, parent);
   }
 
-  const walk = (currentDir: string, relPart: string) => {
+  let totalSize = 0;
+  const walk = (currentDir: string, relPart: string, depth: number) => {
+    if (depth > MAX_DIR_DEPTH) {
+      logger.warn(
+        { event: "extraction.maxDepth.reached", depth },
+        "Max directory depth reached, skipping deeper entries",
+      );
+      return;
+    }
     const entries = js7z.FS.readdir(currentDir);
     for (const name of entries) {
       if (token?.isCancellationRequested) throw new CancelledError();
@@ -71,7 +78,7 @@ function copyFromFSWithStrip(
       try {
         const st = js7z.FS.stat(full);
         if (js7z.FS.isDir(st.mode)) {
-          walk(full, rel);
+          walk(full, rel, depth + 1);
           continue;
         }
       } catch {
@@ -124,21 +131,11 @@ function copyFromFSWithStrip(
         );
         continue;
       }
-      // Decompression bomb check: verify reported vs actual size ratio
-      let reportedSize: number | undefined;
-      try {
-        reportedSize = js7z.FS.stat(full).size;
-      } catch {
-        logger.debug(
-          { event: "extraction.statReportedSize.failed" },
-          "Stat may fail, skipping bomb check",
-        );
-      }
-      if (reportedSize !== undefined && data.byteLength > reportedSize * 4 && reportedSize > 1024) {
-        throw new Error(
-          t("security.decompressionBomb", String(reportedSize), String(data.byteLength)),
-        );
-      }
+      // Enforce the configured total-extraction limit as we write — the same
+      // guard copyDirFromFS uses. (The previous check compared the VFS file's
+      // stat size to its own read length, which are always equal, so it never
+      // fired and provided no bomb protection.)
+      totalSize = checkTotalSize(totalSize, data.byteLength);
 
       let finalPath = outPath;
       const dir = path.dirname(outPath);
@@ -166,7 +163,7 @@ function copyFromFSWithStrip(
     }
   };
 
-  walk(fsDir, "");
+  walk(fsDir, "", 0);
 }
 
 /**

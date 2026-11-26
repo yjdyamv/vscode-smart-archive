@@ -17,6 +17,7 @@ import { spawn } from "child_process";
 import type { ProgressLike } from "../utils/cancellation";
 import { logger } from "../utils/logger-core";
 import { bundled7zPath } from "./bundled7z";
+import { CODEC_SPAWN_TIMEOUT_MS } from "../constants";
 
 export type NativeCodec = "zst" | "lz4" | "br";
 
@@ -78,7 +79,7 @@ function run7zz(args: string[]): Promise<void> {
   const sz = native7zz();
   if (!sz) return Promise.reject(new Error("no bundled 7zz"));
   return new Promise((resolve, reject) => {
-    const proc = spawn(sz, args, { windowsHide: true });
+    const proc = spawn(sz, args, { windowsHide: true, timeout: CODEC_SPAWN_TIMEOUT_MS });
     const stderr: Buffer[] = [];
     proc.stderr?.on("data", (d: Buffer) => stderr.push(d));
     proc.on("close", (code) => {
@@ -118,6 +119,7 @@ export async function nativeCompressFile(
       const sz = native7zz()!;
       const proc = spawn(sz, ["a", output, input, `-mx${level}`, mtArg(codec)], {
         windowsHide: true,
+        timeout: CODEC_SPAWN_TIMEOUT_MS,
       });
       let settled = false;
       const timer = prog ? monitorOutputGrowth(input, output, prog, () => settled) : null;

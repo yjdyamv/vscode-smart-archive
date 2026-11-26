@@ -42,7 +42,6 @@ export const handlePassword: MessageHandler = async (ctx) => {
     if (token.isCancellationRequested) throw new vscode.CancellationError();
 
     logger.info({ event: "webview.password.ok", count: pwEntries.length });
-    s.password = msg.pw;
 
     // Prove the password by decrypting a few KB of one member. Listing alone
     // cannot do it: for archives we create the headers are encrypted, so a
@@ -58,6 +57,10 @@ export const handlePassword: MessageHandler = async (ctx) => {
       webview.postMessage({ c: "pwerr", t: t("password.wrongPassword") });
       return;
     }
+
+    // Commit the password to shared state only once it is proven correct, so
+    // a failed probe never poisons later extract/preview/test operations.
+    s.password = msg.pw;
 
     // Remember the password for this session (OS keychain), so re-opening the
     // archive after closing the tab skips the prompt.

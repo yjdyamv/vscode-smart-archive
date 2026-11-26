@@ -316,16 +316,34 @@ async function promptSaveNameWizard(defaultName: string, ext: string): Promise<S
  */
 function estimateVolumeCount(targets: readonly { fsPath: string }[], volumeSize: string): number {
   let total = 0;
+  const visited = new Set<string>();
   const walk = (p: string): void => {
     let st;
     try {
-      st = fs.statSync(p);
+      st = fs.lstatSync(p);
     } catch {
       return;
     }
+    // Never follow symlinks: a link loop (or a junction cycle) would recurse
+    // without bound and overflow the stack before compression even starts.
+    if (st.isSymbolicLink()) return;
     if (st.isDirectory()) {
-      for (const child of fs.readdirSync(p)) walk(path.join(p, child));
-    } else {
+      let real: string;
+      try {
+        real = fs.realpathSync(p);
+      } catch {
+        return;
+      }
+      if (visited.has(real)) return;
+      visited.add(real);
+      let children: string[];
+      try {
+        children = fs.readdirSync(p);
+      } catch {
+        return;
+      }
+      for (const child of children) walk(path.join(p, child));
+    } else if (st.isFile()) {
       total += st.size;
     }
   };

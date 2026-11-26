@@ -32,6 +32,10 @@ export function createMessageDispatcher(ctx: MessageDispatcherContext) {
         ctx.viewState.value = "content";
         break;
       case "err":
+        // A host error can leave a pending select-all drain without its
+        // dirChildren replies; clear the flag so it stops auto-selecting
+        // subtrees the user never chose.
+        ctx.selectAllPending.value = false;
         ctx.showToast(msg.t, false);
         ctx.viewState.value = "content";
         break;

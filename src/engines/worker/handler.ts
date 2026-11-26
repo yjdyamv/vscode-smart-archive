@@ -41,7 +41,20 @@ export function serializeWorkerError(err: unknown): { message: string; name?: st
 
 export function createArchiveWorkerHandler(port: WorkerPort): void {
   const cancelled = new Set<number>();
+  const cancelListeners = new Map<number, Set<() => void>>();
   let requestChain: Promise<void> = Promise.resolve();
+
+  function fireCancellation(requestId: number): void {
+    const listeners = cancelListeners.get(requestId);
+    if (!listeners) return;
+    for (const listener of listeners) {
+      try {
+        listener();
+      } catch (err) {
+        logger.warn({ event: "worker.cancel.listener.failed", id: requestId, err });
+      }
+    }
+  }
 
   function post(message: unknown): void {
     port.postMessage(message);
@@ -60,11 +73,23 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
       get isCancellationRequested() {
         return cancelled.has(requestId);
       },
-      onCancellationRequested(_listener: () => void) {
-        // Cancellation arrives as a message while callMain is running; the
-        // token is polled at phase boundaries, so a one-shot subscription is
-        // unnecessary — the getter above is the source of truth.
-        return { dispose() {} };
+      onCancellationRequested(listener: () => void) {
+        // Real subscription: engines that abort in-flight work (tar-writer's
+        // pack.destroy, rar5's controller.abort) rely on this firing when the
+        // host's cancel message arrives — a no-op here silently disabled
+        // cancellation for every such engine inside the worker.
+        let set = cancelListeners.get(requestId);
+        if (!set) {
+          set = new Set();
+          cancelListeners.set(requestId, set);
+        }
+        set.add(listener);
+        if (cancelled.has(requestId)) listener();
+        return {
+          dispose() {
+            set.delete(listener);
+          },
+        };
       },
     };
   }
@@ -101,6 +126,7 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
       });
     } finally {
       cancelled.delete(id);
+      cancelListeners.delete(id);
     }
   }
 
@@ -121,6 +147,7 @@ export function createArchiveWorkerHandler(port: WorkerPort): void {
         break;
       case "cancel":
         cancelled.add(message.id);
+        fireCancellation(message.id);
         break;
       case "shutdown":
         port.close();

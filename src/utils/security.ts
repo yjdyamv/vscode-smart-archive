@@ -367,5 +367,9 @@ export function isValidEntryName(name: string): boolean {
   if (name === "." || name === "..") return false;
   if (/[<>:"/\\|?*]/.test(name)) return false;
   if (name.endsWith(".") || name.endsWith(" ")) return false;
+  // Reject control characters and Windows device names (CON, NUL, COM1, …):
+  // legal on Unix but unextractable on NTFS, so rename/new-folder must not be
+  // able to create an entry the extractor would later skip.
+  if (isReservedWinName(name)) return false;
   return true;
 }

@@ -104,6 +104,9 @@ describe("isValidEntryName", () => {
     expect(isValidEntryName("name.")).toBe(false); // trailing dot collides on Windows
     expect(isValidEntryName("name ")).toBe(false); // trailing space
     expect(isValidEntryName("x".repeat(256))).toBe(false);
+    expect(isValidEntryName("CON")).toBe(false); // Windows device name
+    expect(isValidEntryName("com1.log")).toBe(false); // device name with extension
+    expect(isValidEntryName("bad\u0001name")).toBe(false); // control character
   });
 });
 
@@ -142,6 +145,16 @@ describe("isValidMsg (webview router)", () => {
     expect(isValidMsg({ c: "preview", path: 7 } as never)).toBe(false);
     expect(isValidMsg({ c: "pw", pw: 7 } as never)).toBe(false);
     expect(isValidMsg({ c: "saveExpanded", paths: [null] } as never)).toBe(false);
+  });
+
+  it("validates excludes and flat on extractSelected", () => {
+    expect(
+      isValidMsg({ c: "extSel", paths: ["a.txt"], excludes: ["dir/b.txt"], flat: true } as never),
+    ).toBe(true);
+    expect(isValidMsg({ c: "extSel", paths: ["a.txt"], excludes: ["../x"] } as never)).toBe(false);
+    expect(isValidMsg({ c: "extSel", paths: ["a.txt"], excludes: "dir" } as never)).toBe(false);
+    expect(isValidMsg({ c: "extSel", paths: ["a.txt"], excludes: [42] } as never)).toBe(false);
+    expect(isValidMsg({ c: "extSel", paths: ["a.txt"], flat: "yes" } as never)).toBe(false);
   });
 });
 

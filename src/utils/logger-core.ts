@@ -53,17 +53,30 @@ const sink = new Writable({
   },
 });
 
-/** Sanitize sensitive fields before hitting any output */
-export function sanitize(obj: Record<string, unknown>): Record<string, unknown> {
+/** Keys whose VALUES are secret regardless of depth or nesting. */
+const REDACT_KEYS = new Set(["password", "pw", "pass", "secret", "token"]);
+
+/** Deep-redact secret-keyed values; cycle-safe; arrays and nested objects. */
+function redact(value: unknown, seen: WeakSet<object>): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((v) => redact(v, seen));
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (k === "password" || k === "pw" || k === "pass") {
-      out[k] = "***";
-    } else {
-      out[k] = v;
-    }
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = REDACT_KEYS.has(k.toLowerCase()) ? "***" : redact(v, seen);
   }
   return out;
+}
+
+/**
+ * Sanitize sensitive fields before hitting any output. Recurses so a
+ * password nested in an options/params object is redacted too — the previous
+ * top-level-only pass let `logger.info({ opts: { password } })` through in
+ * clear text.
+ */
+export function sanitize(obj: Record<string, unknown>): Record<string, unknown> {
+  return redact(obj, new WeakSet()) as Record<string, unknown>;
 }
 
 /**

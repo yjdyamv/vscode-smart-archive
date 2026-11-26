@@ -120,7 +120,10 @@ export async function listViaExtract(
   password = "",
   data?: Uint8Array,
 ): Promise<ListEntry[]> {
-  checkArchiveInputSize(filePath);
+  // `data` overrides reading from disk (in-memory archive bytes), so the
+  // input file need not exist — mirror js7z-list-core and skip the on-disk
+  // size probe in that case.
+  if (!data) checkArchiveInputSize(filePath);
   const ext = getFullExt(filePath);
   const buf = data ?? fs.readFileSync(filePath);
   const archiveName = path.basename(filePath);

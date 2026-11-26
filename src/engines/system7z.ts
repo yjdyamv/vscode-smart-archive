@@ -312,6 +312,10 @@ export function system7zCanDecompress(inputPath: string): boolean {
       stdio: "pipe",
       input: "",
       timeout: BINARY_DETECT_TIMEOUT * 2,
+      // Large listings exceed Node's default 1 MiB maxBuffer; without this
+      // the child is killed, status becomes null, and the truncated output is
+      // misread — falsely classifying archives as decodable.
+      maxBuffer: CHILD_CAPTURE_MAX_BYTES,
       windowsHide: true,
     });
   } catch {

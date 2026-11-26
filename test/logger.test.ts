@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
 import { Writable } from "stream";
-import { setLoggerSink } from "../src/utils/logger-core";
+import { setLoggerSink, sanitize } from "../src/utils/logger-core";
 import { logger } from "../src/utils/logger";
 
 const flush = () => new Promise((r) => setTimeout(r, 50));
@@ -242,5 +242,29 @@ describe("logger.setLevel", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe("sanitize", () => {
+  it("redacts password-like keys at any depth and inside arrays", () => {
+    const out = sanitize({
+      event: "x",
+      password: "top",
+      opts: { password: "nested", keep: 1 },
+      list: [{ pw: "a" }, { pass: "b" }],
+      token: "t",
+    });
+    expect(out.password).toBe("***");
+    expect((out.opts as Record<string, unknown>).password).toBe("***");
+    expect((out.opts as Record<string, unknown>).keep).toBe(1);
+    expect((out.list as Array<Record<string, unknown>>)[0].pw).toBe("***");
+    expect((out.list as Array<Record<string, unknown>>)[1].pass).toBe("***");
+    expect(out.token).toBe("***");
+  });
+
+  it("survives circular references", () => {
+    const a: Record<string, unknown> = { event: "y" };
+    a.self = a;
+    expect((sanitize(a).self as string)).toBe("[circular]");
   });
 });

@@ -59,7 +59,14 @@ export async function loadExpandedPaths(
     if (!_secrets) return [];
     const key = `expanded:${hashKey(archiveUri.toString())}`;
     const raw = await _secrets.get(key);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) && parsed.every((p) => typeof p === "string") ? parsed : [];
+    } catch {
+      // Corrupt/tampered SecretStorage value must not break opening the editor.
+      return [];
+    }
   }
   return _sessionState.get(archiveUri.toString()) ?? [];
 }

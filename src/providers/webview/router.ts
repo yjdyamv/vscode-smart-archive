@@ -135,6 +135,15 @@ export function isValidMsg(msg: WebviewMsg): boolean {
       if (typeof p !== "string" || !isValidArchivePath(p)) return false;
     }
   }
+  // `excludes` (extractSelected) flows straight into the engine's exclusion
+  // filters, so it needs the same structural + content validation as paths.
+  if (m.excludes !== undefined) {
+    if (!Array.isArray(m.excludes) || m.excludes.length > MAX_MSG_PATHS) return false;
+    for (const p of m.excludes) {
+      if (typeof p !== "string" || !isValidArchivePath(p)) return false;
+    }
+  }
+  if (m.flat !== undefined && typeof m.flat !== "boolean") return false;
   // Single entry paths (preview / renamePrompt / expandDir). Note `dir`
   // carries either an entry path (newFolderPrompt) or a local filesystem
   // path (addFiles) depending on the command, so it is type-checked above
@@ -180,8 +189,9 @@ export function registerHandler(webview: vscode.Webview): void {
         return;
       }
 
-      // Map-based dispatch for command handlers
-      const handler = HANDLERS[msg.c];
+      // Map-based dispatch for command handlers. hasOwn guards against
+      // prototype members ("constructor", "__proto__", …) resolving truthy.
+      const handler = Object.hasOwn(HANDLERS, msg.c) ? HANDLERS[msg.c] : undefined;
       if (handler) {
         await handler({ webview, state: s, msg });
       }

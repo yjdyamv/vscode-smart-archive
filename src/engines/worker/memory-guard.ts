@@ -19,6 +19,9 @@ let _limitMb = WORKER_MEMORY_LIMIT_DEFAULT_MB;
 
 /** Set the RSS ceiling in MiB (0 disables the guard). */
 export function setWorkerMemoryLimitMb(mb: number): void {
+  // Ignore non-finite/negative values — they would silently disable the guard
+  // (NaN comparisons are always false). 0 is the explicit "disabled" value.
+  if (!Number.isFinite(mb) || mb < 0) return;
   _limitMb = mb;
 }
 

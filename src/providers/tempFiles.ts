@@ -56,6 +56,10 @@ function cleanupPreviewTemp(): void {
     secureRmDir(PREVIEW_TMP_DIR);
   } catch (err) {
     logger.warn({ event: "tempFiles.cleanup.failed", err }, "Failed to clean up temp files");
+  } finally {
+    // Reset so getPreviewTmpDir() lazily recreates a fresh dir instead of
+    // handing callers a path that no longer exists.
+    PREVIEW_TMP_DIR = "";
   }
 }
 
